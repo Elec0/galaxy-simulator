@@ -2,4 +2,5 @@
 **/bin/
 **/obj/
 /.packages/
+**/.godot/
 .DS_Store

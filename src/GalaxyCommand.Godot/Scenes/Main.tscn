@@ -1,0 +1,62 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Main.cs" id="1_main"]
+[ext_resource type="Script" path="res://Scripts/GalaxyMap.cs" id="2_map"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_main")
+
+[node name="GalaxyMap" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_map")
+
+[node name="Interface" type="CanvasLayer" parent="."]
+
+[node name="Header" type="MarginContainer" parent="Interface"]
+offset_right = 1280.0
+offset_bottom = 96.0
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 16
+
+[node name="Content" type="VBoxContainer" parent="Interface/Header"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="Interface/Header/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 28
+text = "GALAXY COMMAND"
+
+[node name="Subtitle" type="Label" parent="Interface/Header/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.43, 0.58, 0.72, 1)
+theme_override_font_sizes/font_size = 14
+text = "FOUNDATION VIEW  •  AUTHORITATIVE SIMULATION CONNECTED"
+
+[node name="StatusPanel" type="PanelContainer" parent="Interface"]
+offset_left = 28.0
+offset_top = 614.0
+offset_right = 1252.0
+offset_bottom = 692.0
+
+[node name="Margin" type="MarginContainer" parent="Interface/StatusPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="Status" type="Label" parent="Interface/StatusPanel/Margin"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.82, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "Loading simulation status…"

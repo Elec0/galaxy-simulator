@@ -38,6 +38,23 @@ dotnet run --project src/GalaxyCommand.Cli/GalaxyCommand.Cli.csproj --no-build -
 The SDK version is pinned in `global.json`. Shared compiler settings enable
 nullable-reference checking and treat warnings as errors.
 
+## Godot graphics client
+
+The graphics foundation is a Godot 4.7.1 .NET project under
+`src/GalaxyCommand.Godot`. It references the rendering-independent simulation
+library and starts with a simple 2D map that verifies the integration boundary.
+
+Install the .NET edition of Godot, then open
+`src/GalaxyCommand.Godot/project.godot` in the editor. From this directory, the
+client can also be built and run with:
+
+```sh
+/Applications/Godot_mono.app/Contents/MacOS/Godot \
+  --headless --path src/GalaxyCommand.Godot --build-solutions --quit
+/Applications/Godot_mono.app/Contents/MacOS/Godot \
+  --path src/GalaxyCommand.Godot
+```
+
 ## Rust migration reference
 
 The existing Rust workspace remains in place temporarily as the working Phase
