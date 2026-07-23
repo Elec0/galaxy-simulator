@@ -42,7 +42,10 @@ nullable-reference checking and treat warnings as errors.
 
 The graphics foundation is a Godot 4.7.1 .NET project under
 `src/GalaxyCommand.Godot`. It references the rendering-independent simulation
-library and starts with a simple 2D map that verifies the integration boundary.
+library and renders immutable presentation snapshots from the live Phase 1
+scenario. The initial client advances automatically at 30× speed so ship travel
+and construction can be observed without changing authoritative simulation
+behavior.
 
 Install the .NET edition of Godot, then open
 `src/GalaxyCommand.Godot/project.godot` in the editor. From this directory, the
@@ -55,24 +58,10 @@ client can also be built and run with:
   --path src/GalaxyCommand.Godot
 ```
 
-## Rust migration reference
-
-The existing Rust workspace remains in place temporarily as the working Phase
-1 behavioral reference while its systems are migrated to C#. To verify it,
-ensure Homebrew's keg-only `rustup` proxy directory is on `PATH` and run:
-
-```sh
-export PATH="$(brew --prefix rustup)/bin:$PATH"
-cargo fmt --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-cargo run -p galaxy-simulation-cli
-```
-
-Both the active C# CLI and the temporary Rust reference run the integrated
-Phase 1 scenario through mining, transport, refining, component manufacturing,
-and construction of a persistent freighter. Their reports include material and
-logistics totals, facility-state timing, current shortages, structured record
-counts, and deterministic event-log and final-state fingerprints. The C# test
-suite also disables Mine-to-Refinery travel at 50 simulated seconds and restores
-it at 250 seconds to verify shortage visibility and recovery.
+The C# CLI runs the integrated Phase 1 scenario through mining, transport,
+refining, component manufacturing, and construction of a persistent freighter.
+Its report includes material and logistics totals, facility-state timing,
+current shortages, structured record counts, and deterministic event-log and
+final-state fingerprints. The test suite also disables Mine-to-Refinery travel
+at 50 simulated seconds and restores it at 250 seconds to verify shortage
+visibility and recovery.

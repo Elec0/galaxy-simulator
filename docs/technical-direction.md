@@ -4,7 +4,7 @@
 
 ## Current direction
 
-Use C# and .NET for the authoritative simulation and keep it independent from rendering. The earlier Rust Phase 1 implementation remains temporarily as a behavioral reference during migration.
+Use C# and .NET for the authoritative simulation and keep it independent from rendering.
 
 A likely workspace division is:
 
@@ -15,6 +15,11 @@ A likely workspace division is:
 ## Rendering and application framework
 
 Godot with C# is the leading candidate for the 2D application, but the UI framework remains an unresolved choice. The simulation should avoid depending on rendering-specific types or schedules so it remains testable and replaceable.
+
+The initial Godot integration consumes immutable presentation snapshots. These
+contain discrete simulation locations, routes, ship state, and scheduled travel
+times. Godot assigns screen coordinates and interpolates travel for display;
+continuous rendering positions are not authoritative simulation state.
 
 Simple indexed .NET collections may be preferable for some economic structures. ECS should be adopted where entity-oriented queries provide a clear benefit, not as a requirement for every subsystem.
 

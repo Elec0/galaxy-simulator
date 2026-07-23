@@ -56,6 +56,12 @@ public sealed class RouteGraph : INavigation
     private readonly Dictionary<LocationId, SortedSet<RouteId>> _outgoing = [];
     private readonly IdSequence<RouteId> _routeIds = new();
 
+    public IEnumerable<LocationId> Locations =>
+        _locations.OrderBy(location => location.Value);
+
+    public IEnumerable<DirectedRoute> Routes =>
+        _routes.Values.OrderBy(route => route.Id.Value);
+
     public bool AddLocation(LocationId location)
     {
         bool inserted = _locations.Add(location);

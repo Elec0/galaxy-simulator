@@ -153,6 +153,8 @@ public sealed class PhaseOneScenario
     private readonly IdSequence<InventoryId> _inventoryIds = new();
     private readonly RouteId _mineToRefineryRoute;
     private readonly MaterialId[] _knownMaterials;
+    private readonly SortedDictionary<LocationId, string> _locationNames =
+        new(EntityIdComparer<LocationId>.Instance);
     private readonly List<ScenarioEventRecord> _eventRecords = [];
     private readonly List<DecisionRecord> _decisionRecords = [];
     private readonly PhaseOneMetrics _metrics = new();
@@ -166,9 +168,15 @@ public sealed class PhaseOneScenario
         LocationId mineLocation = locationIds.Allocate();
         LocationId refineryLocation = locationIds.Allocate();
         LocationId shipyardLocation = locationIds.Allocate();
-        foreach (LocationId location in new[] { mineLocation, refineryLocation, shipyardLocation })
+        foreach ((LocationId location, string name) in new[]
+        {
+            (mineLocation, "Mine"),
+            (refineryLocation, "Refinery"),
+            (shipyardLocation, "Shipyard"),
+        })
         {
             _navigation.AddLocation(location);
+            _locationNames.Add(location, name);
         }
 
         (_mineToRefineryRoute, _) = _navigation.AddBidirectionalRoutes(
@@ -266,6 +274,48 @@ public sealed class PhaseOneScenario
     public IReadOnlyList<ScenarioEventRecord> EventRecords => _eventRecords;
     public IReadOnlyList<DecisionRecord> DecisionRecords => _decisionRecords;
 
+    public PhaseOneSnapshot CaptureSnapshot()
+    {
+        var ships = new List<ShipSnapshot>();
+        foreach (ShipId shipId in _ships.FreighterIds)
+        {
+            Freighter freighter = _ships.GetFreighter(shipId)
+                ?? throw new InvalidOperationException($"Missing freighter {shipId}.");
+            TransportJob? job = freighter.ActiveJobId is { } jobId
+                ? _transportBoard.GetJob(jobId)
+                : null;
+            RouteId? currentRoute = job?.CurrentRouteId;
+            SimulationTime? arrivesAt = currentRoute is not null
+                ? job?.TransitionAt
+                : null;
+            SimulationTime? departedAt = currentRoute is { } routeId && arrivesAt is { } arrival
+                ? TravelDeparture(routeId, arrival)
+                : null;
+
+            ships.Add(new ShipSnapshot(
+                freighter.ShipId,
+                freighter.LocationId,
+                freighter.ActiveJobId,
+                job?.Status,
+                currentRoute,
+                departedAt,
+                arrivesAt));
+        }
+
+        return new PhaseOneSnapshot(
+            _agenda.CurrentTime,
+            SnapshotCollection.Copy(_navigation.Locations.Select(location =>
+                new LocationSnapshot(location, _locationNames[location]))),
+            SnapshotCollection.Copy(_navigation.Routes.Select(route =>
+                new RouteSnapshot(
+                    route.Id,
+                    route.Origin,
+                    route.Destination,
+                    route.BaseDuration,
+                    route.IsEnabled))),
+            SnapshotCollection.Copy(ships));
+    }
+
     public void ScheduleApprovedRouteDisruption()
     {
         foreach ((ulong timestamp, bool enabled) in new[]
@@ -320,6 +370,13 @@ public sealed class PhaseOneScenario
             EventLogDigest(),
             FinalStateDigest(),
             CurrentShortages());
+    }
+
+    private SimulationTime TravelDeparture(RouteId routeId, SimulationTime arrivesAt)
+    {
+        DirectedRoute route = _navigation.GetRoute(routeId)
+            ?? throw new InvalidOperationException($"Missing route {routeId}.");
+        return new SimulationTime(checked(arrivesAt.Milliseconds - route.BaseDuration.Milliseconds));
     }
 
     private abstract record PhaseOneEvent

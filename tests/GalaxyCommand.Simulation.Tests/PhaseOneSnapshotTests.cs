@@ -1,0 +1,69 @@
+using GalaxyCommand.Simulation;
+
+namespace GalaxyCommand.Simulation.Tests;
+
+public sealed class PhaseOneSnapshotTests
+{
+    [Fact]
+    public void InitialSnapshotDescribesScenarioTopologyAndShips()
+    {
+        var scenario = new PhaseOneScenario();
+        scenario.RunUntilFirstShip(SimulationTime.Zero);
+
+        PhaseOneSnapshot snapshot = scenario.CaptureSnapshot();
+
+        Assert.Equal(SimulationTime.Zero, snapshot.Time);
+        Assert.Equal(["Mine", "Refinery", "Shipyard"],
+            snapshot.Locations.Select(location => location.Name));
+        Assert.Equal(4, snapshot.Routes.Count);
+        Assert.Equal(2, snapshot.Ships.Count);
+        Assert.Equal([1UL, 2UL],
+            snapshot.Ships.Select(ship => ship.Location.Value));
+    }
+
+    [Fact]
+    public void TravelingShipSnapshotIncludesInterpolationTimes()
+    {
+        var scenario = new PhaseOneScenario();
+        scenario.RunUntilFirstShip(new SimulationTime(50_000));
+
+        PhaseOneSnapshot snapshot = scenario.CaptureSnapshot();
+        ShipSnapshot traveling = Assert.Single(
+            snapshot.Ships,
+            ship => ship.TransportStatus is TransportJobStatus.TravelingToSource
+                or TransportJobStatus.TravelingToDestination);
+
+        Assert.NotNull(traveling.CurrentRoute);
+        Assert.True(traveling.DepartedAt < snapshot.Time);
+        Assert.True(traveling.ArrivesAt > snapshot.Time);
+    }
+
+    [Fact]
+    public void CompletedSnapshotContainsConstructedShipAtShipyard()
+    {
+        var scenario = new PhaseOneScenario();
+        scenario.RunUntilFirstShip(new SimulationTime(1_000_000));
+
+        PhaseOneSnapshot snapshot = scenario.CaptureSnapshot();
+
+        ShipSnapshot constructed = Assert.Single(
+            snapshot.Ships,
+            ship => ship.Id == new ShipId(3));
+        LocationSnapshot shipyard = Assert.Single(
+            snapshot.Locations,
+            location => location.Name == "Shipyard");
+        Assert.Equal(shipyard.Id, constructed.Location);
+        Assert.Null(constructed.ActiveTransportJob);
+    }
+
+    [Fact]
+    public void SnapshotCollectionsCannotBeModified()
+    {
+        var scenario = new PhaseOneScenario();
+        PhaseOneSnapshot snapshot = scenario.CaptureSnapshot();
+        var locations = Assert.IsAssignableFrom<IList<LocationSnapshot>>(snapshot.Locations);
+
+        Assert.Throws<NotSupportedException>(() =>
+            locations.Add(new LocationSnapshot(new LocationId(99), "Injected")));
+    }
+}
