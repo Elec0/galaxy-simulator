@@ -21,6 +21,16 @@ contain discrete simulation locations, routes, ship state, and scheduled travel
 times. Godot assigns screen coordinates and interpolates travel for display;
 continuous rendering positions are not authoritative simulation state.
 
+## Construction model
+
+Construction uses immutable definitions and a product-neutral runtime pipeline.
+`ConstructionDesign` owns identity, display name, and a `ConstructionRecipe`;
+product types such as `ShipDesign` inherit from it and add only their own
+capabilities. `ConstructionProcess` owns input reservation, FIFO queuing, work
+timing, and completion state. Product-specific construction sites compose that
+process and materialize the completed entity, so ship creation does not become
+a requirement of the shared construction lifecycle.
+
 Simple indexed .NET collections may be preferable for some economic structures. ECS should be adopted where entity-oriented queries provide a clear benefit, not as a requirement for every subsystem.
 
 ## Performance strategy

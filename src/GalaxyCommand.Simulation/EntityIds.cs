@@ -66,11 +66,11 @@ public readonly record struct OrganizationId : IEntityId<OrganizationId>
     public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }
 
-public readonly record struct ShipBlueprintId : IEntityId<ShipBlueprintId>
+public readonly record struct ConstructionDesignId : IEntityId<ConstructionDesignId>
 {
-    public ShipBlueprintId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
+    public ConstructionDesignId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
     public ulong Value { get; }
-    public static ShipBlueprintId Create(ulong value) => new(value);
+    public static ConstructionDesignId Create(ulong value) => new(value);
     public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }
 
@@ -98,11 +98,11 @@ public readonly record struct ProductionJobId : IEntityId<ProductionJobId>
     public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }
 
-public readonly record struct ShipConstructionOrderId : IEntityId<ShipConstructionOrderId>
+public readonly record struct ConstructionOrderId : IEntityId<ConstructionOrderId>
 {
-    public ShipConstructionOrderId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
+    public ConstructionOrderId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
     public ulong Value { get; }
-    public static ShipConstructionOrderId Create(ulong value) => new(value);
+    public static ConstructionOrderId Create(ulong value) => new(value);
     public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }
 

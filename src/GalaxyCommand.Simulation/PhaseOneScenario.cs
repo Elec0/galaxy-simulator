@@ -26,7 +26,9 @@ public abstract record ScenarioEventKind
 {
     public sealed record Transport(TransportEvent Event) : ScenarioEventKind;
     public sealed record ProductionComplete(FacilityId FacilityId) : ScenarioEventKind;
-    public sealed record ShipyardComplete : ScenarioEventKind;
+    public sealed record ConstructionComplete(
+        FacilityId FacilityId,
+        ConstructionOrderId OrderId) : ScenarioEventKind;
     public sealed record RouteEnabled(RouteId RouteId, bool Enabled) : ScenarioEventKind;
 }
 
@@ -151,6 +153,9 @@ public sealed class PhaseOneScenario
     private readonly IdSequence<CapacityReservationId> _capacityReservationIds = new();
     private readonly IdSequence<ShipId> _shipIds = new();
     private readonly IdSequence<InventoryId> _inventoryIds = new();
+    private readonly IdSequence<ConstructionDesignId> _constructionDesignIds = new();
+    private readonly ConstructionIdSequences _constructionIds = new();
+    private readonly ConstructionDesignCatalog _constructionDesigns = new();
     private readonly RouteId _mineToRefineryRoute;
     private readonly MaterialId[] _knownMaterials;
     private readonly SortedDictionary<LocationId, string> _locationNames =
@@ -242,20 +247,23 @@ public sealed class PhaseOneScenario
             components,
             throughput);
 
-        var blueprint = new ShipBlueprint(
-            new IdSequence<ShipBlueprintId>().Allocate(),
+        var shipDesign = new ShipDesign(
+            _constructionDesignIds.Allocate(),
+            "Phase 1 Freighter",
+            new ConstructionRecipe(
+                [new KeyValuePair<MaterialId, Quantity>(
+                    components,
+                    _config.ShipyardComponentInput)],
+                _config.ShipyardWork),
             _config.FreighterCargoCapacity);
+        _constructionDesigns.Add(shipDesign);
         _shipyard = new Shipyard(
             shipyardFacility,
             organization,
             shipyardLocation,
             shipyardInventory,
             throughput);
-        _shipyard.Enqueue(
-            new ShipyardIdSequences(),
-            blueprint,
-            [new KeyValuePair<MaterialId, Quantity>(components, _config.ShipyardComponentInput)],
-            _config.ShipyardWork);
+        _shipyard.Enqueue(_constructionIds, shipDesign);
 
         foreach (LocationId location in new[] { mineLocation, refineryLocation })
         {
@@ -265,7 +273,7 @@ public sealed class PhaseOneScenario
             _ships.AddFreighter(new Ship(
                 shipId,
                 organization,
-                blueprint.Id,
+                shipDesign.Id,
                 location,
                 cargoInventoryId));
         }
@@ -279,6 +287,8 @@ public sealed class PhaseOneScenario
         var ships = new List<ShipSnapshot>();
         foreach (ShipId shipId in _ships.FreighterIds)
         {
+            Ship ship = _ships.GetShip(shipId)
+                ?? throw new InvalidOperationException($"Missing ship {shipId}.");
             Freighter freighter = _ships.GetFreighter(shipId)
                 ?? throw new InvalidOperationException($"Missing freighter {shipId}.");
             TransportJob? job = freighter.ActiveJobId is { } jobId
@@ -294,12 +304,27 @@ public sealed class PhaseOneScenario
 
             ships.Add(new ShipSnapshot(
                 freighter.ShipId,
+                ship.DesignId,
                 freighter.LocationId,
                 freighter.ActiveJobId,
                 job?.Status,
                 currentRoute,
                 departedAt,
                 arrivesAt));
+        }
+
+        var constructions = new List<ConstructionSnapshot>();
+        if (_shipyard.ActiveOrder is { } activeOrder)
+        {
+            Inventory inventory = GetInventory(_shipyard.InventoryId);
+            constructions.Add(new ConstructionSnapshot(
+                _shipyard.FacilityId,
+                activeOrder.Id,
+                activeOrder.Design.Id,
+                activeOrder.Design.Name,
+                activeOrder.Status,
+                activeOrder.CompletesAt,
+                SnapshotCollection.Copy(_shipyard.UnmetInputs(inventory))));
         }
 
         return new PhaseOneSnapshot(
@@ -313,7 +338,8 @@ public sealed class PhaseOneScenario
                     route.Destination,
                     route.BaseDuration,
                     route.IsEnabled))),
-            SnapshotCollection.Copy(ships));
+            SnapshotCollection.Copy(ships),
+            SnapshotCollection.Copy(constructions));
     }
 
     public void ScheduleApprovedRouteDisruption()
@@ -383,7 +409,9 @@ public sealed class PhaseOneScenario
     {
         public sealed record Transport(TransportEvent Event) : PhaseOneEvent;
         public sealed record ProductionComplete(FacilityId FacilityId) : PhaseOneEvent;
-        public sealed record ShipyardComplete : PhaseOneEvent;
+        public sealed record ConstructionComplete(
+            FacilityId FacilityId,
+            ConstructionOrderId OrderId) : PhaseOneEvent;
         public sealed record RouteEnabled(RouteId RouteId, bool Enabled) : PhaseOneEvent;
     }
 
@@ -456,7 +484,13 @@ public sealed class PhaseOneScenario
 
                 break;
 
-            case PhaseOneEvent.ShipyardComplete:
+            case PhaseOneEvent.ConstructionComplete construction:
+                if (construction.FacilityId != _shipyard.FacilityId
+                    || _shipyard.ActiveOrder?.Id != construction.OrderId)
+                {
+                    break;
+                }
+
                 _constructedShipId = _shipyard.CompleteActive(
                     _shipIds,
                     _inventoryIds,
@@ -513,9 +547,13 @@ public sealed class PhaseOneScenario
 
     private void PrepareShipyard(SimulationTime now)
     {
+        if (_shipyard.ActiveOrder is not { } activeOrder)
+        {
+            return;
+        }
+
         Inventory inventory = GetInventory(_shipyard.InventoryId);
-        IReadOnlyDictionary<MaterialId, Quantity> inputs = _shipyard.ActiveOrder?.Inputs
-            ?? new Dictionary<MaterialId, Quantity>();
+        IReadOnlyDictionary<MaterialId, Quantity> inputs = activeOrder.Design.Recipe.Inputs;
         if (_shipyard.PrepareActive(_reservationIds, inventory, now) is not { } completesAt)
         {
             return;
@@ -532,8 +570,10 @@ public sealed class PhaseOneScenario
         _agenda.Schedule(
             completesAt,
             EventPhase.PhysicalCompletion,
-            new EventGeneration(0),
-            new PhaseOneEvent.ShipyardComplete());
+            activeOrder.Generation,
+            new PhaseOneEvent.ConstructionComplete(
+                _shipyard.FacilityId,
+                activeOrder.Id));
     }
 
     private void PublishDemands(SimulationTime now)
@@ -674,7 +714,7 @@ public sealed class PhaseOneScenario
         FacilityTimeMetrics shipyardCurrent =
             _metrics.FacilityTimeMutable.GetValueOrDefault(shipyardId);
         _metrics.FacilityTimeMutable[shipyardId] =
-            _shipyard.ActiveOrder?.Status == ShipConstructionOrderStatus.Running
+            _shipyard.ActiveOrder?.Status == ConstructionOrderStatus.Running
                 ? shipyardCurrent with
                 {
                     ActiveMilliseconds = checked(shipyardCurrent.ActiveMilliseconds + elapsed),
@@ -773,10 +813,13 @@ public sealed class PhaseOneScenario
         inventoryIds.Add(_shipyard.InventoryId);
         foreach (ShipId shipId in _ships.FreighterIds)
         {
+            Ship ship = _ships.GetShip(shipId)
+                ?? throw new InvalidOperationException($"Ship {shipId} is missing.");
             Freighter freighter = _ships.GetFreighter(shipId)
                 ?? throw new InvalidOperationException($"Freighter {shipId} is missing.");
             inventoryIds.Add(freighter.CargoInventoryId);
             hash.WriteUInt64(shipId.Value);
+            hash.WriteUInt64(ship.DesignId.Value);
             hash.WriteUInt64(freighter.LocationId.Value);
             hash.WriteUInt64(freighter.ActiveJobId?.Value ?? 0);
         }
@@ -785,6 +828,7 @@ public sealed class PhaseOneScenario
         {
             Inventory inventory = GetInventory(inventoryId);
             hash.WriteUInt64(inventoryId.Value);
+            hash.WriteUInt64(inventory.Capacity.Units);
             hash.WriteUInt64(inventory.TotalStored.Units);
             hash.WriteUInt64(inventory.ReservedCapacity.Units);
             foreach (MaterialId material in _knownMaterials)
@@ -822,8 +866,10 @@ public sealed class PhaseOneScenario
                 hash.WriteByte(1);
                 hash.WriteUInt64(production.FacilityId.Value);
                 break;
-            case ScenarioEventKind.ShipyardComplete:
+            case ScenarioEventKind.ConstructionComplete construction:
                 hash.WriteByte(2);
+                hash.WriteUInt64(construction.FacilityId.Value);
+                hash.WriteUInt64(construction.OrderId.Value);
                 break;
             case ScenarioEventKind.RouteEnabled route:
                 hash.WriteByte(3);
@@ -887,7 +933,10 @@ public sealed class PhaseOneScenario
             PhaseOneEvent.Transport transport => new ScenarioEventKind.Transport(transport.Event),
             PhaseOneEvent.ProductionComplete production =>
                 new ScenarioEventKind.ProductionComplete(production.FacilityId),
-            PhaseOneEvent.ShipyardComplete => new ScenarioEventKind.ShipyardComplete(),
+            PhaseOneEvent.ConstructionComplete construction =>
+                new ScenarioEventKind.ConstructionComplete(
+                    construction.FacilityId,
+                    construction.OrderId),
             PhaseOneEvent.RouteEnabled route =>
                 new ScenarioEventKind.RouteEnabled(route.RouteId, route.Enabled),
             _ => throw new ArgumentOutOfRangeException(nameof(scenarioEvent)),

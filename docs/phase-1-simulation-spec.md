@@ -114,7 +114,13 @@ Refining and component recipes may repeat automatically while enabled. Ship cons
 
 Construction follows the same material and work principles. A completed ship becomes a new persistent entity rather than a counter or abstract reward.
 
-Ship construction uses a separate finite FIFO shipyard queue rather than a material-output production line. A Phase 1 ship blueprint defines cargo capacity. Each shipyard and constructed ship belongs to a typed organization, although organizations have no autonomous faction behavior during Phase 1.
+Ship construction uses a finite FIFO construction process rather than a
+material-output production line. A Phase 1 `ShipDesign` inherits the shared
+construction definition, supplies its material-and-work recipe, and defines
+cargo capacity. The shipyard composes the product-neutral construction process
+and is responsible only for creating the completed ship. Each shipyard and
+constructed ship belongs to a typed organization, although organizations have
+no autonomous faction behavior during Phase 1.
 
 Completing construction allocates a persistent ship and cargo inventory at the shipyard location, then registers the ship as an idle freighter available to the transport board.
 
@@ -187,6 +193,12 @@ The headless runner reports at least:
 Phase 1 uses an explicit random seed even if the first fixture requires little randomness. Stable entity and event ordering must not depend on hash-map iteration order.
 
 Repeated runs with identical configuration, seed, initial state, and commands should produce the same final-state and event-log digests. Phase 1 uses FNV-1a 64-bit fingerprints with explicit little-endian field encoding. The event-log fingerprint covers canonical processed-event ordering and structured decision records; the final-state fingerprint covers the authoritative time, route availability, inventories, ships, and transport jobs. These fingerprints are regression checks, not security hashes.
+
+Construction-completion event records include the construction facility and
+order IDs. Ship state fingerprints include construction design IDs, and
+inventory fingerprints include configured capacity, so different constructed
+designs cannot collapse to the same state solely because their current cargo
+and locations happen to match.
 
 ## Disruption test
 

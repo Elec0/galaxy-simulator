@@ -1,11 +1,28 @@
 namespace GalaxyCommand.Simulation;
 
-public readonly record struct ShipBlueprint(ShipBlueprintId Id, Quantity CargoCapacity);
+/// <summary>
+/// Constructible ship definition. Ship-specific capabilities belong here rather
+/// than in the shared construction pipeline.
+/// </summary>
+public sealed class ShipDesign : ConstructionDesign
+{
+    public ShipDesign(
+        ConstructionDesignId id,
+        string name,
+        ConstructionRecipe recipe,
+        Quantity cargoCapacity)
+        : base(id, name, recipe)
+    {
+        CargoCapacity = cargoCapacity;
+    }
+
+    public Quantity CargoCapacity { get; }
+}
 
 public sealed record Ship(
     ShipId Id,
     OrganizationId OrganizationId,
-    ShipBlueprintId BlueprintId,
+    ConstructionDesignId DesignId,
     LocationId LocationId,
     InventoryId CargoInventoryId);
 

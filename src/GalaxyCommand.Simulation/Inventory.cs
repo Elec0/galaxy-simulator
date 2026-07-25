@@ -11,7 +11,7 @@ public abstract record ReservationOwner
 
     public sealed record ProductionJob(ProductionJobId JobId) : ReservationOwner;
 
-    public sealed record ShipConstructionOrder(ShipConstructionOrderId OrderId) : ReservationOwner;
+    public sealed record ConstructionOrder(ConstructionOrderId OrderId) : ReservationOwner;
 }
 
 /// <summary>

@@ -16,8 +16,8 @@ public sealed class PhaseOneScenarioTests
         Assert.Equal(3, report.EndingShipCount);
         Assert.Equal<ulong>(675_400, report.EndTime.Milliseconds);
         Assert.Equal<ulong>(45, report.EventsProcessed);
-        Assert.Equal<ulong>(0x1945c73c43117149, report.EventLogDigest);
-        Assert.Equal<ulong>(0xb66c06e6448750e5, report.FinalStateDigest);
+        Assert.Equal<ulong>(0xedecd9ddf882bfd6, report.EventLogDigest);
+        Assert.Equal<ulong>(0x3704cbc7608f2738, report.FinalStateDigest);
         Assert.True(report.Metrics.TransportJobsCreated >= report.Metrics.TransportJobsCompleted);
         Assert.True(report.Metrics.TransportJobsCompleted > 0);
         Assert.Equal<ulong>(0, report.Metrics.TransportJobsFailed);
@@ -25,6 +25,8 @@ public sealed class PhaseOneScenarioTests
         Assert.All(report.Metrics.MaterialProduced.Values, quantity =>
             Assert.True(quantity > Quantity.Zero));
         Assert.NotEmpty(scenario.EventRecords);
+        Assert.Contains(scenario.EventRecords, record =>
+            record.Kind is ScenarioEventKind.ConstructionComplete);
         Assert.Contains(scenario.DecisionRecords, record =>
             record.Reason == DecisionReason.HighestRankedReachableTransport);
     }
@@ -71,5 +73,21 @@ public sealed class PhaseOneScenarioTests
         Assert.Equal(first.FinalStateDigest, second.FinalStateDigest);
         Assert.Equal(first.Metrics.TransportJobsCreated, second.Metrics.TransportJobsCreated);
         Assert.Equal(first.Metrics.MaterialProduced, second.Metrics.MaterialProduced);
+    }
+
+    [Fact]
+    public void ShipDesignCapacityContributesToFinalStateDigest()
+    {
+        var baseline = new PhaseOneScenario(
+            new PhaseOneConfig { FreighterCargoCapacity = new Quantity(10) });
+        var changed = new PhaseOneScenario(
+            new PhaseOneConfig { FreighterCargoCapacity = new Quantity(11) });
+
+        PhaseOneReport baselineReport =
+            baseline.RunUntilFirstShip(new SimulationTime(1_000_000));
+        PhaseOneReport changedReport =
+            changed.RunUntilFirstShip(new SimulationTime(1_000_000));
+
+        Assert.NotEqual(baselineReport.FinalStateDigest, changedReport.FinalStateDigest);
     }
 }

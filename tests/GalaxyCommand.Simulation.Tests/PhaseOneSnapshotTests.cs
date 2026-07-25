@@ -19,6 +19,14 @@ public sealed class PhaseOneSnapshotTests
         Assert.Equal(2, snapshot.Ships.Count);
         Assert.Equal([1UL, 2UL],
             snapshot.Ships.Select(ship => ship.Location.Value));
+        ConstructionSnapshot construction = Assert.Single(snapshot.Constructions);
+        Assert.Equal("Phase 1 Freighter", construction.DesignName);
+        Assert.Equal(ConstructionOrderStatus.WaitingForInputs, construction.Status);
+        Assert.Equal(
+            new Quantity(4),
+            Assert.Single(construction.UnmetInputs).Value);
+        Assert.All(snapshot.Ships, ship =>
+            Assert.Equal(construction.DesignId, ship.DesignId));
     }
 
     [Fact]
@@ -54,6 +62,7 @@ public sealed class PhaseOneSnapshotTests
             location => location.Name == "Shipyard");
         Assert.Equal(shipyard.Id, constructed.Location);
         Assert.Null(constructed.ActiveTransportJob);
+        Assert.Empty(snapshot.Constructions);
     }
 
     [Fact]
