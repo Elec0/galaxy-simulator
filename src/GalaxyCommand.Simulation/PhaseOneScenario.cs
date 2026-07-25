@@ -129,158 +129,76 @@ public sealed record PhaseOneReport(
     ulong FinalStateDigest,
     IReadOnlyList<ShortageRecord> CurrentShortages);
 
+internal abstract record PhaseOneEvent
+{
+    public sealed record Transport(TransportEvent Event) : PhaseOneEvent;
+    public sealed record ProductionComplete(FacilityId FacilityId) : PhaseOneEvent;
+    public sealed record ConstructionComplete(
+        FacilityId FacilityId,
+        ConstructionOrderId OrderId) : PhaseOneEvent;
+    public sealed record RouteEnabled(RouteId RouteId, bool Enabled) : PhaseOneEvent;
+}
+
 /// <summary>
-/// Integrated three-location Phase 1 proof-of-concept simulation.
+/// Runtime behavior for the integrated Phase 1 proof-of-concept fixture.
 /// </summary>
-public sealed class PhaseOneScenario
+internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
 {
     private readonly PhaseOneConfig _config;
+    private readonly SimulationWorld _world;
     private readonly EventAgenda<PhaseOneEvent> _agenda = new();
-    private readonly RouteGraph _navigation = new();
-    private readonly InventoryRegistry _inventories = new();
-    private readonly SortedDictionary<FacilityId, ProductionLine> _productionLines =
-        new(EntityIdComparer<FacilityId>.Instance);
-    private readonly SortedDictionary<FacilityId, MaterialId> _productionOutputs =
-        new(EntityIdComparer<FacilityId>.Instance);
-    private readonly SortedDictionary<FacilityId, LocationId> _facilityLocations =
-        new(EntityIdComparer<FacilityId>.Instance);
+    private readonly SimulationEngine<PhaseOneEvent> _engine;
+    private readonly RouteGraph _navigation;
+    private readonly InventoryRegistry _inventories;
+    private readonly SortedDictionary<FacilityId, ProductionLine> _productionLines;
+    private readonly SortedDictionary<FacilityId, MaterialId> _productionOutputs;
+    private readonly SortedDictionary<FacilityId, LocationId> _facilityLocations;
     private readonly Shipyard _shipyard;
-    private readonly TransportBoard _transportBoard = new();
-    private readonly ShipRegistry _ships = new();
-    private readonly ProductionIdSequences _productionIds = new();
-    private readonly TransportIdSequences _transportIds = new();
-    private readonly IdSequence<ReservationId> _reservationIds = new();
-    private readonly IdSequence<CapacityReservationId> _capacityReservationIds = new();
-    private readonly IdSequence<ShipId> _shipIds = new();
-    private readonly IdSequence<InventoryId> _inventoryIds = new();
-    private readonly IdSequence<ConstructionDesignId> _constructionDesignIds = new();
-    private readonly ConstructionIdSequences _constructionIds = new();
-    private readonly ConstructionDesignCatalog _constructionDesigns = new();
+    private readonly TransportBoard _transportBoard;
+    private readonly ShipRegistry _ships;
+    private readonly ProductionIdSequences _productionIds;
+    private readonly TransportIdSequences _transportIds;
+    private readonly IdSequence<ReservationId> _reservationIds;
+    private readonly IdSequence<CapacityReservationId> _capacityReservationIds;
+    private readonly IdSequence<ShipId> _shipIds;
+    private readonly IdSequence<InventoryId> _inventoryIds;
     private readonly RouteId _mineToRefineryRoute;
     private readonly MaterialId[] _knownMaterials;
-    private readonly SortedDictionary<LocationId, string> _locationNames =
-        new(EntityIdComparer<LocationId>.Instance);
+    private readonly SortedDictionary<LocationId, string> _locationNames;
     private readonly List<ScenarioEventRecord> _eventRecords = [];
     private readonly List<DecisionRecord> _decisionRecords = [];
     private readonly PhaseOneMetrics _metrics = new();
     private ShipId? _constructedShipId;
     private SimulationTime _metricsTime = SimulationTime.Zero;
 
-    public PhaseOneScenario(PhaseOneConfig? config = null)
+    public PhaseOneRuntime(PhaseOneConfig? config = null)
     {
         _config = config ?? new PhaseOneConfig();
-        var locationIds = new IdSequence<LocationId>();
-        LocationId mineLocation = locationIds.Allocate();
-        LocationId refineryLocation = locationIds.Allocate();
-        LocationId shipyardLocation = locationIds.Allocate();
-        foreach ((LocationId location, string name) in new[]
-        {
-            (mineLocation, "Mine"),
-            (refineryLocation, "Refinery"),
-            (shipyardLocation, "Shipyard"),
-        })
-        {
-            _navigation.AddLocation(location);
-            _locationNames.Add(location, name);
-        }
-
-        (_mineToRefineryRoute, _) = _navigation.AddBidirectionalRoutes(
-            mineLocation,
-            refineryLocation,
-            _config.RouteDuration);
-        _navigation.AddBidirectionalRoutes(
-            refineryLocation,
-            shipyardLocation,
-            _config.RouteDuration);
-
-        var materialIds = new IdSequence<MaterialId>();
-        MaterialId ore = materialIds.Allocate();
-        MaterialId alloy = materialIds.Allocate();
-        MaterialId components = materialIds.Allocate();
-        _knownMaterials = [ore, alloy, components];
-        OrganizationId organization = new IdSequence<OrganizationId>().Allocate();
-        var facilityIds = new IdSequence<FacilityId>();
-        FacilityId mine = facilityIds.Allocate();
-        FacilityId refinery = facilityIds.Allocate();
-        FacilityId componentFactory = facilityIds.Allocate();
-        FacilityId shipyardFacility = facilityIds.Allocate();
-        InventoryId mineInventory = _inventoryIds.Allocate();
-        InventoryId refineryInventory = _inventoryIds.Allocate();
-        InventoryId componentInventory = _inventoryIds.Allocate();
-        InventoryId shipyardInventory = _inventoryIds.Allocate();
-        foreach (InventoryId inventoryId in new[]
-        {
-            mineInventory, refineryInventory, componentInventory, shipyardInventory,
-        })
-        {
-            _inventories.Add(new Inventory(inventoryId, _config.FacilityStorageCapacity));
-        }
-
-        var throughput = new Throughput(1);
-        AddProductionLine(
-            mine,
-            mineInventory,
-            mineLocation,
-            new Recipe([], ore, _config.OreBatch, _config.MineWork),
-            ore,
-            throughput);
-        AddProductionLine(
-            refinery,
-            refineryInventory,
-            refineryLocation,
-            new Recipe(
-                [new KeyValuePair<MaterialId, Quantity>(ore, _config.RefineryOreInput)],
-                alloy,
-                _config.RefineryAlloyOutput,
-                _config.RefineryWork),
-            alloy,
-            throughput);
-        AddProductionLine(
-            componentFactory,
-            componentInventory,
-            shipyardLocation,
-            new Recipe(
-                [new KeyValuePair<MaterialId, Quantity>(alloy, _config.ComponentAlloyInput)],
-                components,
-                _config.ComponentOutput,
-                _config.ComponentWork),
-            components,
-            throughput);
-
-        var shipDesign = new ShipDesign(
-            _constructionDesignIds.Allocate(),
-            "Phase 1 Freighter",
-            new ConstructionRecipe(
-                [new KeyValuePair<MaterialId, Quantity>(
-                    components,
-                    _config.ShipyardComponentInput)],
-                _config.ShipyardWork),
-            _config.FreighterCargoCapacity);
-        _constructionDesigns.Add(shipDesign);
-        _shipyard = new Shipyard(
-            shipyardFacility,
-            organization,
-            shipyardLocation,
-            shipyardInventory,
-            throughput);
-        _shipyard.Enqueue(_constructionIds, shipDesign);
-
-        foreach (LocationId location in new[] { mineLocation, refineryLocation })
-        {
-            ShipId shipId = _shipIds.Allocate();
-            InventoryId cargoInventoryId = _inventoryIds.Allocate();
-            _inventories.Add(new Inventory(cargoInventoryId, _config.FreighterCargoCapacity));
-            _ships.AddFreighter(new Ship(
-                shipId,
-                organization,
-                shipDesign.Id,
-                location,
-                cargoInventoryId));
-        }
+        PhaseOneFixtureState fixture = PhaseOneFixture.Create(_config);
+        _world = fixture.World;
+        _navigation = _world.Navigation;
+        _inventories = _world.Inventories;
+        _productionLines = _world.ProductionLines;
+        _productionOutputs = _world.ProductionOutputs;
+        _facilityLocations = _world.FacilityLocations;
+        _transportBoard = _world.TransportBoard;
+        _ships = _world.Ships;
+        _productionIds = _world.ProductionIds;
+        _transportIds = _world.TransportIds;
+        _reservationIds = _world.ReservationIds;
+        _capacityReservationIds = _world.CapacityReservationIds;
+        _shipIds = _world.ShipIds;
+        _inventoryIds = _world.InventoryIds;
+        _locationNames = _world.LocationNames;
+        _shipyard = fixture.Shipyard;
+        _mineToRefineryRoute = fixture.MineToRefineryRoute;
+        _knownMaterials = fixture.KnownMaterials;
+        _engine = new SimulationEngine<PhaseOneEvent>(this, _agenda);
     }
 
     public IReadOnlyList<ScenarioEventRecord> EventRecords => _eventRecords;
     public IReadOnlyList<DecisionRecord> DecisionRecords => _decisionRecords;
+    public SimulationWorld World => _world;
 
     public PhaseOneSnapshot CaptureSnapshot()
     {
@@ -350,7 +268,7 @@ public sealed class PhaseOneScenario
             (250_000UL, true),
         })
         {
-            _agenda.Schedule(
+            _engine.Schedule(
                 new SimulationTime(timestamp),
                 EventPhase.StateUpdate,
                 new EventGeneration(0),
@@ -360,35 +278,12 @@ public sealed class PhaseOneScenario
 
     public PhaseOneReport RunUntilFirstShip(SimulationTime target)
     {
-        SimulationTime startTime = _agenda.CurrentTime;
         int startingShipCount = _ships.Count;
-        Reconcile(startTime);
-        ulong eventsProcessed = 0;
-
-        while (_agenda.PopNextThrough(target) is { } scheduled)
-        {
-            SimulationTime now = scheduled.Key.Timestamp;
-            AccrueFacilityTime(now);
-            HandleEvent(scheduled.Payload, now);
-            _eventRecords.Add(new ScenarioEventRecord(
-                now,
-                scheduled.Key.Phase,
-                scheduled.Key.CreationSequence,
-                ToEventKind(scheduled.Payload)));
-            eventsProcessed = checked(eventsProcessed + 1);
-            if (_constructedShipId is not null)
-            {
-                break;
-            }
-
-            Reconcile(now);
-        }
-
-        AccrueFacilityTime(_agenda.CurrentTime);
+        RunReport run = _engine.RunUntil(target);
         return new PhaseOneReport(
-            startTime,
-            _agenda.CurrentTime,
-            eventsProcessed,
+            run.StartTime,
+            run.EndTime,
+            checked((ulong)run.EventsProcessed),
             startingShipCount,
             _ships.Count,
             _constructedShipId,
@@ -398,36 +293,37 @@ public sealed class PhaseOneScenario
             CurrentShortages());
     }
 
+    bool ISimulationRuntime<PhaseOneEvent>.ShouldStop => _constructedShipId is not null;
+
+    void ISimulationRuntime<PhaseOneEvent>.Reconcile(
+        SimulationTime now,
+        EventAgenda<PhaseOneEvent> agenda) =>
+        Reconcile(now);
+
+    void ISimulationRuntime<PhaseOneEvent>.AccrueTo(SimulationTime now) =>
+        AccrueFacilityTime(now);
+
+    void ISimulationRuntime<PhaseOneEvent>.HandleEvent(
+        PhaseOneEvent simulationEvent,
+        SimulationTime now,
+        EventAgenda<PhaseOneEvent> agenda) =>
+        HandleEvent(simulationEvent, now);
+
+    void ISimulationRuntime<PhaseOneEvent>.RecordEvent(
+        ScheduledEvent<PhaseOneEvent> simulationEvent)
+    {
+        _eventRecords.Add(new ScenarioEventRecord(
+            simulationEvent.Key.Timestamp,
+            simulationEvent.Key.Phase,
+            simulationEvent.Key.CreationSequence,
+            ToEventKind(simulationEvent.Payload)));
+    }
+
     private SimulationTime TravelDeparture(RouteId routeId, SimulationTime arrivesAt)
     {
         DirectedRoute route = _navigation.GetRoute(routeId)
             ?? throw new InvalidOperationException($"Missing route {routeId}.");
         return new SimulationTime(checked(arrivesAt.Milliseconds - route.BaseDuration.Milliseconds));
-    }
-
-    private abstract record PhaseOneEvent
-    {
-        public sealed record Transport(TransportEvent Event) : PhaseOneEvent;
-        public sealed record ProductionComplete(FacilityId FacilityId) : PhaseOneEvent;
-        public sealed record ConstructionComplete(
-            FacilityId FacilityId,
-            ConstructionOrderId OrderId) : PhaseOneEvent;
-        public sealed record RouteEnabled(RouteId RouteId, bool Enabled) : PhaseOneEvent;
-    }
-
-    private void AddProductionLine(
-        FacilityId facilityId,
-        InventoryId inventoryId,
-        LocationId locationId,
-        Recipe recipe,
-        MaterialId outputMaterial,
-        Throughput throughput)
-    {
-        var line = new ProductionLine(facilityId, inventoryId, throughput);
-        line.Enqueue(_productionIds, recipe, repeat: true);
-        _productionLines.Add(facilityId, line);
-        _productionOutputs.Add(facilityId, outputMaterial);
-        _facilityLocations.Add(facilityId, locationId);
     }
 
     private void HandleEvent(PhaseOneEvent scenarioEvent, SimulationTime now)

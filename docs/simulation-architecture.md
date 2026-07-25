@@ -14,6 +14,25 @@ The world contains systems, connections, ships, stations, inventories, ownership
 
 Phase 1 represents movement as a graph of locations and routes. Travel behavior will depend on an abstract navigation boundary rather than directly on the graph representation so a continuous spatial model can replace or supplement it later.
 
+`SimulationWorld` is the concrete owner of that durable state. It holds the
+navigation graph, inventories, production facilities, construction sites,
+design catalog, ships, transport board, and identifier sequences. Scenario
+fixtures populate a world through its construction APIs instead of owning
+parallel registries.
+
+### Event runner and scenarios
+
+`SimulationEngine<TEvent>` owns deterministic event ordering and clock
+advancement. A scenario supplies an `ISimulationRuntime<TEvent>` that
+reconciles systems, handles its event vocabulary, accrues time-based metrics,
+and declares its stopping condition. The engine has no knowledge of Phase 1
+materials, facilities, routes, or victory conditions.
+
+`PhaseOneFixture` builds the proof-of-concept world. `PhaseOneScenario` is the
+public facade that binds that fixture to the reusable engine and exposes
+reports, event records, and snapshots. Additional scenarios can build a
+different `SimulationWorld` and event vocabulary without modifying the runner.
+
 ### Physical and logistical activity
 
 Ships travel, carry cargo, mine resources, dock, fight, and perform assigned work. Stations store materials and perform production according to their capabilities.
