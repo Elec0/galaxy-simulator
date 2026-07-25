@@ -7,6 +7,9 @@ public interface ISimulationRuntime<TEvent>
 {
     bool ShouldStop { get; }
 
+    /// <summary>
+    /// Runs once at the start of the decision phase after earlier same-time phases drain.
+    /// </summary>
     void Reconcile(SimulationTime now, EventAgenda<TEvent> agenda);
 
     void AccrueTo(SimulationTime now);
@@ -23,6 +26,8 @@ public sealed class SimulationEngine<TEvent>
 {
     private readonly ISimulationRuntime<TEvent> _runtime;
     private readonly EventAgenda<TEvent> _agenda;
+    private SimulationTime _accruedThrough = SimulationTime.Zero;
+    private bool _initialized;
 
     public SimulationEngine(
         ISimulationRuntime<TEvent> runtime,
@@ -55,29 +60,69 @@ public sealed class SimulationEngine<TEvent>
         }
 
         SimulationTime startTime = CurrentTime;
-        _runtime.Reconcile(startTime, _agenda);
         long eventsProcessed = 0;
+
+        if (!_initialized)
+        {
+            eventsProcessed = ProcessTimestamp(CurrentTime, eventsProcessed);
+            _initialized = true;
+        }
+
         if (_runtime.ShouldStop)
         {
             return new RunReport(startTime, CurrentTime, eventsProcessed);
         }
 
-        while (_agenda.PopNextThrough(target) is { } scheduled)
+        while (_agenda.NextEventKey is { } next && next.Timestamp <= target)
         {
-            SimulationTime now = scheduled.Key.Timestamp;
-            _runtime.AccrueTo(now);
-            _runtime.HandleEvent(scheduled.Payload, now, _agenda);
-            _runtime.RecordEvent(scheduled);
-            eventsProcessed = checked(eventsProcessed + 1);
+            eventsProcessed = ProcessTimestamp(next.Timestamp, eventsProcessed);
             if (_runtime.ShouldStop)
             {
                 break;
             }
-
-            _runtime.Reconcile(now, _agenda);
         }
 
-        _runtime.AccrueTo(CurrentTime);
+        if (!_runtime.ShouldStop)
+        {
+            _agenda.AdvanceTo(target);
+            AccrueThrough(target);
+        }
+
         return new RunReport(startTime, CurrentTime, eventsProcessed);
+    }
+
+    private long ProcessTimestamp(SimulationTime timestamp, long eventsProcessed)
+    {
+        _agenda.AdvanceTo(timestamp);
+        AccrueThrough(timestamp);
+
+        foreach (EventPhase phase in Enum.GetValues<EventPhase>())
+        {
+            _agenda.EnterPhase(phase);
+            if (phase == EventPhase.Decision)
+            {
+                _runtime.Reconcile(timestamp, _agenda);
+            }
+
+            while (_agenda.PopNextInCurrentPhase() is { } scheduled)
+            {
+                _runtime.HandleEvent(scheduled.Payload, timestamp, _agenda);
+                _runtime.RecordEvent(scheduled);
+                eventsProcessed = checked(eventsProcessed + 1);
+            }
+        }
+
+        return eventsProcessed;
+    }
+
+    private void AccrueThrough(SimulationTime timestamp)
+    {
+        if (timestamp <= _accruedThrough)
+        {
+            return;
+        }
+
+        _runtime.AccrueTo(timestamp);
+        _accruedThrough = timestamp;
     }
 }

@@ -13,6 +13,8 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Factions and strategic behavior](docs/factions.md)
 - [Time and pacing](docs/time-and-pacing.md)
 - [Technical direction](docs/technical-direction.md)
+- [Gameplay integration issues and decisions](docs/gameplay-integration.md)
+- [Project task list](docs/task-list.md)
 - [Initial roadmap](docs/roadmap.md)
 - [Phase 1 simulation specification](docs/phase-1-simulation-spec.md)
 

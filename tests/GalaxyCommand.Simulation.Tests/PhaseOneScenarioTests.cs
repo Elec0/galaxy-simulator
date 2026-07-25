@@ -15,9 +15,9 @@ public sealed class PhaseOneScenarioTests
         Assert.Equal(2, report.StartingShipCount);
         Assert.Equal(3, report.EndingShipCount);
         Assert.Equal<ulong>(675_400, report.EndTime.Milliseconds);
-        Assert.Equal<ulong>(45, report.EventsProcessed);
-        Assert.Equal<ulong>(0xedecd9ddf882bfd6, report.EventLogDigest);
-        Assert.Equal<ulong>(0x3704cbc7608f2738, report.FinalStateDigest);
+        Assert.Equal<ulong>(46, report.EventsProcessed);
+        Assert.Equal<ulong>(0x6ea5f3e50d5da2d9, report.EventLogDigest);
+        Assert.Equal<ulong>(0x00755abadb989375, report.FinalStateDigest);
         Assert.True(report.Metrics.TransportJobsCreated >= report.Metrics.TransportJobsCompleted);
         Assert.True(report.Metrics.TransportJobsCompleted > 0);
         Assert.Equal<ulong>(0, report.Metrics.TransportJobsFailed);
