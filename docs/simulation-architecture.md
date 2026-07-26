@@ -14,11 +14,12 @@ The world contains systems, connections, ships, stations, inventories, ownership
 
 Phase 1 represents movement as a graph of locations and routes. Travel behavior will depend on an abstract navigation boundary rather than directly on the graph representation so a continuous spatial model can replace or supplement it later.
 
-`SimulationWorld` is the concrete owner of that durable state. It holds the
-navigation graph, inventories, production facilities, construction sites,
-design catalog, ships, transport board, and identifier sequences. Scenario
-fixtures populate a world through its construction APIs instead of owning
-parallel registries.
+Internal `SimulationWorld` is the concrete owner of that durable state. It
+holds the navigation graph, inventories, production facilities, construction
+sites, design catalog, ships, transport board, and identifier sequences.
+Scenario fixtures populate it through a one-use setup capability that is
+consumed before runtime advancement. Application callers never receive the
+mutable aggregate.
 
 ### Event runner, sessions, and acceptance harnesses
 

@@ -32,7 +32,6 @@ public sealed class SimulationEngineTests
         RunReport report = simulation.RunUntil(new SimulationTime(150));
 
         Assert.Equal(11, runtime.Value);
-        Assert.Single(runtime.World.Navigation.Locations);
         Assert.Equal(
             [EventPhase.StateUpdate, EventPhase.Decision],
             runtime.ProcessedPhases);
@@ -220,13 +219,6 @@ public sealed class SimulationEngineTests
 
     private sealed class CounterRuntime : ISimulationRuntime<CounterEvent>
     {
-        public CounterRuntime()
-        {
-            World.AddLocation("Counter");
-        }
-
-        public SimulationWorld World { get; } = new();
-
         public int Value { get; private set; }
 
         public List<EventPhase> ProcessedPhases { get; } = [];

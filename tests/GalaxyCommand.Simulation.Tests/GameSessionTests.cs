@@ -50,6 +50,9 @@ public sealed class GameSessionTests
         var session = new GameSession();
         var now = new SimulationTime(50_000);
         session.AdvanceTo(now);
+        PhaseOneSnapshot before = session.CaptureSnapshot();
+        ScenarioEventRecord[] eventsBefore = [.. session.EventRecords];
+        DecisionRecord[] decisionsBefore = [.. session.DecisionRecords];
         var source = new CommandSource(
             CommandSourceKind.Player,
             new CommandSourceId("local-player"));
@@ -65,11 +68,38 @@ public sealed class GameSessionTests
             CommandRejectionCodes.UnsupportedCommand,
             record.Result.RejectionCode);
         Assert.Equal([record], session.CommandRecords);
+
+        PhaseOneSnapshot after = session.CaptureSnapshot();
+        Assert.Equal(before.Time, after.Time);
+        Assert.Equal(before.Locations, after.Locations);
+        Assert.Equal(before.Routes, after.Routes);
+        Assert.Equal(before.Ships, after.Ships);
+        Assert.Equal(before.Constructions.Count, after.Constructions.Count);
+        foreach ((ConstructionSnapshot expected, ConstructionSnapshot actual) in
+            before.Constructions.Zip(after.Constructions))
+        {
+            Assert.Equal(expected.FacilityId, actual.FacilityId);
+            Assert.Equal(expected.OrderId, actual.OrderId);
+            Assert.Equal(expected.DesignId, actual.DesignId);
+            Assert.Equal(expected.DesignName, actual.DesignName);
+            Assert.Equal(expected.Status, actual.Status);
+            Assert.Equal(expected.CompletesAt, actual.CompletesAt);
+            Assert.Equal(
+                expected.UnmetInputs.OrderBy(pair => pair.Key.Value),
+                actual.UnmetInputs.OrderBy(pair => pair.Key.Value));
+        }
+        Assert.Equal(eventsBefore, session.EventRecords);
+        Assert.Equal(decisionsBefore, session.DecisionRecords);
     }
 
     [Fact]
-    public void SessionDoesNotExposeMutableWorld()
+    public void PublicSessionBoundaryDoesNotExposeMutableWorld()
     {
+        Type? worldType = typeof(GameSession).Assembly.GetType(
+            "GalaxyCommand.Simulation.SimulationWorld");
+
+        Assert.NotNull(worldType);
+        Assert.False(worldType.IsPublic);
         Assert.Null(typeof(GameSession).GetProperty("World"));
     }
 

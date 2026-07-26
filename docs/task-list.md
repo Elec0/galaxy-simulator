@@ -17,24 +17,6 @@ The current architectural goal is to establish the command and ordering
 boundaries required for an interactive game. Work roughly from top to bottom;
 later tasks may be refined as earlier contracts become concrete.
 
-- [ ] **TASK-003: Introduce a persistent game-session facade**
-  - `GameSession` now accepts gameplay commands, advances authoritative
-    simulation time without a fixture-specific success stop, and captures
-    immutable presentation state.
-  - Godot uses `GameSession` rather than the bounded acceptance scenario.
-  - Command results are exposed now; expose ordered semantic facts through
-    `TASK-008`.
-  - Retain `PhaseOneScenario` under `Acceptance/` as a bounded regression
-    harness; it is not an application-facing session boundary.
-
-- [ ] **TASK-004: Separate setup authority from runtime mutation**
-  - Keep privileged world construction available to fixtures and save loading.
-  - Prevent presentation and gameplay callers from mutating the live
-    `SimulationWorld` directly.
-  - Replace the public mutable-world boundary with queries, snapshots, stable
-    identifiers, and commands.
-  - Add tests proving rejected commands cannot partially mutate state.
-
 - [ ] **TASK-005: Implement the first interactive ship order**
   - Select a ship in Godot.
   - Submit a move order through the game-session facade.
@@ -191,8 +173,26 @@ prerequisites and desired behavior are sufficiently defined.
     sequence, simulation-time, source, result, and diagnostic records.
   - Source attribution supports player, autonomous, dialogue, and script
     callers without authentication or multiplayer-authority semantics.
-  - Persistent-session integration remains in `TASK-003`.
+  - Persistent-session integration was completed by `TASK-003`.
   - Context: [Gameplay integration §1.2 and §2.2](gameplay-integration.md#12-there-is-no-general-gameplay-command-boundary)
+
+- [x] **TASK-003: Introduce a persistent game-session facade**
+  - `GameSession` accepts and records gameplay commands, advances without a
+    fixture milestone stop, captures immutable presentation state, and is the
+    boundary used by Godot.
+  - `PhaseOneScenario` remains isolated under `Acceptance/` as a bounded
+    regression harness.
+  - Ordered semantic facts remain in `TASK-008`.
+  - Context: [Gameplay integration §1.2, §1.7, and §2.3](gameplay-integration.md#12-there-is-no-general-gameplay-command-boundary)
+
+- [x] **TASK-004: Separate setup authority from runtime mutation**
+  - `SimulationWorld` is internal and can only be created through a one-use
+    setup capability reserved for fixture and future save-load construction.
+  - Neither `GameSession` nor the acceptance facade exposes the mutable live
+    world; callers use snapshots, stable identifiers, commands, and records.
+  - Rejected-command tests prove authoritative snapshot, event, and decision
+    state remains unchanged.
+  - Context: [Gameplay integration §1.3 and §2.4](gameplay-integration.md#13-authoritative-state-is-publicly-mutable)
 
 - [x] **TASK-007: Complete scheduled-event cancellation and invalidation**
   - Production, construction, and transport activities advance generations
@@ -228,7 +228,7 @@ prerequisites and desired behavior are sufficiently defined.
 - [x] **DONE-006: Centralize durable scenario state in `SimulationWorld`**
   - The world owns navigation, inventories, production, construction, ships,
     transport state, designs, and identifier sequences.
-  - Restricting runtime mutation is tracked by `TASK-004`.
+  - Runtime mutation access was restricted by `TASK-004`.
 
 - [x] **DONE-007: Generalize construction into a product-neutral process**
   - Shared construction reserves inputs, queues work, tracks completion, and

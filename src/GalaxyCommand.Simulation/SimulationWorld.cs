@@ -4,7 +4,7 @@ namespace GalaxyCommand.Simulation;
 /// Durable mutable state for one simulation. Scenario fixtures populate a
 /// world; runtimes operate on it; the engine only advances events.
 /// </summary>
-public sealed class SimulationWorld
+internal sealed class SimulationWorld
 {
     private readonly IdSequence<LocationId> _locationIds = new();
     private readonly IdSequence<MaterialId> _materialIds = new();
@@ -27,21 +27,25 @@ public sealed class SimulationWorld
     internal SortedDictionary<LocationId, string> LocationNames { get; } =
         new(EntityIdComparer<LocationId>.Instance);
 
-    public RouteGraph Navigation { get; } = new();
+    private SimulationWorld()
+    {
+    }
 
-    public InventoryRegistry Inventories { get; } = new();
+    internal RouteGraph Navigation { get; } = new();
 
-    public ShipRegistry Ships { get; } = new();
+    internal InventoryRegistry Inventories { get; } = new();
 
-    public TransportBoard TransportBoard { get; } = new();
+    internal ShipRegistry Ships { get; } = new();
 
-    public ConstructionDesignCatalog ConstructionDesigns { get; } = new();
+    internal TransportBoard TransportBoard { get; } = new();
 
-    public IReadOnlyList<MaterialId> Materials => _materials;
+    internal ConstructionDesignCatalog ConstructionDesigns { get; } = new();
 
-    public IEnumerable<ProductionLine> ProductionFacilities => ProductionLines.Values;
+    internal IReadOnlyList<MaterialId> Materials => _materials;
 
-    public IEnumerable<Shipyard> ShipyardFacilities => Shipyards.Values;
+    internal IEnumerable<ProductionLine> ProductionFacilities => ProductionLines.Values;
+
+    internal IEnumerable<Shipyard> ShipyardFacilities => Shipyards.Values;
 
     internal ProductionIdSequences ProductionIds { get; } = new();
 
@@ -59,7 +63,9 @@ public sealed class SimulationWorld
 
     internal IdSequence<ConstructionDesignId> ConstructionDesignIds { get; } = new();
 
-    public LocationId AddLocation(string name)
+    internal static Setup BeginSetup() => new(new SimulationWorld());
+
+    private LocationId AddLocation(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         LocationId locationId = _locationIds.Allocate();
@@ -68,25 +74,25 @@ public sealed class SimulationWorld
         return locationId;
     }
 
-    public MaterialId AddMaterial()
+    private MaterialId AddMaterial()
     {
         MaterialId materialId = _materialIds.Allocate();
         _materials.Add(materialId);
         return materialId;
     }
 
-    public OrganizationId AddOrganization() => _organizationIds.Allocate();
+    private OrganizationId AddOrganization() => _organizationIds.Allocate();
 
-    public FacilityId AddFacility() => _facilityIds.Allocate();
+    private FacilityId AddFacility() => _facilityIds.Allocate();
 
-    public Inventory AddInventory(Quantity capacity)
+    private Inventory AddInventory(Quantity capacity)
     {
         var inventory = new Inventory(InventoryIds.Allocate(), capacity);
         Inventories.Add(inventory);
         return inventory;
     }
 
-    public ProductionLine AddProductionLine(
+    private ProductionLine AddProductionLine(
         FacilityId facilityId,
         InventoryId inventoryId,
         LocationId locationId,
@@ -103,14 +109,14 @@ public sealed class SimulationWorld
         return line;
     }
 
-    public void AddShipyard(Shipyard shipyard)
+    private void AddShipyard(Shipyard shipyard)
     {
         ArgumentNullException.ThrowIfNull(shipyard);
         Shipyards.Add(shipyard.FacilityId, shipyard);
         FacilityLocations.Add(shipyard.FacilityId, shipyard.LocationId);
     }
 
-    public ShipDesign AddShipDesign(
+    private ShipDesign AddShipDesign(
         string name,
         ConstructionRecipe recipe,
         Quantity cargoCapacity)
@@ -124,7 +130,7 @@ public sealed class SimulationWorld
         return design;
     }
 
-    public ConstructionOrderId EnqueueConstruction(
+    private ConstructionOrderId EnqueueConstruction(
         Shipyard shipyard,
         ShipDesign design)
     {
@@ -133,7 +139,7 @@ public sealed class SimulationWorld
         return shipyard.Enqueue(ConstructionIds, design);
     }
 
-    public Ship AddFreighter(
+    private Ship AddFreighter(
         OrganizationId organizationId,
         ShipDesign design,
         LocationId locationId)
@@ -148,5 +154,87 @@ public sealed class SimulationWorld
             cargoInventory.Id);
         Ships.AddFreighter(ship);
         return ship;
+    }
+
+    /// <summary>
+    /// One-use capability for fixture and save-load construction. Completing
+    /// setup consumes the capability and hands the world to its runtime.
+    /// </summary>
+    internal sealed class Setup
+    {
+        private SimulationWorld? _world;
+
+        internal Setup(SimulationWorld world)
+        {
+            _world = world;
+        }
+
+        internal LocationId AddLocation(string name) =>
+            World.AddLocation(name);
+
+        internal (RouteId Forward, RouteId Reverse) AddBidirectionalRoutes(
+            LocationId first,
+            LocationId second,
+            SimulationDuration duration) =>
+            World.Navigation.AddBidirectionalRoutes(first, second, duration);
+
+        internal MaterialId AddMaterial() =>
+            World.AddMaterial();
+
+        internal OrganizationId AddOrganization() =>
+            World.AddOrganization();
+
+        internal FacilityId AddFacility() =>
+            World.AddFacility();
+
+        internal Inventory AddInventory(Quantity capacity) =>
+            World.AddInventory(capacity);
+
+        internal ProductionLine AddProductionLine(
+            FacilityId facilityId,
+            InventoryId inventoryId,
+            LocationId locationId,
+            Recipe recipe,
+            Throughput throughput,
+            bool repeat = true) =>
+            World.AddProductionLine(
+                facilityId,
+                inventoryId,
+                locationId,
+                recipe,
+                throughput,
+                repeat);
+
+        internal void AddShipyard(Shipyard shipyard) =>
+            World.AddShipyard(shipyard);
+
+        internal ShipDesign AddShipDesign(
+            string name,
+            ConstructionRecipe recipe,
+            Quantity cargoCapacity) =>
+            World.AddShipDesign(name, recipe, cargoCapacity);
+
+        internal ConstructionOrderId EnqueueConstruction(
+            Shipyard shipyard,
+            ShipDesign design) =>
+            World.EnqueueConstruction(shipyard, design);
+
+        internal Ship AddFreighter(
+            OrganizationId organizationId,
+            ShipDesign design,
+            LocationId locationId) =>
+            World.AddFreighter(organizationId, design, locationId);
+
+        internal SimulationWorld Complete()
+        {
+            SimulationWorld world = World;
+            _world = null;
+            return world;
+        }
+
+        private SimulationWorld World =>
+            _world
+            ?? throw new InvalidOperationException(
+                "Simulation world setup has already completed.");
     }
 }

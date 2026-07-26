@@ -41,12 +41,11 @@ current timestamp cycle completes.
 
 ### 1.2 There is no general gameplay command boundary
 
-**Status: contract defined by `TASK-002`; the initial persistent session
-integration is implemented by `TASK-003`, with semantic facts remaining.**
+**Status: resolved by `TASK-002` and `TASK-003`.**
 
 The bounded Phase 1 acceptance harness can advance the simulation, capture a
-snapshot, expose the mutable world, and schedule one fixture-specific route
-disruption. It is not the application-facing boundary.
+snapshot, and schedule one fixture-specific route disruption. It is not the
+application-facing boundary.
 
 Without a common command boundary, future systems would either add specialized
 methods to the facade or mutate the world directly. Those paths would develop
@@ -64,15 +63,17 @@ ship-order command remains in `TASK-005`.
 
 ### 1.3 Authoritative state is publicly mutable
 
-The acceptance-only `PhaseOneScenario.World` exposes `SimulationWorld`, whose
-public registries and domain objects include mutating operations. `GameSession`
-does not expose this mutable world, so presentation and gameplay callers cannot
-use that route to bypass runtime ordering, validation, event recording, or
-causal rules.
+**Status: resolved by `TASK-004`.**
 
-The same world-building APIs are currently used both to create a fixture and to
-represent the running simulation. Setup authority and runtime authority are not
-separated.
+`SimulationWorld` is now internal to the simulation assembly. A one-use setup
+capability constructs fixture or future save-loaded state, then is consumed
+when it hands the world to its runtime. Neither `GameSession` nor
+`PhaseOneScenario` exposes the mutable live aggregate.
+
+Presentation and gameplay callers instead receive immutable snapshots, stable
+identifiers, command results, and diagnostic records. They cannot bypass
+runtime ordering, validation, event recording, or causal rules through a world
+reference.
 
 ### 1.4 Integrated behavior is centralized in the Phase 1 runtime
 
@@ -192,12 +193,15 @@ semantic facts remain in `TASK-008`.
 
 ### 2.4 Separate setup APIs from runtime mutation
 
-Allow fixtures, save loading, and content initialization to construct a world
-through privileged setup APIs. Once play begins, prevent external callers from
-using those APIs or mutable registries to bypass commands.
+Fixtures construct a world through `SimulationWorld.Setup`. Calling `Complete`
+consumes that capability and hands the internal aggregate to the runtime.
+Future save loading and content initialization should use the same scoped
+setup path.
 
-The live game session should expose read models and stable identifiers, not the
-mutable authoritative world.
+The live game session and bounded acceptance facade expose read models, stable
+identifiers, commands, and records, not the mutable authoritative world.
+Regression coverage verifies that rejected commands leave authoritative
+snapshot, event, and decision state unchanged.
 
 ### 2.5 Split orchestration into explicit simulation systems
 
