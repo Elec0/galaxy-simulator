@@ -41,13 +41,23 @@ current timestamp cycle completes.
 
 ### 1.2 There is no general gameplay command boundary
 
+**Status: contract defined by `TASK-002`; session integration is tracked by
+`TASK-003`.**
+
 The public Phase 1 facade can advance the simulation, capture a snapshot, expose
-the mutable world, and schedule one fixture-specific route disruption. It
-cannot accept general player, AI, dialogue, or scripted intent.
+the mutable world, and schedule one fixture-specific route disruption. It does
+not yet accept general player, autonomous, dialogue, or scripted intent.
 
 Without a common command boundary, future systems would either add specialized
 methods to the facade or mutate the world directly. Those paths would develop
 different validation, ordering, failure, and observability behavior.
+
+The rendering-independent command contract now separates submitted
+`GameplayCommand` intent from internal scheduled events. It assigns every
+submission a simulation timestamp and monotonically increasing
+`CommandSequence`, carries opaque source attribution, returns an explicit
+accepted or rejected result, and records both outcomes. The persistent session
+will own this processor and connect it to authoritative command handlers.
 
 ### 1.3 Authoritative state is publicly mutable
 
@@ -125,7 +135,38 @@ The implemented timestamp cycle is:
 Future semantic-fact recording can follow decision processing without weakening
 these barriers.
 
-### 2.2 Introduce a persistent game-session facade
+### 2.2 Define the gameplay command contract
+
+The implemented command contract has these rules:
+
+1. A `GameplayCommand` describes requested intent. It is not a scheduled event
+   and does not claim that the requested activity has completed.
+2. Every submission carries a `CommandSourceKind` and opaque
+   `CommandSourceId`. The supported categories are player, autonomous,
+   dialogue, and script. These fields provide local attribution and validation
+   context; they are not authentication or multiplayer authority.
+3. The session assigns a monotonically increasing `CommandSequence` and the
+   current authoritative `SimulationTime`. Sequence resolves ordering when
+   multiple commands are submitted at the same timestamp.
+4. A fixed `IGameplayCommandHandler` validates the source, intent, referenced
+   state, and conflicts before applying or scheduling authoritative changes.
+5. `Accepted` means immediate validation succeeded and the intent was applied
+   or scheduled. It does not guarantee that a resulting order or activity will
+   later complete.
+6. `Rejected` includes a stable machine-readable `CommandRejectionCode` and a
+   concise diagnostic reason. Rejection is the expected result for invalid
+   gameplay input; unexpected implementation faults are not converted into
+   gameplay rejections.
+7. Accepted and rejected submissions are retained as ordered
+   `GameplayCommandRecord` values for deterministic tests and debugging.
+8. Later activity completion, cancellation, or failure will be reported as
+   semantic facts rather than retroactively changing the command result.
+
+Command-specific payloads, validation rules, and rejection codes are introduced
+with the subsystem that owns them. This avoids inventing ship-order, dialogue,
+or script data structures before those models exist.
+
+### 2.3 Introduce a persistent game-session facade
 
 Create a rendering-independent facade responsible for:
 
@@ -138,7 +179,7 @@ Create a rendering-independent facade responsible for:
 Godot, faction AI, dialogue choices, and scripted behavior should use this
 boundary rather than mutate `SimulationWorld`.
 
-### 2.3 Separate setup APIs from runtime mutation
+### 2.4 Separate setup APIs from runtime mutation
 
 Allow fixtures, save loading, and content initialization to construct a world
 through privileged setup APIs. Once play begins, prevent external callers from
@@ -147,7 +188,7 @@ using those APIs or mutable registries to bypass commands.
 The live game session should expose read models and stable identifiers, not the
 mutable authoritative world.
 
-### 2.4 Split orchestration into explicit simulation systems
+### 2.5 Split orchestration into explicit simulation systems
 
 Move production, construction, logistics, orders, faction planning, scripts,
 objectives, and other behavior behind explicit system boundaries. Define:
@@ -161,7 +202,7 @@ objectives, and other behavior behind explicit system boundaries. Define:
 A fixed, explicit dispatcher is sufficient initially. A dynamic plugin system
 or general-purpose event bus is not required.
 
-### 2.5 Complete cancellation and invalidation behavior
+### 2.6 Complete cancellation and invalidation behavior
 
 Define how an order or activity changes its generation when it is cancelled,
 replaced, interrupted, or destroyed. Every scheduled event must verify both its
@@ -171,7 +212,7 @@ Specify whether a stale event becomes a silent no-op, an internal diagnostic,
 or a semantic cancellation/failure fact. Add focused tests for each supported
 interruption.
 
-### 2.6 Add semantic facts alongside internal scheduled events
+### 2.7 Add semantic facts alongside internal scheduled events
 
 Keep internal events for deterministic future work. Add a separate ordered fact
 stream for meaningful completed changes. Facts should have stable identities or
@@ -180,7 +221,7 @@ sequence numbers so consumers can process them once.
 Scripts and faction systems should react to facts by submitting commands. They
 should not receive unrestricted mutation callbacks.
 
-### 2.7 Replace scenario termination with objective state
+### 2.8 Replace scenario termination with objective state
 
 Keep bounded stopping conditions in headless acceptance scenarios, benchmarks,
 and tests. A normal game session should continue until the player quits or an
@@ -190,7 +231,7 @@ Construction milestones, quest completion, victory, and defeat should be
 represented as objective or game-state facts rather than implicit engine
 termination.
 
-### 2.8 Generalize presentation snapshots incrementally
+### 2.9 Generalize presentation snapshots incrementally
 
 Retain immutable snapshots, but introduce presentation models organized around
 gameplay needs rather than the Phase 1 fixture. Add current order, controller,

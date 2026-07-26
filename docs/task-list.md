@@ -17,15 +17,6 @@ The current architectural goal is to establish the command and ordering
 boundaries required for an interactive game. Work roughly from top to bottom;
 later tasks may be refined as earlier contracts become concrete.
 
-- [ ] **TASK-002: Define the gameplay command contract**
-  - Separate requested intent from internal scheduled events.
-  - Define command acceptance, rejection, validation, ordering, and failure
-    results.
-  - Define how player, AI, dialogue, and scripts identify their command source
-    without introducing multiplayer authority concepts.
-  - Record commands sufficiently for deterministic tests and debugging.
-  - Context: [Gameplay integration §1.2 and §2.2](gameplay-integration.md#12-there-is-no-general-gameplay-command-boundary)
-
 - [ ] **TASK-003: Introduce a persistent game-session facade**
   - Accept gameplay commands.
   - Advance authoritative simulation time without a fixture-specific success
@@ -198,6 +189,14 @@ prerequisites and desired behavior are sufficiently defined.
   - Same-time work may target the current or a later phase but cannot reopen a
     completed phase.
   - Context: [Gameplay integration §1.1 and §2.1](gameplay-integration.md#11-same-time-event-ordering-does-not-provide-a-complete-phase-barrier)
+
+- [x] **TASK-002: Define the gameplay command contract**
+  - Gameplay intent is distinct from scheduled events and receives deterministic
+    sequence, simulation-time, source, result, and diagnostic records.
+  - Source attribution supports player, autonomous, dialogue, and script
+    callers without authentication or multiplayer-authority semantics.
+  - Persistent-session integration remains in `TASK-003`.
+  - Context: [Gameplay integration §1.2 and §2.2](gameplay-integration.md#12-there-is-no-general-gameplay-command-boundary)
 
 - [x] **DONE-001: Establish the project vision and modular design documents**
   - The project defines a persistent, map-command, materially causal,
