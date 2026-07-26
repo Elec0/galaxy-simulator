@@ -42,3 +42,19 @@ ownership, state transitions, or a multi-step flow. Prefer a small Mermaid
 diagram that is readable alongside the surrounding prose. Do not add decorative
 diagrams or use a diagram as a substitute for the written behavioral contract,
 and keep diagrams synchronized when the documented design changes.
+
+## Performance and concurrency
+
+Parallel readiness is a project-wide architectural requirement. Keep
+authoritative ownership explicit; separate stable read/evaluate work from
+buffered effects and deterministic commit; and make substantial workloads
+batchable without tying one entity, system, or subsystem to one thread.
+
+Simulation results must not depend on worker count, work-stealing order, or
+which worker finishes first. Do not introduce hidden cross-owner mutation,
+task-per-entity designs, pervasive locks, or sequence allocation based on
+concurrent completion order. Retain a single-thread reference path and add
+concurrent execution only with focused deterministic tests and benchmark
+evidence. Follow
+[`docs/concurrency-and-performance.md`](docs/concurrency-and-performance.md)
+for the full contract.

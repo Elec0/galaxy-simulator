@@ -1,6 +1,6 @@
 # Simulation architecture
 
-[Project index](../README.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Technical direction](technical-direction.md) · [Time and pacing](time-and-pacing.md)
+[Project index](../README.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Technical direction](technical-direction.md) · [Time and pacing](time-and-pacing.md)
 
 ## Goals
 
@@ -74,6 +74,14 @@ Different activities should use the update model appropriate to them:
 - Visual interpolation between authoritative simulation changes
 
 An entity remains individually simulated even when it is represented by scheduled events rather than continuous polling.
+
+Parallel evaluation must preserve this update model and its deterministic phase
+barriers. Systems read stable phase state and publish buffered effects;
+authoritative mutation, cross-system transfer, event sequencing, and conflict
+resolution occur through defined commits rather than worker timing. Systems are
+natural ownership boundaries but may expose many work batches when one system
+is crowded. See
+[Concurrency and performance architecture](concurrency-and-performance.md).
 
 ## Reproducibility
 

@@ -1,6 +1,6 @@
 # Gameplay integration issues and decisions
 
-[Project index](../README.md) · [Project task list](task-list.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Technical direction](technical-direction.md) · [Initial roadmap](roadmap.md)
+[Project index](../README.md) · [Project task list](task-list.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Technical direction](technical-direction.md) · [Initial roadmap](roadmap.md)
 
 This document tracks architectural work needed to turn the current deterministic
 simulation into an interactive game that can support player commands, dialogue,
@@ -228,6 +228,12 @@ objectives, and other behavior behind explicit system boundaries. Define:
 
 A fixed, explicit dispatcher is sufficient initially. A dynamic plugin system
 or general-purpose event bus is not required.
+
+Each system boundary should also define stable read inputs, independently
+batchable evaluation work, buffered effects, and deterministic commit rules.
+This permits later concurrent execution without allowing worker scheduling or
+lock acquisition to determine simulation results. The full contract is in
+[Concurrency and performance architecture](concurrency-and-performance.md).
 
 ### 2.6 Complete cancellation and invalidation behavior
 

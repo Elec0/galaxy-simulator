@@ -1,6 +1,6 @@
 # Technical direction
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Initial roadmap](roadmap.md)
+[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Initial roadmap](roadmap.md)
 
 ## Current direction
 
@@ -46,7 +46,19 @@ The first performance goal is to avoid unnecessary work:
 - Avoid galaxy-wide searches by individual ships
 - Render only the information needed at the current zoom level
 
-Parallel processing should follow profiling and deterministic-design needs rather than being added automatically.
+Concurrent execution should follow profiling and deterministic-design evidence,
+while parallel-ready boundaries are established from the beginning.
+
+Parallel readiness is nevertheless a design requirement now. Simulation
+systems should expose explicit state ownership, stable read inputs, independent
+evaluation batches, buffered effects, and deterministic merge and commit
+rules. A crowded system must be divisible into multiple spatial and behavior
+batches; a system must not be permanently equated with one thread.
+
+The runtime will retain a single-thread reference mode. Concurrent execution is
+introduced incrementally where benchmarks show useful work, and authoritative
+results must remain invariant across worker counts and scheduling orders. See
+[Concurrency and performance architecture](concurrency-and-performance.md).
 
 Phase 1 will execute deterministically on one thread. Simulation time, inventory, cargo, production work, and other conserved quantities should prefer integers. Explicit fixed-point values may be used where integer units are not sufficiently expressive. Floating-point values should not be used for conserved economic quantities.
 

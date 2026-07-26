@@ -1,6 +1,6 @@
 # Navigation and spatial architecture
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Player experience](player-experience.md) · [Gameplay integration](gameplay-integration.md) · [Project task list](task-list.md)
+[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Player experience](player-experience.md) · [Gameplay integration](gameplay-integration.md) · [Project task list](task-list.md)
 
 ## Purpose
 
@@ -15,7 +15,75 @@ position, and a place where an activity occurs.
 
 This document defines the boundaries that should be established before the
 first interactive ship move order. It does not select a final pathfinding
-algorithm, collision model, numeric coordinate representation, or scale.
+algorithm, collision model, physical coordinate unit, or scale target.
+
+## Implementation status
+
+The first `TASK-028` implementation slice now provides:
+
+- Typed system and motion identities
+- Signed 64-bit system-local coordinates with deliberately unspecified unit
+  scale
+- Position destination intent and a `RouteId`-free local planner
+- Actor-specific travel-time estimation outside the planning contract
+- Authoritative present and local-motion ship states
+- Scheduled arrival with identity, generation, state, and time validation
+- Cancellation and replacement that materialize the current position before
+  invalidating prior completion
+- Immutable snapshots containing the derived current position and
+  authoritative motion segment
+
+This subsystem is rendering-independent and tested headlessly. It is not yet
+wired into `GameSession`, the Phase 1 transport graph, or Godot; the first
+interactive order performs that integration in `TASK-005`. Connector topology,
+connector traversal, entity destinations, system-only destinations, docking,
+and attachment remain later slices described below.
+
+## Design at a glance
+
+The player or an autonomous actor chooses a destination. The simulation decides
+how to reach it and executes that decision as authoritative movement. A local
+journey stays within one system; a longer journey composes local movement with
+one or more connector traversals.
+
+```mermaid
+flowchart LR
+    subgraph system_a["System A: local 2D space"]
+        ship["Ship"]
+        gate_a["Gate endpoint"]
+        ship -->|"local movement"| gate_a
+    end
+
+    subgraph system_b["System B: local 2D space"]
+        gate_b["Gate endpoint"]
+        destination["Destination station"]
+        gate_b -->|"local movement"| destination
+    end
+
+    gate_a ==>|"connector traversal"| gate_b
+```
+
+The ship, station, and gate endpoints have positions within their systems, but
+do not become nodes in one galaxy-wide movement graph. The line between the
+gate endpoints represents transit topology, not physical distance between the
+two system maps.
+
+The most important boundary is that an order says **where to go**, while
+navigation decides **how to get there**. The chosen path may change without
+changing the order's meaning.
+
+### Terms used in this document
+
+| Term | Meaning |
+| --- | --- |
+| System | One authoritative two-dimensional local space |
+| Spatial entity | A ship, station, gate, resource site, or other physical object located in a system |
+| Connector | The general transit mechanism, initially a gate |
+| Connector endpoint | A physical entry or exit entity positioned within a system |
+| Transit connection | A directional topology link from one connector endpoint to another |
+| Destination | The position, entity, or system named by movement intent |
+| Travel plan | A replaceable internal sequence of local and connector legs |
+| Motion segment | Authoritative scheduled movement between two positions in one system |
 
 ## Core model
 
@@ -36,14 +104,15 @@ that can disagree with it.
 
 ### Connectors join systems
 
-A gate is a physical entity with an endpoint in a system. A transit connection
-relates that endpoint to an endpoint in another system and defines direction,
-availability, traversal duration, and access requirements.
+A gate endpoint is a physical entity positioned in a system. A transit
+connection leads from that endpoint to an endpoint in another system and
+defines direction, availability, traversal duration, and access requirements.
 
-The general concept is a connector so future transit mechanisms do not have to
-pretend to be gates. The first implementation can support gates only. A
-bidirectional gate pair may be represented by two directional connections when
-their rules or state can differ.
+Connector is the general concept covering the endpoints and transit behavior,
+so future mechanisms do not have to pretend to be gates. The first
+implementation can support gates only. A bidirectional gate pair may be
+represented by two directional connections when their rules or state can
+differ.
 
 Entering a connector and travelling through it are different from moving
 through ordinary local space. A ship must first reach the source endpoint,
@@ -58,6 +127,23 @@ Every ship must be in exactly one physical state:
 - Following a local motion segment within a system
 - Traversing a connector between systems
 - Attached to another entity through a state such as docking
+
+```mermaid
+stateDiagram-v2
+    [*] --> Present
+    Present --> LocalMotion: begin local leg
+    LocalMotion --> Present: arrive, cancel, or replace
+    Present --> ConnectorTransit: enter connector
+    ConnectorTransit --> Present: emerge
+    Present --> Attached: dock
+    Attached --> Present: undock
+```
+
+`Present` includes a system and local position. `LocalMotion` contains enough
+information to derive that position at any time during the segment.
+`ConnectorTransit` records the source, destination, and timing even though the
+ship does not occupy ordinary local space during the transition. `Attached`
+locates the ship through the entity to which it is attached.
 
 The exact data types remain an implementation decision, but these states must
 not be represented by a nullable collection of unrelated fields that can form
@@ -79,6 +165,41 @@ target, or order contracts.
 Navigation is divided into intent, planning, and execution. These boundaries
 are semantic; the first implementation does not need a general plugin system
 or a hierarchy of public interfaces for each paragraph below.
+
+```mermaid
+flowchart TB
+    subgraph intent["Intent and ordering"]
+        direction LR
+        command["Move command<br/>destination intent"]
+        order["Order system<br/>lifecycle and reason"]
+        command --> order
+    end
+
+    subgraph simulation["Authoritative simulation"]
+        direction LR
+        planner["Navigation planner<br/>read-only decision"]
+        plan["Travel plan<br/>local and connector legs"]
+        movement["Movement system<br/>execute current leg"]
+        completion["Scheduled completion<br/>generation validated"]
+        state["Authoritative ship state"]
+        planner --> plan --> movement --> completion --> state
+    end
+
+    subgraph presentation["Presentation"]
+        direction LR
+        snapshot["Immutable snapshot"]
+        godot["Godot<br/>view transform and interpolation"]
+        snapshot --> godot
+    end
+
+    order --> planner
+    state --> snapshot
+    state -.->|"replan at a defined boundary"| planner
+```
+
+The planner reads authoritative state and returns a decision; it does not move
+the ship. Godot reads an immutable result and does not feed rendered positions
+back into the simulation.
 
 ### Destination intent
 
@@ -129,6 +250,23 @@ include travel time, connector identity, access, risk, or actor policy as those
 models become authoritative. An unreachable result includes a stable reason
 suitable for order state and player-facing explanation.
 
+### Scaling navigation within a crowded system
+
+A system is an authoritative spatial container, not an indivisible work item.
+Local navigation and interaction queries must be batchable so one crowded
+system can use multiple workers rather than being limited to one thread.
+
+Two-dimensional spatial indexes should restrict proximity and path queries to
+relevant candidates instead of comparing every ship with every other ship.
+Workers read stable topology and spatial views, then return plan or movement
+proposals for deterministic commit. They do not mutate shared ship state or the
+event agenda while evaluating.
+
+The spatial index, partition dimensions, and batch sizes remain benchmarking
+choices. They must not affect gameplay results. The broader ownership, effect
+buffer, merge, and worker-count rules are defined in
+[Concurrency and performance architecture](concurrency-and-performance.md).
+
 ### Execution
 
 The order system owns the actor's requested destination and lifecycle. The
@@ -160,6 +298,28 @@ or rewind a ship already executing a valid leg. The movement mechanism defines
 whether an active leg is allowed to finish, interrupted into a valid spatial
 state, or failed. The initial compatibility behavior may allow an active leg to
 finish and replan at its boundary, matching the Phase 1 route-disruption rule.
+
+## Example: moving to another system
+
+Suppose a ship in System A receives an order to move to a station in System B:
+
+1. The order retains the station as its destination. It does not name a gate.
+2. Navigation resolves the station's spatial state and selects an accessible
+   connector path using deterministic rules.
+3. The movement system executes a local segment from the ship's current
+   position to the selected gate endpoint in System A.
+4. At the endpoint, traversal rules are validated and connector transit begins.
+5. The ship emerges at the paired endpoint in System B.
+6. Navigation plans the final local segment to the station.
+7. The move order completes only when the ship satisfies the destination's
+   movement completion rule. Docking is a separate gameplay order with its own
+   completion rule.
+
+If the selected gate becomes unavailable before traversal begins, the order
+still means “move to that station.” Navigation may choose another connector or
+place the order in a defined unreachable or waiting state. If traversal has
+already begun, the connector's active-transit rule determines the outcome; the
+initial behavior may allow it to finish.
 
 ## Authority and presentation
 
@@ -214,7 +374,8 @@ The following are architectural decisions:
 The following remain deliberately undefined until a concrete gameplay need or
 scale target exists:
 
-- Coordinate scalar, precision, units, and world bounds
+- Coordinate unit scale, precision requirements, and world bounds; the initial
+  implementation uses signed 64-bit integer units
 - Ship acceleration, turning, collision, and formation movement
 - Local obstacle representation and pathfinding algorithm
 - Gate queueing, congestion, animation, and failure while in transit

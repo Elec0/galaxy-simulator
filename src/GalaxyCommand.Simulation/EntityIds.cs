@@ -26,6 +26,22 @@ public readonly record struct RouteId : IEntityId<RouteId>
     public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }
 
+public readonly record struct SystemId : IEntityId<SystemId>
+{
+    public SystemId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
+    public ulong Value { get; }
+    public static SystemId Create(ulong value) => new(value);
+    public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
+public readonly record struct MotionId : IEntityId<MotionId>
+{
+    public MotionId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
+    public ulong Value { get; }
+    public static MotionId Create(ulong value) => new(value);
+    public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
 public readonly record struct FacilityId : IEntityId<FacilityId>
 {
     public FacilityId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }

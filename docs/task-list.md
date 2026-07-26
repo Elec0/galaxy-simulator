@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -26,6 +26,12 @@ bottom; later tasks may be refined as earlier contracts become concrete.
     keeping rendering interpolation non-authoritative.
   - Preserve the Phase 1 graph as a compatibility backend during migration.
   - Prove scheduled point-to-point movement within one system before `TASK-005`.
+  - Implemented foundation: typed system-local positions, position
+    destinations, `RouteId`-free local planning, authoritative scheduled motion,
+    generation-safe cancellation and replacement, and immutable motion
+    snapshots.
+  - Remaining: connector topology and traversal, additional destination forms,
+    and the later Phase 1 compatibility migration.
   - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 - [ ] **TASK-005: Implement the first interactive ship order**
@@ -59,8 +65,21 @@ bottom; later tasks may be refined as earlier contracts become concrete.
   - Separate production, construction, logistics, and order handling.
   - Define system ownership, handled inputs, emitted facts, and deterministic
     evaluation order.
+  - Separate read/evaluate work from buffered effects and authoritative commit
+    so independent batches can later execute concurrently.
   - Start with a fixed explicit dispatcher; do not add a dynamic plugin system
     without a demonstrated need.
+
+- [ ] **TASK-024: Establish scale, performance, and concurrency targets**
+  - Select target counts for total systems, ships, facilities, factions,
+    active scripts, pending events, and retained facts.
+  - Include a target and benchmark for many active ships in one crowded system,
+    not only galaxy-wide totals.
+  - Measure single-thread behavior first, then scaling across worker counts and
+    batch layouts while requiring identical authoritative results.
+  - Establish evaluation, effect-buffer, deterministic-merge, and ownership
+    boundaries before adding concurrent execution or specialized storage.
+  - Context: [Concurrency and performance architecture](concurrency-and-performance.md)
 
 - [ ] **TASK-010: Generalize presentation snapshots**
   - Replace fixture-specific presentation assumptions incrementally.
@@ -145,11 +164,6 @@ prerequisites and desired behavior are sufficiently defined.
     scriptable.
   - Revisit modding goals and security constraints at that time.
 
-- [ ] **TASK-024: Establish scale and performance targets**
-  - Select target counts for locations, ships, facilities, factions, active
-    scripts, pending events, and retained facts.
-  - Profile before introducing parallel processing or specialized storage.
-
 - [ ] **TASK-025: Define bounded explanation history**
   - Retain enough decisions and facts to explain behavior to the player without
     preserving an unlimited event log.
@@ -166,6 +180,8 @@ prerequisites and desired behavior are sufficiently defined.
 - [ ] **TASK-029: Add long-running stability and performance suites**
   - Add increasing-scale scenarios, invariant checks, benchmarks, and
     reproducible failure traces.
+  - Compare deterministic state and event digests across worker counts, batch
+    sizes, and valid partition layouts.
 
 ## Completed foundations
 

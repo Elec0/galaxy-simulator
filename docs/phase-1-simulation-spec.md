@@ -1,6 +1,6 @@
 # Phase 1 simulation specification
 
-[Project index](../README.md) · [Roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md)
+[Project index](../README.md) · [Roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 ## Purpose
 
@@ -143,7 +143,11 @@ Scheduled events are ordered by:
 
 An event may schedule another event at its current timestamp in the same or a later phase, but it cannot schedule an earlier phase at that timestamp or move simulation time backward. Events must verify their caller-managed generation token and referenced state before applying changes. Invalidated events produce a defined no-op or failure transition rather than mutating stale state.
 
-Phase 1 runs on one thread. Parallel execution is deferred until profiling demonstrates a need and deterministic behavior can be preserved.
+The Phase 1 acceptance runtime runs on one thread and remains a deterministic
+reference path. Concurrent execution is introduced only after profiling, but
+new simulation boundaries must preserve the ownership, batching, buffered
+effect, and deterministic-commit contract defined in
+[Concurrency and performance architecture](concurrency-and-performance.md).
 
 ## Numeric representation
 
