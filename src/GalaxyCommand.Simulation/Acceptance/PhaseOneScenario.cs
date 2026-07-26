@@ -12,8 +12,6 @@ public sealed class PhaseOneScenario
         _runtime = new PhaseOneRuntime(config);
     }
 
-    public SimulationWorld World => _runtime.World;
-
     public IReadOnlyList<ScenarioEventRecord> EventRecords => _runtime.EventRecords;
 
     public IReadOnlyList<DecisionRecord> DecisionRecords => _runtime.DecisionRecords;

@@ -15,42 +15,42 @@ internal static class PhaseOneFixture
     public static PhaseOneFixtureState Create(PhaseOneConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
-        var world = new SimulationWorld();
+        SimulationWorld.Setup setup = SimulationWorld.BeginSetup();
 
-        LocationId mineLocation = world.AddLocation("Mine");
-        LocationId refineryLocation = world.AddLocation("Refinery");
-        LocationId shipyardLocation = world.AddLocation("Shipyard");
+        LocationId mineLocation = setup.AddLocation("Mine");
+        LocationId refineryLocation = setup.AddLocation("Refinery");
+        LocationId shipyardLocation = setup.AddLocation("Shipyard");
 
-        (RouteId mineToRefineryRoute, _) = world.Navigation.AddBidirectionalRoutes(
+        (RouteId mineToRefineryRoute, _) = setup.AddBidirectionalRoutes(
             mineLocation,
             refineryLocation,
             config.RouteDuration);
-        world.Navigation.AddBidirectionalRoutes(
+        setup.AddBidirectionalRoutes(
             refineryLocation,
             shipyardLocation,
             config.RouteDuration);
 
-        MaterialId ore = world.AddMaterial();
-        MaterialId alloy = world.AddMaterial();
-        MaterialId components = world.AddMaterial();
-        OrganizationId organization = world.AddOrganization();
-        FacilityId mine = world.AddFacility();
-        FacilityId refinery = world.AddFacility();
-        FacilityId componentFactory = world.AddFacility();
-        FacilityId shipyardFacility = world.AddFacility();
-        Inventory mineInventory = world.AddInventory(config.FacilityStorageCapacity);
-        Inventory refineryInventory = world.AddInventory(config.FacilityStorageCapacity);
-        Inventory componentInventory = world.AddInventory(config.FacilityStorageCapacity);
-        Inventory shipyardInventory = world.AddInventory(config.FacilityStorageCapacity);
+        MaterialId ore = setup.AddMaterial();
+        MaterialId alloy = setup.AddMaterial();
+        MaterialId components = setup.AddMaterial();
+        OrganizationId organization = setup.AddOrganization();
+        FacilityId mine = setup.AddFacility();
+        FacilityId refinery = setup.AddFacility();
+        FacilityId componentFactory = setup.AddFacility();
+        FacilityId shipyardFacility = setup.AddFacility();
+        Inventory mineInventory = setup.AddInventory(config.FacilityStorageCapacity);
+        Inventory refineryInventory = setup.AddInventory(config.FacilityStorageCapacity);
+        Inventory componentInventory = setup.AddInventory(config.FacilityStorageCapacity);
+        Inventory shipyardInventory = setup.AddInventory(config.FacilityStorageCapacity);
 
         var throughput = new Throughput(1);
-        world.AddProductionLine(
+        setup.AddProductionLine(
             mine,
             mineInventory.Id,
             mineLocation,
             new Recipe([], ore, config.OreBatch, config.MineWork),
             throughput);
-        world.AddProductionLine(
+        setup.AddProductionLine(
             refinery,
             refineryInventory.Id,
             refineryLocation,
@@ -60,7 +60,7 @@ internal static class PhaseOneFixture
                 config.RefineryAlloyOutput,
                 config.RefineryWork),
             throughput);
-        world.AddProductionLine(
+        setup.AddProductionLine(
             componentFactory,
             componentInventory.Id,
             shipyardLocation,
@@ -71,7 +71,7 @@ internal static class PhaseOneFixture
                 config.ComponentWork),
             throughput);
 
-        ShipDesign shipDesign = world.AddShipDesign(
+        ShipDesign shipDesign = setup.AddShipDesign(
             "Phase 1 Freighter",
             new ConstructionRecipe(
                 [new KeyValuePair<MaterialId, Quantity>(
@@ -85,16 +85,16 @@ internal static class PhaseOneFixture
             shipyardLocation,
             shipyardInventory.Id,
             throughput);
-        world.AddShipyard(shipyard);
-        world.EnqueueConstruction(shipyard, shipDesign);
+        setup.AddShipyard(shipyard);
+        setup.EnqueueConstruction(shipyard, shipDesign);
 
         foreach (LocationId location in new[] { mineLocation, refineryLocation })
         {
-            world.AddFreighter(organization, shipDesign, location);
+            setup.AddFreighter(organization, shipDesign, location);
         }
 
         return new PhaseOneFixtureState(
-            world,
+            setup.Complete(),
             shipyard,
             mineToRefineryRoute,
             [ore, alloy, components]);

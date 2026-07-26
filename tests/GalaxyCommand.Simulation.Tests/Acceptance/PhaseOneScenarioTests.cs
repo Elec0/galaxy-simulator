@@ -6,6 +6,12 @@ namespace GalaxyCommand.Simulation.Tests;
 public sealed class PhaseOneScenarioTests
 {
     [Fact]
+    public void AcceptanceFacadeDoesNotExposeMutableWorld()
+    {
+        Assert.Null(typeof(PhaseOneScenario).GetProperty("World"));
+    }
+
+    [Fact]
     public void ApprovedPocChainConstructsAPersistentShip()
     {
         var scenario = new PhaseOneScenario();

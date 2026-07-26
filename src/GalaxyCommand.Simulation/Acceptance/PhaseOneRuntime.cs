@@ -208,7 +208,6 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
 
     public IReadOnlyList<ScenarioEventRecord> EventRecords => _eventRecords;
     public IReadOnlyList<DecisionRecord> DecisionRecords => _decisionRecords;
-    public SimulationWorld World => _world;
     public SimulationTime CurrentTime => _engine.CurrentTime;
 
     public PhaseOneSnapshot CaptureSnapshot()
