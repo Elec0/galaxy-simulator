@@ -144,6 +144,100 @@ public sealed class ConstructionTests
         Assert.Null(process.GetCompletedOrder(orderId));
     }
 
+    [Fact]
+    public void CancelledCompletionCannotMaterializeReplacementOrder()
+    {
+        FacilityId facilityId = new IdSequence<FacilityId>().Allocate();
+        InventoryId inventoryId = new IdSequence<InventoryId>().Allocate();
+        var process = new ConstructionProcess(
+            facilityId,
+            inventoryId,
+            new Throughput(1));
+        var ids = new ConstructionIdSequences();
+        var designIds = new IdSequence<ConstructionDesignId>();
+        var firstDesign = new TestConstructionDesign(
+            designIds.Allocate(),
+            "First",
+            new ConstructionRecipe([], new Work(1)));
+        var secondDesign = new TestConstructionDesign(
+            designIds.Allocate(),
+            "Second",
+            new ConstructionRecipe([], new Work(1)));
+        ConstructionOrderId firstId = process.Enqueue(ids, firstDesign);
+        ConstructionOrderId secondId = process.Enqueue(ids, secondDesign);
+        var inventory = new Inventory(inventoryId, new Quantity(1));
+        ConstructionOrder first = Assert.IsType<ConstructionOrder>(process.GetOrder(firstId));
+        EventGeneration scheduledGeneration = first.Generation;
+        SimulationTime completesAt = Assert.IsType<SimulationTime>(
+            process.PrepareActive(
+                new IdSequence<ReservationId>(),
+                inventory,
+                SimulationTime.Zero));
+        Assert.True(process.CancelActive(inventory));
+        Assert.Equal(secondId, process.ActiveOrder?.Id);
+        Assert.Equal(
+            completesAt,
+            process.PrepareActive(
+                new IdSequence<ReservationId>(),
+                inventory,
+                SimulationTime.Zero));
+        bool materialized = false;
+
+        ScheduledEventDisposition disposition = process.CompleteScheduled(
+            firstId,
+            scheduledGeneration,
+            completesAt,
+            _ => materialized = true,
+            out ConstructionOrder? completed);
+
+        Assert.Equal(ScheduledEventDisposition.IgnoredStaleGeneration, disposition);
+        Assert.False(materialized);
+        Assert.Null(completed);
+        Assert.Equal(ConstructionOrderStatus.Cancelled, first.Status);
+        Assert.Equal(secondId, process.ActiveOrder?.Id);
+        Assert.Equal(ConstructionOrderStatus.Running, process.ActiveOrder?.Status);
+    }
+
+    [Fact]
+    public void CancellingReservedConstructionReleasesInputs()
+    {
+        FacilityId facilityId = new IdSequence<FacilityId>().Allocate();
+        InventoryId inventoryId = new IdSequence<InventoryId>().Allocate();
+        MaterialId materialId = new IdSequence<MaterialId>().Allocate();
+        var inventory = new Inventory(inventoryId, new Quantity(10));
+        inventory.Add(materialId, new Quantity(2));
+        var process = new ConstructionProcess(
+            facilityId,
+            inventoryId,
+            new Throughput(1));
+        ConstructionOrderId orderId = process.Enqueue(
+            new ConstructionIdSequences(),
+            new TestConstructionDesign(
+                new ConstructionDesignId(1),
+                "Cancelled",
+                new ConstructionRecipe(
+                    [
+                        new KeyValuePair<MaterialId, Quantity>(
+                            materialId,
+                            new Quantity(4)),
+                    ],
+                    new Work(1))));
+        Assert.Null(process.PrepareActive(
+            new IdSequence<ReservationId>(),
+            inventory,
+            SimulationTime.Zero));
+        ConstructionOrder order =
+            Assert.IsType<ConstructionOrder>(process.GetOrder(orderId));
+        EventGeneration originalGeneration = order.Generation;
+
+        Assert.True(process.CancelActive(inventory));
+
+        Assert.Equal(ConstructionOrderStatus.Cancelled, order.Status);
+        Assert.Equal(originalGeneration.Next(), order.Generation);
+        Assert.Equal(Quantity.Zero, inventory.Reserved(materialId));
+        Assert.Equal(new Quantity(2), inventory.Stored(materialId));
+    }
+
     private sealed class TestConstructionDesign : ConstructionDesign
     {
         public TestConstructionDesign(

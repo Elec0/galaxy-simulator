@@ -83,13 +83,18 @@ generic runner.
 
 ### 1.5 Scheduled work has an incomplete cancellation contract
 
-Event generation tokens exist, and transport events compare their token with
-current job state. Generations are effectively fixed in the current runtime,
-however, and there is no general contract for cancelling, replacing, or
-invalidating pending work.
+**Status: resolved by `TASK-007`.**
 
-Interactive commands, actor destruction, interrupted orders, route changes,
-and save restoration will all require predictable stale-event behavior.
+Previously, event generation tokens existed but generations were fixed, only
+transport payloads carried them, and a transport event could fail an active-job
+check before discovering that it was stale. Production completions identified
+only a facility, so an old completion could mutate replacement work at that
+facility.
+
+Every scheduled activity mutation now carries stable activity identity and an
+`EventGeneration` in its `ScheduledEvent`. The runtime validates the referenced
+activity, generation, and expected state before mutation, then records an
+explicit `ScheduledEventDisposition`.
 
 ### 1.6 Processed-event records are not semantic game facts
 
@@ -204,13 +209,36 @@ or general-purpose event bus is not required.
 
 ### 2.6 Complete cancellation and invalidation behavior
 
-Define how an order or activity changes its generation when it is cancelled,
-replaced, interrupted, or destroyed. Every scheduled event must verify both its
-generation and referenced state before applying a change.
+The implemented cancellation and invalidation contract is:
 
-Specify whether a stale event becomes a silent no-op, an internal diagnostic,
-or a semantic cancellation/failure fact. Add focused tests for each supported
-interruption.
+1. Every independently replaceable scheduled activity owns an
+   `EventGeneration`, initially zero.
+2. Cancellation, replacement, interruption, or destruction cleanup advances
+   the old activity's generation before another activity can reuse its owner.
+   Generation overflow is a fatal invariant error rather than wraparound.
+3. A scheduled mutation captures both the stable activity identifier and its
+   generation. The handler validates, in order, that the reference exists, the
+   generation matches, and the activity is still in the expected state.
+4. A valid event returns `Applied`. Invalid events are no-ops and return one of
+   `IgnoredStaleGeneration`, `IgnoredMissingReference`, or
+   `IgnoredStateMismatch`. The disposition is retained with the internal event
+   record for deterministic diagnostics.
+5. Ignored events do not emit semantic failure or cancellation facts. Explicit
+   cancellation commands will emit those facts when the semantic fact stream
+   is introduced by `TASK-008`.
+6. Cancelling production or construction releases inputs that are still
+   reserved. Inputs already consumed when work started are not recreated.
+7. Cancelling transport before loading releases the source reservation and
+   restores both supply and demand commitments. Interrupting after loading
+   restores demand, retains the material in ship cargo, releases destination
+   capacity, and leaves the ship at its last authoritative discrete location.
+8. Actor destruction must perform activity cleanup before removing the actor.
+   Any already-pending event that later observes a missing actor is an
+   `IgnoredMissingReference` no-op.
+
+Production, construction, and transport use this contract now. Future actor
+orders must use the same generation and disposition rules when `TASK-006` and
+`TASK-011` introduce their lifecycle APIs.
 
 ### 2.7 Add semantic facts alongside internal scheduled events
 

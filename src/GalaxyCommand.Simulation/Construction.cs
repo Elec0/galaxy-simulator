@@ -81,6 +81,7 @@ public enum ConstructionOrderStatus
     WaitingForInputs,
     Running,
     Completed,
+    Cancelled,
 }
 
 /// <summary>
@@ -108,7 +109,7 @@ public sealed class ConstructionOrder
 
     public SimulationTime? CompletesAt { get; internal set; }
 
-    public EventGeneration Generation { get; } = new(0);
+    public EventGeneration Generation { get; internal set; } = new(0);
 
     internal Quantity ReservedInput(Inventory inventory, MaterialId materialId)
     {
@@ -161,6 +162,8 @@ public sealed class ConstructionProcess
 {
     private readonly Throughput _throughput;
     private readonly Queue<ConstructionOrder> _queued = new();
+    private readonly SortedDictionary<ConstructionOrderId, ConstructionOrder> _orders =
+        new(EntityIdComparer<ConstructionOrderId>.Instance);
     private readonly SortedDictionary<ConstructionOrderId, ConstructionOrder> _completed =
         new(EntityIdComparer<ConstructionOrderId>.Instance);
 
@@ -185,6 +188,9 @@ public sealed class ConstructionProcess
     public ConstructionOrder? GetCompletedOrder(ConstructionOrderId orderId) =>
         _completed.GetValueOrDefault(orderId);
 
+    public ConstructionOrder? GetOrder(ConstructionOrderId orderId) =>
+        _orders.GetValueOrDefault(orderId);
+
     public ConstructionOrderId Enqueue(
         ConstructionIdSequences ids,
         ConstructionDesign design)
@@ -193,6 +199,7 @@ public sealed class ConstructionProcess
         ArgumentNullException.ThrowIfNull(design);
         ConstructionOrderId id = ids.AllocateOrder();
         var order = new ConstructionOrder(id, design);
+        _orders.Add(id, order);
         if (ActiveOrder is null)
         {
             ActiveOrder = order;
@@ -299,6 +306,66 @@ public sealed class ConstructionProcess
         }
 
         return order;
+    }
+
+    public ScheduledEventDisposition CompleteScheduled(
+        ConstructionOrderId orderId,
+        EventGeneration generation,
+        SimulationTime now,
+        Action<ConstructionOrder> materializeProduct,
+        out ConstructionOrder? completed)
+    {
+        ArgumentNullException.ThrowIfNull(materializeProduct);
+        completed = null;
+        if (GetOrder(orderId) is not { } order)
+        {
+            return ScheduledEventDisposition.IgnoredMissingReference;
+        }
+
+        if (order.Generation != generation)
+        {
+            return ScheduledEventDisposition.IgnoredStaleGeneration;
+        }
+
+        if (!ReferenceEquals(ActiveOrder, order)
+            || order.Status != ConstructionOrderStatus.Running
+            || order.CompletesAt != now)
+        {
+            return ScheduledEventDisposition.IgnoredStateMismatch;
+        }
+
+        completed = CompleteActive(now, materializeProduct);
+        return ScheduledEventDisposition.Applied;
+    }
+
+    public bool CancelActive(Inventory inventory)
+    {
+        RequireConfiguredInventory(inventory);
+        if (ActiveOrder is not { } order)
+        {
+            return false;
+        }
+
+        EventGeneration nextGeneration = order.Generation.Next();
+        foreach (ReservationId reservationId in order.AllReservationIds())
+        {
+            if (inventory.GetReservation(reservationId) is not null)
+            {
+                inventory.Release(reservationId);
+            }
+        }
+
+        order.ClearReservations();
+        order.Generation = nextGeneration;
+        order.Status = ConstructionOrderStatus.Cancelled;
+        order.CompletesAt = null;
+        ActiveOrder = null;
+        if (_queued.TryDequeue(out ConstructionOrder? next))
+        {
+            ActiveOrder = next;
+        }
+
+        return true;
     }
 
     private void RequireConfiguredInventory(Inventory inventory)

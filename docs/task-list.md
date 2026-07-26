@@ -23,7 +23,7 @@ later tasks may be refined as earlier contracts become concrete.
     stop.
   - Capture immutable presentation state.
   - Expose ordered semantic facts and command results.
-  - Keep `PhaseOneScenario` available as a bounded acceptance scenario.
+  - Remove `PhaseOneScenario`, as its no longer required.
 
 - [ ] **TASK-004: Separate setup authority from runtime mutation**
   - Keep privileged world construction available to fixtures and save loading.
@@ -49,12 +49,6 @@ later tasks may be refined as earlier contracts become concrete.
     failure.
   - Define how control returns after an override ends.
   - Use one order model for player-controlled and autonomous actors.
-
-- [ ] **TASK-007: Complete scheduled-event cancellation and invalidation**
-  - Define when event generations change.
-  - Validate generation and referenced state before every scheduled mutation.
-  - Define stale-event no-op, diagnostic, and fact-emission behavior.
-  - Cover order replacement, actor destruction, and activity interruption.
 
 - [ ] **TASK-008: Introduce semantic game facts**
   - Keep facts separate from internal completion events.
@@ -197,6 +191,16 @@ prerequisites and desired behavior are sufficiently defined.
     callers without authentication or multiplayer-authority semantics.
   - Persistent-session integration remains in `TASK-003`.
   - Context: [Gameplay integration §1.2 and §2.2](gameplay-integration.md#12-there-is-no-general-gameplay-command-boundary)
+
+- [x] **TASK-007: Complete scheduled-event cancellation and invalidation**
+  - Production, construction, and transport activities advance generations
+    during cancellation or interruption and validate identity, generation, and
+    expected state before scheduled mutation.
+  - Ignored events are deterministic no-ops with recorded stale-generation,
+    missing-reference, or state-mismatch diagnostics.
+  - Future actor-order and destruction APIs must apply this contract in
+    `TASK-006` and `TASK-011`; semantic cancellation facts remain in `TASK-008`.
+  - Context: [Gameplay integration §1.5 and §2.6](gameplay-integration.md#15-scheduled-work-has-an-incomplete-cancellation-contract)
 
 - [x] **DONE-001: Establish the project vision and modular design documents**
   - The project defines a persistent, map-command, materially causal,

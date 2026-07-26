@@ -25,7 +25,9 @@ public sealed record PhaseOneConfig
 public abstract record ScenarioEventKind
 {
     public sealed record Transport(TransportEvent Event) : ScenarioEventKind;
-    public sealed record ProductionComplete(FacilityId FacilityId) : ScenarioEventKind;
+    public sealed record ProductionComplete(
+        FacilityId FacilityId,
+        ProductionJobId JobId) : ScenarioEventKind;
     public sealed record ConstructionComplete(
         FacilityId FacilityId,
         ConstructionOrderId OrderId) : ScenarioEventKind;
@@ -36,6 +38,8 @@ public sealed record ScenarioEventRecord(
     SimulationTime Timestamp,
     EventPhase Phase,
     ulong CreationSequence,
+    EventGeneration Generation,
+    ScheduledEventDisposition Disposition,
     ScenarioEventKind Kind);
 
 public enum DecisionReason
@@ -132,7 +136,9 @@ public sealed record PhaseOneReport(
 internal abstract record PhaseOneEvent
 {
     public sealed record Transport(TransportEvent Event) : PhaseOneEvent;
-    public sealed record ProductionComplete(FacilityId FacilityId) : PhaseOneEvent;
+    public sealed record ProductionComplete(
+        FacilityId FacilityId,
+        ProductionJobId JobId) : PhaseOneEvent;
     public sealed record ConstructionComplete(
         FacilityId FacilityId,
         ConstructionOrderId OrderId) : PhaseOneEvent;
@@ -303,19 +309,22 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
     void ISimulationRuntime<PhaseOneEvent>.AccrueTo(SimulationTime now) =>
         AccrueFacilityTime(now);
 
-    void ISimulationRuntime<PhaseOneEvent>.HandleEvent(
-        PhaseOneEvent simulationEvent,
+    ScheduledEventDisposition ISimulationRuntime<PhaseOneEvent>.HandleEvent(
+        ScheduledEvent<PhaseOneEvent> simulationEvent,
         SimulationTime now,
         EventAgenda<PhaseOneEvent> agenda) =>
         HandleEvent(simulationEvent, now);
 
     void ISimulationRuntime<PhaseOneEvent>.RecordEvent(
-        ScheduledEvent<PhaseOneEvent> simulationEvent)
+        ScheduledEvent<PhaseOneEvent> simulationEvent,
+        ScheduledEventDisposition disposition)
     {
         _eventRecords.Add(new ScenarioEventRecord(
             simulationEvent.Key.Timestamp,
             simulationEvent.Key.Phase,
             simulationEvent.Key.CreationSequence,
+            simulationEvent.Generation,
+            disposition,
             ToEventKind(simulationEvent.Payload)));
     }
 
@@ -326,16 +335,28 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
         return new SimulationTime(checked(arrivesAt.Milliseconds - route.BaseDuration.Milliseconds));
     }
 
-    private void HandleEvent(PhaseOneEvent scenarioEvent, SimulationTime now)
+    private ScheduledEventDisposition HandleEvent(
+        ScheduledEvent<PhaseOneEvent> scheduled,
+        SimulationTime now)
     {
+        PhaseOneEvent scenarioEvent = scheduled.Payload;
         switch (scenarioEvent)
         {
             case PhaseOneEvent.Transport transport:
-                TransportJob before = GetTransportJob(transport.Event.JobId);
+                if (scheduled.Generation != transport.Event.Generation)
+                {
+                    return ScheduledEventDisposition.IgnoredStateMismatch;
+                }
+
+                TransportJob? before = _transportBoard.GetJob(transport.Event.JobId);
+                if (before is null)
+                {
+                    return ScheduledEventDisposition.IgnoredMissingReference;
+                }
+
                 TransportJobStatus beforeStatus = before.Status;
-                Freighter freighter = _ships.GetFreighter(before.ShipId)
-                    ?? throw new KeyNotFoundException($"Missing freighter {before.ShipId}.");
-                _transportBoard.HandleEvent(
+                Freighter? freighter = _ships.GetFreighter(before.ShipId);
+                ScheduledEventDisposition transportDisposition = _transportBoard.HandleEvent(
                     transport.Event,
                     freighter,
                     _inventories,
@@ -345,6 +366,11 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
                     static transportEvent => new PhaseOneEvent.Transport(transportEvent),
                     TransportTiming(),
                     now);
+                if (transportDisposition != ScheduledEventDisposition.Applied)
+                {
+                    return transportDisposition;
+                }
+
                 TransportJob after = GetTransportJob(transport.Event.JobId);
                 if (beforeStatus != TransportJobStatus.Completed
                     && after.Status == TransportJobStatus.Completed)
@@ -362,15 +388,29 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
                     _metrics.TransportJobsFailed = checked(_metrics.TransportJobsFailed + 1);
                 }
 
-                break;
+                return ScheduledEventDisposition.Applied;
 
             case PhaseOneEvent.ProductionComplete production:
-                ProductionLine line = _productionLines[production.FacilityId];
+                if (!_productionLines.TryGetValue(production.FacilityId, out ProductionLine? line))
+                {
+                    return ScheduledEventDisposition.IgnoredMissingReference;
+                }
+
                 Inventory inventory = GetInventory(line.InventoryId);
-                (MaterialId Material, Quantity Quantity)? output = line.ActiveJob is { } job
+                (MaterialId Material, Quantity Quantity)? output =
+                    line.GetJob(production.JobId) is { } job
                     ? (job.Recipe.OutputMaterial, job.Recipe.OutputQuantity)
                     : null;
-                if (line.CompleteActive(_productionIds, inventory, now) && output is { } completed)
+                ScheduledEventDisposition productionDisposition = line.CompleteScheduled(
+                    production.JobId,
+                    scheduled.Generation,
+                    _productionIds,
+                    inventory,
+                    now,
+                    out bool outputStored);
+                if (productionDisposition == ScheduledEventDisposition.Applied
+                    && outputStored
+                    && output is { } completed)
                 {
                     IncrementQuantity(
                         _metrics.ProducedMutable,
@@ -378,29 +418,37 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
                         completed.Quantity);
                 }
 
-                break;
+                return productionDisposition;
 
             case PhaseOneEvent.ConstructionComplete construction:
-                if (construction.FacilityId != _shipyard.FacilityId
-                    || _shipyard.ActiveOrder?.Id != construction.OrderId)
+                if (construction.FacilityId != _shipyard.FacilityId)
                 {
-                    break;
+                    return ScheduledEventDisposition.IgnoredMissingReference;
                 }
 
-                _constructedShipId = _shipyard.CompleteActive(
+                ScheduledEventDisposition constructionDisposition =
+                    _shipyard.CompleteScheduled(
+                    construction.OrderId,
+                    scheduled.Generation,
                     _shipIds,
                     _inventoryIds,
                     _inventories,
                     _ships,
-                    now);
-                break;
+                    now,
+                    out ShipId? constructedShipId);
+                if (constructionDisposition == ScheduledEventDisposition.Applied)
+                {
+                    _constructedShipId = constructedShipId;
+                }
+
+                return constructionDisposition;
 
             case PhaseOneEvent.RouteEnabled route:
                 _navigation.SetRouteEnabled(route.RouteId, route.Enabled);
-                break;
+                return ScheduledEventDisposition.Applied;
 
             default:
-                throw new ArgumentOutOfRangeException(nameof(scenarioEvent));
+                throw new ArgumentOutOfRangeException(nameof(scheduled));
         }
     }
 
@@ -433,11 +481,16 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
                     quantity);
             }
 
+            ProductionJob activeJob = line.ActiveJob
+                ?? throw new InvalidOperationException(
+                    $"Production facility {facilityId} started without an active job.");
             _agenda.Schedule(
                 completesAt,
                 EventPhase.PhysicalCompletion,
-                new EventGeneration(0),
-                new PhaseOneEvent.ProductionComplete(facilityId));
+                activeJob.Generation,
+                new PhaseOneEvent.ProductionComplete(
+                    facilityId,
+                    activeJob.Id));
         }
     }
 
@@ -752,6 +805,8 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
         hash.WriteUInt64(record.Timestamp.Milliseconds);
         hash.WriteByte((byte)record.Phase);
         hash.WriteUInt64(record.CreationSequence);
+        hash.WriteUInt64(record.Generation.Value);
+        hash.WriteByte((byte)record.Disposition);
         switch (record.Kind)
         {
             case ScenarioEventKind.Transport transport:
@@ -761,6 +816,7 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
             case ScenarioEventKind.ProductionComplete production:
                 hash.WriteByte(1);
                 hash.WriteUInt64(production.FacilityId.Value);
+                hash.WriteUInt64(production.JobId.Value);
                 break;
             case ScenarioEventKind.ConstructionComplete construction:
                 hash.WriteByte(2);
@@ -828,7 +884,9 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
         {
             PhaseOneEvent.Transport transport => new ScenarioEventKind.Transport(transport.Event),
             PhaseOneEvent.ProductionComplete production =>
-                new ScenarioEventKind.ProductionComplete(production.FacilityId),
+                new ScenarioEventKind.ProductionComplete(
+                    production.FacilityId,
+                    production.JobId),
             PhaseOneEvent.ConstructionComplete construction =>
                 new ScenarioEventKind.ConstructionComplete(
                     construction.FacilityId,

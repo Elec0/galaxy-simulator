@@ -14,9 +14,14 @@ public interface ISimulationRuntime<TEvent>
 
     void AccrueTo(SimulationTime now);
 
-    void HandleEvent(TEvent simulationEvent, SimulationTime now, EventAgenda<TEvent> agenda);
+    ScheduledEventDisposition HandleEvent(
+        ScheduledEvent<TEvent> simulationEvent,
+        SimulationTime now,
+        EventAgenda<TEvent> agenda);
 
-    void RecordEvent(ScheduledEvent<TEvent> simulationEvent);
+    void RecordEvent(
+        ScheduledEvent<TEvent> simulationEvent,
+        ScheduledEventDisposition disposition);
 }
 
 /// <summary>
@@ -106,8 +111,9 @@ public sealed class SimulationEngine<TEvent>
 
             while (_agenda.PopNextInCurrentPhase() is { } scheduled)
             {
-                _runtime.HandleEvent(scheduled.Payload, timestamp, _agenda);
-                _runtime.RecordEvent(scheduled);
+                ScheduledEventDisposition disposition =
+                    _runtime.HandleEvent(scheduled, timestamp, _agenda);
+                _runtime.RecordEvent(scheduled, disposition);
                 eventsProcessed = checked(eventsProcessed + 1);
             }
         }

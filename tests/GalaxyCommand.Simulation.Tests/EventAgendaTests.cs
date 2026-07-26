@@ -117,4 +117,12 @@ public sealed class EventAgendaTests
             agenda.AdvanceTo(new SimulationTime(11)));
         Assert.Equal(SimulationTime.Zero, agenda.CurrentTime);
     }
+
+    [Fact]
+    public void EventGenerationAdvancesAndRejectsOverflow()
+    {
+        Assert.Equal(new EventGeneration(8), new EventGeneration(7).Next());
+        Assert.Throws<OverflowException>(() =>
+            new EventGeneration(ulong.MaxValue).Next());
+    }
 }

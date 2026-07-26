@@ -13,7 +13,23 @@ public enum EventPhase
 /// <summary>
 /// Caller-managed generation used to recognize stale scheduled events.
 /// </summary>
-public readonly record struct EventGeneration(ulong Value);
+public readonly record struct EventGeneration(ulong Value)
+{
+    public EventGeneration Next() =>
+        new(checked(Value + 1));
+}
+
+/// <summary>
+/// Deterministic result of validating and handling one scheduled event.
+/// Ignored events never mutate authoritative state.
+/// </summary>
+public enum ScheduledEventDisposition
+{
+    Applied,
+    IgnoredStaleGeneration,
+    IgnoredMissingReference,
+    IgnoredStateMismatch,
+}
 
 /// <summary>
 /// Complete deterministic ordering key for a scheduled event.

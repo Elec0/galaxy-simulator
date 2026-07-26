@@ -182,6 +182,28 @@ public sealed class SimulationEngineTests
     }
 
     [Fact]
+    public void RuntimeRecordsIgnoredEventDispositionWithoutMutation()
+    {
+        var runtime = new CounterRuntime();
+        var simulation = new SimulationEngine<CounterEvent>(runtime);
+        simulation.Schedule(
+            new SimulationTime(100),
+            EventPhase.PhysicalCompletion,
+            new EventGeneration(0),
+            new CounterEvent(
+                10,
+                ScheduledEventDisposition.IgnoredStaleGeneration));
+
+        RunReport report = simulation.RunUntil(new SimulationTime(100));
+
+        Assert.Equal(0, runtime.Value);
+        Assert.Equal(1, report.EventsProcessed);
+        Assert.Equal(
+            [ScheduledEventDisposition.IgnoredStaleGeneration],
+            runtime.Dispositions);
+    }
+
+    [Fact]
     public void RunUntilRejectsBackwardTimeTravel()
     {
         var simulation = new SimulationEngine<CounterEvent>(new CounterRuntime());
@@ -192,7 +214,9 @@ public sealed class SimulationEngineTests
         Assert.Equal(new SimulationTime(100), simulation.CurrentTime);
     }
 
-    private sealed record CounterEvent(int Delta);
+    private sealed record CounterEvent(
+        int Delta,
+        ScheduledEventDisposition Disposition = ScheduledEventDisposition.Applied);
 
     private sealed class CounterRuntime : ISimulationRuntime<CounterEvent>
     {
@@ -206,6 +230,8 @@ public sealed class SimulationEngineTests
         public int Value { get; private set; }
 
         public List<EventPhase> ProcessedPhases { get; } = [];
+
+        public List<ScheduledEventDisposition> Dispositions { get; } = [];
 
         public List<int> ValuesSeenDuringReconciliation { get; } = [];
 
@@ -237,11 +263,17 @@ public sealed class SimulationEngineTests
             AccruedTimes.Add(now);
         }
 
-        public void HandleEvent(
-            CounterEvent simulationEvent,
+        public ScheduledEventDisposition HandleEvent(
+            ScheduledEvent<CounterEvent> scheduled,
             SimulationTime now,
             EventAgenda<CounterEvent> agenda)
         {
+            CounterEvent simulationEvent = scheduled.Payload;
+            if (simulationEvent.Disposition != ScheduledEventDisposition.Applied)
+            {
+                return simulationEvent.Disposition;
+            }
+
             Value = checked(Value + simulationEvent.Delta);
             if (ScheduleFollowUpEvents
                 && simulationEvent.Delta == 1)
@@ -262,11 +294,16 @@ public sealed class SimulationEngineTests
                     new EventGeneration(0),
                     new CounterEvent(0));
             }
+
+            return ScheduledEventDisposition.Applied;
         }
 
-        public void RecordEvent(ScheduledEvent<CounterEvent> simulationEvent)
+        public void RecordEvent(
+            ScheduledEvent<CounterEvent> simulationEvent,
+            ScheduledEventDisposition disposition)
         {
             ProcessedPhases.Add(simulationEvent.Key.Phase);
+            Dispositions.Add(disposition);
         }
     }
 }

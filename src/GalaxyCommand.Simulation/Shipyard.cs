@@ -54,6 +54,9 @@ public sealed class Shipyard
         SimulationTime now) =>
         _construction.PrepareActive(reservationIds, inventory, now);
 
+    public bool CancelActive(Inventory inventory) =>
+        _construction.CancelActive(inventory);
+
     public ShipId? CompleteActive(
         IdSequence<ShipId> shipIds,
         IdSequence<InventoryId> inventoryIds,
@@ -90,5 +93,49 @@ public sealed class Shipyard
             : constructedShipId
                 ?? throw new InvalidOperationException(
                     $"Construction order {completed.Id} completed without creating a ship.");
+    }
+
+    public ScheduledEventDisposition CompleteScheduled(
+        ConstructionOrderId orderId,
+        EventGeneration generation,
+        IdSequence<ShipId> shipIds,
+        IdSequence<InventoryId> inventoryIds,
+        InventoryRegistry inventories,
+        ShipRegistry ships,
+        SimulationTime now,
+        out ShipId? constructedShipId)
+    {
+        ShipId? materializedShipId = null;
+        ScheduledEventDisposition disposition = _construction.CompleteScheduled(
+            orderId,
+            generation,
+            now,
+            order =>
+            {
+                if (order.Design is not ShipDesign design)
+                {
+                    throw new InvalidOperationException(
+                        $"Shipyard cannot materialize construction design {order.Design.Id}.");
+                }
+
+                ShipId shipId = shipIds.Allocate();
+                InventoryId cargoInventoryId = inventoryIds.Allocate();
+                inventories.Add(new Inventory(cargoInventoryId, design.CargoCapacity));
+                ships.AddFreighter(new Ship(
+                    shipId,
+                    OrganizationId,
+                    design.Id,
+                    LocationId,
+                    cargoInventoryId));
+                _constructedShips.Add(order.Id, shipId);
+                materializedShipId = shipId;
+            },
+            out ConstructionOrder? completed);
+        constructedShipId = completed is null
+            ? null
+            : materializedShipId
+                ?? throw new InvalidOperationException(
+                    $"Construction order {completed.Id} completed without creating a ship.");
+        return disposition;
     }
 }

@@ -179,7 +179,7 @@ public sealed class TransportTests
         RouteId routeId = Assert.IsType<TransportEvent.Arrive>(arrival.Payload).RouteId;
         fixture.Graph.SetRouteEnabled(routeId, false);
 
-        bool applied = fixture.Board.HandleEvent(
+        ScheduledEventDisposition disposition = fixture.Board.HandleEvent(
             arrival.Payload,
             fixture.Freighter,
             fixture.Inventories,
@@ -189,7 +189,7 @@ public sealed class TransportTests
             timing,
             arrival.Key.Timestamp);
 
-        Assert.True(applied);
+        Assert.Equal(ScheduledEventDisposition.Applied, disposition);
         Assert.Equal(fixture.SourceLocation, fixture.Freighter.LocationId);
         Assert.Equal(TransportJobStatus.Loading, fixture.Board.GetJob(jobId)?.Status);
     }
@@ -328,6 +328,166 @@ public sealed class TransportTests
         Assert.Null(fixture.Freighter.ActiveJobId);
         Assert.Equal<ulong>(10, Assert.IsType<SupplyOffer>(fixture.Board.GetSupply(offerId)).Remaining.Units);
         Assert.Equal<ulong>(4, Assert.IsType<DemandRequest>(fixture.Board.GetDemand(demandId)).Remaining.Units);
+    }
+
+    [Fact]
+    public void CancellationInvalidatesPendingArrivalAndRestoresCommitments()
+    {
+        TransportFixture fixture = CreateFixture();
+        TransportJobId jobId = PublishAndAssign(fixture);
+        TransportJob job = Assert.IsType<TransportJob>(fixture.Board.GetJob(jobId));
+        EventGeneration scheduledGeneration = job.Generation;
+        var capacityReservationIds = new IdSequence<CapacityReservationId>();
+        var agenda = new EventAgenda<TransportEvent>();
+        TransportTiming timing = CreateTiming();
+        fixture.Board.StartOrRetry(
+            jobId,
+            fixture.Freighter,
+            fixture.Inventories,
+            capacityReservationIds,
+            fixture.Graph,
+            agenda,
+            timing,
+            SimulationTime.Zero);
+        ScheduledEvent<TransportEvent> arrival = Assert.IsType<ScheduledEvent<TransportEvent>>(
+            agenda.PopNextThrough(new SimulationTime(10)));
+
+        Assert.True(fixture.Board.CancelOrInterrupt(
+            jobId,
+            fixture.Freighter,
+            fixture.Inventories));
+        ScheduledEventDisposition disposition = fixture.Board.HandleEvent(
+            arrival.Payload,
+            fixture.Freighter,
+            fixture.Inventories,
+            capacityReservationIds,
+            fixture.Graph,
+            agenda,
+            timing,
+            arrival.Key.Timestamp);
+
+        Assert.Equal(ScheduledEventDisposition.IgnoredStaleGeneration, disposition);
+        Assert.Equal(scheduledGeneration.Next(), job.Generation);
+        Assert.Equal(TransportJobStatus.Cancelled, job.Status);
+        Assert.Null(fixture.Freighter.ActiveJobId);
+        Assert.Equal(
+            new Quantity(10),
+            fixture.Board.GetSupply(job.SupplyOfferId)?.Remaining);
+        Assert.Equal(
+            new Quantity(4),
+            fixture.Board.GetDemand(job.DemandRequestId)?.Remaining);
+        Assert.Equal(
+            Quantity.Zero,
+            fixture.Inventories.Get(job.SourceInventoryId)?.Reserved(job.MaterialId));
+    }
+
+    [Fact]
+    public void InterruptionAfterLoadingRetainsCargoAndReleasesDestinationCapacity()
+    {
+        TransportFixture fixture = CreateFixture();
+        TransportJobId jobId = PublishAndAssign(fixture);
+        TransportJob job = Assert.IsType<TransportJob>(fixture.Board.GetJob(jobId));
+        var capacityReservationIds = new IdSequence<CapacityReservationId>();
+        var agenda = new EventAgenda<TransportEvent>();
+        TransportTiming timing = CreateTiming();
+        fixture.Board.StartOrRetry(
+            jobId,
+            fixture.Freighter,
+            fixture.Inventories,
+            capacityReservationIds,
+            fixture.Graph,
+            agenda,
+            timing,
+            SimulationTime.Zero);
+        for (int processed = 0; processed < 3; processed++)
+        {
+            ScheduledEvent<TransportEvent> scheduled =
+                Assert.IsType<ScheduledEvent<TransportEvent>>(
+                    agenda.PopNextThrough(new SimulationTime(10_000)));
+            Assert.Equal(
+                ScheduledEventDisposition.Applied,
+                fixture.Board.HandleEvent(
+                    scheduled.Payload,
+                    fixture.Freighter,
+                    fixture.Inventories,
+                    capacityReservationIds,
+                    fixture.Graph,
+                    agenda,
+                    timing,
+                    scheduled.Key.Timestamp));
+        }
+
+        Assert.Equal(TransportJobStatus.Unloading, job.Status);
+        ScheduledEvent<TransportEvent> unloading =
+            Assert.IsType<ScheduledEvent<TransportEvent>>(
+                agenda.PopNextThrough(new SimulationTime(10_000)));
+        Assert.True(fixture.Board.CancelOrInterrupt(
+            jobId,
+            fixture.Freighter,
+            fixture.Inventories));
+
+        Assert.Equal(
+            ScheduledEventDisposition.IgnoredStaleGeneration,
+            fixture.Board.HandleEvent(
+                unloading.Payload,
+                fixture.Freighter,
+                fixture.Inventories,
+                capacityReservationIds,
+                fixture.Graph,
+                agenda,
+                timing,
+                unloading.Key.Timestamp));
+        Assert.Equal(TransportJobStatus.Cancelled, job.Status);
+        Assert.Equal(
+            new Quantity(4),
+            fixture.Inventories.Get(fixture.Freighter.CargoInventoryId)?
+                .Stored(fixture.Material));
+        Assert.Equal(
+            Quantity.Zero,
+            fixture.Inventories.Get(fixture.DestinationInventoryId)?.ReservedCapacity);
+        Assert.Equal(
+            new Quantity(6),
+            fixture.Board.GetSupply(job.SupplyOfferId)?.Remaining);
+        Assert.Equal(
+            new Quantity(4),
+            fixture.Board.GetDemand(job.DemandRequestId)?.Remaining);
+    }
+
+    [Fact]
+    public void EventWithMissingActorIsIgnoredWithoutMutation()
+    {
+        TransportFixture fixture = CreateFixture();
+        TransportJobId jobId = PublishAndAssign(fixture);
+        var capacityReservationIds = new IdSequence<CapacityReservationId>();
+        var agenda = new EventAgenda<TransportEvent>();
+        TransportTiming timing = CreateTiming();
+        fixture.Board.StartOrRetry(
+            jobId,
+            fixture.Freighter,
+            fixture.Inventories,
+            capacityReservationIds,
+            fixture.Graph,
+            agenda,
+            timing,
+            SimulationTime.Zero);
+        ScheduledEvent<TransportEvent> arrival = Assert.IsType<ScheduledEvent<TransportEvent>>(
+            agenda.PopNextThrough(new SimulationTime(10)));
+        TransportJob job = Assert.IsType<TransportJob>(fixture.Board.GetJob(jobId));
+
+        ScheduledEventDisposition disposition = fixture.Board.HandleEvent(
+            arrival.Payload,
+            null,
+            fixture.Inventories,
+            capacityReservationIds,
+            fixture.Graph,
+            agenda,
+            timing,
+            arrival.Key.Timestamp);
+
+        Assert.Equal(ScheduledEventDisposition.IgnoredMissingReference, disposition);
+        Assert.Equal(TransportJobStatus.TravelingToSource, job.Status);
+        Assert.Equal(fixture.Freighter.ActiveJobId, job.Id);
+        Assert.Equal(new LocationId(1), fixture.Freighter.LocationId);
     }
 
     private static TransportJobId PublishAndAssign(TransportFixture fixture)

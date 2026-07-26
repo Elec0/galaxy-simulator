@@ -16,7 +16,7 @@ public sealed class PhaseOneScenarioTests
         Assert.Equal(3, report.EndingShipCount);
         Assert.Equal<ulong>(675_400, report.EndTime.Milliseconds);
         Assert.Equal<ulong>(46, report.EventsProcessed);
-        Assert.Equal<ulong>(0x6ea5f3e50d5da2d9, report.EventLogDigest);
+        Assert.Equal<ulong>(0x4a648f666a817742, report.EventLogDigest);
         Assert.Equal<ulong>(0x00755abadb989375, report.FinalStateDigest);
         Assert.True(report.Metrics.TransportJobsCreated >= report.Metrics.TransportJobsCompleted);
         Assert.True(report.Metrics.TransportJobsCompleted > 0);
@@ -25,6 +25,8 @@ public sealed class PhaseOneScenarioTests
         Assert.All(report.Metrics.MaterialProduced.Values, quantity =>
             Assert.True(quantity > Quantity.Zero));
         Assert.NotEmpty(scenario.EventRecords);
+        Assert.All(scenario.EventRecords, record =>
+            Assert.Equal(ScheduledEventDisposition.Applied, record.Disposition));
         Assert.Contains(scenario.EventRecords, record =>
             record.Kind is ScenarioEventKind.ConstructionComplete);
         Assert.Contains(scenario.DecisionRecords, record =>
