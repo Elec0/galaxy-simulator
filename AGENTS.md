@@ -9,6 +9,10 @@ work and implementation status.
   prerequisites, and completed foundations are understood.
 - When starting tracked work, keep its existing task ID and update the task in
   place as its scope becomes clearer.
+- If implementation reveals a scope gap, stop work and call out the gap
+  explicitly so the project owner can decide the direction. Do not silently
+  expand the current task, create an architectural workaround, or defer the
+  decision inside the implementation.
 - Add newly discovered work to the task list even when it should not be
   addressed during the current task. Put it in **Future parking lot** unless it
   is clearly current or near-term work.

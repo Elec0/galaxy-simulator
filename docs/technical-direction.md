@@ -14,14 +14,15 @@ A likely workspace division is:
 
 ## Rendering and application framework
 
-Godot with C# is the leading candidate for the 2D application, but the UI framework remains an unresolved choice. The simulation should avoid depending on rendering-specific types or schedules so it remains testable and replaceable.
+Godot with C# is the current 2D application framework. The simulation remains
+independent of rendering-specific types and schedules so it stays headlessly
+testable and replaceable.
 
-The initial Godot integration consumes immutable Phase 1 presentation
-snapshots containing discrete locations, routes, ship state, and scheduled
-travel times. The general model will make system-relative spatial state and
-scheduled motion segments authoritative. Godot transforms those coordinates
-into the current view and may interpolate a segment for display, but rendered
-frame positions never become simulation state.
+Godot consumes immutable general game snapshots containing systems,
+system-relative ship positions, scheduled motion segments, and current move
+orders. It converts clicks into destination commands through `GameSession`,
+transforms authoritative coordinates into the current view, and interpolates
+only for display. Rendered frame positions never become simulation state.
 
 ## Construction model
 

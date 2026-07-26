@@ -56,10 +56,11 @@ The rendering-independent command contract now separates submitted
 submission a simulation timestamp and monotonically increasing
 `CommandSequence`, carries opaque source attribution, returns an explicit
 accepted or rejected result, and records both outcomes. `GameSession` now owns
-this processor, advances the authoritative runtime without the acceptance
-milestone stop, and is the boundary used by Godot. Commands without an
-implemented subsystem handler are rejected and recorded; the first accepted
-ship-order command remains in `TASK-005`.
+this processor and a clean application runtime independent of the Phase 1
+acceptance harness. It advances authoritative time and is the boundary used by
+Godot. `TASK-005` added the first accepted commands for moving and cancelling a
+player ship; commands without an implemented subsystem handler remain rejected
+and recorded.
 
 ### 1.3 Authoritative state is publicly mutable
 
@@ -116,15 +117,20 @@ being destroyed, a relationship changing, or an objective completing.
 
 `RunUntilFirstShip` and the Phase 1 stopping condition end advancement when the
 first constructed ship appears. This remains correct for the acceptance harness
-and its regression fingerprints. Godot now uses `GameSession`, which advances
-beyond that milestone and does not inherit the harness stopping condition.
+and its regression fingerprints. Godot now uses the clean `GameSession`
+runtime, which has no fixture milestone or Phase 1 world state.
 
 ### 1.8 Presentation state is tied to the Phase 1 fixture
 
-The immutable snapshot boundary is appropriate, but `PhaseOneSnapshot` only
-contains the state needed to display the current fixture. It does not expose
-general entity selection data, current orders and reasons, faction identity,
-relationships, dialogue state, objectives, or player knowledge.
+**Status: partially resolved by `TASK-005`.**
+
+The clean application snapshot now exposes systems, authoritative ship
+positions, active motion segments, and current move-order destination, status,
+and reason. Godot no longer consumes `PhaseOneSnapshot`.
+
+The presentation model still lacks controller identity, semantic fact history,
+factions, relationships, dialogue state, objectives, and player knowledge.
+Those fields should be added only as their authoritative models are introduced.
 
 ### 1.9 The Phase 1 navigation boundary exposes its graph model
 
@@ -203,12 +209,19 @@ Godot uses this boundary rather than the bounded scenario or mutable
 use the same boundary as their command handlers are introduced. Ordered
 semantic facts remain in `TASK-008`.
 
+`GameSessionSetup` explicitly supplies initial systems and spatial ships, while
+the navigation policy is injected separately. The session constructs a clean
+`GameRuntime` with its own event vocabulary, order owner, and spatial movement
+owner. It does not wrap `PhaseOneRuntime`.
+
 ### 2.4 Separate setup APIs from runtime mutation
 
-Fixtures construct a world through `SimulationWorld.Setup`. Calling `Complete`
-consumes that capability and hands the internal aggregate to the runtime.
-Future save loading and content initialization should use the same scoped
-setup path.
+Phase 1 fixtures construct their economic world through
+`SimulationWorld.Setup`. Calling `Complete` consumes that capability and hands
+the internal aggregate to the acceptance runtime. The clean application runtime
+uses immutable `GameSessionSetup` input for initial systems and spatial ships.
+This is setup-time initialization, not a public runtime spawning API; general
+spawn and destruction behavior remains in `TASK-011`.
 
 The live game session and bounded acceptance facade expose read models, stable
 identifiers, commands, and records, not the mutable authoritative world.
@@ -292,9 +305,10 @@ termination.
 ### 2.9 Generalize presentation snapshots incrementally
 
 Retain immutable snapshots, but introduce presentation models organized around
-gameplay needs rather than the Phase 1 fixture. Add current order, controller,
-reason, and relevant history when the first interactive ship command is
-implemented. Add dialogue, faction, objective, and knowledge views only when
+gameplay needs rather than the Phase 1 fixture. `TASK-005` introduced
+`GameSnapshot` with system, ship position, motion, current order, destination,
+status, and reason. Controller and semantic history remain in `TASK-006` and
+`TASK-008`. Add dialogue, faction, objective, and knowledge views only when
 their authoritative models exist.
 
 ### 2.10 Establish hierarchical spatial navigation
@@ -317,21 +331,28 @@ The complete contract and migration sequence are in
 
 ### 3.1 System-space movement boundary
 
+**Status: local movement resolved by `TASK-028` and `TASK-005`.**
+
 The system, spatial-state, destination, planning, and scheduled-motion
 boundaries must be established before the first accepted ship move order. The
-first order should prove a point-to-point move within one system. Gate traversal
-can then compose with the same order contract rather than forcing a replacement
+first order now proves a point-to-point move within one system. Gate traversal
+can compose with the same order contract rather than forcing a replacement
 later.
 
 ### 3.2 Actor control and order lifecycle
+
+**Status: first player move-order slice implemented by `TASK-005`; general
+lifecycle remains in `TASK-006`.**
 
 The project needs one order model shared by player-controlled and autonomous
 actors. It must define command authority, validation, queuing, interruption,
 cancellation, completion, failure, and how control returns after a temporary
 scripted override.
 
-The first implementation target should be selecting one ship in Godot, issuing
-a move order, observing its reason and state, and cancelling or replacing it.
+The first implementation selects one ship in Godot, issues a position move
+order, exposes its reason and state, and supports cancellation and replacement.
+Invalid or immediately unreachable requests are command rejections. Waiting and
+genuine failure after command acceptance remain undefined until `TASK-006`.
 
 ### 3.3 Entity lifecycle and explicit spawning
 

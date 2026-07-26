@@ -5,29 +5,27 @@ namespace GalaxyCommand.Simulation;
 /// </summary>
 public sealed class GameSession : IGameplayCommandHandler
 {
-    private readonly PhaseOneRuntime _runtime;
+    private readonly GameRuntime _runtime;
     private readonly GameplayCommandProcessor _commands;
 
-    public GameSession(PhaseOneConfig? initialConfig = null)
+    public GameSession(
+        GameSessionSetup setup,
+        ISpatialNavigationPlanner navigation)
     {
-        _runtime = new PhaseOneRuntime(
-            initialConfig,
-            stopWhenFirstShipConstructed: false);
+        _runtime = new GameRuntime(setup, navigation);
         _commands = new GameplayCommandProcessor(this);
     }
 
     public SimulationTime CurrentTime => _runtime.CurrentTime;
 
-    public IReadOnlyList<ScenarioEventRecord> EventRecords => _runtime.EventRecords;
-
-    public IReadOnlyList<DecisionRecord> DecisionRecords => _runtime.DecisionRecords;
+    public IReadOnlyList<GameEventRecord> EventRecords => _runtime.EventRecords;
 
     public IReadOnlyList<GameplayCommandRecord> CommandRecords => _commands.Records;
 
     public RunReport AdvanceTo(SimulationTime target) =>
         _runtime.AdvanceTo(target);
 
-    public PhaseOneSnapshot CaptureSnapshot() =>
+    public GameSnapshot CaptureSnapshot() =>
         _runtime.CaptureSnapshot();
 
     public GameplayCommandRecord SubmitCommand(
@@ -36,7 +34,5 @@ public sealed class GameSession : IGameplayCommandHandler
         _commands.Submit(CurrentTime, source, command);
 
     CommandResult IGameplayCommandHandler.Handle(GameplayCommandEnvelope envelope) =>
-        CommandResult.Rejected(
-            CommandRejectionCodes.UnsupportedCommand,
-            $"Gameplay command '{envelope.Command.Kind}' is not supported yet.");
+        _runtime.Handle(envelope);
 }

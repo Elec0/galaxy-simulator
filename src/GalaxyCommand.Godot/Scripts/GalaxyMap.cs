@@ -5,17 +5,77 @@ namespace GalaxyCommand.GodotClient;
 
 public partial class GalaxyMap : Control
 {
-	private PhaseOneSnapshot? _snapshot;
+	private const float ShipHitRadius = 14.0f;
+	private GameSnapshot? _snapshot;
+
+	public event Action<ShipId>? ShipSelected;
+	public event Action<SystemPosition>? DestinationRequested;
+	public event Action<ShipId>? CancelRequested;
+
+	public ShipId? SelectedShipId { get; private set; }
 
 	public override void _Ready()
 	{
 		Resized += QueueRedraw;
 	}
 
-	public void Display(PhaseOneSnapshot snapshot)
+	public void Display(GameSnapshot snapshot)
 	{
 		_snapshot = snapshot;
+		if (SelectedShipId is { } selected
+			&& snapshot.Ships.All(ship => ship.Id != selected))
+		{
+			SelectedShipId = null;
+		}
+
 		QueueRedraw();
+	}
+
+	public override void _GuiInput(InputEvent @event)
+	{
+		if (_snapshot is null
+			|| @event is not InputEventMouseButton mouse
+			|| !mouse.Pressed)
+		{
+			return;
+		}
+
+		if (mouse.ButtonIndex == MouseButton.Right)
+		{
+			if (SelectedShipId is { } selected)
+			{
+				CancelRequested?.Invoke(selected);
+				AcceptEvent();
+			}
+
+			return;
+		}
+
+		if (mouse.ButtonIndex != MouseButton.Left)
+		{
+			return;
+		}
+
+		GameShipSnapshot? hit = _snapshot.Ships
+			.OrderBy(ship => ship.Id.Value)
+			.FirstOrDefault(ship =>
+				ToView(ship.Position).DistanceTo(mouse.Position) <= ShipHitRadius);
+		if (hit is not null)
+		{
+			SelectedShipId = hit.Id;
+			ShipSelected?.Invoke(hit.Id);
+			QueueRedraw();
+			AcceptEvent();
+			return;
+		}
+
+		if (SelectedShipId is not null
+			&& _snapshot.Systems.Count == 1)
+		{
+			DestinationRequested?.Invoke(
+				ToSystemPosition(_snapshot.Systems[0].Id, mouse.Position));
+			AcceptEvent();
+		}
 	}
 
 	public override void _Draw()
@@ -25,31 +85,54 @@ public partial class GalaxyMap : Control
 			return;
 		}
 
-		Dictionary<LocationId, Vector2> locations = LayoutLocations(_snapshot.Locations);
-		foreach (RouteSnapshot route in _snapshot.Routes)
-		{
-			Color color = route.IsEnabled ? new Color("294864") : new Color("603845");
-			DrawLine(locations[route.Origin], locations[route.Destination], color, 2.0f, true);
-		}
+		DrawRect(
+			new Rect2(Vector2.Zero, Size),
+			new Color("071521"));
+		DrawLine(
+			new Vector2(Size.X / 2, 90),
+			new Vector2(Size.X / 2, Size.Y - 100),
+			new Color("153146"),
+			1.0f);
+		DrawLine(
+			new Vector2(30, Size.Y / 2),
+			new Vector2(Size.X - 30, Size.Y / 2),
+			new Color("153146"),
+			1.0f);
 
-		foreach (LocationSnapshot location in _snapshot.Locations)
+		if (_snapshot.Systems.Count == 1)
 		{
-			Vector2 position = locations[location.Id];
-			DrawCircle(position, 19.0f, new Color("102c45"));
-			DrawArc(position, 19.0f, 0, Mathf.Tau, 48, new Color("70c7e8"), 2.0f, true);
 			DrawString(
 				ThemeDB.FallbackFont,
-				position + new Vector2(-42, 43),
-				location.Name.ToUpperInvariant(),
-				HorizontalAlignment.Center,
-				84,
-				13,
-				new Color("8aaac0"));
+				new Vector2(28, 118),
+				_snapshot.Systems[0].Name.ToUpperInvariant(),
+				fontSize: 13,
+				modulate: new Color("668ca5"));
 		}
 
-		foreach (ShipSnapshot ship in _snapshot.Ships)
+		foreach (GameShipSnapshot ship in _snapshot.Ships)
 		{
-			Vector2 position = ShipPosition(ship, locations, _snapshot);
+			Vector2 position = ToView(ship.Position);
+			if (ship.CurrentOrder?.Destination is NavigationDestination.Position destination)
+			{
+				Vector2 target = ToView(destination.Value);
+				DrawLine(position, target, new Color("375a6d"), 1.0f, true);
+				DrawCircle(target, 4.0f, new Color("70c7e8"), false, 1.5f, true);
+			}
+
+			bool selected = ship.Id == SelectedShipId;
+			if (selected)
+			{
+				DrawArc(
+					position,
+					12.0f,
+					0,
+					Mathf.Tau,
+					32,
+					new Color("70c7e8"),
+					2.0f,
+					true);
+			}
+
 			DrawCircle(position, 6.0f, new Color("f5c86b"));
 			DrawString(
 				ThemeDB.FallbackFont,
@@ -60,46 +143,15 @@ public partial class GalaxyMap : Control
 		}
 	}
 
-	private Dictionary<LocationId, Vector2> LayoutLocations(
-		IReadOnlyList<LocationSnapshot> snapshots)
-	{
-		var result = new Dictionary<LocationId, Vector2>();
-		for (int index = 0; index < snapshots.Count; index++)
-		{
-			float horizontal = (index + 1.0f) / (snapshots.Count + 1.0f);
-			float vertical = index % 2 == 0 ? 0.48f : 0.34f;
-			result.Add(snapshots[index].Id, new Vector2(horizontal, vertical) * Size);
-		}
+	private Vector2 ToView(SystemPosition position) =>
+		new(
+			(float)(Size.X / 2 + position.Position.X.Units),
+			(float)(Size.Y / 2 - position.Position.Y.Units));
 
-		return result;
-	}
-
-	private static Vector2 ShipPosition(
-		ShipSnapshot ship,
-		Dictionary<LocationId, Vector2> locations,
-		PhaseOneSnapshot snapshot)
-	{
-		Vector2 origin = locations[ship.Location];
-		if (ship.CurrentRoute is not { } routeId
-			|| ship.DepartedAt is not { } departedAt
-			|| ship.ArrivesAt is not { } arrivesAt)
-		{
-			return origin + ShipOffset(ship.Id);
-		}
-
-		RouteSnapshot route = snapshot.Routes.Single(candidate => candidate.Id == routeId);
-		ulong duration = arrivesAt.Milliseconds - departedAt.Milliseconds;
-		double elapsed = snapshot.Time.Milliseconds - departedAt.Milliseconds;
-		float progress = duration == 0
-			? 1.0f
-			: Mathf.Clamp((float)(elapsed / duration), 0.0f, 1.0f);
-		return locations[route.Origin].Lerp(locations[route.Destination], progress)
-			+ ShipOffset(ship.Id);
-	}
-
-	private static Vector2 ShipOffset(ShipId shipId)
-	{
-		int slot = (int)((shipId.Value - 1) % 3);
-		return new Vector2(0, 12 + (slot * 12));
-	}
+	private SystemPosition ToSystemPosition(SystemId systemId, Vector2 position) =>
+		new(
+			systemId,
+			new SpatialPosition(
+				new SpatialCoordinate((long)Math.Round(position.X - (Size.X / 2))),
+				new SpatialCoordinate((long)Math.Round((Size.Y / 2) - position.Y))));
 }

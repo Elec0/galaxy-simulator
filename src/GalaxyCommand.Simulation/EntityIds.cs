@@ -42,6 +42,14 @@ public readonly record struct MotionId : IEntityId<MotionId>
     public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }
 
+public readonly record struct ShipOrderId : IEntityId<ShipOrderId>
+{
+    public ShipOrderId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
+    public ulong Value { get; }
+    public static ShipOrderId Create(ulong value) => new(value);
+    public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
 public readonly record struct FacilityId : IEntityId<FacilityId>
 {
     public FacilityId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }

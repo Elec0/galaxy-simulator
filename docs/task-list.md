@@ -34,22 +34,14 @@ bottom; later tasks may be refined as earlier contracts become concrete.
     and the later Phase 1 compatibility migration.
   - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
-- [ ] **TASK-005: Implement the first interactive ship order**
-  - Select a ship in Godot.
-  - Submit a destination-based move order through the game-session facade.
-  - Move to a selected position within one system through the `TASK-028`
-    navigation boundary.
-  - Display the current order, destination, motion state, and reason.
-  - Support cancelling or replacing the order.
-  - Verify the same command sequence produces the same result headlessly and
-    through the Godot-facing session boundary.
-
 ## Near-term work
 
 - [ ] **TASK-006: Define actor control and order lifecycle**
   - Define player control, autonomous control, and temporary scripted override.
   - Define order states, queuing, interruption, cancellation, completion, and
     failure.
+  - Define genuine post-acceptance order failure and waiting behavior; invalid
+    or immediately unreachable `TASK-005` requests remain command rejections.
   - Define how control returns after an override ends.
   - Use one order model for player-controlled and autonomous actors.
 
@@ -218,6 +210,20 @@ prerequisites and desired behavior are sufficiently defined.
   - Rejected-command tests prove authoritative snapshot, event, and decision
     state remains unchanged.
   - Context: [Gameplay integration §1.3 and §2.4](gameplay-integration.md#13-authoritative-state-is-publicly-mutable)
+
+- [x] **TASK-005: Implement the first interactive ship order**
+  - `GameSession` now owns a clean application runtime rather than the Phase 1
+    acceptance runtime. Explicit setup seeds systems and spatial ships without
+    introducing a general spawning API.
+  - Player move and cancel commands drive one current destination order through
+    deterministic local planning and authoritative scheduled movement.
+  - Completion, cancellation, replacement, command rejection, immutable
+    snapshots, and stale-arrival handling are covered headlessly.
+  - Godot selects a ship, submits or replaces a position destination, cancels
+    with right-click, and displays the order, reason, destination, and motion.
+  - Queues, controller changes, waiting, and genuine post-acceptance failure
+    remain in `TASK-006`; semantic facts remain in `TASK-008`.
+  - Context: [Gameplay integration §2.3, §2.9, and §3.2](gameplay-integration.md#23-introduce-a-persistent-game-session-facade)
 
 - [x] **TASK-007: Complete scheduled-event cancellation and invalidation**
   - Production, construction, and transport activities advance generations

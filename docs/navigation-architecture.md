@@ -33,11 +33,16 @@ The first `TASK-028` implementation slice now provides:
 - Immutable snapshots containing the derived current position and
   authoritative motion segment
 
-This subsystem is rendering-independent and tested headlessly. It is not yet
-wired into `GameSession`, the Phase 1 transport graph, or Godot; the first
-interactive order performs that integration in `TASK-005`. Connector topology,
-connector traversal, entity destinations, system-only destinations, docking,
-and attachment remain later slices described below.
+The subsystem is now wired into the clean application-facing `GameSession` and
+Godot through `TASK-005`. A move command retains its position destination while
+the planner produces one local leg; the movement owner schedules arrival and
+the order owner tracks active, completed, or cancelled state. Replacement
+materializes the current position before starting the new leg.
+
+The Phase 1 transport graph remains isolated in its acceptance runtime and has
+not migrated to these contracts. Connector topology, connector traversal,
+entity destinations, system-only destinations, docking, and attachment remain
+later slices described below.
 
 ## Design at a glance
 
@@ -393,7 +398,7 @@ scale target exists:
 3. Add scheduled local motion between two positions in one system, including
    cancellation, replacement, snapshots, and headless determinism.
 4. Implement the first interactive ship move order against that local-motion
-   boundary.
+   boundary. **Implemented by `TASK-005`.**
 5. Adapt Phase 1 logistics to request reachability and estimates without
    selecting graph legs itself. Preserve its existing deterministic acceptance
    fingerprints until an explicitly approved fixture migration.

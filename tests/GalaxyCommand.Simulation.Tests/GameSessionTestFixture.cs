@@ -1,0 +1,45 @@
+using GalaxyCommand.Simulation;
+
+namespace GalaxyCommand.Simulation.Tests;
+
+internal static class GameSessionTestFixture
+{
+    internal static SystemId System { get; } = new(1);
+
+    internal static ShipId Ship { get; } = new(1);
+
+    internal static CommandSource Player { get; } = new(
+        CommandSourceKind.Player,
+        new CommandSourceId("test-player"));
+
+    internal static GameSession Create()
+    {
+        var setup = new GameSessionSetup(
+            [new StarSystem(System, "Test System")],
+            [new InitialShipSetup(Ship, Position(0, 0))]);
+        return new GameSession(
+            setup,
+            new DirectLocalNavigationPlanner(new FixedTravelTimeEstimator()));
+    }
+
+    internal static NavigationDestination Destination(long x, long y) =>
+        new NavigationDestination.Position(Position(x, y));
+
+    internal static SystemPosition Position(long x, long y) =>
+        new(
+            System,
+            new SpatialPosition(
+                new SpatialCoordinate(x),
+                new SpatialCoordinate(y)));
+
+    private sealed class FixedTravelTimeEstimator : ILocalTravelTimeEstimator
+    {
+        public SimulationDuration Estimate(
+            ShipId actorId,
+            SystemPosition origin,
+            SystemPosition destination) =>
+            origin == destination
+                ? SimulationDuration.Zero
+                : new SimulationDuration(100);
+    }
+}

@@ -44,12 +44,16 @@ nullable-reference checking and treat warnings as errors.
 
 ## Godot graphics client
 
-The graphics foundation is a Godot 4.7.1 .NET project under
+The graphics client is a Godot 4.7.1 .NET project under
 `src/GalaxyCommand.Godot`. It references the rendering-independent simulation
-library and renders immutable presentation snapshots from the live Phase 1
-scenario. The initial client advances automatically at 30× speed so ship travel
-and construction can be observed without changing authoritative simulation
-behavior.
+library and uses the clean `GameSession` runtime rather than the bounded Phase 1
+acceptance scenario. The client advances automatically, renders authoritative
+system-local ship motion, and submits move or cancel commands through the same
+session boundary used by headless tests.
+
+Click a ship to select it, click empty system space to issue or replace its
+destination, and right-click to cancel its active order. The status panel shows
+the current destination, order state and reason, and motion state.
 
 Install the .NET edition of Godot, then open
 `src/GalaxyCommand.Godot/project.godot` in the editor. From this directory, the

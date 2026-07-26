@@ -19,12 +19,16 @@ ships have authoritative system-relative spatial and motion state, while gates
 and other connectors form the inter-system topology. See
 [Navigation and spatial architecture](navigation-architecture.md).
 
-Internal `SimulationWorld` is the concrete owner of that durable state. It
-holds the navigation graph, inventories, production facilities, construction
-sites, design catalog, ships, transport board, and identifier sequences.
-Scenario fixtures populate it through a one-use setup capability that is
-consumed before runtime advancement. Application callers never receive the
-mutable aggregate.
+Internal `SimulationWorld` is the concrete owner of the Phase 1 economic
+acceptance state. It holds the navigation graph, inventories, production
+facilities, construction sites, design catalog, ships, transport board, and
+identifier sequences. The Phase 1 fixture populates it through a one-use setup
+capability that is consumed before runtime advancement.
+
+The application-facing runtime separately owns general system-local spatial
+state and current ship orders. `GameSessionSetup` provides explicit initial
+systems and ship positions. Application callers never receive either mutable
+aggregate.
 
 ### Event runner, sessions, and acceptance harnesses
 
@@ -34,18 +38,29 @@ reconciles systems, handles its event vocabulary, accrues time-based metrics,
 and declares its stopping condition. The engine has no knowledge of Phase 1
 materials, facilities, routes, or victory conditions.
 
-`PhaseOneFixture` builds the proof-of-concept world. `GameSession` is the
-persistent application-facing facade: it binds the fixture and current runtime
-to the reusable engine, advances without a fixture milestone stop, accepts
-gameplay commands, and exposes immutable snapshots and records without exposing
-the mutable world.
+`GameSession` is the persistent application-facing facade. It owns a clean
+`GameRuntime`, command sequencing, a general game event vocabulary, spatial
+movement, and the current player move order. It exposes immutable
+`GameSnapshot` and diagnostic records without exposing mutable state.
 
-`Acceptance/PhaseOneScenario` is a bounded regression harness over that same
-runtime. It retains the first-constructed-ship stopping condition and exact
-event and state fingerprints used by headless acceptance tests and the CLI. It
-is intentionally not used by Godot. Additional bounded fixtures belong under
-`Acceptance/`; they do not define the lifecycle or API of a normal game
-session.
+`PhaseOneFixture` builds the proof-of-concept economic world.
+`Acceptance/PhaseOneScenario` is a separate bounded regression harness over
+`PhaseOneRuntime`. It retains the first-constructed-ship stopping condition and
+exact event and state fingerprints used by headless acceptance tests and the
+CLI. It is intentionally not used by `GameSession` or Godot.
+
+```mermaid
+flowchart LR
+    godot["Godot input and presentation"] --> session["GameSession"]
+    session --> game["GameRuntime<br/>orders and spatial movement"]
+    cli["CLI and acceptance tests"] --> scenario["PhaseOneScenario"]
+    scenario --> phase_one["PhaseOneRuntime<br/>economic fixture"]
+    game --> engine["SimulationEngine"]
+    phase_one --> engine
+```
+
+Additional bounded fixtures belong under `Acceptance/`; they do not define the
+lifecycle or API of a normal game session.
 
 ### Physical and logistical activity
 
