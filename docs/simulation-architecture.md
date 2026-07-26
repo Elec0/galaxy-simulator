@@ -1,6 +1,6 @@
 # Simulation architecture
 
-[Project index](../README.md) · [Technical direction](technical-direction.md) · [Time and pacing](time-and-pacing.md)
+[Project index](../README.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Technical direction](technical-direction.md) · [Time and pacing](time-and-pacing.md)
 
 ## Goals
 
@@ -10,9 +10,14 @@ The simulation should be persistent, inspectable, reproducible, and able to run 
 
 ### World state
 
-The world contains systems, connections, ships, stations, inventories, ownership, relationships, and other durable state.
+The world contains systems, connections, ships, stations, inventories, ownership, relationships, and other durable state. Each system is a distinct local navigable space. Explicit connectors such as gates provide transit between systems.
 
-Phase 1 represents movement as a graph of locations and routes. Travel behavior will depend on an abstract navigation boundary rather than directly on the graph representation so a continuous spatial model can replace or supplement it later.
+Phase 1 represents movement as a graph of locations and routes. That graph is a
+deterministic acceptance backend rather than the target world model. General
+movement separates destination intent, hierarchical planning, and execution;
+ships have authoritative system-relative spatial and motion state, while gates
+and other connectors form the inter-system topology. See
+[Navigation and spatial architecture](navigation-architecture.md).
 
 Internal `SimulationWorld` is the concrete owner of that durable state. It
 holds the navigation graph, inventories, production facilities, construction

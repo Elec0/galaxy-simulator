@@ -1,6 +1,6 @@
 # Technical direction
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Initial roadmap](roadmap.md)
+[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Initial roadmap](roadmap.md)
 
 ## Current direction
 
@@ -16,10 +16,12 @@ A likely workspace division is:
 
 Godot with C# is the leading candidate for the 2D application, but the UI framework remains an unresolved choice. The simulation should avoid depending on rendering-specific types or schedules so it remains testable and replaceable.
 
-The initial Godot integration consumes immutable presentation snapshots. These
-contain discrete simulation locations, routes, ship state, and scheduled travel
-times. Godot assigns screen coordinates and interpolates travel for display;
-continuous rendering positions are not authoritative simulation state.
+The initial Godot integration consumes immutable Phase 1 presentation
+snapshots containing discrete locations, routes, ship state, and scheduled
+travel times. The general model will make system-relative spatial state and
+scheduled motion segments authoritative. Godot transforms those coordinates
+into the current view and may interpolate a segment for display, but rendered
+frame positions never become simulation state.
 
 ## Construction model
 

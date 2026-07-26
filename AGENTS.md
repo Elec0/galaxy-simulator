@@ -28,3 +28,17 @@ work and implementation status.
   multiplayer, networking, replication, remote-authority, client-prediction,
   rollback-netcode, lobby, or related affordances to the task list or
   implementation.
+
+## Architecture documentation
+
+Architecture documents are reviewed directly by the project owner. Write them
+for a human reader rather than as agent-to-agent notes: establish the problem
+and context, explain the chosen boundaries and terminology, make decisions and
+deferred choices explicit, and keep the narrative understandable without
+requiring a code search.
+
+Include a diagram when it materially clarifies relationships, hierarchy,
+ownership, state transitions, or a multi-step flow. Prefer a small Mermaid
+diagram that is readable alongside the surrounding prose. Do not add decorative
+diagrams or use a diagram as a substitute for the written behavioral contract,
+and keep diagrams synchronized when the documented design changes.

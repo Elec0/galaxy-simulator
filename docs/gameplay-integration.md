@@ -1,6 +1,6 @@
 # Gameplay integration issues and decisions
 
-[Project index](../README.md) · [Project task list](task-list.md) · [Simulation architecture](simulation-architecture.md) · [Technical direction](technical-direction.md) · [Initial roadmap](roadmap.md)
+[Project index](../README.md) · [Project task list](task-list.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Technical direction](technical-direction.md) · [Initial roadmap](roadmap.md)
 
 This document tracks architectural work needed to turn the current deterministic
 simulation into an interactive game that can support player commands, dialogue,
@@ -125,6 +125,18 @@ The immutable snapshot boundary is appropriate, but `PhaseOneSnapshot` only
 contains the state needed to display the current fixture. It does not expose
 general entity selection data, current orders and reasons, faction identity,
 relationships, dialogue state, objectives, or player knowledge.
+
+### 1.9 The Phase 1 navigation boundary exposes its graph model
+
+`INavigation` prevents logistics from modifying `RouteGraph` directly, but its
+queries and results still expose `LocationId`, `RouteId`, and `DirectedRoute`.
+Ships, transport events, and snapshots consequently treat movement as discrete
+graph-edge traversal.
+
+That contract cannot directly represent a ship moving freely within a system
+and then using a gate to enter another system. Extending the graph with every
+position, station, gate endpoint, and local waypoint would also collapse local
+space and inter-system topology into one increasingly expensive model.
 
 ## 2. Steps to resolve the current issues
 
@@ -279,9 +291,33 @@ reason, and relevant history when the first interactive ship command is
 implemented. Add dialogue, faction, objective, and knowledge views only when
 their authoritative models exist.
 
+### 2.10 Establish hierarchical spatial navigation
+
+Define systems as distinct local coordinate spaces and connectors such as gates
+as explicit inter-system transitions. Separate destination intent, planning,
+and movement execution so actor orders never contain graph-selected route
+identifiers.
+
+Normal movement should remain deterministic and scheduled by storing an
+authoritative motion segment rather than polling every ship at rendering
+frequency. Local movement and connector traversal compose as different travel
+legs. The Phase 1 graph remains a compatibility backend until its logistics and
+acceptance coverage can migrate deliberately.
+
+The complete contract and migration sequence are in
+[Navigation and spatial architecture](navigation-architecture.md).
+
 ## 3. Issues that need resolution in the near term
 
-### 3.1 Actor control and order lifecycle
+### 3.1 System-space movement boundary
+
+The system, spatial-state, destination, planning, and scheduled-motion
+boundaries must be established before the first accepted ship move order. The
+first order should prove a point-to-point move within one system. Gate traversal
+can then compose with the same order contract rather than forcing a replacement
+later.
+
+### 3.2 Actor control and order lifecycle
 
 The project needs one order model shared by player-controlled and autonomous
 actors. It must define command authority, validation, queuing, interruption,
@@ -291,7 +327,7 @@ scripted override.
 The first implementation target should be selecting one ship in Godot, issuing
 a move order, observing its reason and state, and cancelling or replacing it.
 
-### 3.2 Entity lifecycle and explicit spawning
+### 3.3 Entity lifecycle and explicit spawning
 
 Creation, destruction, and removal need an authoritative lifecycle. Immediate
 scenario or scripted spawning must be distinguished from causal acquisition
@@ -301,7 +337,7 @@ Spawning must define ownership, design, location, initial state, initial order,
 deterministic identifier allocation, validation, and emitted facts. Destruction
 must clean up cargo, reservations, orders, controllers, and pending events.
 
-### 3.3 Dialogue and scripted-event integration
+### 3.4 Dialogue and scripted-event integration
 
 Dialogue presentation belongs in Godot, while gameplay-affecting conditions,
 choices, completion state, and effects belong to the authoritative game
@@ -311,21 +347,21 @@ Scripted behavior needs deterministic triggers, persistent one-time state, and
 a restricted set of command effects. It should consume semantic facts rather
 than internal transport or production implementation events.
 
-### 3.4 Faction and relationship state
+### 3.5 Faction and relationship state
 
 Organizations currently provide identity but not the faction state required by
 strategic behavior, dialogue, hostility, ownership transfer, or enemy
 classification. Relationships, objectives, priorities, and known information
 need authoritative homes before faction-specific scripts are added.
 
-### 3.5 Pause, speed, and input timing
+### 3.6 Pause, speed, and input timing
 
 Define when commands submitted while paused take effect, how commands are
 ordered when several arrive at the same simulation time, and whether opening
 dialogue pauses automatically. These are local single-player rules; no
 multiplayer synchronization behavior is needed.
 
-### 3.6 Save, load, and replay state
+### 3.7 Save, load, and replay state
 
 Before scripts and orders accumulate significant state, identify everything a
 save must preserve: authoritative world state, simulation time, pending agenda,
@@ -341,6 +377,10 @@ serialization format.
   person-level characters, crew, or more than one of these
 - The actor order vocabulary and the difference between an order, task, action,
   objective, and standing order
+- Coordinate precision and units for system-local authoritative space
+- Local pathfinding, collision, acceleration, and formation-movement behavior
+- Connector access, congestion, traversal failure, and arrival behavior
+- The simulation detail used for movement in inactive or unobserved systems
 - Authority precedence among the player, autonomous AI, faction strategy, and
   temporary scripted control
 - Which activities may be interrupted immediately and which require a safe

@@ -13,14 +13,27 @@ rather than deleting them.
 
 ## Current focus
 
-The current architectural goal is to establish the command and ordering
-boundaries required for an interactive game. Work roughly from top to bottom;
-later tasks may be refined as earlier contracts become concrete.
+The current architectural goal is to establish the spatial, command, and
+ordering boundaries required for an interactive game. Work roughly from top to
+bottom; later tasks may be refined as earlier contracts become concrete.
+
+- [ ] **TASK-028: Establish hierarchical system-space navigation**
+  - Introduce systems as distinct local navigable spaces and connectors as
+    explicit inter-system transitions.
+  - Separate destination intent, deterministic planning, and authoritative
+    movement execution; actor orders must not contain `RouteId`.
+  - Represent system-local position and scheduled motion authoritatively while
+    keeping rendering interpolation non-authoritative.
+  - Preserve the Phase 1 graph as a compatibility backend during migration.
+  - Prove scheduled point-to-point movement within one system before `TASK-005`.
+  - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 - [ ] **TASK-005: Implement the first interactive ship order**
   - Select a ship in Godot.
-  - Submit a move order through the game-session facade.
-  - Display the current order, destination, state, and reason.
+  - Submit a destination-based move order through the game-session facade.
+  - Move to a selected position within one system through the `TASK-028`
+    navigation boundary.
+  - Display the current order, destination, motion state, and reason.
   - Support cancelling or replacing the order.
   - Verify the same command sequence produces the same result headlessly and
     through the Godot-facing session boundary.
@@ -53,7 +66,8 @@ later tasks may be refined as earlier contracts become concrete.
   - Replace fixture-specific presentation assumptions incrementally.
   - Add selection details, controller, current order, reason, and relevant
     recent facts.
-  - Preserve rendering interpolation as non-authoritative state.
+  - Expose authoritative system-local spatial and motion state while preserving
+    rendering interpolation as non-authoritative presentation state.
 
 - [ ] **TASK-011: Define entity lifecycle and explicit spawning**
   - Distinguish causal construction from immediate scenario or scripted spawn.
@@ -79,8 +93,8 @@ later tasks may be refined as earlier contracts become concrete.
 - [ ] **TASK-014: Define the authoritative save boundary**
   - Inventory all state required for save and load.
   - Include simulation time, pending agenda, creation sequences, random state,
-    controllers, orders, generations, objectives, and script or dialogue
-    progress.
+    system topology, spatial and motion state, controllers, orders, generations,
+    objectives, and script or dialogue progress.
   - Defer the final serialization format until the state boundary is tested.
 
 ## Future parking lot
@@ -148,11 +162,6 @@ prerequisites and desired behavior are sufficiently defined.
 - [ ] **TASK-027: Evaluate a broader entity storage model**
   - Reconsider ECS or another indexed model only when concrete query or scale
     evidence justifies it.
-
-- [ ] **TASK-028: Evaluate continuous space or richer navigation**
-  - Preserve the existing navigation boundary so dynamic hazards, gates, access
-    rules, or continuous movement can be introduced without rewriting actor
-    orders.
 
 - [ ] **TASK-029: Add long-running stability and performance suites**
   - Add increasing-scale scenarios, invariant checks, benchmarks, and

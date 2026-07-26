@@ -1,6 +1,6 @@
 # Phase 1 simulation specification
 
-[Project index](../README.md) · [Roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md)
+[Project index](../README.md) · [Roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md)
 
 ## Purpose
 
@@ -60,6 +60,13 @@ Facility inventories hold 100 units. Two capacity-10 freighters begin at Mine an
 Phase 1 uses a directed multigraph whose nodes are locations and whose edges are routes. Multiple routes may connect the same locations. Bidirectional connections consist of two directed routes, and each route has a stable ID, base travel duration, and enabled state.
 
 Ship and logistics behavior must request routes and travel estimates through an abstract navigation interface. Those systems should not inspect or modify the graph representation directly. This preserves the option to introduce continuous space, gates, dynamic hazards, or a different route model later.
+
+This interface and its `LocationId` and `RouteId` results are part of the Phase
+1 acceptance contract, not the target gameplay-order contract. General actor
+orders describe destination intent and use the hierarchical system-space model
+defined in [Navigation and spatial architecture](navigation-architecture.md).
+The graph remains in place during migration so changes to interactive movement
+do not accidentally invalidate the economic proof.
 
 Pathfinding selects the enabled path with the lowest total base duration and breaks equal-duration ties deterministically by route IDs. All Phase 1 ships use base route durations; ship-specific speed and access restrictions are deferred behind the navigation boundary.
 

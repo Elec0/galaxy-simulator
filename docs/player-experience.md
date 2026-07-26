@@ -1,12 +1,17 @@
 # Player experience
 
-[Project index](../README.md) · [Vision](vision.md) · [Economy](economy.md)
+[Project index](../README.md) · [Vision](vision.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Economy](economy.md)
 
 ## Starting position
 
 The player begins with a single owned ship and limited resources. The exact starting roles remain open, but the command model should support activities such as hauling, mining, scouting, escorting, and trading.
 
 The player does not steer the ship directly. Instead, they select it on the system or galaxy map and issue orders.
+
+On a system map, the player may choose a position or entity as a destination.
+For travel to another system, navigation composes local movement with the
+required gate or other connector transitions. The player specifies the desired
+destination rather than manually encoding those travel legs in the order.
 
 ## Command model
 
