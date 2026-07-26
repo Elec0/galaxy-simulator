@@ -20,7 +20,7 @@ design catalog, ships, transport board, and identifier sequences. Scenario
 fixtures populate a world through its construction APIs instead of owning
 parallel registries.
 
-### Event runner and scenarios
+### Event runner, sessions, and acceptance harnesses
 
 `SimulationEngine<TEvent>` owns deterministic event ordering and clock
 advancement. A scenario supplies an `ISimulationRuntime<TEvent>` that
@@ -28,10 +28,18 @@ reconciles systems, handles its event vocabulary, accrues time-based metrics,
 and declares its stopping condition. The engine has no knowledge of Phase 1
 materials, facilities, routes, or victory conditions.
 
-`PhaseOneFixture` builds the proof-of-concept world. `PhaseOneScenario` is the
-public facade that binds that fixture to the reusable engine and exposes
-reports, event records, and snapshots. Additional scenarios can build a
-different `SimulationWorld` and event vocabulary without modifying the runner.
+`PhaseOneFixture` builds the proof-of-concept world. `GameSession` is the
+persistent application-facing facade: it binds the fixture and current runtime
+to the reusable engine, advances without a fixture milestone stop, accepts
+gameplay commands, and exposes immutable snapshots and records without exposing
+the mutable world.
+
+`Acceptance/PhaseOneScenario` is a bounded regression harness over that same
+runtime. It retains the first-constructed-ship stopping condition and exact
+event and state fingerprints used by headless acceptance tests and the CLI. It
+is intentionally not used by Godot. Additional bounded fixtures belong under
+`Acceptance/`; they do not define the lifecycle or API of a normal game
+session.
 
 ### Physical and logistical activity
 

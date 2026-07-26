@@ -2,15 +2,15 @@ using GalaxyCommand.Simulation;
 
 namespace GalaxyCommand.Simulation.Tests;
 
-public sealed class PhaseOneSnapshotTests
+public sealed class GameSessionSnapshotTests
 {
     [Fact]
     public void InitialSnapshotDescribesScenarioTopologyAndShips()
     {
-        var scenario = new PhaseOneScenario();
-        scenario.RunUntilFirstShip(SimulationTime.Zero);
+        var session = new GameSession();
+        session.AdvanceTo(SimulationTime.Zero);
 
-        PhaseOneSnapshot snapshot = scenario.CaptureSnapshot();
+        PhaseOneSnapshot snapshot = session.CaptureSnapshot();
 
         Assert.Equal(SimulationTime.Zero, snapshot.Time);
         Assert.Equal(["Mine", "Refinery", "Shipyard"],
@@ -32,10 +32,10 @@ public sealed class PhaseOneSnapshotTests
     [Fact]
     public void TravelingShipSnapshotIncludesInterpolationTimes()
     {
-        var scenario = new PhaseOneScenario();
-        scenario.RunUntilFirstShip(new SimulationTime(50_000));
+        var session = new GameSession();
+        session.AdvanceTo(new SimulationTime(50_000));
 
-        PhaseOneSnapshot snapshot = scenario.CaptureSnapshot();
+        PhaseOneSnapshot snapshot = session.CaptureSnapshot();
         ShipSnapshot traveling = Assert.Single(
             snapshot.Ships,
             ship => ship.TransportStatus is TransportJobStatus.TravelingToSource
@@ -49,10 +49,10 @@ public sealed class PhaseOneSnapshotTests
     [Fact]
     public void CompletedSnapshotContainsConstructedShipAtShipyard()
     {
-        var scenario = new PhaseOneScenario();
-        scenario.RunUntilFirstShip(new SimulationTime(1_000_000));
+        var session = new GameSession();
+        session.AdvanceTo(new SimulationTime(1_000_000));
 
-        PhaseOneSnapshot snapshot = scenario.CaptureSnapshot();
+        PhaseOneSnapshot snapshot = session.CaptureSnapshot();
 
         ShipSnapshot constructed = Assert.Single(
             snapshot.Ships,
@@ -68,8 +68,8 @@ public sealed class PhaseOneSnapshotTests
     [Fact]
     public void SnapshotCollectionsCannotBeModified()
     {
-        var scenario = new PhaseOneScenario();
-        PhaseOneSnapshot snapshot = scenario.CaptureSnapshot();
+        var session = new GameSession();
+        PhaseOneSnapshot snapshot = session.CaptureSnapshot();
         var locations = Assert.IsAssignableFrom<IList<LocationSnapshot>>(snapshot.Locations);
 
         Assert.Throws<NotSupportedException>(() =>

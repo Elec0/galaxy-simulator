@@ -18,12 +18,14 @@ boundaries required for an interactive game. Work roughly from top to bottom;
 later tasks may be refined as earlier contracts become concrete.
 
 - [ ] **TASK-003: Introduce a persistent game-session facade**
-  - Accept gameplay commands.
-  - Advance authoritative simulation time without a fixture-specific success
-    stop.
-  - Capture immutable presentation state.
-  - Expose ordered semantic facts and command results.
-  - Remove `PhaseOneScenario`, as its no longer required.
+  - `GameSession` now accepts gameplay commands, advances authoritative
+    simulation time without a fixture-specific success stop, and captures
+    immutable presentation state.
+  - Godot uses `GameSession` rather than the bounded acceptance scenario.
+  - Command results are exposed now; expose ordered semantic facts through
+    `TASK-008`.
+  - Retain `PhaseOneScenario` under `Acceptance/` as a bounded regression
+    harness; it is not an application-facing session boundary.
 
 - [ ] **TASK-004: Separate setup authority from runtime mutation**
   - Keep privileged world construction available to fixtures and save loading.

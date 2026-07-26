@@ -1,4 +1,5 @@
 using GalaxyCommand.Simulation;
+using GalaxyCommand.Simulation.Acceptance;
 
 var simulation = new PhaseOneScenario();
 PhaseOneReport report = simulation.RunUntilFirstShip(new SimulationTime(1_000_000));

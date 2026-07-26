@@ -1,7 +1,7 @@
-namespace GalaxyCommand.Simulation;
+namespace GalaxyCommand.Simulation.Acceptance;
 
 /// <summary>
-/// Public facade for the integrated three-location Phase 1 fixture.
+/// Bounded acceptance harness for the integrated three-location Phase 1 fixture.
 /// </summary>
 public sealed class PhaseOneScenario
 {

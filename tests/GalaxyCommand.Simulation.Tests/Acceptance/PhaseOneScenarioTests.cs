@@ -1,4 +1,5 @@
 using GalaxyCommand.Simulation;
+using GalaxyCommand.Simulation.Acceptance;
 
 namespace GalaxyCommand.Simulation.Tests;
 

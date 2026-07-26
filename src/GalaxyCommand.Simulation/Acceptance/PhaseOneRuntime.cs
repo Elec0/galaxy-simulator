@@ -151,6 +151,7 @@ internal abstract record PhaseOneEvent
 internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
 {
     private readonly PhaseOneConfig _config;
+    private readonly bool _stopWhenFirstShipConstructed;
     private readonly SimulationWorld _world;
     private readonly EventAgenda<PhaseOneEvent> _agenda = new();
     private readonly SimulationEngine<PhaseOneEvent> _engine;
@@ -177,9 +178,12 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
     private ShipId? _constructedShipId;
     private SimulationTime _metricsTime = SimulationTime.Zero;
 
-    public PhaseOneRuntime(PhaseOneConfig? config = null)
+    public PhaseOneRuntime(
+        PhaseOneConfig? config = null,
+        bool stopWhenFirstShipConstructed = true)
     {
         _config = config ?? new PhaseOneConfig();
+        _stopWhenFirstShipConstructed = stopWhenFirstShipConstructed;
         PhaseOneFixtureState fixture = PhaseOneFixture.Create(_config);
         _world = fixture.World;
         _navigation = _world.Navigation;
@@ -205,6 +209,7 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
     public IReadOnlyList<ScenarioEventRecord> EventRecords => _eventRecords;
     public IReadOnlyList<DecisionRecord> DecisionRecords => _decisionRecords;
     public SimulationWorld World => _world;
+    public SimulationTime CurrentTime => _engine.CurrentTime;
 
     public PhaseOneSnapshot CaptureSnapshot()
     {
@@ -299,7 +304,11 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
             CurrentShortages());
     }
 
-    bool ISimulationRuntime<PhaseOneEvent>.ShouldStop => _constructedShipId is not null;
+    public RunReport AdvanceTo(SimulationTime target) =>
+        _engine.RunUntil(target);
+
+    bool ISimulationRuntime<PhaseOneEvent>.ShouldStop =>
+        _stopWhenFirstShipConstructed && _constructedShipId is not null;
 
     void ISimulationRuntime<PhaseOneEvent>.Reconcile(
         SimulationTime now,

@@ -41,12 +41,12 @@ current timestamp cycle completes.
 
 ### 1.2 There is no general gameplay command boundary
 
-**Status: contract defined by `TASK-002`; session integration is tracked by
-`TASK-003`.**
+**Status: contract defined by `TASK-002`; the initial persistent session
+integration is implemented by `TASK-003`, with semantic facts remaining.**
 
-The public Phase 1 facade can advance the simulation, capture a snapshot, expose
-the mutable world, and schedule one fixture-specific route disruption. It does
-not yet accept general player, autonomous, dialogue, or scripted intent.
+The bounded Phase 1 acceptance harness can advance the simulation, capture a
+snapshot, expose the mutable world, and schedule one fixture-specific route
+disruption. It is not the application-facing boundary.
 
 Without a common command boundary, future systems would either add specialized
 methods to the facade or mutate the world directly. Those paths would develop
@@ -56,15 +56,19 @@ The rendering-independent command contract now separates submitted
 `GameplayCommand` intent from internal scheduled events. It assigns every
 submission a simulation timestamp and monotonically increasing
 `CommandSequence`, carries opaque source attribution, returns an explicit
-accepted or rejected result, and records both outcomes. The persistent session
-will own this processor and connect it to authoritative command handlers.
+accepted or rejected result, and records both outcomes. `GameSession` now owns
+this processor, advances the authoritative runtime without the acceptance
+milestone stop, and is the boundary used by Godot. Commands without an
+implemented subsystem handler are rejected and recorded; the first accepted
+ship-order command remains in `TASK-005`.
 
 ### 1.3 Authoritative state is publicly mutable
 
-`PhaseOneScenario.World` exposes `SimulationWorld`, whose public registries and
-domain objects include mutating operations. A presentation client or future
-gameplay system can therefore change authoritative state without passing
-through runtime ordering, validation, event recording, or causal rules.
+The acceptance-only `PhaseOneScenario.World` exposes `SimulationWorld`, whose
+public registries and domain objects include mutating operations. `GameSession`
+does not expose this mutable world, so presentation and gameplay callers cannot
+use that route to bypass runtime ordering, validation, event recording, or
+causal rules.
 
 The same world-building APIs are currently used both to create a fixture and to
 represent the running simulation. Setup authority and runtime authority are not
@@ -107,12 +111,12 @@ Dialogue, objectives, scripts, UI notifications, and faction reactions need
 semantic facts such as an actor entering a location, an order failing, an asset
 being destroyed, a relationship changing, or an objective completing.
 
-### 1.7 The public scenario lifecycle is a proof-of-concept lifecycle
+### 1.7 The bounded scenario lifecycle is a proof-of-concept lifecycle
 
 `RunUntilFirstShip` and the Phase 1 stopping condition end advancement when the
-first constructed ship appears. The Godot client also stops at that point. This
-is correct for the current acceptance scenario but cannot be the lifecycle of a
-persistent game.
+first constructed ship appears. This remains correct for the acceptance harness
+and its regression fingerprints. Godot now uses `GameSession`, which advances
+beyond that milestone and does not inherit the harness stopping condition.
 
 ### 1.8 Presentation state is tied to the Phase 1 fixture
 
@@ -173,7 +177,7 @@ or script data structures before those models exist.
 
 ### 2.3 Introduce a persistent game-session facade
 
-Create a rendering-independent facade responsible for:
+The rendering-independent `GameSession` facade is now responsible for:
 
 - Accepting validated gameplay commands
 - Advancing authoritative simulation time
@@ -181,8 +185,10 @@ Create a rendering-independent facade responsible for:
 - Returning command acceptance or rejection reasons
 - Exposing ordered semantic facts for presentation and development tools
 
-Godot, faction AI, dialogue choices, and scripted behavior should use this
-boundary rather than mutate `SimulationWorld`.
+Godot uses this boundary rather than the bounded scenario or mutable
+`SimulationWorld`. Faction AI, dialogue choices, and scripted behavior should
+use the same boundary as their command handlers are introduced. Ordered
+semantic facts remain in `TASK-008`.
 
 ### 2.4 Separate setup APIs from runtime mutation
 
@@ -251,8 +257,10 @@ should not receive unrestricted mutation callbacks.
 
 ### 2.8 Replace scenario termination with objective state
 
-Keep bounded stopping conditions in headless acceptance scenarios, benchmarks,
-and tests. A normal game session should continue until the player quits or an
+`GameSession` has no fixture milestone stop and continues advancing after the
+first constructed ship. Keep bounded stopping conditions in headless acceptance
+scenarios, benchmarks, and tests; `Acceptance/PhaseOneScenario` is the current
+example. A normal game session should continue until the player quits or an
 explicit terminal game state is reached.
 
 Construction milestones, quest completion, victory, and defeat should be
