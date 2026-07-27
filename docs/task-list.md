@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -16,6 +16,18 @@ rather than deleting them.
 The current architectural goal is to establish the spatial, command, and
 ordering boundaries required for an interactive game. Work roughly from top to
 bottom; later tasks may be refined as earlier contracts become concrete.
+
+- [ ] **TASK-006: Define actor control and order lifecycle**
+  - Define player control, autonomous control, and temporary scripted override.
+  - Define order states, queuing, interruption, cancellation, completion, and
+    failure.
+  - Define genuine post-acceptance order failure and waiting behavior; invalid
+    or immediately unreachable `TASK-005` requests remain command rejections.
+  - Define how control returns after an override ends.
+  - Use one order model for player-controlled and autonomous actors.
+  - Architecture proposal drafted; implement controller, order-coordinator, and
+    multi-leg foundations before continuing connector traversal.
+  - Context: [Actor control and order lifecycle](actor-control-and-orders.md)
 
 - [ ] **TASK-028: Establish hierarchical system-space navigation**
   - Introduce systems as distinct local navigable spaces and connectors as
@@ -35,15 +47,6 @@ bottom; later tasks may be refined as earlier contracts become concrete.
   - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 ## Near-term work
-
-- [ ] **TASK-006: Define actor control and order lifecycle**
-  - Define player control, autonomous control, and temporary scripted override.
-  - Define order states, queuing, interruption, cancellation, completion, and
-    failure.
-  - Define genuine post-acceptance order failure and waiting behavior; invalid
-    or immediately unreachable `TASK-005` requests remain command rejections.
-  - Define how control returns after an override ends.
-  - Use one order model for player-controlled and autonomous actors.
 
 - [ ] **TASK-008: Introduce semantic game facts**
   - Keep facts separate from internal completion events.

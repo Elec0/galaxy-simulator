@@ -1,6 +1,6 @@
 # Gameplay integration issues and decisions
 
-[Project index](../README.md) · [Project task list](task-list.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Technical direction](technical-direction.md) · [Initial roadmap](roadmap.md)
+[Project index](../README.md) · [Project task list](task-list.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Concurrency and performance](concurrency-and-performance.md) · [Technical direction](technical-direction.md) · [Initial roadmap](roadmap.md)
 
 This document tracks architectural work needed to turn the current deterministic
 simulation into an interactive game that can support player commands, dialogue,
@@ -353,6 +353,9 @@ The first implementation selects one ship in Godot, issues a position move
 order, exposes its reason and state, and supports cancellation and replacement.
 Invalid or immediately unreachable requests are command rejections. Waiting and
 genuine failure after command acceptance remain undefined until `TASK-006`.
+The proposed controller, override, queue, lifecycle, multi-leg, and deterministic
+commit contracts are in
+[Actor control and order lifecycle](actor-control-and-orders.md).
 
 ### 3.3 Entity lifecycle and explicit spawning
 

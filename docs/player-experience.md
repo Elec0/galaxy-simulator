@@ -1,6 +1,6 @@
 # Player experience
 
-[Project index](../README.md) · [Vision](vision.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Economy](economy.md)
+[Project index](../README.md) · [Vision](vision.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Economy](economy.md)
 
 ## Starting position
 

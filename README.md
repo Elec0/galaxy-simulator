@@ -10,6 +10,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Player experience](docs/player-experience.md)
 - [Simulation architecture](docs/simulation-architecture.md)
 - [Navigation and spatial architecture](docs/navigation-architecture.md)
+- [Actor control and order lifecycle](docs/actor-control-and-orders.md)
 - [Concurrency and performance architecture](docs/concurrency-and-performance.md)
 - [Economy and production](docs/economy.md)
 - [Factions and strategic behavior](docs/factions.md)
