@@ -12,13 +12,18 @@ The scenario, rules, invariants, and acceptance criteria are defined in the [Pha
 
 ## Phase 2: Persistent ships and orders
 
-Represent individually owned ships with routes, cargo, tasks, and scheduled travel. Add player-issued commands and basic autonomous logistics.
+Represent individually owned ships with cargo, destination-based orders,
+authoritative system-local spatial state, and scheduled travel. Add
+player-issued commands and basic autonomous logistics without exposing
+path-selected legs in order payloads.
 
 Success means one command model can control both a single ship and a small group.
 
 ## Phase 3: Minimal map application
 
-Render systems, connections, ships, stations, selections, routes, and time controls. Expose enough state to inspect what each entity is doing.
+Render the galaxy topology and individual system spaces, including connectors,
+ships, stations, selections, planned travel, and time controls. Expose enough
+state to inspect what each entity is doing.
 
 Success means the headless scenario can be understood and influenced through the map.
 

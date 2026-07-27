@@ -9,10 +9,14 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Vision and principles](docs/vision.md)
 - [Player experience](docs/player-experience.md)
 - [Simulation architecture](docs/simulation-architecture.md)
+- [Navigation and spatial architecture](docs/navigation-architecture.md)
+- [Concurrency and performance architecture](docs/concurrency-and-performance.md)
 - [Economy and production](docs/economy.md)
 - [Factions and strategic behavior](docs/factions.md)
 - [Time and pacing](docs/time-and-pacing.md)
 - [Technical direction](docs/technical-direction.md)
+- [Gameplay integration issues and decisions](docs/gameplay-integration.md)
+- [Project task list](docs/task-list.md)
 - [Initial roadmap](docs/roadmap.md)
 - [Phase 1 simulation specification](docs/phase-1-simulation-spec.md)
 
@@ -38,24 +42,34 @@ dotnet run --project src/GalaxyCommand.Cli/GalaxyCommand.Cli.csproj --no-build -
 The SDK version is pinned in `global.json`. Shared compiler settings enable
 nullable-reference checking and treat warnings as errors.
 
-## Rust migration reference
+## Godot graphics client
 
-The existing Rust workspace remains in place temporarily as the working Phase
-1 behavioral reference while its systems are migrated to C#. To verify it,
-ensure Homebrew's keg-only `rustup` proxy directory is on `PATH` and run:
+The graphics client is a Godot 4.7.1 .NET project under
+`src/GalaxyCommand.Godot`. It references the rendering-independent simulation
+library and uses the clean `GameSession` runtime rather than the bounded Phase 1
+acceptance scenario. The client advances automatically, renders authoritative
+system-local ship motion, and submits move or cancel commands through the same
+session boundary used by headless tests.
+
+Click a ship to select it, click empty system space to issue or replace its
+destination, and right-click to cancel its active order. The status panel shows
+the current destination, order state and reason, and motion state.
+
+Install the .NET edition of Godot, then open
+`src/GalaxyCommand.Godot/project.godot` in the editor. From this directory, the
+client can also be built and run with:
 
 ```sh
-export PATH="$(brew --prefix rustup)/bin:$PATH"
-cargo fmt --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-cargo run -p galaxy-simulation-cli
+/Applications/Godot_mono.app/Contents/MacOS/Godot \
+  --headless --path src/GalaxyCommand.Godot --build-solutions --quit
+/Applications/Godot_mono.app/Contents/MacOS/Godot \
+  --path src/GalaxyCommand.Godot
 ```
 
-Both the active C# CLI and the temporary Rust reference run the integrated
-Phase 1 scenario through mining, transport, refining, component manufacturing,
-and construction of a persistent freighter. Their reports include material and
-logistics totals, facility-state timing, current shortages, structured record
-counts, and deterministic event-log and final-state fingerprints. The C# test
-suite also disables Mine-to-Refinery travel at 50 simulated seconds and restores
-it at 250 seconds to verify shortage visibility and recovery.
+The C# CLI runs the integrated Phase 1 scenario through mining, transport,
+refining, component manufacturing, and construction of a persistent freighter.
+Its report includes material and logistics totals, facility-state timing,
+current shortages, structured record counts, and deterministic event-log and
+final-state fingerprints. The test suite also disables Mine-to-Refinery travel
+at 50 simulated seconds and restores it at 250 seconds to verify shortage
+visibility and recovery.

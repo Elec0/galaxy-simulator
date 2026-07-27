@@ -84,6 +84,68 @@ public sealed class ProductionTests
         Assert.Equal(ProductionJobStatus.WaitingForInputs, fixture.Line.ActiveJob?.Status);
     }
 
+    [Fact]
+    public void CancellingReservedWorkReleasesInputsAndAdvancesGeneration()
+    {
+        ProductionFixture fixture = CreateFixture(10);
+        ProductionJobId jobId =
+            fixture.Line.Enqueue(fixture.ProductionIds, CreateRecipe(fixture), repeat: false);
+        fixture.Inventory.Add(fixture.Input, new Quantity(2));
+        Assert.Null(fixture.Line.PrepareActive(
+            fixture.ReservationIds,
+            fixture.Inventory,
+            SimulationTime.Zero));
+        ProductionJob job = Assert.IsType<ProductionJob>(fixture.Line.GetJob(jobId));
+        EventGeneration originalGeneration = job.Generation;
+
+        Assert.True(fixture.Line.CancelActive(fixture.Inventory));
+
+        Assert.Equal(ProductionJobStatus.Cancelled, job.Status);
+        Assert.Equal(originalGeneration.Next(), job.Generation);
+        Assert.Equal(Quantity.Zero, fixture.Inventory.Reserved(fixture.Input));
+        Assert.Equal(new Quantity(2), fixture.Inventory.Stored(fixture.Input));
+    }
+
+    [Fact]
+    public void CancelledCompletionCannotCompleteReplacementJob()
+    {
+        ProductionFixture fixture = CreateFixture(10);
+        fixture.Inventory.Add(fixture.Input, new Quantity(8));
+        ProductionJobId firstId =
+            fixture.Line.Enqueue(fixture.ProductionIds, CreateRecipe(fixture), repeat: false);
+        ProductionJobId secondId =
+            fixture.Line.Enqueue(fixture.ProductionIds, CreateRecipe(fixture), repeat: false);
+        ProductionJob first = Assert.IsType<ProductionJob>(fixture.Line.GetJob(firstId));
+        EventGeneration scheduledGeneration = first.Generation;
+        SimulationTime completesAt = Assert.IsType<SimulationTime>(
+            fixture.Line.PrepareActive(
+                fixture.ReservationIds,
+                fixture.Inventory,
+                SimulationTime.Zero));
+        Assert.True(fixture.Line.CancelActive(fixture.Inventory));
+        Assert.Equal(secondId, fixture.Line.ActiveJob?.Id);
+        Assert.Equal(
+            completesAt,
+            fixture.Line.PrepareActive(
+                fixture.ReservationIds,
+                fixture.Inventory,
+                SimulationTime.Zero));
+
+        ScheduledEventDisposition disposition = fixture.Line.CompleteScheduled(
+            firstId,
+            scheduledGeneration,
+            fixture.ProductionIds,
+            fixture.Inventory,
+            completesAt,
+            out bool outputStored);
+
+        Assert.Equal(ScheduledEventDisposition.IgnoredStaleGeneration, disposition);
+        Assert.False(outputStored);
+        Assert.Equal(secondId, fixture.Line.ActiveJob?.Id);
+        Assert.Equal(ProductionJobStatus.Running, fixture.Line.ActiveJob?.Status);
+        Assert.Equal(Quantity.Zero, fixture.Inventory.Stored(fixture.Output));
+    }
+
     private static ProductionFixture CreateFixture(ulong capacity)
     {
         var facilityIds = new IdSequence<FacilityId>();

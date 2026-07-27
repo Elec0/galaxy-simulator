@@ -13,7 +13,23 @@ public enum EventPhase
 /// <summary>
 /// Caller-managed generation used to recognize stale scheduled events.
 /// </summary>
-public readonly record struct EventGeneration(ulong Value);
+public readonly record struct EventGeneration(ulong Value)
+{
+    public EventGeneration Next() =>
+        new(checked(Value + 1));
+}
+
+/// <summary>
+/// Deterministic result of validating and handling one scheduled event.
+/// Ignored events never mutate authoritative state.
+/// </summary>
+public enum ScheduledEventDisposition
+{
+    Applied,
+    IgnoredStaleGeneration,
+    IgnoredMissingReference,
+    IgnoredStateMismatch,
+}
 
 /// <summary>
 /// Complete deterministic ordering key for a scheduled event.
@@ -68,6 +84,13 @@ public sealed class EventAgenda<TEvent>
 
     public int Count => _pending.Count;
 
+    /// <summary>
+    /// Earliest pending event without changing agenda state.
+    /// </summary>
+    public EventKey? NextEventKey => _pending.Count > 0
+        ? _pending.First().Key
+        : null;
+
     public EventKey Schedule(
         SimulationTime timestamp,
         EventPhase phase,
@@ -95,6 +118,71 @@ public sealed class EventAgenda<TEvent>
         return key;
     }
 
+    /// <summary>
+    /// Moves the agenda clock without consuming an event.
+    /// </summary>
+    public void AdvanceTo(SimulationTime target)
+    {
+        if (target < CurrentTime)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(target),
+                target,
+                $"Target {target.Milliseconds} ms precedes current simulation time {CurrentTime.Milliseconds} ms.");
+        }
+
+        if (NextEventKey is { } next && next.Timestamp < target)
+        {
+            throw new InvalidOperationException(
+                $"Cannot advance to {target.Milliseconds} ms while an event remains pending at {next.Timestamp.Milliseconds} ms.");
+        }
+
+        CurrentTime = target;
+        CurrentPhase = null;
+    }
+
+    /// <summary>
+    /// Opens a phase at the current timestamp. Completed phases cannot be reopened.
+    /// </summary>
+    public void EnterPhase(EventPhase phase)
+    {
+        if (CurrentPhase is { } currentPhase && phase < currentPhase)
+        {
+            throw new InvalidOperationException(
+                $"Cannot return to phase {phase} after phase {currentPhase} at the current timestamp.");
+        }
+
+        CurrentPhase = phase;
+    }
+
+    /// <summary>
+    /// Removes the next event only when it belongs to the open timestamp and phase.
+    /// </summary>
+    public ScheduledEvent<TEvent>? PopNextInCurrentPhase()
+    {
+        if (CurrentPhase is not { } currentPhase
+            || _pending.Count == 0)
+        {
+            return null;
+        }
+
+        KeyValuePair<EventKey, PendingEvent> first = _pending.First();
+        if (first.Key.Timestamp != CurrentTime
+            || first.Key.Phase != currentPhase)
+        {
+            return null;
+        }
+
+        _pending.Remove(first.Key);
+        return new ScheduledEvent<TEvent>(
+            first.Key,
+            first.Value.Generation,
+            first.Value.Payload);
+    }
+
+    /// <summary>
+    /// Removes the next event through a target time for direct subsystem processing.
+    /// </summary>
     public ScheduledEvent<TEvent>? PopNextThrough(SimulationTime target)
     {
         if (target < CurrentTime)
@@ -105,19 +193,13 @@ public sealed class EventAgenda<TEvent>
                 $"Target {target.Milliseconds} ms precedes current simulation time {CurrentTime.Milliseconds} ms.");
         }
 
-        if (_pending.Count == 0)
+        if (_pending.Count == 0 || _pending.First().Key.Timestamp > target)
         {
-            AdvanceWithoutEvent(target);
+            AdvanceTo(target);
             return null;
         }
 
         KeyValuePair<EventKey, PendingEvent> first = _pending.First();
-        if (first.Key.Timestamp > target)
-        {
-            AdvanceWithoutEvent(target);
-            return null;
-        }
-
         _pending.Remove(first.Key);
         CurrentTime = first.Key.Timestamp;
         CurrentPhase = first.Key.Phase;
@@ -125,12 +207,6 @@ public sealed class EventAgenda<TEvent>
             first.Key,
             first.Value.Generation,
             first.Value.Payload);
-    }
-
-    private void AdvanceWithoutEvent(SimulationTime target)
-    {
-        CurrentTime = target;
-        CurrentPhase = null;
     }
 
     private sealed record PendingEvent(EventGeneration Generation, TEvent Payload);

@@ -30,5 +30,8 @@ public sealed class EntityIdTests
     public void EntityIdsRejectZero()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new ShipId(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new SystemId(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new MotionId(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ShipOrderId(0));
     }
 }

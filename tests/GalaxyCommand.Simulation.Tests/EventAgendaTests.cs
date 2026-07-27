@@ -16,9 +16,14 @@ public sealed class EventAgendaTests
         agenda.Schedule(timestamp, EventPhase.PhysicalCompletion, generation, "second completion");
 
         var payloads = new List<string>();
-        while (agenda.PopNextThrough(timestamp) is { } scheduled)
+        agenda.AdvanceTo(timestamp);
+        foreach (EventPhase phase in Enum.GetValues<EventPhase>())
         {
-            payloads.Add(scheduled.Payload);
+            agenda.EnterPhase(phase);
+            while (agenda.PopNextInCurrentPhase() is { } scheduled)
+            {
+                payloads.Add(scheduled.Payload);
+            }
         }
 
         Assert.Equal(
@@ -31,8 +36,8 @@ public sealed class EventAgendaTests
     {
         var agenda = new EventAgenda<string>();
         var timestamp = new SimulationTime(10);
-        agenda.Schedule(timestamp, EventPhase.Decision, new EventGeneration(0), "decision");
-        Assert.NotNull(agenda.PopNextThrough(timestamp));
+        agenda.AdvanceTo(timestamp);
+        agenda.EnterPhase(EventPhase.Decision);
 
         Assert.Throws<InvalidOperationException>(() =>
             agenda.Schedule(
@@ -48,7 +53,7 @@ public sealed class EventAgendaTests
         var agenda = new EventAgenda<string>();
         var timestamp = new SimulationTime(10);
 
-        Assert.Null(agenda.PopNextThrough(timestamp));
+        agenda.AdvanceTo(timestamp);
         agenda.Schedule(
             timestamp,
             EventPhase.PhysicalCompletion,
@@ -65,10 +70,59 @@ public sealed class EventAgendaTests
         var generation = new EventGeneration(7);
         var timestamp = new SimulationTime(10);
         agenda.Schedule(timestamp, EventPhase.StateUpdate, generation, "refresh");
+        agenda.AdvanceTo(timestamp);
+        agenda.EnterPhase(EventPhase.StateUpdate);
 
         ScheduledEvent<string> scheduled = Assert.IsType<ScheduledEvent<string>>(
-            agenda.PopNextThrough(timestamp));
+            agenda.PopNextInCurrentPhase());
 
         Assert.Equal(generation, scheduled.Generation);
+    }
+
+    [Fact]
+    public void CurrentPhaseAcceptsSameAndLaterPhaseWork()
+    {
+        var agenda = new EventAgenda<string>();
+        var timestamp = new SimulationTime(10);
+        var generation = new EventGeneration(0);
+        agenda.AdvanceTo(timestamp);
+        agenda.EnterPhase(EventPhase.StateUpdate);
+
+        EventKey samePhase = agenda.Schedule(
+            timestamp,
+            EventPhase.StateUpdate,
+            generation,
+            "same phase");
+        EventKey laterPhase = agenda.Schedule(
+            timestamp,
+            EventPhase.Decision,
+            generation,
+            "later phase");
+
+        Assert.True(samePhase < laterPhase);
+        Assert.Equal(samePhase, agenda.NextEventKey);
+    }
+
+    [Fact]
+    public void AdvanceToRejectsSkippingPendingWork()
+    {
+        var agenda = new EventAgenda<string>();
+        agenda.Schedule(
+            new SimulationTime(10),
+            EventPhase.PhysicalCompletion,
+            new EventGeneration(0),
+            "pending");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            agenda.AdvanceTo(new SimulationTime(11)));
+        Assert.Equal(SimulationTime.Zero, agenda.CurrentTime);
+    }
+
+    [Fact]
+    public void EventGenerationAdvancesAndRejectsOverflow()
+    {
+        Assert.Equal(new EventGeneration(8), new EventGeneration(7).Next());
+        Assert.Throws<OverflowException>(() =>
+            new EventGeneration(ulong.MaxValue).Next());
     }
 }

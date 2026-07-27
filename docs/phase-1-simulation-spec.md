@@ -1,6 +1,6 @@
 # Phase 1 simulation specification
 
-[Project index](../README.md) · [Roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md)
+[Project index](../README.md) · [Roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 ## Purpose
 
@@ -61,6 +61,13 @@ Phase 1 uses a directed multigraph whose nodes are locations and whose edges are
 
 Ship and logistics behavior must request routes and travel estimates through an abstract navigation interface. Those systems should not inspect or modify the graph representation directly. This preserves the option to introduce continuous space, gates, dynamic hazards, or a different route model later.
 
+This interface and its `LocationId` and `RouteId` results are part of the Phase
+1 acceptance contract, not the target gameplay-order contract. General actor
+orders describe destination intent and use the hierarchical system-space model
+defined in [Navigation and spatial architecture](navigation-architecture.md).
+The graph remains in place during migration so changes to interactive movement
+do not accidentally invalidate the economic proof.
+
 Pathfinding selects the enabled path with the lowest total base duration and breaks equal-duration ties deterministically by route IDs. All Phase 1 ships use base route durations; ship-specific speed and access restrictions are deferred behind the navigation boundary.
 
 While travelling, a ship retains its departure, destination, route, departure time, and expected arrival time. The simulation schedules arrival rather than continuously updating position.
@@ -114,7 +121,13 @@ Refining and component recipes may repeat automatically while enabled. Ship cons
 
 Construction follows the same material and work principles. A completed ship becomes a new persistent entity rather than a counter or abstract reward.
 
-Ship construction uses a separate finite FIFO shipyard queue rather than a material-output production line. A Phase 1 ship blueprint defines cargo capacity. Each shipyard and constructed ship belongs to a typed organization, although organizations have no autonomous faction behavior during Phase 1.
+Ship construction uses a finite FIFO construction process rather than a
+material-output production line. A Phase 1 `ShipDesign` inherits the shared
+construction definition, supplies its material-and-work recipe, and defines
+cargo capacity. The shipyard composes the product-neutral construction process
+and is responsible only for creating the completed ship. Each shipyard and
+constructed ship belongs to a typed organization, although organizations have
+no autonomous faction behavior during Phase 1.
 
 Completing construction allocates a persistent ship and cargo inventory at the shipyard location, then registers the ship as an idle freighter available to the transport board.
 
@@ -130,7 +143,11 @@ Scheduled events are ordered by:
 
 An event may schedule another event at its current timestamp in the same or a later phase, but it cannot schedule an earlier phase at that timestamp or move simulation time backward. Events must verify their caller-managed generation token and referenced state before applying changes. Invalidated events produce a defined no-op or failure transition rather than mutating stale state.
 
-Phase 1 runs on one thread. Parallel execution is deferred until profiling demonstrates a need and deterministic behavior can be preserved.
+The Phase 1 acceptance runtime runs on one thread and remains a deterministic
+reference path. Concurrent execution is introduced only after profiling, but
+new simulation boundaries must preserve the ownership, batching, buffered
+effect, and deterministic-commit contract defined in
+[Concurrency and performance architecture](concurrency-and-performance.md).
 
 ## Numeric representation
 
@@ -187,6 +204,12 @@ The headless runner reports at least:
 Phase 1 uses an explicit random seed even if the first fixture requires little randomness. Stable entity and event ordering must not depend on hash-map iteration order.
 
 Repeated runs with identical configuration, seed, initial state, and commands should produce the same final-state and event-log digests. Phase 1 uses FNV-1a 64-bit fingerprints with explicit little-endian field encoding. The event-log fingerprint covers canonical processed-event ordering and structured decision records; the final-state fingerprint covers the authoritative time, route availability, inventories, ships, and transport jobs. These fingerprints are regression checks, not security hashes.
+
+Construction-completion event records include the construction facility and
+order IDs. Ship state fingerprints include construction design IDs, and
+inventory fingerprints include configured capacity, so different constructed
+designs cannot collapse to the same state solely because their current cargo
+and locations happen to match.
 
 ## Disruption test
 

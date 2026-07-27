@@ -71,6 +71,7 @@ public enum ProductionJobStatus
     Running,
     CompletedAwaitingStorage,
     Completed,
+    Cancelled,
 }
 
 /// <summary>
@@ -98,7 +99,7 @@ public sealed class ProductionJob
 
     public SimulationTime? CompletesAt { get; internal set; }
 
-    public EventGeneration Generation { get; } = new(0);
+    public EventGeneration Generation { get; internal set; } = new(0);
 
     public Quantity ReservedInput(Inventory inventory, MaterialId materialId)
     {
@@ -150,6 +151,8 @@ public sealed class ProductionLine
 {
     private readonly Throughput _throughput;
     private readonly Queue<ProductionJob> _queued = new();
+    private readonly SortedDictionary<ProductionJobId, ProductionJob> _jobs =
+        new(EntityIdComparer<ProductionJobId>.Instance);
 
     public ProductionLine(
         FacilityId facilityId,
@@ -168,6 +171,9 @@ public sealed class ProductionLine
     public ProductionJob? ActiveJob { get; private set; }
 
     public int QueuedJobCount => _queued.Count;
+
+    public ProductionJob? GetJob(ProductionJobId jobId) =>
+        _jobs.GetValueOrDefault(jobId);
 
     public IReadOnlyDictionary<MaterialId, Quantity> UnmetInputs(Inventory inventory)
     {
@@ -195,6 +201,7 @@ public sealed class ProductionLine
         bool repeat)
     {
         ProductionJob job = AllocateJob(ids, recipe, repeat);
+        _jobs.Add(job.Id, job);
         if (ActiveJob is null)
         {
             ActiveJob = job;
@@ -286,9 +293,67 @@ public sealed class ProductionLine
         ActiveJob = null;
         if (job.IsRepeating)
         {
-            _queued.Enqueue(AllocateJob(ids, job.Recipe, repeat: true));
+            ProductionJob repeated = AllocateJob(ids, job.Recipe, repeat: true);
+            _jobs.Add(repeated.Id, repeated);
+            _queued.Enqueue(repeated);
         }
 
+        PromoteQueuedJob();
+        return true;
+    }
+
+    public ScheduledEventDisposition CompleteScheduled(
+        ProductionJobId jobId,
+        EventGeneration generation,
+        ProductionIdSequences ids,
+        Inventory inventory,
+        SimulationTime now,
+        out bool outputStored)
+    {
+        outputStored = false;
+        if (GetJob(jobId) is not { } job)
+        {
+            return ScheduledEventDisposition.IgnoredMissingReference;
+        }
+
+        if (job.Generation != generation)
+        {
+            return ScheduledEventDisposition.IgnoredStaleGeneration;
+        }
+
+        if (!ReferenceEquals(ActiveJob, job)
+            || job.Status != ProductionJobStatus.Running
+            || job.CompletesAt != now)
+        {
+            return ScheduledEventDisposition.IgnoredStateMismatch;
+        }
+
+        outputStored = CompleteActive(ids, inventory, now);
+        return ScheduledEventDisposition.Applied;
+    }
+
+    public bool CancelActive(Inventory inventory)
+    {
+        RequireConfiguredInventory(inventory);
+        if (ActiveJob is not { } job)
+        {
+            return false;
+        }
+
+        EventGeneration nextGeneration = job.Generation.Next();
+        foreach (ReservationId reservationId in job.AllReservationIds())
+        {
+            if (inventory.GetReservation(reservationId) is not null)
+            {
+                inventory.Release(reservationId);
+            }
+        }
+
+        job.ClearReservations();
+        job.Generation = nextGeneration;
+        job.Status = ProductionJobStatus.Cancelled;
+        job.CompletesAt = null;
+        ActiveJob = null;
         PromoteQueuedJob();
         return true;
     }
