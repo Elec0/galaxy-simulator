@@ -8,17 +8,31 @@ namespace GalaxyCommand.Simulation;
 /// </summary>
 public sealed record InitialShipSetup
 {
-    public InitialShipSetup(ShipId id, SystemPosition position)
+    public InitialShipSetup(
+        ShipId id,
+        SystemPosition position,
+        ActorController baseController)
     {
         ArgumentOutOfRangeException.ThrowIfZero(id.Value);
         ArgumentOutOfRangeException.ThrowIfZero(position.SystemId.Value);
+        ArgumentNullException.ThrowIfNull(baseController);
+        if (baseController.Kind == ActorControllerKind.Script)
+        {
+            throw new ArgumentException(
+                "A script cannot be an actor's persistent base controller.",
+                nameof(baseController));
+        }
+
         Id = id;
         Position = position;
+        BaseController = baseController;
     }
 
     public ShipId Id { get; }
 
     public SystemPosition Position { get; }
+
+    public ActorController BaseController { get; }
 }
 
 /// <summary>

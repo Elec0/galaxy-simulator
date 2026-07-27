@@ -35,9 +35,10 @@ The first `TASK-028` implementation slice now provides:
 
 The subsystem is now wired into the clean application-facing `GameSession` and
 Godot through `TASK-005`. A move command retains its position destination while
-the planner produces one local leg; the movement owner schedules arrival and
-the order owner tracks active, completed, or cancelled state. Replacement
-materializes the current position before starting the new leg.
+the planner produces one or more local legs; the movement owner schedules each
+arrival and the `TASK-006` order coordinator tracks active, queued, suspended,
+and terminal state. Replacement materializes the current position before
+starting the new leg.
 
 The Phase 1 transport graph remains isolated in its acceptance runtime and has
 not migrated to these contracts. Connector topology, connector traversal,

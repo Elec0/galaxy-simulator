@@ -53,8 +53,9 @@ system-local ship motion, and submits move or cancel commands through the same
 session boundary used by headless tests.
 
 Click a ship to select it, click empty system space to issue or replace its
-destination, and right-click to cancel its active order. The status panel shows
-the current destination, order state and reason, and motion state.
+destination, Shift-click to append a destination, and right-click to cancel its
+active order. The status panel shows the active controller, queue length,
+current destination, order state and reason, and motion state.
 
 Install the .NET edition of Godot, then open
 `src/GalaxyCommand.Godot/project.godot` in the editor. From this directory, the

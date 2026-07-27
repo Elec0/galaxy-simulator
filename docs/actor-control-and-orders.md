@@ -11,14 +11,46 @@ how an order progresses, and why it is waiting, cancelled, or failed.
 
 `TASK-005` proved one current player move order. It deliberately did not define
 queues, autonomous control, scripted overrides, or post-acceptance failure.
-This document proposes those boundaries before `TASK-006` implementation and
-before connector traversal expands movement into multiple travel legs.
+This document records the accepted boundaries implemented by `TASK-006` and
+retained for the later expansion into multiple connector travel legs.
 
-The recommendations are proposed decisions for owner review. They do not add
-multiplayer authority, authentication, remote control, prediction, or
-replication. All control is local single-player simulation state.
+These decisions do not add multiplayer authority, authentication, remote
+control, prediction, or replication. All control is local single-player
+simulation state.
 
-## Recommended model at a glance
+**Decision status:** Accepted by the project owner on 2026-07-27.
+
+## Implementation status
+
+`TASK-006` now implements:
+
+- Explicit player and autonomous base controllers, exact source matching, and
+  stable controller revisions
+- One non-nesting scripted override with separate work, suspended base work,
+  an opaque stable reason, explicit cancel-outstanding release policy, and
+  deterministic base restoration
+- Explicit replace-all and append placement, one active order, a FIFO queue,
+  stable order-ID cancellation, and same-timestamp promotion
+- Active, queued, waiting, suspended, completed, cancelled, and failed lifecycle
+  vocabulary; implemented transitions have stable reasons, while concrete
+  waiting reasons and wake conditions remain connector work
+- A private multi-leg plan executor that separates leg completion from order
+  completion
+- Immutable controller, current-order, queue, and suspended-work snapshots
+- Read-only move and cancel evaluation proposals followed by owner commit
+- The same move-order model for player and autonomous sources
+
+Godot exposes replace, append, and active-order cancellation for the current
+move order. Semantic transition facts remain in `TASK-008`. Connector-driven
+waiting, replanning, and post-acceptance failure proofs remain in `TASK-028`,
+while target destruction remains in `TASK-011`.
+
+The current runtime still does not schedule or persist long-running scripted
+behavior. The override commands provide only the control boundary described
+here; `TASK-017` retains script scheduling, checkpointing, wake, cancellation,
+and persistence behavior.
+
+## Accepted model at a glance
 
 Each actor has one persistent base controller. It may also have one temporary
 scripted override. The controller submits destination-oriented orders through
@@ -68,7 +100,7 @@ the actor, move the actor directly, or bypass normal validation.
 
 ## Decision summary
 
-| Question | Recommended answer |
+| Question | Accepted decision |
 | --- | --- |
 | What identifies a controller? | A local opaque controller reference with a kind and stable ID; do not infer control from asset ownership |
 | How many controllers can direct one actor? | One base controller and at most one non-nesting temporary override |
@@ -90,7 +122,7 @@ the actor, move the actor directly, or bypass normal validation.
 Is command attribution enough to determine control, and how should player,
 autonomous, dialogue, and script sources relate to an actor?
 
-### Recommendation
+### Accepted decision
 
 Give every commandable actor an authoritative `ActorControlState` containing:
 
@@ -103,6 +135,12 @@ ID. Initial base kinds are player and autonomous. A script may occupy the
 temporary override slot. Dialogue remains a command source, not a persistent
 controller; a dialogue effect either submits an ordinary eligible command or
 explicitly begins a scripted override through a later approved command.
+
+The current runtime does not execute long-running scripted behaviors. The
+script source and temporary-override contracts define how a future script
+runtime may interact with actors; they do not provide script scheduling,
+checkpointing, persistence, wake conditions, or long-running execution.
+`TASK-017` retains that broader scripted-behavior work.
 
 `CommandSource` remains submission attribution. The order coordinator compares
 it with the actor's active controller before accepting actor-directed intent.
@@ -120,7 +158,7 @@ without turning local simulation metadata into authentication.
 Should an override replace, cancel, or suspend existing work? Can overrides
 nest, and what happens when the override ends?
 
-### Recommendation
+### Accepted decision
 
 Support one non-nesting temporary override per actor initially. A request to
 begin another override while one is active is rejected as a conflict.
@@ -128,11 +166,13 @@ begin another override while one is active is rejected as a conflict.
 Beginning an override:
 
 1. Validates the actor and expected current controller revision.
-2. Materializes any active physical motion at the current simulation time.
-3. Invalidates pending completion for the interrupted leg.
-4. Suspends the base controller's active order and FIFO queue as one retained
+2. Records a required opaque stable reason ID for snapshots and future semantic
+   facts.
+3. Materializes any active physical motion at the current simulation time.
+4. Invalidates pending completion for the interrupted leg.
+5. Suspends the base controller's active order and FIFO queue as one retained
    base-work set.
-5. Installs the scripted controller with a separate active order and queue.
+6. Installs the scripted controller with a separate active order and queue.
 
 Ending an override:
 
@@ -143,6 +183,11 @@ Ending an override:
 4. Re-evaluates the suspended active order from the actor's current state.
 5. Replans and resumes it when still valid, waits when a recoverable condition
    blocks it, or fails when its completion condition is no longer achievable.
+
+Release requests require an explicit policy. The current runtime supports only
+`CancelOutstanding`: it cancels any unfinished override-owned order and then
+restores base work. Completion-based or delayed release would require the
+long-running scripted behavior owned by `TASK-017`.
 
 ```mermaid
 sequenceDiagram
@@ -177,7 +222,7 @@ deferred until a concrete narrative need justifies them.
 Should new orders always replace current work, or should actors maintain a
 queue? How should cancellation interact with that queue?
 
-### Recommendation
+### Accepted decision
 
 Each controller work set owns:
 
@@ -209,7 +254,7 @@ not require retaining an unlimited authoritative order history.
 
 Which states are authoritative, and what does interruption mean?
 
-### Recommendation
+### Accepted decision
 
 Use these durable order states:
 
@@ -261,7 +306,7 @@ explanation history and player-facing transition facts remain separate work in
 When should an invalid request be rejected immediately, and when should an
 accepted order later wait or fail?
 
-### Recommendation
+### Accepted decision
 
 Keep the three outcomes distinct:
 
@@ -294,7 +339,7 @@ destroyed with no order-specific fallback.
 Does finishing a movement leg complete the order, and where should a
 multi-leg plan live?
 
-### Recommendation
+### Accepted decision
 
 Each order type owns a completion predicate. A move-to-position order completes
 when the actor satisfies that destination's movement rule. Docking, following,
@@ -325,7 +370,7 @@ gate or route selection in actor intent.
 Should autonomous behavior mutate orders directly or use a separate order
 type?
 
-### Recommendation
+### Accepted decision
 
 Player and autonomous controllers submit the same gameplay commands and create
 the same order types. Both pass through active-controller validation, placement
@@ -346,7 +391,7 @@ direct orders from automation without creating two execution models.
 How should the order system support parallel execution without allowing races
 to determine results?
 
-### Recommendation
+### Accepted decision
 
 Separate order work into:
 
@@ -370,7 +415,7 @@ state, or the event agenda.
 
 What must a snapshot expose for the player to understand control and orders?
 
-### Recommendation
+### Accepted decision
 
 An actor snapshot should expose:
 
@@ -398,27 +443,28 @@ owns format selection.
 
 Actor destruction must invalidate active work and pending events before removing
 controller and order state. Runtime spawning and destruction remain in
-`TASK-011`; `TASK-006` should expose cleanup operations that `TASK-011` can call
-without defining spawning itself.
+`TASK-011`; `TASK-006` exposes an internal coordinated cleanup boundary that
+`TASK-011` can call without defining spawning or destruction policy itself.
 
-## Recommended implementation sequence
+## Implemented sequence
 
-Keep `TASK-006` stable but implement it in bounded slices:
+`TASK-006` was implemented in bounded slices:
 
-1. Add controller references, base-controller setup, active-controller
+1. Added controller references, base-controller setup, active-controller
    validation, and controller snapshots.
-2. Replace the current-order-only owner with an order coordinator supporting
+2. Replaced the current-order-only owner with an order coordinator supporting
    stable order identity, explicit replace/append placement, one active order,
    and a FIFO queue.
-3. Separate leg completion from order completion and introduce the internal
+3. Separated leg completion from order completion and introduced the internal
    multi-leg plan executor needed by connector travel.
-4. Add one non-nesting scripted override with suspended base work and
-   deterministic restoration.
-5. Add waiting and failed states to the lifecycle contract, but prove their
-   first real transitions with connector and target invalidation work rather
-   than synthetic production behavior.
-6. Add semantic transition facts in `TASK-008` after the lifecycle owner is
-   stable.
+4. Added one non-nesting scripted override with a stable reason ID, explicit
+   cancel-outstanding release, suspended base work, and deterministic
+   restoration.
+5. Added waiting and failed states to the lifecycle contract; their first real
+   wake and invalidation proofs remain with connector and target lifecycle work
+   rather than synthetic production behavior.
+6. Semantic transition facts remain in `TASK-008` now that the lifecycle owner
+   is stable.
 
 The implementation should preserve a single-thread reference path and compare
 identical snapshots, command records, event records, order transitions, and
@@ -426,7 +472,7 @@ facts across valid evaluation batch layouts when concurrent execution begins.
 
 ## Deferred choices
 
-The initial `TASK-006` work should not decide:
+The initial `TASK-006` work did not decide:
 
 - Nested or prioritized scripted overrides
 - Shared group or fleet orders

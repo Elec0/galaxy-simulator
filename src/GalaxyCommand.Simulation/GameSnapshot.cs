@@ -18,7 +18,10 @@ public sealed record GameShipSnapshot(
     ShipId Id,
     SystemPosition Position,
     LocalMotionSnapshot? Motion,
-    ShipOrderSnapshot? CurrentOrder);
+    ActorControlSnapshot Control,
+    ShipOrderSnapshot? CurrentOrder,
+    IReadOnlyList<ShipOrderSnapshot> QueuedOrders,
+    IReadOnlyList<ShipOrderSnapshot> SuspendedOrders);
 
 internal static class GameSnapshotCollection
 {

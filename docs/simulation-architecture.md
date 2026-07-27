@@ -40,8 +40,9 @@ materials, facilities, routes, or victory conditions.
 
 `GameSession` is the persistent application-facing facade. It owns a clean
 `GameRuntime`, command sequencing, a general game event vocabulary, spatial
-movement, and the current player move order. It exposes immutable
-`GameSnapshot` and diagnostic records without exposing mutable state.
+movement, actor control, and active, queued, or suspended ship orders. It
+exposes immutable `GameSnapshot` and diagnostic records without exposing
+mutable state.
 
 `PhaseOneFixture` builds the proof-of-concept economic world.
 `Acceptance/PhaseOneScenario` is a separate bounded regression harness over

@@ -243,6 +243,34 @@ public sealed class SpatialMovementTests
             fixture.Movement.GetState(fixture.ShipId));
     }
 
+    [Fact]
+    public void RemovingMovingActorMakesPendingArrivalAMissingReference()
+    {
+        var fixture = new MovementFixture();
+        SystemPosition origin = Position(0, 0);
+        fixture.Movement.Add(fixture.ShipId, origin);
+        LocalMotionSegment motion = Assert.IsType<LocalMotionSegment>(
+            fixture.Start(origin, Position(100, 0), new SimulationDuration(100)));
+        var arrival = new SpatialMovementEvent.Arrive(
+            fixture.ShipId,
+            motion.Id,
+            motion.Generation);
+
+        bool removed = fixture.Movement.CommitRemove(
+            fixture.ShipId,
+            new SimulationTime(25));
+        ScheduledEventDisposition disposition = fixture.Movement.HandleEvent(
+            arrival,
+            motion.Generation,
+            motion.ArrivesAt);
+
+        Assert.True(removed);
+        Assert.Null(fixture.Movement.GetState(fixture.ShipId));
+        Assert.Equal(
+            ScheduledEventDisposition.IgnoredMissingReference,
+            disposition);
+    }
+
     private static SystemPosition Position(long x, long y) =>
         new(
             new SystemId(1),

@@ -191,6 +191,9 @@ public sealed class SpatialMovement
     public ShipSpatialState? GetState(ShipId shipId) =>
         _actors.GetValueOrDefault(shipId)?.State;
 
+    public bool Contains(ShipId shipId) =>
+        _actors.ContainsKey(shipId);
+
     public SystemPosition? PositionAt(ShipId shipId, SimulationTime time)
     {
         ActorState? actor = _actors.GetValueOrDefault(shipId);
@@ -278,6 +281,25 @@ public sealed class SpatialMovement
 
         MaterializeForChange(actor, now);
         return true;
+    }
+
+    /// <summary>
+    /// Authoritative cleanup commit for an actor being removed. Any pending
+    /// arrival becomes a deterministic missing-reference no-op.
+    /// </summary>
+    public bool CommitRemove(ShipId shipId, SimulationTime now)
+    {
+        if (!_actors.TryGetValue(shipId, out ActorState? actor))
+        {
+            return false;
+        }
+
+        if (actor.State is ShipSpatialState.Moving)
+        {
+            MaterializeForChange(actor, now);
+        }
+
+        return _actors.Remove(shipId);
     }
 
     public ScheduledEventDisposition HandleEvent(

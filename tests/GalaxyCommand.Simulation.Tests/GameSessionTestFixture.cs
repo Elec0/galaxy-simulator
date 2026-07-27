@@ -12,14 +12,26 @@ internal static class GameSessionTestFixture
         CommandSourceKind.Player,
         new CommandSourceId("test-player"));
 
-    internal static GameSession Create()
+    internal static ActorController PlayerController { get; } = new(
+        ActorControllerKind.Player,
+        Player.Id);
+
+    internal static GameSession Create(
+        ActorController? baseController = null,
+        ISpatialNavigationPlanner? navigation = null)
     {
         var setup = new GameSessionSetup(
             [new StarSystem(System, "Test System")],
-            [new InitialShipSetup(Ship, Position(0, 0))]);
+            [
+                new InitialShipSetup(
+                    Ship,
+                    Position(0, 0),
+                    baseController ?? PlayerController),
+            ]);
         return new GameSession(
             setup,
-            new DirectLocalNavigationPlanner(new FixedTravelTimeEstimator()));
+            navigation
+                ?? new DirectLocalNavigationPlanner(new FixedTravelTimeEstimator()));
     }
 
     internal static NavigationDestination Destination(long x, long y) =>
@@ -32,7 +44,7 @@ internal static class GameSessionTestFixture
                 new SpatialCoordinate(x),
                 new SpatialCoordinate(y)));
 
-    private sealed class FixedTravelTimeEstimator : ILocalTravelTimeEstimator
+    internal sealed class FixedTravelTimeEstimator : ILocalTravelTimeEstimator
     {
         public SimulationDuration Estimate(
             ShipId actorId,

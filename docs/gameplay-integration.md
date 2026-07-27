@@ -277,9 +277,10 @@ The implemented cancellation and invalidation contract is:
    Any already-pending event that later observes a missing actor is an
    `IgnoredMissingReference` no-op.
 
-Production, construction, and transport use this contract now. Future actor
-orders must use the same generation and disposition rules when `TASK-006` and
-`TASK-011` introduce their lifecycle APIs.
+Production, construction, transport, and spatial movement cancellation use this
+contract now. `TASK-006` applies it when orders are cancelled, replaced, or
+suspended for a scripted override. `TASK-011` must apply the same rules during
+actor destruction.
 
 ### 2.7 Add semantic facts alongside internal scheduled events
 
@@ -307,7 +308,8 @@ termination.
 Retain immutable snapshots, but introduce presentation models organized around
 gameplay needs rather than the Phase 1 fixture. `TASK-005` introduced
 `GameSnapshot` with system, ship position, motion, current order, destination,
-status, and reason. Controller and semantic history remain in `TASK-006` and
+status, and reason. `TASK-006` added base and active controllers, controller
+revision, queued orders, and suspended base work. Semantic history remains in
 `TASK-008`. Add dialogue, faction, objective, and knowledge views only when
 their authoritative models exist.
 
@@ -341,20 +343,24 @@ later.
 
 ### 3.2 Actor control and order lifecycle
 
-**Status: first player move-order slice implemented by `TASK-005`; general
-lifecycle remains in `TASK-006`.**
+**Status: controller and general order foundation resolved by `TASK-006`.**
 
 The project needs one order model shared by player-controlled and autonomous
 actors. It must define command authority, validation, queuing, interruption,
 cancellation, completion, failure, and how control returns after a temporary
 scripted override.
 
-The first implementation selects one ship in Godot, issues a position move
-order, exposes its reason and state, and supports cancellation and replacement.
-Invalid or immediately unreachable requests are command rejections. Waiting and
-genuine failure after command acceptance remain undefined until `TASK-006`.
-The proposed controller, override, queue, lifecycle, multi-leg, and deterministic
-commit contracts are in
+Godot selects one ship, issues or queues position move orders, exposes controller
+and order state, and supports stable cancellation and replacement. Player and
+autonomous sources use the same coordinator. Invalid or immediately unreachable
+requests are command rejections.
+
+Waiting requires a recoverable condition with a defined wake trigger; genuine
+failure requires accepted intent that later becomes impossible. Their first
+concrete navigation transitions remain in `TASK-028`, rather than being
+synthetically produced by the order foundation.
+The accepted controller, override, queue, lifecycle, multi-leg, and
+deterministic commit contracts are in
 [Actor control and order lifecycle](actor-control-and-orders.md).
 
 ### 3.3 Entity lifecycle and explicit spawning

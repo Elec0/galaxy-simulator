@@ -9,7 +9,7 @@ public partial class GalaxyMap : Control
 	private GameSnapshot? _snapshot;
 
 	public event Action<ShipId>? ShipSelected;
-	public event Action<SystemPosition>? DestinationRequested;
+	public event Action<SystemPosition, OrderPlacement>? DestinationRequested;
 	public event Action<ShipId>? CancelRequested;
 
 	public ShipId? SelectedShipId { get; private set; }
@@ -72,8 +72,12 @@ public partial class GalaxyMap : Control
 		if (SelectedShipId is not null
 			&& _snapshot.Systems.Count == 1)
 		{
+			OrderPlacement placement = mouse.ShiftPressed
+				? OrderPlacement.Append
+				: OrderPlacement.ReplaceAll;
 			DestinationRequested?.Invoke(
-				ToSystemPosition(_snapshot.Systems[0].Id, mouse.Position));
+				ToSystemPosition(_snapshot.Systems[0].Id, mouse.Position),
+				placement);
 			AcceptEvent();
 		}
 	}
@@ -112,7 +116,8 @@ public partial class GalaxyMap : Control
 		foreach (GameShipSnapshot ship in _snapshot.Ships)
 		{
 			Vector2 position = ToView(ship.Position);
-			if (ship.CurrentOrder?.Destination is NavigationDestination.Position destination)
+			if (ShouldDrawRoute(ship.CurrentOrder)
+				&& ship.CurrentOrder!.Destination is NavigationDestination.Position destination)
 			{
 				Vector2 target = ToView(destination.Value);
 				DrawLine(position, target, new Color("375a6d"), 1.0f, true);
@@ -142,6 +147,9 @@ public partial class GalaxyMap : Control
 				modulate: new Color("d8bb78"));
 		}
 	}
+
+	private static bool ShouldDrawRoute(ShipOrderSnapshot? order) =>
+		order?.Status is ShipOrderStatus.Active or ShipOrderStatus.Waiting;
 
 	private Vector2 ToView(SystemPosition position) =>
 		new(

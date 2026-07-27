@@ -137,6 +137,12 @@ public static class CommandRejectionCodes
     public static CommandRejectionCode InvalidState { get; } = new("invalid-state");
 
     public static CommandRejectionCode Conflict { get; } = new("conflict");
+
+    public static CommandRejectionCode ActorOverridden { get; } = new("actor-overridden");
+
+    public static CommandRejectionCode StaleControlRevision { get; } = new("stale-control-revision");
+
+    public static CommandRejectionCode OrderNotFound { get; } = new("order-not-found");
 }
 
 public enum CommandResultStatus

@@ -45,7 +45,12 @@ public partial class Main : Node
 				new SpatialCoordinate(0)));
 		var setup = new GameSessionSetup(
 			[new StarSystem(InitialSystemId, "Initial System")],
-			[new InitialShipSetup(InitialShipId, position)]);
+			[
+				new InitialShipSetup(
+					InitialShipId,
+					position,
+					new ActorController(ActorControllerKind.Player, new CommandSourceId("local-player"))),
+			]);
 		return new GameSession(
 			setup,
 			new DirectLocalNavigationPlanner(new MapTravelTimeEstimator()));
@@ -57,7 +62,9 @@ public partial class Main : Node
 		RefreshPresentation();
 	}
 
-	private void OnDestinationRequested(SystemPosition destination)
+	private void OnDestinationRequested(
+		SystemPosition destination,
+		OrderPlacement placement)
 	{
 		if (_map.SelectedShipId is not { } shipId)
 		{
@@ -68,16 +75,30 @@ public partial class Main : Node
 			_player,
 			new MoveShipCommand(
 				shipId,
-				new NavigationDestination.Position(destination)));
+				new NavigationDestination.Position(destination),
+				placement));
 		_lastCommandStatus = DescribeResult(record);
 		RefreshPresentation();
 	}
 
 	private void OnCancelRequested(ShipId shipId)
 	{
+		ShipOrderSnapshot? current = _session.CaptureSnapshot().Ships
+			.SingleOrDefault(ship => ship.Id == shipId)
+			?.CurrentOrder;
+		if (current is null
+			|| current.Status is ShipOrderStatus.Completed
+				or ShipOrderStatus.Cancelled
+				or ShipOrderStatus.Failed)
+		{
+			_lastCommandStatus = "No active order to cancel";
+			RefreshPresentation();
+			return;
+		}
+
 		GameplayCommandRecord record = _session.SubmitCommand(
 			_player,
-			new CancelShipOrderCommand(shipId));
+			new CancelShipOrderCommand(shipId, current.Id));
 		_lastCommandStatus = DescribeResult(record);
 		RefreshPresentation();
 	}
@@ -102,10 +123,17 @@ public partial class Main : Node
 		string motion = selected?.Motion is { } activeMotion
 			? $"moving until {FormatTime(activeMotion.ArrivesAt)}"
 			: "stationary";
+		string control = selected is null
+			? "No controller"
+			: $"{selected.Control.ActiveController.Kind}:{selected.Control.ActiveController.Id}";
+		string queue = selected is null
+			? "QUEUE 0"
+			: $"QUEUE {selected.QueuedOrders.Count}";
 
 		_status.Text =
 			$"SIM {FormatTime(snapshot.Time)}   |   SHIPS {snapshot.Ships.Count}   |   " +
-			$"{_lastCommandStatus}   |   {order}   |   {motion}";
+			$"{control}   |   {queue}   |   {_lastCommandStatus}   |   " +
+			$"{order}   |   {motion}";
 	}
 
 	private static string DescribeResult(GameplayCommandRecord record) =>

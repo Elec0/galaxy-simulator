@@ -36,7 +36,15 @@ public sealed class GameSessionSnapshotTests
                 new ShipId(99),
                 GameSessionTestFixture.Position(0, 0),
                 null,
-                null)));
+                new ActorControlSnapshot(
+                    GameSessionTestFixture.PlayerController,
+                    GameSessionTestFixture.PlayerController,
+                    null,
+                    null,
+                    default),
+                null,
+                Array.Empty<ShipOrderSnapshot>(),
+                Array.Empty<ShipOrderSnapshot>())));
     }
 
     [Fact]
@@ -48,7 +56,8 @@ public sealed class GameSessionSnapshotTests
                 new SystemId(2),
                 new SpatialPosition(
                     new SpatialCoordinate(0),
-                    new SpatialCoordinate(0))));
+                    new SpatialCoordinate(0))),
+            GameSessionTestFixture.PlayerController);
 
         Assert.Throws<ArgumentException>(() =>
             new GameSessionSetup(

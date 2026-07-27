@@ -17,18 +17,6 @@ The current architectural goal is to establish the spatial, command, and
 ordering boundaries required for an interactive game. Work roughly from top to
 bottom; later tasks may be refined as earlier contracts become concrete.
 
-- [ ] **TASK-006: Define actor control and order lifecycle**
-  - Define player control, autonomous control, and temporary scripted override.
-  - Define order states, queuing, interruption, cancellation, completion, and
-    failure.
-  - Define genuine post-acceptance order failure and waiting behavior; invalid
-    or immediately unreachable `TASK-005` requests remain command rejections.
-  - Define how control returns after an override ends.
-  - Use one order model for player-controlled and autonomous actors.
-  - Architecture proposal drafted; implement controller, order-coordinator, and
-    multi-leg foundations before continuing connector traversal.
-  - Context: [Actor control and order lifecycle](actor-control-and-orders.md)
-
 - [ ] **TASK-028: Establish hierarchical system-space navigation**
   - Introduce systems as distinct local navigable spaces and connectors as
     explicit inter-system transitions.
@@ -37,13 +25,16 @@ bottom; later tasks may be refined as earlier contracts become concrete.
   - Represent system-local position and scheduled motion authoritatively while
     keeping rendering interpolation non-authoritative.
   - Preserve the Phase 1 graph as a compatibility backend during migration.
-  - Prove scheduled point-to-point movement within one system before `TASK-005`.
+  - Proven foundation: scheduled point-to-point movement within one system was
+    completed before `TASK-005`.
   - Implemented foundation: typed system-local positions, position
     destinations, `RouteId`-free local planning, authoritative scheduled motion,
     generation-safe cancellation and replacement, and immutable motion
     snapshots.
   - Remaining: connector topology and traversal, additional destination forms,
     and the later Phase 1 compatibility migration.
+  - The controller, queue, and multi-leg order foundation required for
+    connector traversal was completed by `TASK-006`.
   - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 ## Near-term work
@@ -130,6 +121,9 @@ prerequisites and desired behavior are sufficiently defined.
 - [ ] **TASK-017: Design deterministic scripted events**
   - Define time-, location-, threshold-, and fact-based triggers.
   - Define one-shot and repeatable persistent state.
+  - Define scheduling, checkpointing, wake, cancellation, and persistence
+    semantics for long-running scripted behavior; the current runtime does not
+    provide long-running script execution.
   - Restrict effects to an approved command vocabulary.
   - Separate development cheats from shipped narrative effects.
 
@@ -224,9 +218,35 @@ prerequisites and desired behavior are sufficiently defined.
     snapshots, and stale-arrival handling are covered headlessly.
   - Godot selects a ship, submits or replaces a position destination, cancels
     with right-click, and displays the order, reason, destination, and motion.
-  - Queues, controller changes, waiting, and genuine post-acceptance failure
-    remain in `TASK-006`; semantic facts remain in `TASK-008`.
+  - Queues, controller changes, and the broader lifecycle were completed by
+    `TASK-006`; semantic facts remain in `TASK-008`.
   - Context: [Gameplay integration §2.3, §2.9, and §3.2](gameplay-integration.md#23-introduce-a-persistent-game-session-facade)
+
+- [x] **TASK-006: Define actor control and order lifecycle**
+  - Actors now have explicit player or autonomous base controllers, exact
+    command-source eligibility, stable control revisions, and one non-nesting
+    temporary scripted override with an opaque reason ID and explicit
+    cancel-outstanding release policy.
+  - One shared order coordinator supports explicit replace-all or FIFO append,
+    stable order-ID cancellation, queued promotion, suspension, restoration,
+    terminal reasons, and immutable active, queued, and suspended snapshots.
+  - A private plan executor advances multiple local travel legs without
+    confusing leg completion with order completion.
+  - Move and cancel evaluation produce immutable proposals before deterministic
+    owner commit; autonomous and player sources use the same order model.
+  - Godot uses click to replace, Shift-click to append, and right-click to
+    cancel the active order while displaying controller and queue state; route
+    overlays are limited to active or waiting orders and clear on cancellation
+    or completion.
+  - Waiting and failed states are defined; connector and target invalidation in
+    `TASK-028` and `TASK-011` provide their first concrete wake and failure
+    proofs. Semantic transition facts remain in `TASK-008`.
+  - An internal coordinated actor-cleanup boundary invalidates pending movement
+    before removing spatial, control, and order ownership; destruction policy
+    and commands remain in `TASK-011`.
+  - The current runtime still does not execute long-running scripted behavior;
+    scheduling, checkpointing, and persistence remain in `TASK-017`.
+  - Context: [Actor control and order lifecycle](actor-control-and-orders.md)
 
 - [x] **TASK-007: Complete scheduled-event cancellation and invalidation**
   - Production, construction, and transport activities advance generations
@@ -234,8 +254,9 @@ prerequisites and desired behavior are sufficiently defined.
     expected state before scheduled mutation.
   - Ignored events are deterministic no-ops with recorded stale-generation,
     missing-reference, or state-mismatch diagnostics.
-  - Future actor-order and destruction APIs must apply this contract in
-    `TASK-006` and `TASK-011`; semantic cancellation facts remain in `TASK-008`.
+  - Actor movement and order cancellation apply this contract through
+    `TASK-006`; destruction cleanup remains in `TASK-011` and semantic
+    cancellation facts remain in `TASK-008`.
   - Context: [Gameplay integration §1.5 and §2.6](gameplay-integration.md#15-scheduled-work-has-an-incomplete-cancellation-contract)
 
 - [x] **DONE-001: Establish the project vision and modular design documents**
