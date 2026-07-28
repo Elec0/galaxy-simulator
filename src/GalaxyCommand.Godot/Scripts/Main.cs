@@ -144,9 +144,14 @@ public partial class Main : Node
 			: $"{record.Result.RejectionCode}: {record.Result.Reason}";
 
 	private static string DescribeDestination(NavigationDestination destination) =>
-		destination is NavigationDestination.Position position
-			? $"({position.Value.Position.X}, {position.Value.Position.Y})"
-			: destination.GetType().Name;
+		destination switch
+		{
+			NavigationDestination.Position position =>
+				$"({position.Value.Position.X}, {position.Value.Position.Y})",
+			NavigationDestination.System system =>
+				$"system {system.SystemId}",
+			_ => destination.GetType().Name,
+		};
 
 	private static string FormatTime(SimulationTime time)
 	{

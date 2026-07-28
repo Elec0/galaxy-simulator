@@ -66,6 +66,29 @@ public sealed class ConnectorTraversalTests
     }
 
     [Fact]
+    public void SystemDestinationCompletesWhenShipEmergesInRequestedSystem()
+    {
+        GameSession session = CreateSession();
+
+        GameplayCommandRecord command = session.SubmitCommand(
+            Player,
+            MoveTo(
+                new NavigationDestination.System(DestinationSystem),
+                OrderPlacement.ReplaceAll));
+
+        Assert.Equal(CommandResultStatus.Accepted, command.Result.Status);
+        session.AdvanceTo(new SimulationTime(60));
+
+        GameShipSnapshot completed = Assert.Single(
+            session.CaptureSnapshot().Ships);
+        Assert.Equal(Position(DestinationSystem, -10), completed.Position);
+        Assert.Null(completed.Motion);
+        Assert.Null(completed.Transit);
+        Assert.Equal(ShipOrderStatus.Completed, completed.CurrentOrder?.Status);
+        Assert.Equal(2, session.EventRecords.Count);
+    }
+
+    [Fact]
     public void CancellingDuringTransitLeavesPhysicalTraversalInProgress()
     {
         GameSession session = CreateSession();

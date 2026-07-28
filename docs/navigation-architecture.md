@@ -26,7 +26,8 @@ The implemented `TASK-028` slices now provide:
   identities
 - Signed 64-bit system-local coordinates with deliberately unspecified unit
   scale
-- Position destination intent and a `RouteId`-free local planner
+- Position and system destination intent with `RouteId`-free local and
+  hierarchical planners
 - Immutable, always-enabled connector topology and deterministic hierarchical
   planning by total local-plus-transit duration with connection-ID tie-breaking
 - Actor-specific travel-time estimation outside the planning contract
@@ -40,16 +41,16 @@ The implemented `TASK-028` slices now provide:
   state without nullable combinations that can contradict each other
 
 The subsystem is now wired into the clean application-facing `GameSession` and
-Godot through `TASK-005`. A move command retains its position destination while
-the planner produces one or more local legs; the movement owner schedules each
-arrival and the `TASK-006` order coordinator tracks active, queued, suspended,
-and terminal state. Replacement materializes the current position before
+Godot through `TASK-005`. A move command retains its destination intent while
+the planner produces local and connector legs; the movement owner schedules
+each completion and the `TASK-006` order coordinator tracks active, queued,
+suspended, and terminal state. Replacement materializes local motion before
 starting the new leg.
 
 The Phase 1 transport graph remains isolated in its acceptance runtime and has
 not migrated to these contracts. Runtime connector availability and access,
-entity destinations, system-only destinations, docking, and attachment remain
-later slices described below.
+entity destinations, docking, and attachment remain later slices described
+below.
 
 ## Design at a glance
 
@@ -224,6 +225,12 @@ to get there. Initial destination forms should cover:
 - A physical entity, resolved through that entity's current spatial state
 - A system when arrival anywhere through a valid connector is sufficient
 
+Position and system destinations are implemented. A system destination
+completes immediately when the actor is already in that system; otherwise it
+completes when connector emergence first places the actor at a valid position
+inside the requested system. It does not invent a preferred coordinate or add
+a final local leg.
+
 Docking, following, patrolling, and attacking may use movement internally, but
 they remain distinct gameplay orders with their own completion rules. A move
 order must not contain Phase 1 `RouteId` values or a preselected list of gates.
@@ -253,7 +260,8 @@ Planning is hierarchical:
 2. Otherwise, choose a deterministic sequence of inter-system connectors.
 3. For each connector, plan local movement to its source endpoint.
 4. Traverse it and continue planning from the destination endpoint.
-5. Plan the final local movement to the requested destination.
+5. For a position destination, plan the final local movement. For a system
+   destination, complete at the emergence endpoint.
 
 The inter-system topology graph and a system's local spatial navigation are
 separate indexes. A single galaxy-wide graph should not contain every arbitrary

@@ -38,8 +38,15 @@ bottom; later tasks may be refined as earlier contracts become concrete.
     hierarchical planning, discriminated `AtPosition`/local-motion/transit
     snapshots, scheduled emergence, non-interruptible transit cancellation,
     and replacement-order wait/wake behavior.
-  - Remaining: runtime connector availability and access, additional
-    destination forms, and the later Phase 1 compatibility migration.
+  - Implemented system destinations: orders complete immediately in the current
+    system or at the first valid connector emergence in another system.
+  - Remaining: runtime connector availability and access, entity destinations,
+    and the later Phase 1 compatibility migration.
+  - Entity destinations require the spatial-entity identity and lifecycle
+    foundation in `TASK-011`.
+  - Before Phase 1 compatibility migration, define an explicit mapping from
+    legacy `LocationId` nodes to systems and spatial entities; do not infer that
+    mapping from the old route graph.
   - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 ## Near-term work

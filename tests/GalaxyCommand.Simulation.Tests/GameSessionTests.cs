@@ -36,6 +36,28 @@ public sealed class GameSessionTests
     }
 
     [Fact]
+    public void CurrentSystemDestinationCompletesWithoutPhysicalMovement()
+    {
+        GameSession session = GameSessionTestFixture.Create();
+
+        GameplayCommandRecord command = session.SubmitCommand(
+            GameSessionTestFixture.Player,
+            new MoveShipCommand(
+                GameSessionTestFixture.Ship,
+                new NavigationDestination.System(
+                    GameSessionTestFixture.System),
+                OrderPlacement.ReplaceAll));
+
+        Assert.Equal(CommandResultStatus.Accepted, command.Result.Status);
+        GameShipSnapshot completed = Assert.Single(
+            session.CaptureSnapshot().Ships);
+        Assert.Equal(ShipOrderStatus.Completed, completed.CurrentOrder?.Status);
+        Assert.Equal(GameSessionTestFixture.Position(0, 0), completed.Position);
+        Assert.Null(completed.Motion);
+        Assert.Empty(session.EventRecords);
+    }
+
+    [Fact]
     public void ReplacementStartsAtMaterializedCurrentPosition()
     {
         GameSession session = GameSessionTestFixture.Create();

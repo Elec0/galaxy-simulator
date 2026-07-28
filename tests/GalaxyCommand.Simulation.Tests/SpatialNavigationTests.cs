@@ -59,6 +59,69 @@ public sealed class SpatialNavigationTests
     }
 
     [Fact]
+    public void CurrentSystemDestinationNeedsNoTravelLeg()
+    {
+        var estimator = new RecordingEstimator(new SimulationDuration(250));
+        var planner = new DirectLocalNavigationPlanner(estimator);
+        var request = new NavigationRequest(
+            new ShipId(3),
+            Position(new SystemId(1), 10, -20),
+            new NavigationDestination.System(new SystemId(1)),
+            SimulationTime.Zero);
+
+        var result = Assert.IsType<NavigationPlanResult.Planned>(
+            planner.Plan(request));
+
+        Assert.Empty(result.Plan.Legs);
+        Assert.Equal(SimulationDuration.Zero, result.Plan.TotalDuration);
+        Assert.Empty(estimator.Requests);
+    }
+
+    [Fact]
+    public void CrossSystemDestinationCompletesAtEmergenceEndpoint()
+    {
+        SystemId firstSystem = new(1);
+        SystemId secondSystem = new(2);
+        SystemPosition origin = Position(firstSystem, 0, 0);
+        SystemPosition source = Position(firstSystem, 10, 0);
+        SystemPosition emergence = Position(secondSystem, -10, 0);
+        var topology = new ConnectorTopology(
+            [
+                new ConnectorEndpoint(new ConnectorEndpointId(1), source),
+                new ConnectorEndpoint(new ConnectorEndpointId(2), emergence),
+            ],
+            [
+                new TransitConnection(
+                    new TransitConnectionId(1),
+                    new ConnectorEndpointId(1),
+                    new ConnectorEndpointId(2),
+                    new SimulationDuration(50)),
+            ]);
+        var destination = new NavigationDestination.System(secondSystem);
+        var planner = new HierarchicalNavigationPlanner(
+            topology,
+            new CoordinateEstimator());
+
+        var result = Assert.IsType<NavigationPlanResult.Planned>(
+            planner.Plan(new NavigationRequest(
+                new ShipId(3),
+                origin,
+                destination,
+                SimulationTime.Zero)));
+
+        Assert.Equal(destination, result.Plan.Destination);
+        Assert.Equal(new SimulationDuration(60), result.Plan.TotalDuration);
+        Assert.Collection(
+            result.Plan.Legs,
+            first => Assert.IsType<TravelLeg.Local>(first),
+            second =>
+            {
+                var connector = Assert.IsType<TravelLeg.Connector>(second);
+                Assert.Equal(emergence, connector.Destination);
+            });
+    }
+
+    [Fact]
     public void HierarchicalPlannerComposesLocalAndConnectorLegs()
     {
         SystemId firstSystem = new(1);
@@ -316,6 +379,8 @@ public sealed class SpatialNavigationTests
             new SystemPosition(default, new SpatialPosition()));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new NavigationDestination.Position(default));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new NavigationDestination.System(default));
     }
 
     private static SystemPosition Position(

@@ -567,11 +567,18 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             }
         }
 
-        if (destination is NavigationDestination.Position position
-            && expectedOrigin != position.Value)
+        bool destinationSatisfied = destination switch
+        {
+            NavigationDestination.Position position =>
+                expectedOrigin == position.Value,
+            NavigationDestination.System system =>
+                expectedOrigin.SystemId == system.SystemId,
+            _ => false,
+        };
+        if (!destinationSatisfied)
         {
             throw new InvalidOperationException(
-                $"Travel plan ends at {expectedOrigin}, expected {position.Value}.");
+                $"Travel plan ends at {expectedOrigin}, which does not satisfy {destination}.");
         }
     }
 
@@ -598,8 +605,14 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
     private static bool DestinationSatisfied(
         SystemPosition current,
         NavigationDestination destination) =>
-        destination is NavigationDestination.Position position
-        && current == position.Value;
+        destination switch
+        {
+            NavigationDestination.Position position =>
+                current == position.Value,
+            NavigationDestination.System system =>
+                current.SystemId == system.SystemId,
+            _ => false,
+        };
 
     private CommandResult? RejectIneligible(
         ShipId shipId,

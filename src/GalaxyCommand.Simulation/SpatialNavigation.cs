@@ -247,6 +247,17 @@ public abstract record NavigationDestination
 
         public SystemPosition Value { get; }
     }
+
+    public sealed record System : NavigationDestination
+    {
+        public System(SystemId systemId)
+        {
+            ArgumentOutOfRangeException.ThrowIfZero(systemId.Value);
+            SystemId = systemId;
+        }
+
+        public SystemId SystemId { get; }
+    }
 }
 
 /// <summary>
@@ -471,11 +482,22 @@ public sealed class DirectLocalNavigationPlanner : ISpatialNavigationPlanner
     public NavigationPlanResult Plan(NavigationRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var destination = request.Destination as NavigationDestination.Position
-            ?? throw new ArgumentOutOfRangeException(
+        if (request.Destination is NavigationDestination.System system)
+        {
+            return request.Origin.SystemId == system.SystemId
+                ? new NavigationPlanResult.Planned(
+                    new TravelPlan(request.Destination, []))
+                : new NavigationPlanResult.Unreachable(
+                    NavigationFailureReason.InterSystemConnectorRequired);
+        }
+
+        if (request.Destination is not NavigationDestination.Position destination)
+        {
+            throw new ArgumentOutOfRangeException(
                 nameof(request),
                 request.Destination,
                 "Unsupported navigation destination.");
+        }
 
         if (request.Origin.SystemId != destination.Value.SystemId)
         {
@@ -520,15 +542,30 @@ public sealed class HierarchicalNavigationPlanner : ISpatialNavigationPlanner
     public NavigationPlanResult Plan(NavigationRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var destination = request.Destination as NavigationDestination.Position
-            ?? throw new ArgumentOutOfRangeException(
-                nameof(request),
-                request.Destination,
-                "Unsupported navigation destination.");
-
-        if (request.Origin.SystemId == destination.Value.SystemId)
+        SystemId destinationSystem = request.Destination switch
         {
-            return PlannedLocal(request, destination.Value);
+            NavigationDestination.Position position =>
+                position.Value.SystemId,
+            NavigationDestination.System system =>
+                system.SystemId,
+            _ => throw new ArgumentOutOfRangeException(
+                    nameof(request),
+                    request.Destination,
+                    "Unsupported navigation destination."),
+        };
+
+        if (request.Origin.SystemId == destinationSystem)
+        {
+            return request.Destination switch
+            {
+                NavigationDestination.Position position =>
+                    PlannedLocal(request, position.Value),
+                NavigationDestination.System =>
+                    new NavigationPlanResult.Planned(
+                        new TravelPlan(request.Destination, [])),
+                _ => throw new InvalidOperationException(
+                    "Unsupported navigation destination."),
+            };
         }
 
         SearchState? bestDestination = null;
@@ -554,24 +591,11 @@ public sealed class HierarchicalNavigationPlanner : ISpatialNavigationPlanner
                 continue;
             }
 
-            if (current.Position.SystemId == destination.Value.SystemId)
+            if (current.Position.SystemId == destinationSystem)
             {
-                SimulationDuration finalDuration = _travelTime.Estimate(
-                    request.ActorId,
-                    current.Position,
-                    destination.Value);
-                var completed = new SearchState(
-                    current.ArrivalEndpointId,
-                    destination.Value,
-                    current.Duration.Add(finalDuration),
-                    [
-                        .. current.Legs,
-                        new TravelLeg.Local(
-                            current.Position,
-                            destination.Value,
-                            finalDuration),
-                    ],
-                    current.ConnectionPath);
+                SearchState completed = CompleteDestination(
+                    request,
+                    current);
                 if (bestDestination is null
                     || CompareSearchState(completed, bestDestination) < 0)
                 {
@@ -614,6 +638,34 @@ public sealed class HierarchicalNavigationPlanner : ISpatialNavigationPlanner
             new TravelPlan(
                 request.Destination,
                 [new TravelLeg.Local(request.Origin, destination, duration)]));
+    }
+
+    private SearchState CompleteDestination(
+        NavigationRequest request,
+        SearchState current)
+    {
+        if (request.Destination is NavigationDestination.System)
+        {
+            return current;
+        }
+
+        var destination = (NavigationDestination.Position)request.Destination;
+        SimulationDuration finalDuration = _travelTime.Estimate(
+            request.ActorId,
+            current.Position,
+            destination.Value);
+        return new SearchState(
+            current.ArrivalEndpointId,
+            destination.Value,
+            current.Duration.Add(finalDuration),
+            [
+                .. current.Legs,
+                new TravelLeg.Local(
+                    current.Position,
+                    destination.Value,
+                    finalDuration),
+            ],
+            current.ConnectionPath);
     }
 
     private void AddOutgoingCandidates(
