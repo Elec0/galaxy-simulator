@@ -3,8 +3,8 @@ using System.Collections.ObjectModel;
 namespace GalaxyCommand.Simulation;
 
 /// <summary>
-/// Authoritative physical state for the initial system-space movement slice.
-/// Connector transit and attachment are added with their owning subsystems.
+/// Authoritative physical state for system-local motion and connector transit.
+/// Attachment is added with its future owning subsystem.
 /// </summary>
 public abstract record ShipSpatialState
 {
@@ -12,9 +12,9 @@ public abstract record ShipSpatialState
     {
     }
 
-    public sealed record Present : ShipSpatialState
+    public sealed record AtPosition : ShipSpatialState
     {
-        public Present(SystemPosition position)
+        public AtPosition(SystemPosition position)
         {
             ArgumentOutOfRangeException.ThrowIfZero(position.SystemId.Value);
             Position = position;
@@ -32,6 +32,17 @@ public abstract record ShipSpatialState
         }
 
         public LocalMotionSegment Motion { get; }
+    }
+
+    public sealed record ConnectorTransit : ShipSpatialState
+    {
+        public ConnectorTransit(ConnectorTransitSegment transit)
+        {
+            ArgumentNullException.ThrowIfNull(transit);
+            Transit = transit;
+        }
+
+        public ConnectorTransitSegment Transit { get; }
     }
 }
 
@@ -124,23 +135,76 @@ public sealed record LocalMotionSegment
     }
 }
 
+/// <summary>
+/// Scheduled authoritative traversal between endpoints in distinct systems.
+/// A ship in this state has no ordinary system-local position.
+/// </summary>
+public sealed record ConnectorTransitSegment
+{
+    public ConnectorTransitSegment(
+        ConnectorTransitId id,
+        EventGeneration generation,
+        TransitConnectionId connectionId,
+        SystemPosition source,
+        SystemPosition destination,
+        SimulationTime departedAt,
+        SimulationTime arrivesAt)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(id.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(connectionId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(source.SystemId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(destination.SystemId.Value);
+        if (source.SystemId == destination.SystemId)
+        {
+            throw new ArgumentException(
+                "Connector transit must cross a system boundary.",
+                nameof(destination));
+        }
+
+        if (arrivesAt <= departedAt)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(arrivesAt),
+                arrivesAt,
+                "Connector transit must have a positive duration.");
+        }
+
+        Id = id;
+        Generation = generation;
+        ConnectionId = connectionId;
+        Source = source;
+        Destination = destination;
+        DepartedAt = departedAt;
+        ArrivesAt = arrivesAt;
+    }
+
+    public ConnectorTransitId Id { get; }
+
+    public EventGeneration Generation { get; }
+
+    public TransitConnectionId ConnectionId { get; }
+
+    public SystemPosition Source { get; }
+
+    public SystemPosition Destination { get; }
+
+    public SimulationTime DepartedAt { get; }
+
+    public SimulationTime ArrivesAt { get; }
+}
+
 public abstract record SpatialMovementEvent
 {
     private SpatialMovementEvent(
         ShipId shipId,
-        MotionId motionId,
         EventGeneration generation)
     {
         ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
-        ArgumentOutOfRangeException.ThrowIfZero(motionId.Value);
         ShipId = shipId;
-        MotionId = motionId;
         Generation = generation;
     }
 
     public ShipId ShipId { get; }
-
-    public MotionId MotionId { get; }
 
     public EventGeneration Generation { get; }
 
@@ -150,9 +214,28 @@ public abstract record SpatialMovementEvent
             ShipId shipId,
             MotionId motionId,
             EventGeneration generation)
-            : base(shipId, motionId, generation)
+            : base(shipId, generation)
         {
+            ArgumentOutOfRangeException.ThrowIfZero(motionId.Value);
+            MotionId = motionId;
         }
+
+        public MotionId MotionId { get; }
+    }
+
+    public sealed record Emerge : SpatialMovementEvent
+    {
+        public Emerge(
+            ShipId shipId,
+            ConnectorTransitId transitId,
+            EventGeneration generation)
+            : base(shipId, generation)
+        {
+            ArgumentOutOfRangeException.ThrowIfZero(transitId.Value);
+            TransitId = transitId;
+        }
+
+        public ConnectorTransitId TransitId { get; }
     }
 }
 
@@ -164,19 +247,64 @@ public sealed record LocalMotionSnapshot(
     SimulationTime DepartedAt,
     SimulationTime ArrivesAt);
 
+public sealed record ConnectorTransitSnapshot(
+    ConnectorTransitId Id,
+    EventGeneration Generation,
+    TransitConnectionId ConnectionId,
+    SystemPosition Source,
+    SystemPosition Destination,
+    SimulationTime DepartedAt,
+    SimulationTime ArrivesAt);
+
+public abstract record ShipSpatialSnapshotState
+{
+    private ShipSpatialSnapshotState()
+    {
+    }
+
+    public sealed record AtPosition(SystemPosition Position) : ShipSpatialSnapshotState;
+
+    public sealed record LocalMotion(
+        SystemPosition CurrentPosition,
+        LocalMotionSnapshot Motion) : ShipSpatialSnapshotState;
+
+    public sealed record ConnectorTransit(
+        ConnectorTransitSnapshot Transit) : ShipSpatialSnapshotState;
+}
+
 public sealed record ShipSpatialSnapshot(
     ShipId ShipId,
-    SystemPosition Position,
-    LocalMotionSnapshot? Motion);
+    ShipSpatialSnapshotState State)
+{
+    public SystemPosition? Position =>
+        State switch
+        {
+            ShipSpatialSnapshotState.AtPosition atPosition =>
+                atPosition.Position,
+            ShipSpatialSnapshotState.LocalMotion localMotion =>
+                localMotion.CurrentPosition,
+            ShipSpatialSnapshotState.ConnectorTransit => null,
+            _ => throw new InvalidOperationException(
+                $"Unsupported spatial snapshot state {State.GetType().Name}."),
+        };
+
+    public LocalMotionSnapshot? Motion =>
+        (State as ShipSpatialSnapshotState.LocalMotion)?.Motion;
+
+    public ConnectorTransitSnapshot? Transit =>
+        (State as ShipSpatialSnapshotState.ConnectorTransit)?.Transit;
+}
 
 /// <summary>
-/// Authoritative owner of ship spatial state for scheduled local movement.
+/// Authoritative owner of ship spatial state for scheduled local movement and
+/// connector traversal.
 /// </summary>
 public sealed class SpatialMovement
 {
     private readonly SortedDictionary<ShipId, ActorState> _actors =
         new(EntityIdComparer<ShipId>.Instance);
     private readonly IdSequence<MotionId> _motionIds = new();
+    private readonly IdSequence<ConnectorTransitId> _transitIds = new();
 
     public void Add(ShipId shipId, SystemPosition position)
     {
@@ -199,8 +327,9 @@ public sealed class SpatialMovement
         ActorState? actor = _actors.GetValueOrDefault(shipId);
         return actor?.State switch
         {
-            ShipSpatialState.Present present => present.Position,
+            ShipSpatialState.AtPosition atPosition => atPosition.Position,
             ShipSpatialState.Moving moving => moving.Motion.PositionAt(time),
+            ShipSpatialState.ConnectorTransit => null,
             _ => null,
         };
     }
@@ -242,7 +371,7 @@ public sealed class SpatialMovement
             || leg.Origin == leg.Destination)
         {
             actor.Generation = generation;
-            actor.State = new ShipSpatialState.Present(leg.Destination);
+            actor.State = new ShipSpatialState.AtPosition(leg.Destination);
             return null;
         }
 
@@ -266,6 +395,57 @@ public sealed class SpatialMovement
         actor.Generation = generation;
         actor.State = new ShipSpatialState.Moving(motion);
         return motion;
+    }
+
+    /// <summary>
+    /// Authoritative commit for one validated connector traversal.
+    /// </summary>
+    public ConnectorTransitSegment CommitStartConnector<TEvent>(
+        ShipId shipId,
+        TravelLeg.Connector leg,
+        SimulationTime now,
+        EventAgenda<TEvent> agenda,
+        Func<SpatialMovementEvent, TEvent> wrapEvent)
+    {
+        ArgumentNullException.ThrowIfNull(leg);
+        ArgumentNullException.ThrowIfNull(agenda);
+        ArgumentNullException.ThrowIfNull(wrapEvent);
+        if (now != agenda.CurrentTime)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(now),
+                now,
+                $"Movement time {now.Milliseconds} ms does not match agenda time {agenda.CurrentTime.Milliseconds} ms.");
+        }
+
+        ActorState actor = GetRequiredActor(shipId);
+        if (actor.State is not ShipSpatialState.AtPosition atPosition
+            || atPosition.Position != leg.Origin)
+        {
+            throw new InvalidOperationException(
+                $"Ship {shipId} is not at connector origin {leg.Origin}.");
+        }
+
+        SimulationTime arrivesAt = now.Add(leg.Duration);
+        var transit = new ConnectorTransitSegment(
+            _transitIds.Allocate(),
+            actor.Generation,
+            leg.ConnectionId,
+            leg.Origin,
+            leg.Destination,
+            now,
+            arrivesAt);
+        TEvent wrappedEvent = wrapEvent(new SpatialMovementEvent.Emerge(
+            shipId,
+            transit.Id,
+            transit.Generation));
+        agenda.Schedule(
+            arrivesAt,
+            EventPhase.PhysicalCompletion,
+            transit.Generation,
+            wrappedEvent);
+        actor.State = new ShipSpatialState.ConnectorTransit(transit);
+        return transit;
     }
 
     /// <summary>
@@ -323,16 +503,25 @@ public sealed class SpatialMovement
             return ScheduledEventDisposition.IgnoredStaleGeneration;
         }
 
-        if (movementEvent is not SpatialMovementEvent.Arrive arrive
-            || actor.State is not ShipSpatialState.Moving moving
-            || moving.Motion.Id != arrive.MotionId
-            || moving.Motion.ArrivesAt != now)
+        switch (movementEvent)
         {
-            return ScheduledEventDisposition.IgnoredStateMismatch;
+            case SpatialMovementEvent.Arrive arrive
+                when actor.State is ShipSpatialState.Moving moving
+                    && moving.Motion.Id == arrive.MotionId
+                    && moving.Motion.ArrivesAt == now:
+                actor.State = new ShipSpatialState.AtPosition(
+                    moving.Motion.Destination);
+                return ScheduledEventDisposition.Applied;
+            case SpatialMovementEvent.Emerge emerge
+                when actor.State is ShipSpatialState.ConnectorTransit traversing
+                    && traversing.Transit.Id == emerge.TransitId
+                    && traversing.Transit.ArrivesAt == now:
+                actor.State = new ShipSpatialState.AtPosition(
+                    traversing.Transit.Destination);
+                return ScheduledEventDisposition.Applied;
+            default:
+                return ScheduledEventDisposition.IgnoredStateMismatch;
         }
-
-        actor.State = new ShipSpatialState.Present(moving.Motion.Destination);
-        return ScheduledEventDisposition.Applied;
     }
 
     public IReadOnlyList<ShipSpatialSnapshot> CaptureSnapshot(SimulationTime now)
@@ -342,24 +531,39 @@ public sealed class SpatialMovement
         {
             switch (actor.State)
             {
-                case ShipSpatialState.Present present:
+                case ShipSpatialState.AtPosition atPosition:
                     snapshots.Add(new ShipSpatialSnapshot(
                         shipId,
-                        present.Position,
-                        null));
+                        new ShipSpatialSnapshotState.AtPosition(
+                            atPosition.Position)));
                     break;
                 case ShipSpatialState.Moving moving:
                     LocalMotionSegment motion = moving.Motion;
                     snapshots.Add(new ShipSpatialSnapshot(
                         shipId,
-                        motion.PositionAt(now),
-                        new LocalMotionSnapshot(
-                            motion.Id,
-                            motion.Generation,
-                            motion.Origin,
-                            motion.Destination,
-                            motion.DepartedAt,
-                            motion.ArrivesAt)));
+                        new ShipSpatialSnapshotState.LocalMotion(
+                            motion.PositionAt(now),
+                            new LocalMotionSnapshot(
+                                motion.Id,
+                                motion.Generation,
+                                motion.Origin,
+                                motion.Destination,
+                                motion.DepartedAt,
+                                motion.ArrivesAt))));
+                    break;
+                case ShipSpatialState.ConnectorTransit traversing:
+                    ConnectorTransitSegment transit = traversing.Transit;
+                    snapshots.Add(new ShipSpatialSnapshot(
+                        shipId,
+                        new ShipSpatialSnapshotState.ConnectorTransit(
+                            new ConnectorTransitSnapshot(
+                                transit.Id,
+                                transit.Generation,
+                                transit.ConnectionId,
+                                transit.Source,
+                                transit.Destination,
+                                transit.DepartedAt,
+                                transit.ArrivesAt))));
                     break;
                 default:
                     throw new InvalidOperationException(
@@ -378,12 +582,14 @@ public sealed class SpatialMovement
         ActorState actor,
         SimulationTime now)
     {
-        if (actor.State is ShipSpatialState.Present present)
+        if (actor.State is ShipSpatialState.AtPosition atPosition)
         {
-            return present.Position;
+            return atPosition.Position;
         }
 
-        var moving = (ShipSpatialState.Moving)actor.State;
+        var moving = actor.State as ShipSpatialState.Moving
+            ?? throw new InvalidOperationException(
+                "Connector transit cannot be materialized into a system-local position.");
         if (now < moving.Motion.DepartedAt)
         {
             throw new ArgumentOutOfRangeException(
@@ -394,7 +600,7 @@ public sealed class SpatialMovement
 
         SystemPosition position = moving.Motion.PositionAt(now);
         actor.Generation = actor.Generation.Next();
-        actor.State = new ShipSpatialState.Present(position);
+        actor.State = new ShipSpatialState.AtPosition(position);
         return position;
     }
 
@@ -403,8 +609,10 @@ public sealed class SpatialMovement
         SimulationTime now) =>
         actor.State switch
         {
-            ShipSpatialState.Present present => present.Position,
+            ShipSpatialState.AtPosition atPosition => atPosition.Position,
             ShipSpatialState.Moving moving => moving.Motion.PositionAt(now),
+            ShipSpatialState.ConnectorTransit => throw new InvalidOperationException(
+                "A ship in connector transit has no system-local position."),
             _ => throw new InvalidOperationException(
                 $"Unsupported spatial state {actor.State.GetType().Name}."),
         };
@@ -413,7 +621,7 @@ public sealed class SpatialMovement
     {
         public ActorState(SystemPosition position)
         {
-            State = new ShipSpatialState.Present(position);
+            State = new ShipSpatialState.AtPosition(position);
         }
 
         public EventGeneration Generation { get; set; } = new(0);

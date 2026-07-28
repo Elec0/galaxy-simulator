@@ -29,6 +29,7 @@ public enum ShipOrderReason
     SuspendedByScriptedOverride,
     ResumingAfterScriptedOverride,
     ScriptedOverrideEnded,
+    WaitingForConnectorTransitCompletion,
     DestinationBecameUnreachable,
 }
 
@@ -153,6 +154,7 @@ internal sealed class ShipOrderCoordinator
         active.Plan = plan;
         active.NextLegIndex = 0;
         active.MotionId = null;
+        active.TransitId = null;
         active.Status = ShipOrderStatus.Active;
         active.Reason = ShipOrderReason.MovingToDestination;
     }
@@ -176,6 +178,20 @@ internal sealed class ShipOrderCoordinator
         active.MotionId = motionId;
     }
 
+    internal void BindTransit(
+        ShipId shipId,
+        ShipOrderId orderId,
+        ConnectorTransitId transitId)
+    {
+        ShipOrder active = GetRequiredActive(shipId, orderId);
+        active.TransitId = transitId;
+    }
+
+    internal bool IsBoundTransit(
+        ShipId shipId,
+        ConnectorTransitId transitId) =>
+        GetActive(shipId)?.TransitId == transitId;
+
     internal void CompleteLeg(
         ShipId shipId,
         ShipOrderId orderId,
@@ -190,6 +206,35 @@ internal sealed class ShipOrderCoordinator
 
         active.MotionId = null;
         active.NextLegIndex = checked(active.NextLegIndex + 1);
+    }
+
+    internal void CompleteTransit(
+        ShipId shipId,
+        ShipOrderId orderId,
+        ConnectorTransitId expectedTransitId)
+    {
+        ShipOrder active = GetRequiredActive(shipId, orderId);
+        if (active.TransitId != expectedTransitId)
+        {
+            throw new InvalidOperationException(
+                $"Order {orderId} expected connector transit {active.TransitId}, not {expectedTransitId}.");
+        }
+
+        active.TransitId = null;
+        active.NextLegIndex = checked(active.NextLegIndex + 1);
+    }
+
+    internal void WaitForTransitCompletion(
+        ShipId shipId,
+        ShipOrderId orderId)
+    {
+        ShipOrder active = GetRequiredActive(shipId, orderId);
+        active.Plan = null;
+        active.NextLegIndex = 0;
+        active.MotionId = null;
+        active.TransitId = null;
+        active.Status = ShipOrderStatus.Waiting;
+        active.Reason = ShipOrderReason.WaitingForConnectorTransitCompletion;
     }
 
     internal void CompleteActive(ShipId shipId, ShipOrderId orderId)
@@ -231,6 +276,7 @@ internal sealed class ShipOrderCoordinator
             active.Plan = null;
             active.NextLegIndex = 0;
             active.MotionId = null;
+            active.TransitId = null;
         }
 
         actor.Override = new WorkSet();
@@ -361,6 +407,7 @@ internal sealed class ShipOrderCoordinator
         order.Plan = null;
         order.NextLegIndex = 0;
         order.MotionId = null;
+        order.TransitId = null;
         if (work.Active == order)
         {
             work.Active = null;
@@ -454,4 +501,6 @@ internal sealed class ShipOrder
     internal int NextLegIndex { get; set; }
 
     internal MotionId? MotionId { get; set; }
+
+    internal ConnectorTransitId? TransitId { get; set; }
 }

@@ -24,7 +24,7 @@ public sealed class SpatialMovementTests
 
         fixture.Engine.RunUntil(new SimulationTime(100));
 
-        var present = Assert.IsType<ShipSpatialState.Present>(
+        var present = Assert.IsType<ShipSpatialState.AtPosition>(
             fixture.Movement.GetState(fixture.ShipId));
         Assert.Equal(destination, present.Position);
         Assert.Equal(
@@ -46,7 +46,7 @@ public sealed class SpatialMovementTests
         Assert.True(fixture.Movement.CommitCancel(
             fixture.ShipId,
             fixture.Engine.CurrentTime));
-        var cancelled = Assert.IsType<ShipSpatialState.Present>(
+        var cancelled = Assert.IsType<ShipSpatialState.AtPosition>(
             fixture.Movement.GetState(fixture.ShipId));
         Assert.Equal(Position(40, 16), cancelled.Position);
 
@@ -215,8 +215,8 @@ public sealed class SpatialMovementTests
         Assert.Throws<NotSupportedException>(() =>
             exposed.Add(new ShipSpatialSnapshot(
                 new ShipId(3),
-                Position(30, 0),
-                null)));
+                new ShipSpatialSnapshotState.AtPosition(
+                    Position(30, 0)))));
     }
 
     [Fact]

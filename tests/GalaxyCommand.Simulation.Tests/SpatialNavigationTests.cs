@@ -59,6 +59,230 @@ public sealed class SpatialNavigationTests
     }
 
     [Fact]
+    public void HierarchicalPlannerComposesLocalAndConnectorLegs()
+    {
+        SystemId firstSystem = new(1);
+        SystemId secondSystem = new(2);
+        SystemPosition origin = Position(firstSystem, 0, 0);
+        SystemPosition source = Position(firstSystem, 10, 0);
+        SystemPosition emergence = Position(secondSystem, -10, 0);
+        SystemPosition destination = Position(secondSystem, 0, 0);
+        var topology = new ConnectorTopology(
+            [
+                new ConnectorEndpoint(new ConnectorEndpointId(1), source),
+                new ConnectorEndpoint(new ConnectorEndpointId(2), emergence),
+            ],
+            [
+                new TransitConnection(
+                    new TransitConnectionId(1),
+                    new ConnectorEndpointId(1),
+                    new ConnectorEndpointId(2),
+                    new SimulationDuration(50)),
+            ]);
+        var planner = new HierarchicalNavigationPlanner(
+            topology,
+            new CoordinateEstimator());
+        var request = new NavigationRequest(
+            new ShipId(3),
+            origin,
+            new NavigationDestination.Position(destination),
+            SimulationTime.Zero);
+
+        var result = Assert.IsType<NavigationPlanResult.Planned>(
+            planner.Plan(request));
+
+        Assert.Equal(new SimulationDuration(70), result.Plan.TotalDuration);
+        Assert.Collection(
+            result.Plan.Legs,
+            first =>
+            {
+                var local = Assert.IsType<TravelLeg.Local>(first);
+                Assert.Equal(origin, local.Origin);
+                Assert.Equal(source, local.Destination);
+            },
+            second =>
+            {
+                var connector = Assert.IsType<TravelLeg.Connector>(second);
+                Assert.Equal(new TransitConnectionId(1), connector.ConnectionId);
+                Assert.Equal(source, connector.Origin);
+                Assert.Equal(emergence, connector.Destination);
+            },
+            third =>
+            {
+                var local = Assert.IsType<TravelLeg.Local>(third);
+                Assert.Equal(emergence, local.Origin);
+                Assert.Equal(destination, local.Destination);
+            });
+    }
+
+    [Fact]
+    public void EqualDurationConnectorPathsUseConnectionIdentityTieBreak()
+    {
+        SystemId firstSystem = new(1);
+        SystemId secondSystem = new(2);
+        ConnectorEndpoint[] endpoints =
+        [
+            new ConnectorEndpoint(
+                new ConnectorEndpointId(1),
+                Position(firstSystem, 10, 0)),
+            new ConnectorEndpoint(
+                new ConnectorEndpointId(2),
+                Position(secondSystem, -10, 0)),
+            new ConnectorEndpoint(
+                new ConnectorEndpointId(3),
+                Position(firstSystem, 10, 0)),
+            new ConnectorEndpoint(
+                new ConnectorEndpointId(4),
+                Position(secondSystem, -10, 0)),
+        ];
+        var topology = new ConnectorTopology(
+            endpoints,
+            [
+                new TransitConnection(
+                    new TransitConnectionId(2),
+                    new ConnectorEndpointId(3),
+                    new ConnectorEndpointId(4),
+                    new SimulationDuration(50)),
+                new TransitConnection(
+                    new TransitConnectionId(1),
+                    new ConnectorEndpointId(1),
+                    new ConnectorEndpointId(2),
+                    new SimulationDuration(50)),
+            ]);
+        var planner = new HierarchicalNavigationPlanner(
+            topology,
+            new CoordinateEstimator());
+
+        var result = Assert.IsType<NavigationPlanResult.Planned>(
+            planner.Plan(new NavigationRequest(
+                new ShipId(3),
+                Position(firstSystem, 0, 0),
+                new NavigationDestination.Position(
+                    Position(secondSystem, 0, 0)),
+                SimulationTime.Zero)));
+
+        var selected = Assert.IsType<TravelLeg.Connector>(
+            result.Plan.Legs[1]);
+        Assert.Equal(new TransitConnectionId(1), selected.ConnectionId);
+    }
+
+    [Fact]
+    public void HierarchicalPlannerTraversesMultipleSystems()
+    {
+        SystemId firstSystem = new(1);
+        SystemId middleSystem = new(2);
+        SystemId finalSystem = new(3);
+        var topology = new ConnectorTopology(
+            [
+                new ConnectorEndpoint(
+                    new ConnectorEndpointId(1),
+                    Position(firstSystem, 10, 0)),
+                new ConnectorEndpoint(
+                    new ConnectorEndpointId(2),
+                    Position(middleSystem, -10, 0)),
+                new ConnectorEndpoint(
+                    new ConnectorEndpointId(3),
+                    Position(middleSystem, 10, 0)),
+                new ConnectorEndpoint(
+                    new ConnectorEndpointId(4),
+                    Position(finalSystem, -10, 0)),
+            ],
+            [
+                new TransitConnection(
+                    new TransitConnectionId(1),
+                    new ConnectorEndpointId(1),
+                    new ConnectorEndpointId(2),
+                    new SimulationDuration(50)),
+                new TransitConnection(
+                    new TransitConnectionId(2),
+                    new ConnectorEndpointId(3),
+                    new ConnectorEndpointId(4),
+                    new SimulationDuration(50)),
+            ]);
+        var planner = new HierarchicalNavigationPlanner(
+            topology,
+            new CoordinateEstimator());
+
+        var result = Assert.IsType<NavigationPlanResult.Planned>(
+            planner.Plan(new NavigationRequest(
+                new ShipId(1),
+                Position(firstSystem, 0, 0),
+                new NavigationDestination.Position(
+                    Position(finalSystem, 0, 0)),
+                SimulationTime.Zero)));
+
+        Assert.Equal(new SimulationDuration(140), result.Plan.TotalDuration);
+        Assert.Equal(
+            [new TransitConnectionId(1), new TransitConnectionId(2)],
+            result.Plan.Legs
+                .OfType<TravelLeg.Connector>()
+                .Select(leg => leg.ConnectionId));
+    }
+
+    [Fact]
+    public void HierarchicalPlannerReportsMissingDirectedPath()
+    {
+        SystemPosition source = Position(new SystemId(1), 0, 0);
+        SystemPosition destination = Position(new SystemId(2), 0, 0);
+        var topology = new ConnectorTopology(
+            [
+                new ConnectorEndpoint(new ConnectorEndpointId(1), source),
+                new ConnectorEndpoint(new ConnectorEndpointId(2), destination),
+            ],
+            [
+                new TransitConnection(
+                    new TransitConnectionId(1),
+                    new ConnectorEndpointId(2),
+                    new ConnectorEndpointId(1),
+                    new SimulationDuration(10)),
+            ]);
+        var planner = new HierarchicalNavigationPlanner(
+            topology,
+            new CoordinateEstimator());
+
+        var result = Assert.IsType<NavigationPlanResult.Unreachable>(
+            planner.Plan(new NavigationRequest(
+                new ShipId(1),
+                source,
+                new NavigationDestination.Position(destination),
+                SimulationTime.Zero)));
+
+        Assert.Equal(NavigationFailureReason.NoConnectorPath, result.Reason);
+    }
+
+    [Fact]
+    public void ConnectorTopologyRejectsInvalidReferencesAndSameSystemTransit()
+    {
+        var first = new ConnectorEndpoint(
+            new ConnectorEndpointId(1),
+            Position(new SystemId(1), 0, 0));
+        var second = new ConnectorEndpoint(
+            new ConnectorEndpointId(2),
+            Position(new SystemId(1), 10, 0));
+
+        Assert.Throws<ArgumentException>(() =>
+            new ConnectorTopology(
+                [first],
+                [
+                    new TransitConnection(
+                        new TransitConnectionId(1),
+                        first.Id,
+                        new ConnectorEndpointId(99),
+                        new SimulationDuration(10)),
+                ]));
+        Assert.Throws<ArgumentException>(() =>
+            new ConnectorTopology(
+                [first, second],
+                [
+                    new TransitConnection(
+                        new TransitConnectionId(1),
+                        first.Id,
+                        second.Id,
+                        new SimulationDuration(10)),
+                ]));
+    }
+
+    [Fact]
     public void TravelPlanCopiesLegCollection()
     {
         SystemPosition position = Position(new SystemId(1), 0, 0);
@@ -125,6 +349,31 @@ public sealed class SpatialNavigationTests
         {
             Requests.Add((actorId, origin, destination));
             return _duration;
+        }
+    }
+
+    private sealed class CoordinateEstimator : ILocalTravelTimeEstimator
+    {
+        public SimulationDuration Estimate(
+            ShipId actorId,
+            SystemPosition origin,
+            SystemPosition destination)
+        {
+            Assert.Equal(origin.SystemId, destination.SystemId);
+            Int128 horizontal =
+                (Int128)origin.Position.X.Units
+                - destination.Position.X.Units;
+            Int128 vertical =
+                (Int128)origin.Position.Y.Units
+                - destination.Position.Y.Units;
+            UInt128 horizontalMagnitude = horizontal < 0
+                ? (UInt128)(-horizontal)
+                : (UInt128)horizontal;
+            UInt128 verticalMagnitude = vertical < 0
+                ? (UInt128)(-vertical)
+                : (UInt128)vertical;
+            return new SimulationDuration(
+                checked((ulong)(horizontalMagnitude + verticalMagnitude)));
         }
     }
 }

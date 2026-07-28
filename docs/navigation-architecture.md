@@ -13,25 +13,31 @@ backend, but it is not the target world model. Its graph nodes combine ideas
 that the game needs to keep separate: a system, a position, an entity at that
 position, and a place where an activity occurs.
 
-This document defines the boundaries that should be established before the
-first interactive ship move order. It does not select a final pathfinding
+This document defines the navigation and spatial boundaries used by the
+interactive ship-order runtime. It does not select a final local pathfinding
 algorithm, collision model, physical coordinate unit, or scale target.
 
 ## Implementation status
 
-The first `TASK-028` implementation slice now provides:
+The implemented `TASK-028` slices now provide:
 
 - Typed system and motion identities
+- Dedicated connector-endpoint, directional-connection, and connector-transit
+  identities
 - Signed 64-bit system-local coordinates with deliberately unspecified unit
   scale
 - Position destination intent and a `RouteId`-free local planner
+- Immutable, always-enabled connector topology and deterministic hierarchical
+  planning by total local-plus-transit duration with connection-ID tie-breaking
 - Actor-specific travel-time estimation outside the planning contract
-- Authoritative present and local-motion ship states
+- Authoritative `AtPosition`, local-motion, and connector-transit ship states
 - Scheduled arrival with identity, generation, state, and time validation
 - Cancellation and replacement that materialize the current position before
   invalidating prior completion
-- Immutable snapshots containing the derived current position and
-  authoritative motion segment
+- Non-interruptible connector traversal: cancellation ends order intent without
+  fabricating an in-transit position, while replacement waits for emergence
+- Immutable discriminated snapshots containing position, motion, or transit
+  state without nullable combinations that can contradict each other
 
 The subsystem is now wired into the clean application-facing `GameSession` and
 Godot through `TASK-005`. A move command retains its position destination while
@@ -41,7 +47,7 @@ and terminal state. Replacement materializes the current position before
 starting the new leg.
 
 The Phase 1 transport graph remains isolated in its acceptance runtime and has
-not migrated to these contracts. Connector topology, connector traversal,
+not migrated to these contracts. Runtime connector availability and access,
 entity destinations, system-only destinations, docking, and attachment remain
 later slices described below.
 
@@ -129,24 +135,26 @@ the destination endpoint.
 
 Every ship must be in exactly one physical state:
 
-- Present at a position within a system
+- `AtPosition` at a definite position within a system
 - Following a local motion segment within a system
 - Traversing a connector between systems
 - Attached to another entity through a state such as docking
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Present
-    Present --> LocalMotion: begin local leg
-    LocalMotion --> Present: arrive, cancel, or replace
-    Present --> ConnectorTransit: enter connector
-    ConnectorTransit --> Present: emerge
-    Present --> Attached: dock
-    Attached --> Present: undock
+    [*] --> AtPosition
+    AtPosition --> LocalMotion: begin local leg
+    LocalMotion --> AtPosition: arrive, cancel, or replace
+    AtPosition --> ConnectorTransit: enter connector
+    ConnectorTransit --> AtPosition: emerge
+    AtPosition --> Attached: dock
+    Attached --> AtPosition: undock
 ```
 
-`Present` includes a system and local position. `LocalMotion` contains enough
-information to derive that position at any time during the segment.
+`AtPosition` includes a system and local position. It does not imply that the
+ship is idle or lacks an active order: a ship may be waiting at a gate, paused
+between legs, or stationary under an active order. `LocalMotion` contains
+enough information to derive position at any time during the segment.
 `ConnectorTransit` records the source, destination, and timing even though the
 ship does not occupy ordinary local space during the transition. `Attached`
 locates the ship through the entity to which it is attached.
@@ -251,9 +259,11 @@ The inter-system topology graph and a system's local spatial navigation are
 separate indexes. A single galaxy-wide graph should not contain every arbitrary
 position, station, gate, and local waypoint.
 
-Plans and estimates must have deterministic tie-breaking. The chosen rules can
-include travel time, connector identity, access, risk, or actor policy as those
-models become authoritative. An unreachable result includes a stable reason
+The initial hierarchical planner minimizes total estimated local travel plus
+connector traversal duration. Equal-duration paths compare their ordered
+connection IDs lexicographically. Later cost policy can include access, risk,
+or actor policy when those models become authoritative without making worker
+completion order a tie-breaker. An unreachable result includes a stable reason
 suitable for order state and player-facing explanation.
 
 ### Scaling navigation within a crowded system
@@ -304,6 +314,14 @@ or rewind a ship already executing a valid leg. The movement mechanism defines
 whether an active leg is allowed to finish, interrupted into a valid spatial
 state, or failed. The initial compatibility behavior may allow an active leg to
 finish and replan at its boundary, matching the Phase 1 route-disruption rule.
+
+Connector traversal is physically non-interruptible in the initial runtime.
+Cancelling the owning order during transit cancels its intent immediately, but
+the ship remains in `ConnectorTransit`, emerges at the recorded destination
+endpoint, and becomes idle. Replacing the order during transit cancels the old
+intent, creates the new order in `Waiting` with a stable
+`WaitingForConnectorTransitCompletion` reason, and replans it from the
+emergence point at the completion timestamp.
 
 ## Example: moving to another system
 
@@ -367,6 +385,9 @@ material reservation and delivery commitments.
 The following are architectural decisions:
 
 - Systems are distinct local spaces connected by explicit transit mechanisms.
+- Connector endpoints and directional transit connections have dedicated
+  stable identities; bidirectional gates are two directional connections.
+- The first topology is immutable, always enabled, and universally accessible.
 - Local movement and inter-system traversal are different travel-leg kinds.
 - Orders contain destination intent and never contain a graph-selected path.
 - System-relative spatial and motion state is authoritative.
@@ -385,6 +406,8 @@ scale target exists:
 - Ship acceleration, turning, collision, and formation movement
 - Local obstacle representation and pathfinding algorithm
 - Gate queueing, congestion, animation, and failure while in transit
+- Runtime connector enablement, disablement, access policy, and the authority
+  allowed to change topology
 - Whether inactive systems use reduced-detail movement
 - Combat interaction with scheduled motion
 - Sensor knowledge and whether a planner may use undiscovered topology
@@ -400,11 +423,12 @@ scale target exists:
    cancellation, replacement, snapshots, and headless determinism.
 4. Implement the first interactive ship move order against that local-motion
    boundary. **Implemented by `TASK-005`.**
-5. Adapt Phase 1 logistics to request reachability and estimates without
+5. Add connector endpoints and deterministic directional traversal, then prove
+   a multi-system move composed from local and connector legs.
+   **Implemented by `TASK-028` after the `TASK-006` order foundation.**
+6. Adapt Phase 1 logistics to request reachability and estimates without
    selecting graph legs itself. Preserve its existing deterministic acceptance
    fingerprints until an explicitly approved fixture migration.
-6. Add gate entities and deterministic connector traversal, then prove a
-   multi-system move composed from local and connector legs.
 7. Replace Phase 1-specific location and route presentation with general
    system, spatial-entity, plan, and motion snapshots.
 

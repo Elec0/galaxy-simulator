@@ -34,6 +34,30 @@ public readonly record struct SystemId : IEntityId<SystemId>
     public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }
 
+public readonly record struct ConnectorEndpointId : IEntityId<ConnectorEndpointId>
+{
+    public ConnectorEndpointId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
+    public ulong Value { get; }
+    public static ConnectorEndpointId Create(ulong value) => new(value);
+    public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
+public readonly record struct TransitConnectionId : IEntityId<TransitConnectionId>
+{
+    public TransitConnectionId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
+    public ulong Value { get; }
+    public static TransitConnectionId Create(ulong value) => new(value);
+    public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
+public readonly record struct ConnectorTransitId : IEntityId<ConnectorTransitId>
+{
+    public ConnectorTransitId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
+    public ulong Value { get; }
+    public static ConnectorTransitId Create(ulong value) => new(value);
+    public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
 public readonly record struct MotionId : IEntityId<MotionId>
 {
     public MotionId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }

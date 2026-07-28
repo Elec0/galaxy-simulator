@@ -15,6 +15,8 @@ public sealed class GameSessionSnapshotTests
         GameSystemSnapshot system = Assert.Single(snapshot.Systems);
         Assert.Equal(GameSessionTestFixture.System, system.Id);
         Assert.Equal("Test System", system.Name);
+        Assert.Empty(snapshot.ConnectorEndpoints);
+        Assert.Empty(snapshot.TransitConnections);
         GameShipSnapshot ship = Assert.Single(snapshot.Ships);
         Assert.Equal(GameSessionTestFixture.Ship, ship.Id);
         Assert.Equal(GameSessionTestFixture.Position(0, 0), ship.Position);
@@ -27,15 +29,29 @@ public sealed class GameSessionSnapshotTests
     {
         GameSnapshot snapshot = GameSessionTestFixture.Create().CaptureSnapshot();
         var systems = Assert.IsAssignableFrom<IList<GameSystemSnapshot>>(snapshot.Systems);
+        var endpoints = Assert.IsAssignableFrom<IList<ConnectorEndpointSnapshot>>(
+            snapshot.ConnectorEndpoints);
+        var connections = Assert.IsAssignableFrom<IList<TransitConnectionSnapshot>>(
+            snapshot.TransitConnections);
         var ships = Assert.IsAssignableFrom<IList<GameShipSnapshot>>(snapshot.Ships);
 
         Assert.Throws<NotSupportedException>(() =>
             systems.Add(new GameSystemSnapshot(new SystemId(99), "Injected")));
         Assert.Throws<NotSupportedException>(() =>
+            endpoints.Add(new ConnectorEndpointSnapshot(
+                new ConnectorEndpointId(99),
+                GameSessionTestFixture.Position(0, 0))));
+        Assert.Throws<NotSupportedException>(() =>
+            connections.Add(new TransitConnectionSnapshot(
+                new TransitConnectionId(99),
+                new ConnectorEndpointId(1),
+                new ConnectorEndpointId(2),
+                new SimulationDuration(1))));
+        Assert.Throws<NotSupportedException>(() =>
             ships.Add(new GameShipSnapshot(
                 new ShipId(99),
-                GameSessionTestFixture.Position(0, 0),
-                null,
+                new ShipSpatialSnapshotState.AtPosition(
+                    GameSessionTestFixture.Position(0, 0)),
                 new ActorControlSnapshot(
                     GameSessionTestFixture.PlayerController,
                     GameSessionTestFixture.PlayerController,
@@ -63,5 +79,30 @@ public sealed class GameSessionSnapshotTests
             new GameSessionSetup(
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
                 [ship]));
+    }
+
+    [Fact]
+    public void SetupRejectsConnectorEndpointsInUnknownSystems()
+    {
+        var topology = new ConnectorTopology(
+            [
+                new ConnectorEndpoint(
+                    new ConnectorEndpointId(1),
+                    new SystemPosition(
+                        new SystemId(2),
+                        new SpatialPosition())),
+            ],
+            Array.Empty<TransitConnection>());
+
+        Assert.Throws<ArgumentException>(() =>
+            new GameSessionSetup(
+                [new StarSystem(GameSessionTestFixture.System, "Test System")],
+                [
+                    new InitialShipSetup(
+                        GameSessionTestFixture.Ship,
+                        GameSessionTestFixture.Position(0, 0),
+                        GameSessionTestFixture.PlayerController),
+                ],
+                topology));
     }
 }

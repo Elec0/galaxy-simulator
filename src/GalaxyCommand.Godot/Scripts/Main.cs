@@ -122,6 +122,8 @@ public partial class Main : Node
 			: "No current order";
 		string motion = selected?.Motion is { } activeMotion
 			? $"moving until {FormatTime(activeMotion.ArrivesAt)}"
+			: selected?.Transit is { } transit
+				? $"in transit via C{transit.ConnectionId.Value} until {FormatTime(transit.ArrivesAt)}"
 			: "stationary";
 		string control = selected is null
 			? "No controller"

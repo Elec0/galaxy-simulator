@@ -43,9 +43,23 @@ public sealed class GameSessionSetup
     public GameSessionSetup(
         IEnumerable<StarSystem> systems,
         IEnumerable<InitialShipSetup> ships)
+        : this(
+            systems,
+            ships,
+            new ConnectorTopology(
+                Array.Empty<ConnectorEndpoint>(),
+                Array.Empty<TransitConnection>()))
+    {
+    }
+
+    public GameSessionSetup(
+        IEnumerable<StarSystem> systems,
+        IEnumerable<InitialShipSetup> ships,
+        ConnectorTopology connectorTopology)
     {
         ArgumentNullException.ThrowIfNull(systems);
         ArgumentNullException.ThrowIfNull(ships);
+        ArgumentNullException.ThrowIfNull(connectorTopology);
 
         StarSystem[] systemValues = systems.ToArray();
         InitialShipSetup[] shipValues = ships.ToArray();
@@ -80,11 +94,24 @@ public sealed class GameSessionSetup
             }
         }
 
+        foreach (ConnectorEndpoint endpoint in connectorTopology.Endpoints)
+        {
+            if (!systemIds.Contains(endpoint.Position.SystemId))
+            {
+                throw new ArgumentException(
+                    $"Connector endpoint {endpoint.Id} references unknown system {endpoint.Position.SystemId}.",
+                    nameof(connectorTopology));
+            }
+        }
+
         Systems = new ReadOnlyCollection<StarSystem>(systemValues);
         Ships = new ReadOnlyCollection<InitialShipSetup>(shipValues);
+        ConnectorTopology = connectorTopology;
     }
 
     public IReadOnlyList<StarSystem> Systems { get; }
 
     public IReadOnlyList<InitialShipSetup> Ships { get; }
+
+    public ConnectorTopology ConnectorTopology { get; }
 }

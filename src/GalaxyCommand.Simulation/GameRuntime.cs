@@ -38,6 +38,7 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
     private readonly SpatialMovement _movement = new();
     private readonly ActorControlRegistry _control = new();
     private readonly ShipOrderCoordinator _orders = new();
+    private readonly ConnectorTopology _topology;
     private readonly ISpatialNavigationPlanner _navigation;
     private readonly List<GameEventRecord> _eventRecords = [];
 
@@ -47,6 +48,7 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
     {
         ArgumentNullException.ThrowIfNull(setup);
         ArgumentNullException.ThrowIfNull(navigation);
+        _topology = setup.ConnectorTopology;
         _navigation = navigation;
 
         foreach (StarSystem system in setup.Systems)
@@ -81,11 +83,20 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             CurrentTime,
             GameSnapshotCollection.Copy(_systems.Values.Select(system =>
                 new GameSystemSnapshot(system.Id, system.Name))),
+            GameSnapshotCollection.Copy(_topology.Endpoints.Select(endpoint =>
+                new ConnectorEndpointSnapshot(
+                    endpoint.Id,
+                    endpoint.Position))),
+            GameSnapshotCollection.Copy(_topology.Connections.Select(connection =>
+                new TransitConnectionSnapshot(
+                    connection.Id,
+                    connection.SourceEndpointId,
+                    connection.DestinationEndpointId,
+                    connection.Duration))),
             GameSnapshotCollection.Copy(spatial.Select(ship =>
                 new GameShipSnapshot(
                     ship.ShipId,
-                    ship.Position,
-                    ship.Motion,
+                    ship.State,
                     _control.Capture(ship.ShipId),
                     _orders.CaptureCurrent(ship.ShipId),
                     _orders.CaptureQueue(ship.ShipId),
@@ -153,13 +164,39 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             now);
         if (disposition == ScheduledEventDisposition.Applied)
         {
-            ShipOrder active = _orders.GetActive(spatial.Event.ShipId)
-                ?? throw new InvalidOperationException(
-                    $"Ship {spatial.Event.ShipId} completed motion without an active order.");
-            _orders.CompleteLeg(
-                spatial.Event.ShipId,
-                active.Id,
-                spatial.Event.MotionId);
+            switch (spatial.Event)
+            {
+                case SpatialMovementEvent.Arrive arrive:
+                    {
+                        ShipOrder active = _orders.GetActive(arrive.ShipId)
+                            ?? throw new InvalidOperationException(
+                                $"Ship {arrive.ShipId} completed local motion without an active order.");
+                        _orders.CompleteLeg(
+                            arrive.ShipId,
+                            active.Id,
+                            arrive.MotionId);
+                        break;
+                    }
+                case SpatialMovementEvent.Emerge emerge:
+                    {
+                        if (_orders.GetActive(emerge.ShipId) is { } active
+                            && _orders.IsBoundTransit(
+                                emerge.ShipId,
+                                emerge.TransitId))
+                        {
+                            _orders.CompleteTransit(
+                                emerge.ShipId,
+                                active.Id,
+                                emerge.TransitId);
+                        }
+
+                        break;
+                    }
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported spatial event {spatial.Event.GetType().Name}.");
+            }
+
             StartOrContinueOrders(spatial.Event.ShipId);
         }
 
@@ -205,14 +242,28 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             case OrderPlacement.ReplaceAll:
                 _movement.CommitCancel(proposal.ShipId, CurrentTime);
                 _orders.ReplaceAll(proposal.ShipId, order);
-                _orders.SetPlan(proposal.ShipId, order.Id, proposal.Plan);
+                if (proposal.Plan is { } replacementPlan)
+                {
+                    _orders.SetPlan(
+                        proposal.ShipId,
+                        order.Id,
+                        replacementPlan);
+                }
+
                 StartOrContinueOrders(proposal.ShipId);
                 break;
             case OrderPlacement.Append:
                 bool becameActive = _orders.Append(proposal.ShipId, order);
                 if (becameActive)
                 {
-                    _orders.SetPlan(proposal.ShipId, order.Id, proposal.Plan);
+                    if (proposal.Plan is { } appendedPlan)
+                    {
+                        _orders.SetPlan(
+                            proposal.ShipId,
+                            order.Id,
+                            appendedPlan);
+                    }
+
                     StartOrContinueOrders(proposal.ShipId);
                 }
 
@@ -268,10 +319,32 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             return new MoveOrderEvaluation(null, rejection);
         }
 
-        SystemPosition origin = _movement.PositionAt(command.ShipId, CurrentTime)
-            ?? throw new InvalidOperationException(
-                $"Controlled ship {command.ShipId} has no spatial state.");
-        NavigationPlanResult result = Plan(command.ShipId, origin, command.Destination);
+        SystemPosition? origin = _movement.PositionAt(
+            command.ShipId,
+            CurrentTime);
+        if (origin is null)
+        {
+            if (_movement.GetState(command.ShipId)
+                is not ShipSpatialState.ConnectorTransit)
+            {
+                throw new InvalidOperationException(
+                    $"Controlled ship {command.ShipId} has no spatial state.");
+            }
+
+            return new MoveOrderEvaluation(
+                new MoveOrderProposal(
+                    command.ShipId,
+                    source,
+                    command.Destination,
+                    command.Placement,
+                    null),
+                null);
+        }
+
+        NavigationPlanResult result = Plan(
+            command.ShipId,
+            origin.Value,
+            command.Destination);
         if (result is NavigationPlanResult.Unreachable unreachable)
         {
             return new MoveOrderEvaluation(
@@ -282,7 +355,7 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
         }
 
         TravelPlan plan = ((NavigationPlanResult.Planned)result).Plan;
-        ValidateExecutablePlan(origin, command.Destination, plan);
+        ValidateExecutablePlan(origin.Value, command.Destination, plan);
         return new MoveOrderEvaluation(
             new MoveOrderProposal(
                 command.ShipId,
@@ -362,9 +435,23 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
     {
         while (_orders.GetActive(shipId) is { } active)
         {
-            SystemPosition current = _movement.PositionAt(shipId, CurrentTime)
-                ?? throw new InvalidOperationException(
-                    $"Order actor {shipId} has no spatial state.");
+            SystemPosition? availablePosition = _movement.PositionAt(
+                shipId,
+                CurrentTime);
+            if (availablePosition is null)
+            {
+                if (_movement.GetState(shipId)
+                    is not ShipSpatialState.ConnectorTransit)
+                {
+                    throw new InvalidOperationException(
+                        $"Order actor {shipId} has no spatial state.");
+                }
+
+                _orders.WaitForTransitCompletion(shipId, active.Id);
+                return;
+            }
+
+            SystemPosition current = availablePosition.Value;
             if (active.Plan is null)
             {
                 NavigationPlanResult result = Plan(
@@ -395,26 +482,41 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                 continue;
             }
 
-            if (nextLeg is not TravelLeg.Local local)
+            switch (nextLeg)
             {
-                throw new InvalidOperationException(
-                    $"Unsupported travel leg {nextLeg.GetType().Name}.");
-            }
+                case TravelLeg.Local local:
+                    {
+                        LocalMotionSegment? motion = _movement.CommitStartOrReplace(
+                            shipId,
+                            local,
+                            CurrentTime,
+                            _agenda,
+                            movement => new GameEvent.SpatialMovement(movement));
+                        if (motion is null)
+                        {
+                            _orders.CompleteLeg(shipId, active.Id, null);
+                            continue;
+                        }
 
-            LocalMotionSegment? motion = _movement.CommitStartOrReplace(
-                shipId,
-                local,
-                CurrentTime,
-                _agenda,
-                movement => new GameEvent.SpatialMovement(movement));
-            if (motion is null)
-            {
-                _orders.CompleteLeg(shipId, active.Id, null);
-                continue;
+                        _orders.BindMotion(shipId, active.Id, motion.Id);
+                        return;
+                    }
+                case TravelLeg.Connector connector:
+                    {
+                        ConnectorTransitSegment transit =
+                            _movement.CommitStartConnector(
+                                shipId,
+                                connector,
+                                CurrentTime,
+                                _agenda,
+                                movement => new GameEvent.SpatialMovement(movement));
+                        _orders.BindTransit(shipId, active.Id, transit.Id);
+                        return;
+                    }
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported travel leg {nextLeg.GetType().Name}.");
             }
-
-            _orders.BindMotion(shipId, active.Id, motion.Id);
-            return;
         }
     }
 
@@ -428,7 +530,7 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             destination,
             CurrentTime));
 
-    private static void ValidateExecutablePlan(
+    private void ValidateExecutablePlan(
         SystemPosition origin,
         NavigationDestination destination,
         TravelPlan plan)
@@ -444,19 +546,25 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
         SystemPosition expectedOrigin = origin;
         foreach (TravelLeg travelLeg in plan.Legs)
         {
-            if (travelLeg is not TravelLeg.Local local)
+            switch (travelLeg)
             {
-                throw new InvalidOperationException(
-                    $"The current runtime cannot execute {travelLeg.GetType().Name}.");
-            }
+                case TravelLeg.Local local:
+                    if (local.Origin != expectedOrigin)
+                    {
+                        throw new InvalidOperationException(
+                            $"Travel plan leg begins at {local.Origin}, expected {expectedOrigin}.");
+                    }
 
-            if (local.Origin != expectedOrigin)
-            {
-                throw new InvalidOperationException(
-                    $"Travel plan leg begins at {local.Origin}, expected {expectedOrigin}.");
+                    expectedOrigin = local.Destination;
+                    break;
+                case TravelLeg.Connector connector:
+                    ValidateConnectorLeg(expectedOrigin, connector);
+                    expectedOrigin = connector.Destination;
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"The current runtime cannot execute {travelLeg.GetType().Name}.");
             }
-
-            expectedOrigin = local.Destination;
         }
 
         if (destination is NavigationDestination.Position position
@@ -464,6 +572,26 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
         {
             throw new InvalidOperationException(
                 $"Travel plan ends at {expectedOrigin}, expected {position.Value}.");
+        }
+    }
+
+    private void ValidateConnectorLeg(
+        SystemPosition expectedOrigin,
+        TravelLeg.Connector leg)
+    {
+        TransitConnection connection = _topology.GetConnection(
+            leg.ConnectionId);
+        ConnectorEndpoint source = _topology.GetEndpoint(
+            connection.SourceEndpointId);
+        ConnectorEndpoint destination = _topology.GetEndpoint(
+            connection.DestinationEndpointId);
+        if (leg.Origin != expectedOrigin
+            || leg.Origin != source.Position
+            || leg.Destination != destination.Position
+            || leg.Duration != connection.Duration)
+        {
+            throw new InvalidOperationException(
+                $"Connector leg {leg.ConnectionId} does not match authoritative topology.");
         }
     }
 
@@ -517,7 +645,7 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
         CommandSource Source,
         NavigationDestination Destination,
         OrderPlacement Placement,
-        TravelPlan Plan);
+        TravelPlan? Plan);
 
     private sealed record MoveOrderEvaluation(
         MoveOrderProposal? Proposal,

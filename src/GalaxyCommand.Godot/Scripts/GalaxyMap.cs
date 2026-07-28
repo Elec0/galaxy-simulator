@@ -59,7 +59,8 @@ public partial class GalaxyMap : Control
 		GameShipSnapshot? hit = _snapshot.Ships
 			.OrderBy(ship => ship.Id.Value)
 			.FirstOrDefault(ship =>
-				ToView(ship.Position).DistanceTo(mouse.Position) <= ShipHitRadius);
+				ship.Position is { } position
+				&& ToView(position).DistanceTo(mouse.Position) <= ShipHitRadius);
 		if (hit is not null)
 		{
 			SelectedShipId = hit.Id;
@@ -115,7 +116,12 @@ public partial class GalaxyMap : Control
 
 		foreach (GameShipSnapshot ship in _snapshot.Ships)
 		{
-			Vector2 position = ToView(ship.Position);
+			if (ship.Position is not { } systemPosition)
+			{
+				continue;
+			}
+
+			Vector2 position = ToView(systemPosition);
 			if (ShouldDrawRoute(ship.CurrentOrder)
 				&& ship.CurrentOrder!.Destination is NavigationDestination.Position destination)
 			{

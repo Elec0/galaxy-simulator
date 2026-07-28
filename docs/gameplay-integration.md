@@ -333,13 +333,14 @@ The complete contract and migration sequence are in
 
 ### 3.1 System-space movement boundary
 
-**Status: local movement resolved by `TASK-028` and `TASK-005`.**
+**Status: local movement and static connector traversal resolved by `TASK-028`
+and `TASK-005`.**
 
 The system, spatial-state, destination, planning, and scheduled-motion
 boundaries must be established before the first accepted ship move order. The
-first order now proves a point-to-point move within one system. Gate traversal
-can compose with the same order contract rather than forcing a replacement
-later.
+first order proves a point-to-point move within one system. Static directional
+connector traversal now composes local and transit legs through that same order
+contract.
 
 ### 3.2 Actor control and order lifecycle
 
@@ -356,9 +357,9 @@ autonomous sources use the same coordinator. Invalid or immediately unreachable
 requests are command rejections.
 
 Waiting requires a recoverable condition with a defined wake trigger; genuine
-failure requires accepted intent that later becomes impossible. Their first
-concrete navigation transitions remain in `TASK-028`, rather than being
-synthetically produced by the order foundation.
+failure requires accepted intent that later becomes impossible. `TASK-028`
+proves waiting for non-interruptible transit and waking on emergence. Target
+invalidation in `TASK-011` retains the first genuine failure proof.
 The accepted controller, override, queue, lifecycle, multi-leg, and
 deterministic commit contracts are in
 [Actor control and order lifecycle](actor-control-and-orders.md).

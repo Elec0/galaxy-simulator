@@ -39,10 +39,10 @@ and declares its stopping condition. The engine has no knowledge of Phase 1
 materials, facilities, routes, or victory conditions.
 
 `GameSession` is the persistent application-facing facade. It owns a clean
-`GameRuntime`, command sequencing, a general game event vocabulary, spatial
-movement, actor control, and active, queued, or suspended ship orders. It
-exposes immutable `GameSnapshot` and diagnostic records without exposing
-mutable state.
+`GameRuntime`, command sequencing, a general game event vocabulary, immutable
+connector topology, hierarchical navigation, spatial movement, actor control,
+and active, queued, or suspended ship orders. It exposes immutable
+`GameSnapshot` and diagnostic records without exposing mutable state.
 
 `PhaseOneFixture` builds the proof-of-concept economic world.
 `Acceptance/PhaseOneScenario` is a separate bounded regression harness over
@@ -53,7 +53,7 @@ CLI. It is intentionally not used by `GameSession` or Godot.
 ```mermaid
 flowchart LR
     godot["Godot input and presentation"] --> session["GameSession"]
-    session --> game["GameRuntime<br/>orders and spatial movement"]
+    session --> game["GameRuntime<br/>orders, topology, and spatial movement"]
     cli["CLI and acceptance tests"] --> scenario["PhaseOneScenario"]
     scenario --> phase_one["PhaseOneRuntime<br/>economic fixture"]
     game --> engine["SimulationEngine"]

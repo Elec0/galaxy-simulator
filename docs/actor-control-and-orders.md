@@ -32,8 +32,8 @@ simulation state.
 - Explicit replace-all and append placement, one active order, a FIFO queue,
   stable order-ID cancellation, and same-timestamp promotion
 - Active, queued, waiting, suspended, completed, cancelled, and failed lifecycle
-  vocabulary; implemented transitions have stable reasons, while concrete
-  waiting reasons and wake conditions remain connector work
+  vocabulary with stable reasons; `TASK-028` now proves connector-transit
+  waiting and emergence-driven wake behavior
 - A private multi-leg plan executor that separates leg completion from order
   completion
 - Immutable controller, current-order, queue, and suspended-work snapshots
@@ -41,9 +41,9 @@ simulation state.
 - The same move-order model for player and autonomous sources
 
 Godot exposes replace, append, and active-order cancellation for the current
-move order. Semantic transition facts remain in `TASK-008`. Connector-driven
-waiting, replanning, and post-acceptance failure proofs remain in `TASK-028`,
-while target destruction remains in `TASK-011`.
+move order. Semantic transition facts remain in `TASK-008`. `TASK-028` now
+proves connector-driven waiting, emergence wake, and replanning; target
+invalidation and its post-acceptance failure proof remain in `TASK-011`.
 
 The current runtime still does not schedule or persist long-running scripted
 behavior. The override commands provide only the control boundary described
@@ -327,10 +327,11 @@ event- or fact-triggered re-evaluation when topology, access, target state, or
 capacity changes. A scheduled retry is valid only when passage of time itself
 is the relevant rule. Do not poll every waiting order every tick.
 
-Connector work in `TASK-028` should supply the first concrete waiting and
-post-acceptance failure cases. For example, an accepted multi-system order may
-wait when its only connector is temporarily disabled and fail if its target is
-destroyed with no order-specific fallback.
+Connector work in `TASK-028` supplies the first concrete waiting case: a
+replacement order accepted during non-interruptible transit waits for emergence
+and wakes from the physical completion event. Runtime connector disablement
+remains deferred. Target destruction in `TASK-011` should supply the first
+post-acceptance failure case when no order-specific fallback exists.
 
 ## Completion rules and multi-leg execution
 
@@ -460,9 +461,9 @@ controller and order state. Runtime spawning and destruction remain in
 4. Added one non-nesting scripted override with a stable reason ID, explicit
    cancel-outstanding release, suspended base work, and deterministic
    restoration.
-5. Added waiting and failed states to the lifecycle contract; their first real
-   wake and invalidation proofs remain with connector and target lifecycle work
-   rather than synthetic production behavior.
+5. Added waiting and failed states to the lifecycle contract. `TASK-028` proves
+   transit waiting and emergence wake; target invalidation and failure remain
+   with `TASK-011` rather than synthetic production behavior.
 6. Semantic transition facts remain in `TASK-008` now that the lifecycle owner
    is stable.
 

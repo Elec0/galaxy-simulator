@@ -31,10 +31,15 @@ bottom; later tasks may be refined as earlier contracts become concrete.
     destinations, `RouteId`-free local planning, authoritative scheduled motion,
     generation-safe cancellation and replacement, and immutable motion
     snapshots.
-  - Remaining: connector topology and traversal, additional destination forms,
-    and the later Phase 1 compatibility migration.
   - The controller, queue, and multi-leg order foundation required for
     connector traversal was completed by `TASK-006`.
+  - Implemented connector slice: immutable directional topology, dedicated
+    endpoint/connection/transit identities, deterministic duration-based
+    hierarchical planning, discriminated `AtPosition`/local-motion/transit
+    snapshots, scheduled emergence, non-interruptible transit cancellation,
+    and replacement-order wait/wake behavior.
+  - Remaining: runtime connector availability and access, additional
+    destination forms, and the later Phase 1 compatibility migration.
   - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 ## Near-term work
@@ -238,9 +243,10 @@ prerequisites and desired behavior are sufficiently defined.
     cancel the active order while displaying controller and queue state; route
     overlays are limited to active or waiting orders and clear on cancellation
     or completion.
-  - Waiting and failed states are defined; connector and target invalidation in
-    `TASK-028` and `TASK-011` provide their first concrete wake and failure
-    proofs. Semantic transition facts remain in `TASK-008`.
+  - Waiting and failed states are defined; `TASK-028` proves transit waiting
+    and emergence wake, while target invalidation in `TASK-011` retains the
+    first concrete failure proof. Semantic transition facts remain in
+    `TASK-008`.
   - An internal coordinated actor-cleanup boundary invalidates pending movement
     before removing spatial, control, and order ownership; destruction policy
     and commands remain in `TASK-011`.
