@@ -330,9 +330,17 @@ public sealed class ActorControlAndOrderTests
     [Fact]
     public void QueueAndOverrideSequenceIsIncrementallyDeterministic()
     {
-        (GameSnapshot Snapshot, GameplayCommandRecord[] Commands, GameEventRecord[] Events)
+        (
+            GameSnapshot Snapshot,
+            GameplayCommandRecord[] Commands,
+            GameEventRecord[] Events,
+            GameFactEnvelope[] Facts)
             singleRun = RunOverrideSequence(incremental: false);
-        (GameSnapshot Snapshot, GameplayCommandRecord[] Commands, GameEventRecord[] Events)
+        (
+            GameSnapshot Snapshot,
+            GameplayCommandRecord[] Commands,
+            GameEventRecord[] Events,
+            GameFactEnvelope[] Facts)
             incremental = RunOverrideSequence(incremental: true);
 
         Assert.Equal(singleRun.Snapshot.Time, incremental.Snapshot.Time);
@@ -352,6 +360,7 @@ public sealed class ActorControlAndOrderTests
 
         Assert.Equal(singleRun.Commands, incremental.Commands);
         Assert.Equal(singleRun.Events, incremental.Events);
+        Assert.Equal(singleRun.Facts, incremental.Facts);
     }
 
     private static MoveShipCommand MoveTo(
@@ -398,7 +407,8 @@ public sealed class ActorControlAndOrderTests
     private static (
         GameSnapshot Snapshot,
         GameplayCommandRecord[] Commands,
-        GameEventRecord[] Events)
+        GameEventRecord[] Events,
+        GameFactEnvelope[] Facts)
         RunOverrideSequence(bool incremental)
     {
         GameSession session = GameSessionTestFixture.Create();
@@ -438,7 +448,8 @@ public sealed class ActorControlAndOrderTests
         return (
             session.CaptureSnapshot(),
             [.. session.CommandRecords],
-            [.. session.EventRecords]);
+            [.. session.EventRecords],
+            [.. session.ReadFactsAfter(null, maximumCount: 256).Facts]);
     }
 
     private sealed class TwoLegPlanner : ISpatialNavigationPlanner

@@ -47,6 +47,15 @@ internal enum CancelOrderDisposition
     Queued,
 }
 
+internal sealed record ShipOrderTransition(
+    ShipId ShipId,
+    ShipOrderId OrderId,
+    CommandSource Source,
+    NavigationDestination Destination,
+    ShipOrderStatus? PreviousStatus,
+    ShipOrderStatus NextStatus,
+    ShipOrderReason Reason);
+
 internal sealed class ShipOrderCoordinator
 {
     private readonly SortedDictionary<ShipId, ActorOrders> _actors =
@@ -90,43 +99,73 @@ internal sealed class ShipOrderCoordinator
             || work.Queue.Any(order => order.Id == orderId);
     }
 
-    internal void ReplaceAll(ShipId shipId, ShipOrder order)
+    internal void ReplaceAll(
+        ShipId shipId,
+        ShipOrder order,
+        ICollection<ShipOrderTransition> transitions)
     {
         ArgumentNullException.ThrowIfNull(order);
+        ArgumentNullException.ThrowIfNull(transitions);
         WorkSet work = CurrentWork(GetRequired(shipId));
-        CancelWork(work, ShipOrderReason.ReplacedByCommand);
-        Activate(work, order, ShipOrderReason.MovingToDestination);
+        CancelWork(
+            shipId,
+            work,
+            ShipOrderReason.ReplacedByCommand,
+            transitions);
+        Activate(
+            shipId,
+            work,
+            order,
+            ShipOrderReason.MovingToDestination,
+            transitions);
     }
 
-    internal bool Append(ShipId shipId, ShipOrder order)
+    internal bool Append(
+        ShipId shipId,
+        ShipOrder order,
+        ICollection<ShipOrderTransition> transitions)
     {
         ArgumentNullException.ThrowIfNull(order);
+        ArgumentNullException.ThrowIfNull(transitions);
         WorkSet work = CurrentWork(GetRequired(shipId));
         if (work.Active is null)
         {
-            Activate(work, order, ShipOrderReason.MovingToDestination);
+            Activate(
+                shipId,
+                work,
+                order,
+                ShipOrderReason.MovingToDestination,
+                transitions);
             return true;
         }
 
-        order.Status = ShipOrderStatus.Queued;
-        order.Reason = ShipOrderReason.QueuedBehindActiveOrder;
+        Transition(
+            shipId,
+            order,
+            ShipOrderStatus.Queued,
+            ShipOrderReason.QueuedBehindActiveOrder,
+            transitions);
         work.Queue.Add(order);
         return false;
     }
 
     internal CancelOrderDisposition Cancel(
         ShipId shipId,
-        ShipOrderId orderId)
+        ShipOrderId orderId,
+        ICollection<ShipOrderTransition> transitions)
     {
+        ArgumentNullException.ThrowIfNull(transitions);
         WorkSet work = CurrentWork(GetRequired(shipId));
         if (work.Active?.Id == orderId)
         {
             Finish(
+                shipId,
                 work,
                 work.Active,
                 ShipOrderStatus.Cancelled,
-                ShipOrderReason.CancelledByCommand);
-            Promote(work);
+                ShipOrderReason.CancelledByCommand,
+                transitions);
+            Promote(shipId, work, transitions);
             return CancelOrderDisposition.Active;
         }
 
@@ -138,8 +177,12 @@ internal sealed class ShipOrderCoordinator
 
         ShipOrder queued = work.Queue[queuedIndex];
         work.Queue.RemoveAt(queuedIndex);
-        queued.Status = ShipOrderStatus.Cancelled;
-        queued.Reason = ShipOrderReason.CancelledByCommand;
+        Transition(
+            shipId,
+            queued,
+            ShipOrderStatus.Cancelled,
+            ShipOrderReason.CancelledByCommand,
+            transitions);
         work.LastTerminal = queued;
         return CancelOrderDisposition.Queued;
     }
@@ -147,16 +190,29 @@ internal sealed class ShipOrderCoordinator
     internal void SetPlan(
         ShipId shipId,
         ShipOrderId orderId,
-        TravelPlan plan)
+        TravelPlan plan,
+        ICollection<ShipOrderTransition> transitions)
     {
         ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(transitions);
         ShipOrder active = GetRequiredActive(shipId, orderId);
         active.Plan = plan;
         active.NextLegIndex = 0;
         active.MotionId = null;
         active.TransitId = null;
-        active.Status = ShipOrderStatus.Active;
-        active.Reason = ShipOrderReason.MovingToDestination;
+        if (active.Status == ShipOrderStatus.Active)
+        {
+            active.Reason = ShipOrderReason.MovingToDestination;
+        }
+        else
+        {
+            Transition(
+                shipId,
+                active,
+                ShipOrderStatus.Active,
+                ShipOrderReason.MovingToDestination,
+                transitions);
+        }
     }
 
     internal TravelLeg? NextLeg(ShipId shipId, ShipOrderId orderId)
@@ -226,43 +282,64 @@ internal sealed class ShipOrderCoordinator
 
     internal void WaitForTransitCompletion(
         ShipId shipId,
-        ShipOrderId orderId)
+        ShipOrderId orderId,
+        ICollection<ShipOrderTransition> transitions)
     {
+        ArgumentNullException.ThrowIfNull(transitions);
         ShipOrder active = GetRequiredActive(shipId, orderId);
         active.Plan = null;
         active.NextLegIndex = 0;
         active.MotionId = null;
         active.TransitId = null;
-        active.Status = ShipOrderStatus.Waiting;
-        active.Reason = ShipOrderReason.WaitingForConnectorTransitCompletion;
+        Transition(
+            shipId,
+            active,
+            ShipOrderStatus.Waiting,
+            ShipOrderReason.WaitingForConnectorTransitCompletion,
+            transitions);
     }
 
-    internal void CompleteActive(ShipId shipId, ShipOrderId orderId)
+    internal void CompleteActive(
+        ShipId shipId,
+        ShipOrderId orderId,
+        ICollection<ShipOrderTransition> transitions)
     {
+        ArgumentNullException.ThrowIfNull(transitions);
         WorkSet work = CurrentWork(GetRequired(shipId));
         ShipOrder active = GetRequiredActive(work, shipId, orderId);
         Finish(
+            shipId,
             work,
             active,
             ShipOrderStatus.Completed,
-            ShipOrderReason.DestinationReached);
-        Promote(work);
+            ShipOrderReason.DestinationReached,
+            transitions);
+        Promote(shipId, work, transitions);
     }
 
-    internal void FailActive(ShipId shipId, ShipOrderId orderId)
+    internal void FailActive(
+        ShipId shipId,
+        ShipOrderId orderId,
+        ICollection<ShipOrderTransition> transitions)
     {
+        ArgumentNullException.ThrowIfNull(transitions);
         WorkSet work = CurrentWork(GetRequired(shipId));
         ShipOrder active = GetRequiredActive(work, shipId, orderId);
         Finish(
+            shipId,
             work,
             active,
             ShipOrderStatus.Failed,
-            ShipOrderReason.DestinationBecameUnreachable);
-        Promote(work);
+            ShipOrderReason.DestinationBecameUnreachable,
+            transitions);
+        Promote(shipId, work, transitions);
     }
 
-    internal void BeginOverride(ShipId shipId)
+    internal void BeginOverride(
+        ShipId shipId,
+        ICollection<ShipOrderTransition> transitions)
     {
+        ArgumentNullException.ThrowIfNull(transitions);
         ActorOrders actor = GetRequired(shipId);
         if (actor.Override is not null)
         {
@@ -271,8 +348,12 @@ internal sealed class ShipOrderCoordinator
 
         if (actor.Base.Active is { } active)
         {
-            active.Status = ShipOrderStatus.Suspended;
-            active.Reason = ShipOrderReason.SuspendedByScriptedOverride;
+            Transition(
+                shipId,
+                active,
+                ShipOrderStatus.Suspended,
+                ShipOrderReason.SuspendedByScriptedOverride,
+                transitions);
             active.Plan = null;
             active.NextLegIndex = 0;
             active.MotionId = null;
@@ -284,15 +365,21 @@ internal sealed class ShipOrderCoordinator
 
     internal ShipOrder? EndOverride(
         ShipId shipId,
-        ScriptedOverrideReleasePolicy releasePolicy)
+        ScriptedOverrideReleasePolicy releasePolicy,
+        ICollection<ShipOrderTransition> transitions)
     {
+        ArgumentNullException.ThrowIfNull(transitions);
         ActorOrders actor = GetRequired(shipId);
         WorkSet overrideWork = actor.Override
             ?? throw new InvalidOperationException($"Actor {shipId} has no override orders.");
         switch (releasePolicy)
         {
             case ScriptedOverrideReleasePolicy.CancelOutstanding:
-                CancelWork(overrideWork, ShipOrderReason.ScriptedOverrideEnded);
+                CancelWork(
+                    shipId,
+                    overrideWork,
+                    ShipOrderReason.ScriptedOverrideEnded,
+                    transitions);
                 break;
             default:
                 throw new InvalidOperationException(
@@ -309,8 +396,12 @@ internal sealed class ShipOrderCoordinator
                     $"Base order {suspended.Id} was not suspended during override.");
             }
 
-            suspended.Status = ShipOrderStatus.Active;
-            suspended.Reason = ShipOrderReason.ResumingAfterScriptedOverride;
+            Transition(
+                shipId,
+                suspended,
+                ShipOrderStatus.Active,
+                ShipOrderReason.ResumingAfterScriptedOverride,
+                transitions);
         }
 
         return actor.Base.Active;
@@ -350,9 +441,11 @@ internal sealed class ShipOrderCoordinator
     }
 
     private static void Activate(
+        ShipId shipId,
         WorkSet work,
         ShipOrder order,
-        ShipOrderReason reason)
+        ShipOrderReason reason,
+        ICollection<ShipOrderTransition> transitions)
     {
         if (work.Active is not null)
         {
@@ -360,12 +453,19 @@ internal sealed class ShipOrderCoordinator
                 $"Cannot activate order {order.Id} while order {work.Active.Id} is active.");
         }
 
-        order.Status = ShipOrderStatus.Active;
-        order.Reason = reason;
+        Transition(
+            shipId,
+            order,
+            ShipOrderStatus.Active,
+            reason,
+            transitions);
         work.Active = order;
     }
 
-    private static void Promote(WorkSet work)
+    private static void Promote(
+        ShipId shipId,
+        WorkSet work,
+        ICollection<ShipOrderTransition> transitions)
     {
         if (work.Active is not null || work.Queue.Count == 0)
         {
@@ -374,22 +474,39 @@ internal sealed class ShipOrderCoordinator
 
         ShipOrder next = work.Queue[0];
         work.Queue.RemoveAt(0);
-        Activate(work, next, ShipOrderReason.MovingToDestination);
+        Activate(
+            shipId,
+            work,
+            next,
+            ShipOrderReason.MovingToDestination,
+            transitions);
     }
 
     private static void CancelWork(
+        ShipId shipId,
         WorkSet work,
-        ShipOrderReason reason)
+        ShipOrderReason reason,
+        ICollection<ShipOrderTransition> transitions)
     {
         if (work.Active is { } active)
         {
-            Finish(work, active, ShipOrderStatus.Cancelled, reason);
+            Finish(
+                shipId,
+                work,
+                active,
+                ShipOrderStatus.Cancelled,
+                reason,
+                transitions);
         }
 
         foreach (ShipOrder queued in work.Queue)
         {
-            queued.Status = ShipOrderStatus.Cancelled;
-            queued.Reason = reason;
+            Transition(
+                shipId,
+                queued,
+                ShipOrderStatus.Cancelled,
+                reason,
+                transitions);
             work.LastTerminal = queued;
         }
 
@@ -397,13 +514,14 @@ internal sealed class ShipOrderCoordinator
     }
 
     private static void Finish(
+        ShipId shipId,
         WorkSet work,
         ShipOrder order,
         ShipOrderStatus status,
-        ShipOrderReason reason)
+        ShipOrderReason reason,
+        ICollection<ShipOrderTransition> transitions)
     {
-        order.Status = status;
-        order.Reason = reason;
+        Transition(shipId, order, status, reason, transitions);
         order.Plan = null;
         order.NextLegIndex = 0;
         order.MotionId = null;
@@ -414,6 +532,31 @@ internal sealed class ShipOrderCoordinator
         }
 
         work.LastTerminal = order;
+    }
+
+    private static void Transition(
+        ShipId shipId,
+        ShipOrder order,
+        ShipOrderStatus status,
+        ShipOrderReason reason,
+        ICollection<ShipOrderTransition> transitions)
+    {
+        if (order.Status == status && order.Reason == reason)
+        {
+            return;
+        }
+
+        ShipOrderStatus? previousStatus = order.Status;
+        order.Status = status;
+        order.Reason = reason;
+        transitions.Add(new ShipOrderTransition(
+            shipId,
+            order.Id,
+            order.Source,
+            order.Destination,
+            previousStatus,
+            status,
+            reason));
     }
 
     private ShipOrder GetRequiredActive(
@@ -449,8 +592,12 @@ internal sealed class ShipOrderCoordinator
                 order.Id,
                 order.Source,
                 order.Destination,
-                order.Status,
-                order.Reason);
+                order.Status
+                    ?? throw new InvalidOperationException(
+                        $"Order {order.Id} has not entered its lifecycle."),
+                order.Reason
+                    ?? throw new InvalidOperationException(
+                        $"Order {order.Id} has no lifecycle reason."));
 
     private static ReadOnlyCollection<ShipOrderSnapshot> CopySnapshots(
         IEnumerable<ShipOrder> orders) =>
@@ -492,9 +639,9 @@ internal sealed class ShipOrder
 
     internal NavigationDestination Destination { get; }
 
-    internal ShipOrderStatus Status { get; set; }
+    internal ShipOrderStatus? Status { get; set; }
 
-    internal ShipOrderReason Reason { get; set; }
+    internal ShipOrderReason? Reason { get; set; }
 
     internal TravelPlan? Plan { get; set; }
 

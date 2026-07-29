@@ -204,12 +204,38 @@ public sealed record GameplayCommandRecord
 }
 
 /// <summary>
+/// Validated command result plus semantic domain changes buffered by the
+/// authoritative handler for deterministic fact commit.
+/// </summary>
+public sealed class GameplayCommandHandlingResult
+{
+    public GameplayCommandHandlingResult(CommandResult result)
+        : this(result, Array.Empty<GameFactProposal>())
+    {
+    }
+
+    internal GameplayCommandHandlingResult(
+        CommandResult result,
+        IEnumerable<GameFactProposal> factProposals)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(factProposals);
+        Result = result;
+        FactProposals = factProposals.ToArray();
+    }
+
+    public CommandResult Result { get; }
+
+    internal IReadOnlyList<GameFactProposal> FactProposals { get; }
+}
+
+/// <summary>
 /// Fixed command-dispatch boundary implemented by a game-session runtime.
 /// Implementations validate before applying any authoritative mutation.
 /// </summary>
 public interface IGameplayCommandHandler
 {
-    CommandResult Handle(GameplayCommandEnvelope envelope);
+    GameplayCommandHandlingResult Handle(GameplayCommandEnvelope envelope);
 }
 
 /// <summary>
@@ -218,17 +244,34 @@ public interface IGameplayCommandHandler
 public sealed class GameplayCommandProcessor
 {
     private readonly IGameplayCommandHandler _handler;
+    private readonly GameFactStore _facts;
     private readonly List<GameplayCommandRecord> _records = [];
     private ulong? _nextSequence = 1;
     private SimulationTime? _lastSubmittedAt;
 
-    public GameplayCommandProcessor(IGameplayCommandHandler handler)
+    public GameplayCommandProcessor(
+        IGameplayCommandHandler handler,
+        int factRetentionCapacity)
+        : this(handler, new GameFactStore(factRetentionCapacity))
+    {
+    }
+
+    internal GameplayCommandProcessor(
+        IGameplayCommandHandler handler,
+        GameFactStore facts)
     {
         ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(facts);
         _handler = handler;
+        _facts = facts;
     }
 
     public IReadOnlyList<GameplayCommandRecord> Records => _records.AsReadOnly();
+
+    public GameFactReadResult ReadFactsAfter(
+        GameFactSequence? sequence,
+        int maximumCount) =>
+        _facts.ReadAfter(sequence, maximumCount);
 
     public GameplayCommandRecord Submit(
         SimulationTime submittedAt,
@@ -254,8 +297,41 @@ public sealed class GameplayCommandProcessor
             submittedAt,
             source,
             command);
-        CommandResult result = _handler.Handle(envelope)
+        GameplayCommandHandlingResult handling = _handler.Handle(envelope)
             ?? throw new InvalidOperationException("Command handler returned no result.");
+        CommandResult result = handling.Result;
+        GameFact outcome = result.Status switch
+        {
+            CommandResultStatus.Accepted => new CommandAcceptedFact(
+                envelope.Sequence,
+                envelope.Source,
+                envelope.Command.Kind),
+            CommandResultStatus.Rejected => new CommandRejectedFact(
+                envelope.Sequence,
+                envelope.Source,
+                envelope.Command.Kind,
+                result.RejectionCode
+                    ?? throw new InvalidOperationException(
+                        "Rejected command has no rejection code.")),
+            _ => throw new InvalidOperationException(
+                $"Unknown command result status {result.Status}."),
+        };
+        var proposals = new List<GameFactProposal>(
+            handling.FactProposals.Count + 1)
+        {
+            new(
+                new GameFactProposalKey(
+                    GameFactCommitCategory.CommandOutcome,
+                    envelope.Sequence.Value,
+                    0,
+                    0),
+                outcome),
+        };
+        proposals.AddRange(handling.FactProposals);
+        _facts.Commit(
+            submittedAt,
+            new CommandFactCause(envelope.Sequence),
+            proposals);
         var record = new GameplayCommandRecord(envelope, result);
         _records.Add(record);
         _lastSubmittedAt = submittedAt;

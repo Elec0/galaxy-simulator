@@ -42,24 +42,29 @@ public sealed class GameSessionSetup
 {
     public GameSessionSetup(
         IEnumerable<StarSystem> systems,
-        IEnumerable<InitialShipSetup> ships)
+        IEnumerable<InitialShipSetup> ships,
+        int factRetentionCapacity)
         : this(
             systems,
             ships,
             new ConnectorTopology(
                 Array.Empty<ConnectorEndpoint>(),
-                Array.Empty<TransitConnection>()))
+                Array.Empty<TransitConnection>()),
+            factRetentionCapacity)
     {
     }
 
     public GameSessionSetup(
         IEnumerable<StarSystem> systems,
         IEnumerable<InitialShipSetup> ships,
-        ConnectorTopology connectorTopology)
+        ConnectorTopology connectorTopology,
+        int factRetentionCapacity)
     {
         ArgumentNullException.ThrowIfNull(systems);
         ArgumentNullException.ThrowIfNull(ships);
         ArgumentNullException.ThrowIfNull(connectorTopology);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(
+            factRetentionCapacity);
 
         StarSystem[] systemValues = systems.ToArray();
         InitialShipSetup[] shipValues = ships.ToArray();
@@ -107,6 +112,7 @@ public sealed class GameSessionSetup
         Systems = new ReadOnlyCollection<StarSystem>(systemValues);
         Ships = new ReadOnlyCollection<InitialShipSetup>(shipValues);
         ConnectorTopology = connectorTopology;
+        FactRetentionCapacity = factRetentionCapacity;
     }
 
     public IReadOnlyList<StarSystem> Systems { get; }
@@ -114,4 +120,6 @@ public sealed class GameSessionSetup
     public IReadOnlyList<InitialShipSetup> Ships { get; }
 
     public ConnectorTopology ConnectorTopology { get; }
+
+    public int FactRetentionCapacity { get; }
 }

@@ -50,7 +50,8 @@ public partial class Main : Node
 					InitialShipId,
 					position,
 					new ActorController(ActorControllerKind.Player, new CommandSourceId("local-player"))),
-			]);
+			],
+			factRetentionCapacity: 1024);
 		return new GameSession(
 			setup,
 			new DirectLocalNavigationPlanner(new MapTravelTimeEstimator()));

@@ -8,7 +8,9 @@ public sealed class GameplayCommandTests
     public void ProcessorAssignsDeterministicOrderAndRecordsEveryResult()
     {
         var handler = new RecordingHandler();
-        var processor = new GameplayCommandProcessor(handler);
+        var processor = new GameplayCommandProcessor(
+            handler,
+            factRetentionCapacity: 16);
         var player = new CommandSource(
             CommandSourceKind.Player,
             new CommandSourceId("local-player"));
@@ -34,6 +36,22 @@ public sealed class GameplayCommandTests
         Assert.Equal(
             [accepted.Envelope, rejected.Envelope],
             handler.Handled);
+        Assert.Collection(
+            processor.ReadFactsAfter(null, maximumCount: 10).Facts,
+            fact =>
+            {
+                Assert.Equal<ulong>(1, fact.Sequence.Value);
+                Assert.IsType<CommandAcceptedFact>(fact.Fact);
+            },
+            fact =>
+            {
+                Assert.Equal<ulong>(2, fact.Sequence.Value);
+                var rejectedFact = Assert.IsType<CommandRejectedFact>(
+                    fact.Fact);
+                Assert.Equal(
+                    CommandRejectionCodes.InvalidState,
+                    rejectedFact.RejectionCode);
+            });
     }
 
     [Theory]
@@ -82,7 +100,9 @@ public sealed class GameplayCommandTests
     [Fact]
     public void ProcessorRejectsMissingSubmissionData()
     {
-        var processor = new GameplayCommandProcessor(new RecordingHandler());
+        var processor = new GameplayCommandProcessor(
+            new RecordingHandler(),
+            factRetentionCapacity: 16);
         var player = new CommandSource(
             CommandSourceKind.Player,
             new CommandSourceId("local-player"));
@@ -117,7 +137,9 @@ public sealed class GameplayCommandTests
     [Fact]
     public void ProcessorRejectsSubmissionTimeMovingBackward()
     {
-        var processor = new GameplayCommandProcessor(new RecordingHandler());
+        var processor = new GameplayCommandProcessor(
+            new RecordingHandler(),
+            factRetentionCapacity: 16);
         var player = new CommandSource(
             CommandSourceKind.Player,
             new CommandSourceId("local-player"));
@@ -149,15 +171,17 @@ public sealed class GameplayCommandTests
     {
         public List<GameplayCommandEnvelope> Handled { get; } = [];
 
-        public CommandResult Handle(GameplayCommandEnvelope envelope)
+        public GameplayCommandHandlingResult Handle(
+            GameplayCommandEnvelope envelope)
         {
             Handled.Add(envelope);
             var command = Assert.IsType<TestCommand>(envelope.Command);
-            return command.Outcome == "accepted"
+            CommandResult result = command.Outcome == "accepted"
                 ? CommandResult.Accepted()
                 : CommandResult.Rejected(
                     CommandRejectionCodes.InvalidState,
                     "The test state rejects this command.");
+            return new GameplayCommandHandlingResult(result);
         }
     }
 }

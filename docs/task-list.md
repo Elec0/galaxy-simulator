@@ -51,17 +51,6 @@ bottom; later tasks may be refined as earlier contracts become concrete.
 
 ## Near-term work
 
-- [ ] **TASK-008: Introduce semantic game facts**
-  - Keep facts separate from internal completion events.
-  - Assign stable ordering or sequence identifiers.
-  - Emit initial facts for command acceptance or failure, actor movement, order
-    completion, and order cancellation.
-  - Define bounded retention and consumption by UI, scripts, and development
-    tools.
-  - Architecture accepted on 2026-07-28; implementation follows the typed,
-    deterministically ordered, bounded fact-stream contract.
-  - Context: [Semantic game facts](semantic-game-facts.md)
-
 - [ ] **TASK-009: Split Phase 1 runtime orchestration into explicit systems**
   - Separate production, construction, logistics, and order handling.
   - Define system ownership, handled inputs, emitted facts, and deterministic
@@ -211,7 +200,7 @@ prerequisites and desired behavior are sufficiently defined.
     boundary used by Godot.
   - `PhaseOneScenario` remains isolated under `Acceptance/` as a bounded
     regression harness.
-  - Ordered semantic facts remain in `TASK-008`.
+  - Ordered semantic facts were completed by `TASK-008`.
   - Context: [Gameplay integration §1.2, §1.7, and §2.3](gameplay-integration.md#12-there-is-no-general-gameplay-command-boundary)
 
 - [x] **TASK-004: Separate setup authority from runtime mutation**
@@ -234,7 +223,7 @@ prerequisites and desired behavior are sufficiently defined.
   - Godot selects a ship, submits or replaces a position destination, cancels
     with right-click, and displays the order, reason, destination, and motion.
   - Queues, controller changes, and the broader lifecycle were completed by
-    `TASK-006`; semantic facts remain in `TASK-008`.
+    `TASK-006`; semantic facts were completed by `TASK-008`.
   - Context: [Gameplay integration §2.3, §2.9, and §3.2](gameplay-integration.md#23-introduce-a-persistent-game-session-facade)
 
 - [x] **TASK-006: Define actor control and order lifecycle**
@@ -255,8 +244,8 @@ prerequisites and desired behavior are sufficiently defined.
     or completion.
   - Waiting and failed states are defined; `TASK-028` proves transit waiting
     and emergence wake, while target invalidation in `TASK-011` retains the
-    first concrete failure proof. Semantic transition facts remain in
-    `TASK-008`.
+    first concrete failure proof. `TASK-008` completed semantic order
+    transitions for the current lifecycle.
   - An internal coordinated actor-cleanup boundary invalidates pending movement
     before removing spatial, control, and order ownership; destruction policy
     and commands remain in `TASK-011`.
@@ -271,9 +260,24 @@ prerequisites and desired behavior are sufficiently defined.
   - Ignored events are deterministic no-ops with recorded stale-generation,
     missing-reference, or state-mismatch diagnostics.
   - Actor movement and order cancellation apply this contract through
-    `TASK-006`; destruction cleanup remains in `TASK-011` and semantic
-    cancellation facts remain in `TASK-008`.
+    `TASK-006`; `TASK-008` completed semantic cancellation facts, while
+    destruction cleanup remains in `TASK-011`.
   - Context: [Gameplay integration §1.5 and §2.6](gameplay-integration.md#15-scheduled-work-has-an-incomplete-cancellation-contract)
+
+- [x] **TASK-008: Introduce semantic game facts**
+  - `GameSession` exposes typed, immutable facts with one monotonic session
+    sequence and immediate command or scheduled-event causes.
+  - Command outcomes, order transitions, local motion, and connector transit
+    commit through deterministic proposal ordering; ignored events remain
+    diagnostics.
+  - An explicitly sized bounded window supports cursor reads, limits result
+    allocation to requested facts, and reports retention gaps without copying
+    facts into world snapshots.
+  - Deterministic tests cover rejection, cancellation, replacement, override
+    restoration, connector traversal, stale events, retention, and incremental
+    advancement. Presentation consumption remains in `TASK-010`, persistent
+    scripts in `TASK-017`, and save boundaries in `TASK-014`.
+  - Context: [Semantic game facts](semantic-game-facts.md)
 
 - [x] **DONE-001: Establish the project vision and modular design documents**
   - The project defines a persistent, map-command, materially causal,

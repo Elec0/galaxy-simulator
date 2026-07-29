@@ -5,6 +5,7 @@ namespace GalaxyCommand.Simulation;
 /// </summary>
 public sealed class GameSession : IGameplayCommandHandler
 {
+    private readonly GameFactStore _facts;
     private readonly GameRuntime _runtime;
     private readonly GameplayCommandProcessor _commands;
 
@@ -12,8 +13,10 @@ public sealed class GameSession : IGameplayCommandHandler
         GameSessionSetup setup,
         ISpatialNavigationPlanner navigation)
     {
-        _runtime = new GameRuntime(setup, navigation);
-        _commands = new GameplayCommandProcessor(this);
+        ArgumentNullException.ThrowIfNull(setup);
+        _facts = new GameFactStore(setup.FactRetentionCapacity);
+        _runtime = new GameRuntime(setup, navigation, _facts);
+        _commands = new GameplayCommandProcessor(this, _facts);
     }
 
     public SimulationTime CurrentTime => _runtime.CurrentTime;
@@ -33,6 +36,12 @@ public sealed class GameSession : IGameplayCommandHandler
         GameplayCommand command) =>
         _commands.Submit(CurrentTime, source, command);
 
-    CommandResult IGameplayCommandHandler.Handle(GameplayCommandEnvelope envelope) =>
+    public GameFactReadResult ReadFactsAfter(
+        GameFactSequence? sequence,
+        int maximumCount) =>
+        _facts.ReadAfter(sequence, maximumCount);
+
+    GameplayCommandHandlingResult IGameplayCommandHandler.Handle(
+        GameplayCommandEnvelope envelope) =>
         _runtime.Handle(envelope);
 }

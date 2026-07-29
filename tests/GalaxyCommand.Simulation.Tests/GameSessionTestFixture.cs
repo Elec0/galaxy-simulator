@@ -18,7 +18,8 @@ internal static class GameSessionTestFixture
 
     internal static GameSession Create(
         ActorController? baseController = null,
-        ISpatialNavigationPlanner? navigation = null)
+        ISpatialNavigationPlanner? navigation = null,
+        int factRetentionCapacity = 256)
     {
         var setup = new GameSessionSetup(
             [new StarSystem(System, "Test System")],
@@ -27,7 +28,8 @@ internal static class GameSessionTestFixture
                     Ship,
                     Position(0, 0),
                     baseController ?? PlayerController),
-            ]);
+            ],
+            factRetentionCapacity);
         return new GameSession(
             setup,
             navigation

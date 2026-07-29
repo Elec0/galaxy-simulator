@@ -78,7 +78,8 @@ public sealed class GameSessionSnapshotTests
         Assert.Throws<ArgumentException>(() =>
             new GameSessionSetup(
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
-                [ship]));
+                [ship],
+                factRetentionCapacity: 256));
     }
 
     [Fact]
@@ -103,6 +104,22 @@ public sealed class GameSessionSnapshotTests
                         GameSessionTestFixture.Position(0, 0),
                         GameSessionTestFixture.PlayerController),
                 ],
-                topology));
+                topology,
+                factRetentionCapacity: 256));
+    }
+
+    [Fact]
+    public void SetupRequiresExplicitPositiveFactRetentionCapacity()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new GameSessionSetup(
+                [new StarSystem(GameSessionTestFixture.System, "Test System")],
+                [
+                    new InitialShipSetup(
+                        GameSessionTestFixture.Ship,
+                        GameSessionTestFixture.Position(0, 0),
+                        GameSessionTestFixture.PlayerController),
+                ],
+                factRetentionCapacity: 0));
     }
 }

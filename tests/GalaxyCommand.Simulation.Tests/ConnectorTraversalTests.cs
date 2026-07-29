@@ -63,6 +63,21 @@ public sealed class ConnectorTraversalTests
                 ScheduledEventDisposition.Applied,
             ],
             session.EventRecords.Select(record => record.Disposition));
+        Assert.Equal(
+            [
+                typeof(CommandAcceptedFact),
+                typeof(ShipOrderTransitionFact),
+                typeof(ShipLocalMotionStartedFact),
+                typeof(ShipLocalMotionEndedFact),
+                typeof(ShipConnectorTransitStartedFact),
+                typeof(ShipConnectorTransitCompletedFact),
+                typeof(ShipLocalMotionStartedFact),
+                typeof(ShipLocalMotionEndedFact),
+                typeof(ShipOrderTransitionFact),
+            ],
+            session.ReadFactsAfter(null, maximumCount: 20)
+                .Facts
+                .Select(envelope => envelope.Fact.GetType()));
     }
 
     [Fact]
@@ -180,6 +195,9 @@ public sealed class ConnectorTraversalTests
         Assert.Equal(expected.SuspendedOrders, actual.SuspendedOrders);
         Assert.Equal(singleRun.EventRecords, incremental.EventRecords);
         Assert.Equal(singleRun.CommandRecords, incremental.CommandRecords);
+        Assert.Equal(
+            singleRun.ReadFactsAfter(null, maximumCount: 20).Facts,
+            incremental.ReadFactsAfter(null, maximumCount: 20).Facts);
     }
 
     private static GameSession CreateSession()
@@ -198,7 +216,8 @@ public sealed class ConnectorTraversalTests
                         ActorControllerKind.Player,
                         Player.Id)),
             ],
-            topology);
+            topology,
+            factRetentionCapacity: 256);
         return new GameSession(
             setup,
             new HierarchicalNavigationPlanner(

@@ -28,6 +28,10 @@ for authoritative world state.
 
 **Decision status:** Accepted by the project owner on 2026-07-28.
 
+**Implementation status:** Completed by `TASK-008` on 2026-07-28. Presentation,
+persistent-script, save/load, and explanation-history integration remain with
+their owning follow-up tasks.
+
 ## Accepted model at a glance
 
 Domain owners produce immutable fact proposals while committing meaningful
@@ -524,9 +528,9 @@ Phase 1 diagnostic event and decision fingerprints remain unchanged. Migrating
 the acceptance fixture to semantic facts is separate from proving the clean
 session fact boundary.
 
-## Implementation sequence
+## Implemented sequence
 
-Implement the accepted decisions in this order:
+`TASK-008` implemented the accepted decisions in this order:
 
 1. Add the typed fact envelope, causes, payload hierarchy, sequence, proposal,
    and bounded window.

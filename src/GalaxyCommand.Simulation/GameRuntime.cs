@@ -40,16 +40,20 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
     private readonly ShipOrderCoordinator _orders = new();
     private readonly ConnectorTopology _topology;
     private readonly ISpatialNavigationPlanner _navigation;
+    private readonly GameFactStore _facts;
     private readonly List<GameEventRecord> _eventRecords = [];
 
     internal GameRuntime(
         GameSessionSetup setup,
-        ISpatialNavigationPlanner navigation)
+        ISpatialNavigationPlanner navigation,
+        GameFactStore facts)
     {
         ArgumentNullException.ThrowIfNull(setup);
         ArgumentNullException.ThrowIfNull(navigation);
+        ArgumentNullException.ThrowIfNull(facts);
         _topology = setup.ConnectorTopology;
         _navigation = navigation;
+        _facts = facts;
 
         foreach (StarSystem system in setup.Systems)
         {
@@ -103,7 +107,8 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                     _orders.CaptureSuspended(ship.ShipId)))));
     }
 
-    internal CommandResult Handle(GameplayCommandEnvelope envelope)
+    internal GameplayCommandHandlingResult Handle(
+        GameplayCommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(envelope);
         return envelope.Command switch
@@ -114,9 +119,10 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                 HandleBeginOverride(envelope.Source, begin),
             EndScriptedOverrideCommand end =>
                 HandleEndOverride(envelope.Source, end),
-            _ => CommandResult.Rejected(
-                CommandRejectionCodes.UnsupportedCommand,
-                $"Gameplay command '{envelope.Command.Kind}' is not supported yet."),
+            _ => new GameplayCommandHandlingResult(
+                CommandResult.Rejected(
+                    CommandRejectionCodes.UnsupportedCommand,
+                    $"Gameplay command '{envelope.Command.Kind}' is not supported yet.")),
         };
     }
 
@@ -158,6 +164,26 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                 $"Unsupported game event {simulationEvent.Payload.GetType().Name}.");
         }
 
+        LocalMotionSegment? endingMotion = spatial.Event switch
+        {
+            SpatialMovementEvent.Arrive arrive
+                when _movement.GetState(arrive.ShipId)
+                    is ShipSpatialState.Moving moving
+                    && moving.Motion.Id == arrive.MotionId =>
+                moving.Motion,
+            _ => null,
+        };
+        ConnectorTransitSegment? completingTransit = spatial.Event switch
+        {
+            SpatialMovementEvent.Emerge emerge
+                when _movement.GetState(emerge.ShipId)
+                    is ShipSpatialState.ConnectorTransit traversing
+                    && traversing.Transit.Id == emerge.TransitId =>
+                traversing.Transit,
+            _ => null,
+        };
+        var transitions = new List<ShipOrderTransition>();
+        var factProposals = new List<GameFactProposal>();
         ScheduledEventDisposition disposition = _movement.HandleEvent(
             spatial.Event,
             simulationEvent.Generation,
@@ -171,6 +197,19 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                         ShipOrder active = _orders.GetActive(arrive.ShipId)
                             ?? throw new InvalidOperationException(
                                 $"Ship {arrive.ShipId} completed local motion without an active order.");
+                        LocalMotionSegment motion = endingMotion
+                            ?? throw new InvalidOperationException(
+                                $"Applied arrival for ship {arrive.ShipId} had no matching motion.");
+                        factProposals.Add(PhysicalWorkEndedProposal(
+                            arrive.ShipId,
+                            motion.Id.Value,
+                            new ShipLocalMotionEndedFact(
+                                arrive.ShipId,
+                                Snapshot(motion),
+                                motion.Destination,
+                                now,
+                                LocalMotionEndReason.Arrived,
+                                active.Id)));
                         _orders.CompleteLeg(
                             arrive.ShipId,
                             active.Id,
@@ -179,17 +218,30 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                     }
                 case SpatialMovementEvent.Emerge emerge:
                     {
+                        ConnectorTransitSegment transit = completingTransit
+                            ?? throw new InvalidOperationException(
+                                $"Applied emergence for ship {emerge.ShipId} had no matching transit.");
+                        ShipOrderId? transitOrderId = null;
                         if (_orders.GetActive(emerge.ShipId) is { } active
                             && _orders.IsBoundTransit(
                                 emerge.ShipId,
                                 emerge.TransitId))
                         {
+                            transitOrderId = active.Id;
                             _orders.CompleteTransit(
                                 emerge.ShipId,
                                 active.Id,
                                 emerge.TransitId);
                         }
 
+                        factProposals.Add(PhysicalWorkEndedProposal(
+                            emerge.ShipId,
+                            transit.Id.Value,
+                            new ShipConnectorTransitCompletedFact(
+                                emerge.ShipId,
+                                Snapshot(transit),
+                                now,
+                                transitOrderId)));
                         break;
                     }
                 default:
@@ -197,7 +249,15 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                         $"Unsupported spatial event {spatial.Event.GetType().Name}.");
             }
 
-            StartOrContinueOrders(spatial.Event.ShipId);
+            StartOrContinueOrders(
+                spatial.Event.ShipId,
+                transitions,
+                factProposals);
+            AddOrderTransitionProposals(transitions, factProposals);
+            _facts.Commit(
+                now,
+                new ScheduledEventFactCause(simulationEvent.Key),
+                factProposals);
         }
 
         return disposition;
@@ -223,16 +283,18 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             kind));
     }
 
-    private CommandResult HandleMove(
+    private GameplayCommandHandlingResult HandleMove(
         CommandSource source,
         MoveShipCommand command)
     {
         MoveOrderEvaluation evaluation = EvaluateMove(source, command);
         if (evaluation.Rejection is { } rejection)
         {
-            return rejection;
+            return new GameplayCommandHandlingResult(rejection);
         }
 
+        var transitions = new List<ShipOrderTransition>();
+        var factProposals = new List<GameFactProposal>();
         MoveOrderProposal proposal = evaluation.Proposal
             ?? throw new InvalidOperationException(
                 "Accepted move-order evaluation produced no proposal.");
@@ -240,20 +302,33 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
         switch (proposal.Placement)
         {
             case OrderPlacement.ReplaceAll:
-                _movement.CommitCancel(proposal.ShipId, CurrentTime);
-                _orders.ReplaceAll(proposal.ShipId, order);
+                EndActiveLocalMotion(
+                    proposal.ShipId,
+                    LocalMotionEndReason.ReplacedByCommand,
+                    factProposals);
+                _orders.ReplaceAll(
+                    proposal.ShipId,
+                    order,
+                    transitions);
                 if (proposal.Plan is { } replacementPlan)
                 {
                     _orders.SetPlan(
                         proposal.ShipId,
                         order.Id,
-                        replacementPlan);
+                        replacementPlan,
+                        transitions);
                 }
 
-                StartOrContinueOrders(proposal.ShipId);
+                StartOrContinueOrders(
+                    proposal.ShipId,
+                    transitions,
+                    factProposals);
                 break;
             case OrderPlacement.Append:
-                bool becameActive = _orders.Append(proposal.ShipId, order);
+                bool becameActive = _orders.Append(
+                    proposal.ShipId,
+                    order,
+                    transitions);
                 if (becameActive)
                 {
                     if (proposal.Plan is { } appendedPlan)
@@ -261,10 +336,14 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                         _orders.SetPlan(
                             proposal.ShipId,
                             order.Id,
-                            appendedPlan);
+                            appendedPlan,
+                            transitions);
                     }
 
-                    StartOrContinueOrders(proposal.ShipId);
+                    StartOrContinueOrders(
+                        proposal.ShipId,
+                        transitions,
+                        factProposals);
                 }
 
                 break;
@@ -273,29 +352,40 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                     $"Unsupported order placement {proposal.Placement}.");
         }
 
-        return CommandResult.Accepted();
+        AddOrderTransitionProposals(transitions, factProposals);
+        return new GameplayCommandHandlingResult(
+            CommandResult.Accepted(),
+            factProposals);
     }
 
-    private CommandResult HandleCancel(
+    private GameplayCommandHandlingResult HandleCancel(
         CommandSource source,
         CancelShipOrderCommand command)
     {
         CancelOrderEvaluation evaluation = EvaluateCancel(source, command);
         if (evaluation.Rejection is { } rejection)
         {
-            return rejection;
+            return new GameplayCommandHandlingResult(rejection);
         }
 
+        var transitions = new List<ShipOrderTransition>();
+        var factProposals = new List<GameFactProposal>();
         CancelOrderProposal proposal = evaluation.Proposal
             ?? throw new InvalidOperationException(
                 "Accepted cancel-order evaluation produced no proposal.");
         if (proposal.WasActive)
         {
-            _movement.CommitCancel(proposal.ShipId, CurrentTime);
+            EndActiveLocalMotion(
+                proposal.ShipId,
+                LocalMotionEndReason.CancelledByCommand,
+                factProposals);
         }
 
         CancelOrderDisposition disposition =
-            _orders.Cancel(proposal.ShipId, proposal.OrderId);
+            _orders.Cancel(
+                proposal.ShipId,
+                proposal.OrderId,
+                transitions);
         if (disposition == CancelOrderDisposition.Missing)
         {
             throw new InvalidOperationException(
@@ -304,10 +394,16 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
 
         if (disposition == CancelOrderDisposition.Active)
         {
-            StartOrContinueOrders(proposal.ShipId);
+            StartOrContinueOrders(
+                proposal.ShipId,
+                transitions,
+                factProposals);
         }
 
-        return CommandResult.Accepted();
+        AddOrderTransitionProposals(transitions, factProposals);
+        return new GameplayCommandHandlingResult(
+            CommandResult.Accepted(),
+            factProposals);
     }
 
     private MoveOrderEvaluation EvaluateMove(
@@ -392,7 +488,7 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             null);
     }
 
-    private CommandResult HandleBeginOverride(
+    private GameplayCommandHandlingResult HandleBeginOverride(
         CommandSource source,
         BeginScriptedOverrideCommand command)
     {
@@ -402,16 +498,24 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             command.ExpectedRevision);
         if (RejectInvalidOverride(validation, command.ShipId) is { } rejection)
         {
-            return rejection;
+            return new GameplayCommandHandlingResult(rejection);
         }
 
-        _movement.CommitCancel(command.ShipId, CurrentTime);
-        _orders.BeginOverride(command.ShipId);
+        var transitions = new List<ShipOrderTransition>();
+        var factProposals = new List<GameFactProposal>();
+        EndActiveLocalMotion(
+            command.ShipId,
+            LocalMotionEndReason.SuspendedByScriptedOverride,
+            factProposals);
+        _orders.BeginOverride(command.ShipId, transitions);
         _control.BeginOverride(command.ShipId, source, command.Reason);
-        return CommandResult.Accepted();
+        AddOrderTransitionProposals(transitions, factProposals);
+        return new GameplayCommandHandlingResult(
+            CommandResult.Accepted(),
+            factProposals);
     }
 
-    private CommandResult HandleEndOverride(
+    private GameplayCommandHandlingResult HandleEndOverride(
         CommandSource source,
         EndScriptedOverrideCommand command)
     {
@@ -421,18 +525,37 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             command.ExpectedRevision);
         if (RejectInvalidOverride(validation, command.ShipId) is { } rejection)
         {
-            return rejection;
+            return new GameplayCommandHandlingResult(rejection);
         }
 
-        _movement.CommitCancel(command.ShipId, CurrentTime);
-        _orders.EndOverride(command.ShipId, command.ReleasePolicy);
+        var transitions = new List<ShipOrderTransition>();
+        var factProposals = new List<GameFactProposal>();
+        EndActiveLocalMotion(
+            command.ShipId,
+            LocalMotionEndReason.ScriptedOverrideEnded,
+            factProposals);
+        _orders.EndOverride(
+            command.ShipId,
+            command.ReleasePolicy,
+            transitions);
         _control.EndOverride(command.ShipId);
-        StartOrContinueOrders(command.ShipId);
-        return CommandResult.Accepted();
+        StartOrContinueOrders(
+            command.ShipId,
+            transitions,
+            factProposals);
+        AddOrderTransitionProposals(transitions, factProposals);
+        return new GameplayCommandHandlingResult(
+            CommandResult.Accepted(),
+            factProposals);
     }
 
-    private void StartOrContinueOrders(ShipId shipId)
+    private void StartOrContinueOrders(
+        ShipId shipId,
+        ICollection<ShipOrderTransition> transitions,
+        List<GameFactProposal> factProposals)
     {
+        ArgumentNullException.ThrowIfNull(transitions);
+        ArgumentNullException.ThrowIfNull(factProposals);
         while (_orders.GetActive(shipId) is { } active)
         {
             SystemPosition? availablePosition = _movement.PositionAt(
@@ -447,7 +570,10 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                         $"Order actor {shipId} has no spatial state.");
                 }
 
-                _orders.WaitForTransitCompletion(shipId, active.Id);
+                _orders.WaitForTransitCompletion(
+                    shipId,
+                    active.Id,
+                    transitions);
                 return;
             }
 
@@ -460,13 +586,20 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                     active.Destination);
                 if (result is NavigationPlanResult.Unreachable)
                 {
-                    _orders.FailActive(shipId, active.Id);
+                    _orders.FailActive(
+                        shipId,
+                        active.Id,
+                        transitions);
                     continue;
                 }
 
                 TravelPlan plan = ((NavigationPlanResult.Planned)result).Plan;
                 ValidateExecutablePlan(current, active.Destination, plan);
-                _orders.SetPlan(shipId, active.Id, plan);
+                _orders.SetPlan(
+                    shipId,
+                    active.Id,
+                    plan,
+                    transitions);
             }
 
             TravelLeg? nextLeg = _orders.NextLeg(shipId, active.Id);
@@ -478,7 +611,10 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                         $"Order {active.Id} exhausted its plan before reaching its destination.");
                 }
 
-                _orders.CompleteActive(shipId, active.Id);
+                _orders.CompleteActive(
+                    shipId,
+                    active.Id,
+                    transitions);
                 continue;
             }
 
@@ -499,6 +635,13 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                         }
 
                         _orders.BindMotion(shipId, active.Id, motion.Id);
+                        factProposals.Add(PhysicalWorkStartedProposal(
+                            shipId,
+                            motion.Id.Value,
+                            new ShipLocalMotionStartedFact(
+                                shipId,
+                                Snapshot(motion),
+                                active.Id)));
                         return;
                     }
                 case TravelLeg.Connector connector:
@@ -511,6 +654,13 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                                 _agenda,
                                 movement => new GameEvent.SpatialMovement(movement));
                         _orders.BindTransit(shipId, active.Id, transit.Id);
+                        factProposals.Add(PhysicalWorkStartedProposal(
+                            shipId,
+                            transit.Id.Value,
+                            new ShipConnectorTransitStartedFact(
+                                shipId,
+                                Snapshot(transit),
+                                active.Id)));
                         return;
                     }
                 default:
@@ -519,6 +669,114 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             }
         }
     }
+
+    private void EndActiveLocalMotion(
+        ShipId shipId,
+        LocalMotionEndReason reason,
+        List<GameFactProposal> factProposals)
+    {
+        ArgumentNullException.ThrowIfNull(factProposals);
+        if (_movement.GetState(shipId)
+            is not ShipSpatialState.Moving moving)
+        {
+            return;
+        }
+
+        ShipOrder active = _orders.GetActive(shipId)
+            ?? throw new InvalidOperationException(
+                $"Ship {shipId} has local motion without an active order.");
+        LocalMotionSegment motion = moving.Motion;
+        if (!_movement.CommitCancel(shipId, CurrentTime))
+        {
+            throw new InvalidOperationException(
+                $"Ship {shipId} local motion disappeared before cancellation commit.");
+        }
+
+        SystemPosition finalPosition = _movement.PositionAt(shipId, CurrentTime)
+            ?? throw new InvalidOperationException(
+                $"Ship {shipId} has no materialized position after cancelling local motion.");
+        factProposals.Add(PhysicalWorkEndedProposal(
+            shipId,
+            motion.Id.Value,
+            new ShipLocalMotionEndedFact(
+                shipId,
+                Snapshot(motion),
+                finalPosition,
+                CurrentTime,
+                reason,
+                active.Id)));
+    }
+
+    private static void AddOrderTransitionProposals(
+        IEnumerable<ShipOrderTransition> transitions,
+        List<GameFactProposal> factProposals)
+    {
+        ArgumentNullException.ThrowIfNull(transitions);
+        ArgumentNullException.ThrowIfNull(factProposals);
+        int ordinal = 0;
+        foreach (ShipOrderTransition transition in transitions)
+        {
+            factProposals.Add(new GameFactProposal(
+                new GameFactProposalKey(
+                    GameFactCommitCategory.OrderTransition,
+                    transition.ShipId.Value,
+                    transition.OrderId.Value,
+                    ordinal),
+                new ShipOrderTransitionFact(
+                    transition.ShipId,
+                    transition.OrderId,
+                    transition.Source,
+                    transition.Destination,
+                    transition.PreviousStatus,
+                    transition.NextStatus,
+                    transition.Reason)));
+            ordinal = checked(ordinal + 1);
+        }
+    }
+
+    private static GameFactProposal PhysicalWorkEndedProposal(
+        ShipId shipId,
+        ulong activityId,
+        GameFact fact) =>
+        new(
+            new GameFactProposalKey(
+                GameFactCommitCategory.PhysicalWorkEnded,
+                shipId.Value,
+                activityId,
+                0),
+            fact);
+
+    private static GameFactProposal PhysicalWorkStartedProposal(
+        ShipId shipId,
+        ulong activityId,
+        GameFact fact) =>
+        new(
+            new GameFactProposalKey(
+                GameFactCommitCategory.PhysicalWorkStarted,
+                shipId.Value,
+                activityId,
+                0),
+            fact);
+
+    private static LocalMotionSnapshot Snapshot(LocalMotionSegment motion) =>
+        new(
+            motion.Id,
+            motion.Generation,
+            motion.Origin,
+            motion.Destination,
+            motion.DepartedAt,
+            motion.ArrivesAt);
+
+    private static ConnectorTransitSnapshot Snapshot(
+        ConnectorTransitSegment transit) =>
+        new(
+            transit.Id,
+            transit.Generation,
+            transit.ConnectionId,
+            transit.Source,
+            transit.Destination,
+            transit.DepartedAt,
+            transit.ArrivesAt);
 
     private NavigationPlanResult Plan(
         ShipId shipId,
