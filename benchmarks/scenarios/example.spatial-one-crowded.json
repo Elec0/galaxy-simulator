@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "example.spatial-one-crowded",
+  "basePreset": "spatial.one-crowded",
+  "basePresetVersion": 1,
+  "parameters": {
+    "activeShipCount": 250,
+    "factRetentionCapacity": 2500,
+    "measuredIterations": 3,
+    "shipCount": 250,
+    "warmupIterations": 1
+  }
+}

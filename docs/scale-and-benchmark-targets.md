@@ -8,6 +8,13 @@ This document is the accepted `TASK-024` architecture. The project owner
 accepted the initial scale envelope and informational simulation-speed goals on
 2026-07-28.
 
+Implementation now includes a dedicated headless runner, explicit smoke and
+full-suite gating, versioned JSON scenario files, validated numeric overrides,
+machine-readable results, fast configuration coverage in the normal unit-test
+suite, and the five initial single-thread scenario shapes. The canonical
+Release full suite passed all committed digests across repeated iterations on
+2026-07-28, completing `TASK-024`.
+
 The benchmark execution and enforcement policy is accepted:
 
 - Normal unit-test runs contain only fast deterministic correctness coverage.
@@ -324,10 +331,10 @@ The delivery sequence is:
 5. Add economic volume and mixed benchmarks as scalable fixtures and
    authoritative gameplay domains become available.
 
-The architecture pass is accepted. `TASK-024` itself is complete only after the
-initial runner and currently available benchmark shapes exist and reproducible
-single-thread results have been captured. Later worker-count comparisons do not
-block `TASK-024`; they use its contract when concurrent execution exists.
+The architecture and initial implementation are complete. Later worker-count
+comparisons use this contract when concurrent execution exists; they remain in
+the orchestration and long-running performance work rather than reopening
+`TASK-024`.
 
 ## Accepted decisions
 

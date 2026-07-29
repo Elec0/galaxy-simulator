@@ -45,6 +45,48 @@ dotnet run --project src/GalaxyCommand.Cli/GalaxyCommand.Cli.csproj --no-build -
 The SDK version is pinned in `global.json`. Shared compiler settings enable
 nullable-reference checking and treat warnings as errors.
 
+## Deterministic benchmarks
+
+The dedicated benchmark runner writes human-readable progress to stderr and a
+machine-readable JSON report to stdout. Its default smoke suite runs only the
+small Phase 1 correctness baseline:
+
+```sh
+dotnet run --project benchmarks/GalaxyCommand.Benchmarks/GalaxyCommand.Benchmarks.csproj -- --suite smoke
+```
+
+Heavy reference scenarios never run as part of `dotnet test` and require the
+explicit full-suite option:
+
+```sh
+dotnet run --project benchmarks/GalaxyCommand.Benchmarks/GalaxyCommand.Benchmarks.csproj -- --suite full
+```
+
+List presets and their numeric defaults with `--list`. Run one heavy preset or
+tune named integer parameters with visible overrides:
+
+```sh
+dotnet run --project benchmarks/GalaxyCommand.Benchmarks/GalaxyCommand.Benchmarks.csproj -- \
+  --suite full \
+  --preset spatial.one-crowded \
+  --set shipCount=500 \
+  --set activeShipCount=500 \
+  --set measuredIterations=3
+```
+
+For repeatable custom settings, use a versioned scenario file:
+
+```sh
+dotnet run --project benchmarks/GalaxyCommand.Benchmarks/GalaxyCommand.Benchmarks.csproj -- \
+  --suite full \
+  --scenario-file benchmarks/scenarios/example.spatial-one-crowded.json
+```
+
+Timing, allocation, and memory results are informational. Canonical digests,
+repeated-run agreement, semantic counts, and simulation invariants are enforced.
+The accepted benchmark contract and scale envelopes are documented in
+[Scale targets and benchmark architecture](docs/scale-and-benchmark-targets.md).
+
 ## Godot graphics client
 
 The graphics client is a Godot 4.7.1 .NET project under

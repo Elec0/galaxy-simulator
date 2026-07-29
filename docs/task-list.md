@@ -13,29 +13,8 @@ rather than deleting them.
 
 ## Current focus
 
-The current architectural goal is to select measurable scale targets before
-runtime orchestration is divided into parallel-ready owners.
-
-- [ ] **TASK-024: Establish scale, performance, and concurrency targets**
-  - Select target counts for total systems, ships, facilities, factions,
-    active scripts, pending events, and retained facts.
-  - Include a target and benchmark for many active ships in one crowded system,
-    not only galaxy-wide totals.
-  - Measure single-thread behavior first, then scaling across worker counts and
-    batch layouts while requiring identical authoritative results.
-  - Establish evaluation, effect-buffer, deterministic-merge, and ownership
-    boundaries before adding concurrent execution or specialized storage.
-  - Architecture accepted on 2026-07-28. Heavy benchmarks require explicit
-    opt-in; normal tests keep only fast correctness coverage; timing remains
-    informational and correctness is enforceable.
-  - Scenario counts, rates, durations, and activity proportions use validated,
-    versioned numeric configuration with reproducible presets and overrides.
-  - The reference and stress envelopes and the `1x` crowded-system and `30x`
-    mixed-galaxy informational speed goals are accepted; reference hardware is
-    not required.
-  - Context: [Scale targets and benchmark architecture](scale-and-benchmark-targets.md)
-
-## Near-term work
+The current architectural goal is to divide the Phase 1 runtime into explicit,
+parallel-ready owners without adding concurrent execution yet.
 
 - [ ] **TASK-009: Split Phase 1 runtime orchestration into explicit systems**
   - Separate production, construction, logistics, and order handling.
@@ -45,8 +24,10 @@ runtime orchestration is divided into parallel-ready owners.
     so independent batches can later execute concurrently.
   - Start with a fixed explicit dispatcher; do not add a dynamic plugin system
     without a demonstrated need.
-  - Begin implementation after `TASK-024` targets and benchmark contract are
-    accepted.
+  - Preserve the accepted `TASK-024` single-thread benchmark digests and expose
+    per-domain measurement boundaries without enforcing timing.
+
+## Near-term work
 
 - [ ] **TASK-010: Generalize presentation snapshots**
   - Replace fixture-specific presentation assumptions incrementally.
@@ -279,6 +260,21 @@ prerequisites and desired behavior are sufficiently defined.
     advancement. Presentation consumption remains in `TASK-010`, persistent
     scripts in `TASK-017`, and save boundaries in `TASK-014`.
   - Context: [Semantic game facts](semantic-game-facts.md)
+
+- [x] **TASK-024: Establish scale, performance, and concurrency targets**
+  - Accepted reference and stress envelopes include galaxy-wide and
+    crowded-system workloads; `1x` crowded and `30x` mixed-galaxy speeds remain
+    informational goals without reference-hardware or timing gates.
+  - A dedicated headless runner provides versioned canonical presets, validated
+    JSON files and numeric overrides, readable progress, machine-readable
+    results, repeatability checks, and committed correctness digests.
+  - Normal unit tests retain only fast configuration and smoke correctness
+    coverage. Heavy Phase 1, spatial, connector-navigation, and fact-retention
+    scenarios require explicit `--suite full` selection.
+  - The canonical Release full suite passed all five committed digests across
+    repeated iterations on 2026-07-28. Worker-count and long-running suites
+    remain in `TASK-009` and `TASK-029`.
+  - Context: [Scale targets and benchmark architecture](scale-and-benchmark-targets.md)
 
 - [x] **TASK-028: Establish hierarchical system-space navigation**
   - Added typed systems and local positions, position and system destinations,

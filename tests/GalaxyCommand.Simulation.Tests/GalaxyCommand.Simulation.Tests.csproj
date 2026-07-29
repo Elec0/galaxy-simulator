@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../benchmarks/GalaxyCommand.Benchmarks/GalaxyCommand.Benchmarks.csproj" />
     <ProjectReference Include="../../src/GalaxyCommand.Simulation/GalaxyCommand.Simulation.csproj" />
     <Using Include="Xunit" />
   </ItemGroup>
