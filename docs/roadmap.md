@@ -1,6 +1,6 @@
 # Initial roadmap
 
-[Project index](../README.md) · [Technical direction](technical-direction.md) · [Vision](vision.md)
+[Project index](../README.md) · [Technical direction](technical-direction.md) · [Vision](vision.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md)
 
 ## Phase 1: Headless economic loop
 
@@ -37,7 +37,9 @@ Success means a logistical disruption changes a faction's achievable plans witho
 
 Run increasingly large galaxies at multiple requested simulation speeds. Profile bottlenecks and refine event scheduling, indexing, storage, and update frequency.
 
-Success criteria require explicit scale targets, which have not yet been selected.
+Success criteria require accepted scale and simulation-speed targets. The
+current `TASK-024` proposal is in
+[Scale targets and benchmark architecture](scale-and-benchmark-targets.md).
 
 ## First vertical-slice test
 

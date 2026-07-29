@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -13,41 +13,27 @@ rather than deleting them.
 
 ## Current focus
 
-The current architectural goal is to establish the spatial, command, and
-ordering boundaries required for an interactive game. Work roughly from top to
-bottom; later tasks may be refined as earlier contracts become concrete.
+The current architectural goal is to select measurable scale targets before
+runtime orchestration is divided into parallel-ready owners.
 
-- [ ] **TASK-028: Establish hierarchical system-space navigation**
-  - Introduce systems as distinct local navigable spaces and connectors as
-    explicit inter-system transitions.
-  - Separate destination intent, deterministic planning, and authoritative
-    movement execution; actor orders must not contain `RouteId`.
-  - Represent system-local position and scheduled motion authoritatively while
-    keeping rendering interpolation non-authoritative.
-  - Preserve the Phase 1 graph as a compatibility backend during migration.
-  - Proven foundation: scheduled point-to-point movement within one system was
-    completed before `TASK-005`.
-  - Implemented foundation: typed system-local positions, position
-    destinations, `RouteId`-free local planning, authoritative scheduled motion,
-    generation-safe cancellation and replacement, and immutable motion
-    snapshots.
-  - The controller, queue, and multi-leg order foundation required for
-    connector traversal was completed by `TASK-006`.
-  - Implemented connector slice: immutable directional topology, dedicated
-    endpoint/connection/transit identities, deterministic duration-based
-    hierarchical planning, discriminated `AtPosition`/local-motion/transit
-    snapshots, scheduled emergence, non-interruptible transit cancellation,
-    and replacement-order wait/wake behavior.
-  - Implemented system destinations: orders complete immediately in the current
-    system or at the first valid connector emergence in another system.
-  - Remaining: runtime connector availability and access, entity destinations,
-    and the later Phase 1 compatibility migration.
-  - Entity destinations require the spatial-entity identity and lifecycle
-    foundation in `TASK-011`.
-  - Before Phase 1 compatibility migration, define an explicit mapping from
-    legacy `LocationId` nodes to systems and spatial entities; do not infer that
-    mapping from the old route graph.
-  - Context: [Navigation and spatial architecture](navigation-architecture.md)
+- [ ] **TASK-024: Establish scale, performance, and concurrency targets**
+  - Select target counts for total systems, ships, facilities, factions,
+    active scripts, pending events, and retained facts.
+  - Include a target and benchmark for many active ships in one crowded system,
+    not only galaxy-wide totals.
+  - Measure single-thread behavior first, then scaling across worker counts and
+    batch layouts while requiring identical authoritative results.
+  - Establish evaluation, effect-buffer, deterministic-merge, and ownership
+    boundaries before adding concurrent execution or specialized storage.
+  - Architecture accepted on 2026-07-28. Heavy benchmarks require explicit
+    opt-in; normal tests keep only fast correctness coverage; timing remains
+    informational and correctness is enforceable.
+  - Scenario counts, rates, durations, and activity proportions use validated,
+    versioned numeric configuration with reproducible presets and overrides.
+  - The reference and stress envelopes and the `1x` crowded-system and `30x`
+    mixed-galaxy informational speed goals are accepted; reference hardware is
+    not required.
+  - Context: [Scale targets and benchmark architecture](scale-and-benchmark-targets.md)
 
 ## Near-term work
 
@@ -59,17 +45,8 @@ bottom; later tasks may be refined as earlier contracts become concrete.
     so independent batches can later execute concurrently.
   - Start with a fixed explicit dispatcher; do not add a dynamic plugin system
     without a demonstrated need.
-
-- [ ] **TASK-024: Establish scale, performance, and concurrency targets**
-  - Select target counts for total systems, ships, facilities, factions,
-    active scripts, pending events, and retained facts.
-  - Include a target and benchmark for many active ships in one crowded system,
-    not only galaxy-wide totals.
-  - Measure single-thread behavior first, then scaling across worker counts and
-    batch layouts while requiring identical authoritative results.
-  - Establish evaluation, effect-buffer, deterministic-merge, and ownership
-    boundaries before adding concurrent execution or specialized storage.
-  - Context: [Concurrency and performance architecture](concurrency-and-performance.md)
+  - Begin implementation after `TASK-024` targets and benchmark contract are
+    accepted.
 
 - [ ] **TASK-010: Generalize presentation snapshots**
   - Replace fixture-specific presentation assumptions incrementally.
@@ -84,6 +61,8 @@ bottom; later tasks may be refined as earlier contracts become concrete.
     initial order.
   - Define destruction and despawn cleanup for cargo, reservations, orders,
     controllers, and pending events.
+  - Add entity navigation destinations after spatial-entity identity,
+    locatability, and invalidation behavior are authoritative.
   - Preserve deterministic identifier allocation and fact ordering.
 
 - [ ] **TASK-012: Define faction and relationship state**
@@ -175,6 +154,28 @@ prerequisites and desired behavior are sufficiently defined.
     reproducible failure traces.
   - Compare deterministic state and event digests across worker counts, batch
     sizes, and valid partition layouts.
+
+- [ ] **TASK-030: Define runtime connector availability and access**
+  - Define enabled state, actor-specific access requirements, and the authority
+    allowed to change either before adding mutable connector state.
+  - Define replan, wait, wake, failure, command, fact, and snapshot behavior for
+    changes before traversal begins and while transit is active.
+  - Begin only when a concrete gameplay system can own availability or access;
+    faction relationships in `TASK-012` and scripted behavior in `TASK-017`
+    may supply those requirements.
+  - Context: [Navigation and spatial architecture](navigation-architecture.md)
+
+- [ ] **TASK-031: Migrate Phase 1 logistics to hierarchical navigation**
+  - Define and approve an explicit mapping from legacy `LocationId` nodes to
+    systems, spatial entities, inventories, facilities, and connector
+    endpoints; do not infer it from the old route graph.
+  - Adapt logistics to request reachability and travel estimates without
+    selecting graph legs itself.
+  - Begin after `TASK-009` establishes orchestration ownership and `TASK-011`
+    establishes the required spatial-entity identities.
+  - Preserve the existing Phase 1 acceptance fingerprints until an explicitly
+    approved fixture migration changes them.
+  - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 ## Completed foundations
 
@@ -278,6 +279,20 @@ prerequisites and desired behavior are sufficiently defined.
     advancement. Presentation consumption remains in `TASK-010`, persistent
     scripts in `TASK-017`, and save boundaries in `TASK-014`.
   - Context: [Semantic game facts](semantic-game-facts.md)
+
+- [x] **TASK-028: Establish hierarchical system-space navigation**
+  - Added typed systems and local positions, position and system destinations,
+    `RouteId`-free deterministic planning, and authoritative scheduled local
+    motion.
+  - Added immutable directional connector topology, dedicated endpoint,
+    connection, and transit identities, deterministic multi-system planning,
+    scheduled emergence, and discriminated spatial snapshots.
+  - Cancellation and replacement are generation-safe; connector transit is
+    non-interruptible, and replacement orders wait and wake on emergence.
+  - Runtime connector availability and access remain in `TASK-030`; entity
+    destinations remain in `TASK-011`; Phase 1 migration remains in
+    `TASK-031`.
+  - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 - [x] **DONE-001: Establish the project vision and modular design documents**
   - The project defines a persistent, map-command, materially causal,

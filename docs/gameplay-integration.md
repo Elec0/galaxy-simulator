@@ -324,7 +324,7 @@ Normal movement should remain deterministic and scheduled by storing an
 authoritative motion segment rather than polling every ship at rendering
 frequency. Local movement and connector traversal compose as different travel
 legs. The Phase 1 graph remains a compatibility backend until its logistics and
-acceptance coverage can migrate deliberately.
+acceptance coverage can migrate deliberately through `TASK-031`.
 
 The complete contract and migration sequence are in
 [Navigation and spatial architecture](navigation-architecture.md).

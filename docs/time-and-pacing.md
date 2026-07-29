@@ -1,6 +1,6 @@
 # Time and pacing
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Economy](economy.md)
+[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Economy](economy.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md)
 
 ## Separate clocks
 
@@ -16,7 +16,9 @@ Computer performance determines how quickly simulation work can be calculated. I
 
 The player should be able to pause and select from multiple simulation speeds. If the computer cannot calculate a requested speed in real time, simulation time advances more slowly without changing the rules.
 
-The supported maximum speed remains a performance target to be established through benchmarking.
+The supported maximum speed remains a performance target to be established
+through `TASK-024`. The current proposal is documented in
+[Scale targets and benchmark architecture](scale-and-benchmark-targets.md).
 
 ## Pacing levers
 

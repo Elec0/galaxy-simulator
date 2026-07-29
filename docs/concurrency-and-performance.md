@@ -1,6 +1,6 @@
 # Concurrency and performance architecture
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Technical direction](technical-direction.md) · [Project task list](task-list.md)
+[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Technical direction](technical-direction.md) · [Project task list](task-list.md)
 
 ## Purpose
 
@@ -256,7 +256,10 @@ a deeply shared mutable object graph.
 ## Measurement and validation
 
 Performance work needs explicit scenarios rather than a single average frame
-rate. Initial benchmark shapes should include:
+rate. `TASK-024` defines the proposed counts, scenario contracts, measurements,
+and review decisions in
+[Scale targets and benchmark architecture](scale-and-benchmark-targets.md).
+Initial benchmark shapes should include:
 
 - Many quiet systems with modest populations
 - One crowded system containing most active ships
@@ -274,10 +277,12 @@ For each scenario, record:
 - Allocation rate, retained memory, and major collection/index sizes
 - Deterministic state and event digests
 
-Regression tests must run representative scenarios with different worker
-counts and batch layouts, then compare authoritative outputs. A parallel
+Fast regression tests must compare authoritative outputs across small,
+representative worker-count and batch-layout cases. Full reference and stress
+scenarios remain in the explicitly selected benchmark suite. A parallel
 implementation is not complete if it is merely faster in one configuration; it
-must also retain the single-thread result.
+must also retain the single-thread result. Timing remains informational in both
+paths; correctness disagreement is the enforced failure.
 
 ## Implementation sequence
 

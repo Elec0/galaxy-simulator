@@ -48,9 +48,11 @@ suspended, and terminal state. Replacement materializes local motion before
 starting the new leg.
 
 The Phase 1 transport graph remains isolated in its acceptance runtime and has
-not migrated to these contracts. Runtime connector availability and access,
-entity destinations, docking, and attachment remain later slices described
-below.
+not migrated to these contracts. Runtime connector availability and access
+remain in `TASK-030`; entity destinations begin with the lifecycle and
+spatial-entity identity work in `TASK-011`; and the deliberate Phase 1
+compatibility migration remains in `TASK-031`. Docking and attachment remain
+later spatial-state work described below.
 
 ## Design at a glance
 
@@ -437,6 +439,7 @@ scale target exists:
 6. Adapt Phase 1 logistics to request reachability and estimates without
    selecting graph legs itself. Preserve its existing deterministic acceptance
    fingerprints until an explicitly approved fixture migration.
+   **Tracked by `TASK-031` after `TASK-009` and `TASK-011`.**
 7. Replace Phase 1-specific location and route presentation with general
    system, spatial-entity, plan, and motion snapshots.
 

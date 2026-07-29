@@ -13,6 +13,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Actor control and order lifecycle](docs/actor-control-and-orders.md)
 - [Semantic game facts](docs/semantic-game-facts.md)
 - [Concurrency and performance architecture](docs/concurrency-and-performance.md)
+- [Scale targets and benchmark architecture](docs/scale-and-benchmark-targets.md)
 - [Economy and production](docs/economy.md)
 - [Factions and strategic behavior](docs/factions.md)
 - [Time and pacing](docs/time-and-pacing.md)
