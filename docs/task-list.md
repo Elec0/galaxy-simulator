@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -58,6 +58,9 @@ bottom; later tasks may be refined as earlier contracts become concrete.
     completion, and order cancellation.
   - Define bounded retention and consumption by UI, scripts, and development
     tools.
+  - Architecture accepted on 2026-07-28; implementation follows the typed,
+    deterministically ordered, bounded fact-stream contract.
+  - Context: [Semantic game facts](semantic-game-facts.md)
 
 - [ ] **TASK-009: Split Phase 1 runtime orchestration into explicit systems**
   - Separate production, construction, logistics, and order handling.

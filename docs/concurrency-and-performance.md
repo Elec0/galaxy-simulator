@@ -1,6 +1,6 @@
 # Concurrency and performance architecture
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Technical direction](technical-direction.md) · [Project task list](task-list.md)
+[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Technical direction](technical-direction.md) · [Project task list](task-list.md)
 
 ## Purpose
 

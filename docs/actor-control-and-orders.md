@@ -1,6 +1,6 @@
 # Actor control and order lifecycle
 
-[Project index](../README.md) · [Player experience](player-experience.md) · [Gameplay integration](gameplay-integration.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Project task list](task-list.md)
+[Project index](../README.md) · [Player experience](player-experience.md) · [Gameplay integration](gameplay-integration.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Semantic game facts](semantic-game-facts.md) · [Concurrency and performance](concurrency-and-performance.md) · [Project task list](task-list.md)
 
 ## Purpose
 
