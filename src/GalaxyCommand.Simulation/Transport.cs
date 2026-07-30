@@ -200,6 +200,41 @@ public sealed class TransportJob
     public SimulationTime? TransitionAt { get; internal set; }
 }
 
+public sealed record TransportAssignmentCandidate(
+    ShipId ShipId,
+    SupplyOfferId OfferId,
+    DemandRequestId DemandId,
+    DemandPriority Priority,
+    SimulationTime DemandCreatedAt,
+    SimulationDuration JourneyDuration,
+    Quantity Quantity);
+
+internal sealed class TransportAssignmentCandidateComparer :
+    IComparer<TransportAssignmentCandidate>
+{
+    public static readonly TransportAssignmentCandidateComparer Instance = new();
+
+    public int Compare(
+        TransportAssignmentCandidate? left,
+        TransportAssignmentCandidate? right)
+    {
+        if (ReferenceEquals(left, right)) return 0;
+        if (left is null) return -1;
+        if (right is null) return 1;
+
+        int result = right.Priority.CompareTo(left.Priority);
+        if (result != 0) return result;
+        result = left.DemandCreatedAt.CompareTo(right.DemandCreatedAt);
+        if (result != 0) return result;
+        result = left.JourneyDuration.CompareTo(right.JourneyDuration);
+        if (result != 0) return result;
+        result = right.Quantity.CompareTo(left.Quantity);
+        if (result != 0) return result;
+        result = left.DemandId.Value.CompareTo(right.DemandId.Value);
+        return result != 0 ? result : left.OfferId.Value.CompareTo(right.OfferId.Value);
+    }
+}
+
 public sealed class TransportIdSequences
 {
     private readonly IdSequence<SupplyOfferId> _offers = new();
@@ -257,6 +292,8 @@ public sealed class TransportBoard
     public DemandRequest? GetDemand(DemandRequestId demandId) => _demands.GetValueOrDefault(demandId);
     public TransportJob? GetJob(TransportJobId jobId) => _jobs.GetValueOrDefault(jobId);
     public IEnumerable<TransportJob> Jobs => _jobs.Values;
+    internal IEnumerable<SupplyOffer> Supplies => _supplies.Values;
+    internal IEnumerable<DemandRequest> Demands => _demands.Values;
 
     public Quantity OfferedQuantity(InventoryId inventoryId, MaterialId materialId) =>
         SumQuantities(_supplies.Values
@@ -301,10 +338,54 @@ public sealed class TransportBoard
             return null;
         }
 
-        Candidate? candidate = BestCandidate(freighter, inventories, navigation, cargoCapacity);
+        TransportAssignmentCandidate? candidate =
+            BestCandidate(freighter, inventories, navigation, cargoCapacity);
         return candidate is null
             ? null
             : CommitAssignment(candidate, ids, reservationIds, freighter, inventories, now);
+    }
+
+    internal TransportJobId? TryCommitAssignment(
+        TransportAssignmentCandidate candidate,
+        TransportIdSequences ids,
+        IdSequence<ReservationId> reservationIds,
+        Freighter freighter,
+        InventoryRegistry inventories,
+        SimulationTime now)
+    {
+        if (candidate.ShipId != freighter.ShipId || freighter.ActiveJobId is not null)
+        {
+            return null;
+        }
+
+        if (!_supplies.TryGetValue(candidate.OfferId, out SupplyOffer? supply)
+            || !_demands.TryGetValue(candidate.DemandId, out DemandRequest? demand)
+            || supply.MaterialId != demand.MaterialId)
+        {
+            return null;
+        }
+
+        Inventory source = inventories.Get(supply.InventoryId)
+            ?? throw new KeyNotFoundException($"Unknown inventory {supply.InventoryId}.");
+        Inventory cargo = inventories.Get(freighter.CargoInventoryId)
+            ?? throw new KeyNotFoundException($"Unknown inventory {freighter.CargoInventoryId}.");
+        Quantity quantity = candidate.Quantity
+            .Min(supply.Remaining)
+            .Min(demand.Remaining)
+            .Min(source.Available(supply.MaterialId))
+            .Min(cargo.RemainingCapacity);
+        if (quantity == Quantity.Zero)
+        {
+            return null;
+        }
+
+        return CommitAssignment(
+            candidate with { Quantity = quantity },
+            ids,
+            reservationIds,
+            freighter,
+            inventories,
+            now);
     }
 
     public bool StartOrRetry(
@@ -546,13 +627,13 @@ public sealed class TransportBoard
         return true;
     }
 
-    private Candidate? BestCandidate(
+    private TransportAssignmentCandidate? BestCandidate(
         Freighter freighter,
         InventoryRegistry inventories,
         INavigation navigation,
         Quantity cargoCapacity)
     {
-        Candidate? best = null;
+        TransportAssignmentCandidate? best = null;
         foreach (DemandRequest demand in _demands.Values.Where(d => d.Remaining > Quantity.Zero))
         {
             foreach (SupplyOffer supply in _supplies.Values.Where(s =>
@@ -576,14 +657,18 @@ public sealed class TransportBoard
                     continue;
                 }
 
-                var candidate = new Candidate(
+                var candidate = new TransportAssignmentCandidate(
+                    freighter.ShipId,
                     supply.Id,
                     demand.Id,
                     demand.Priority,
                     demand.CreatedAt,
                     toSource.TotalDuration.Add(toDestination.TotalDuration),
                     quantity);
-                if (best is null || CandidateComparer.Instance.Compare(candidate, best) < 0)
+                if (best is null
+                    || TransportAssignmentCandidateComparer.Instance.Compare(
+                        candidate,
+                        best) < 0)
                 {
                     best = candidate;
                 }
@@ -594,7 +679,7 @@ public sealed class TransportBoard
     }
 
     private TransportJobId CommitAssignment(
-        Candidate candidate,
+        TransportAssignmentCandidate candidate,
         TransportIdSequences ids,
         IdSequence<ReservationId> reservationIds,
         Freighter freighter,
@@ -823,34 +908,4 @@ public sealed class TransportBoard
         }
     }
 
-    private sealed record Candidate(
-        SupplyOfferId OfferId,
-        DemandRequestId DemandId,
-        DemandPriority Priority,
-        SimulationTime DemandCreatedAt,
-        SimulationDuration JourneyDuration,
-        Quantity Quantity);
-
-    private sealed class CandidateComparer : IComparer<Candidate>
-    {
-        public static readonly CandidateComparer Instance = new();
-
-        public int Compare(Candidate? left, Candidate? right)
-        {
-            if (ReferenceEquals(left, right)) return 0;
-            if (left is null) return -1;
-            if (right is null) return 1;
-
-            int result = right.Priority.CompareTo(left.Priority);
-            if (result != 0) return result;
-            result = left.DemandCreatedAt.CompareTo(right.DemandCreatedAt);
-            if (result != 0) return result;
-            result = left.JourneyDuration.CompareTo(right.JourneyDuration);
-            if (result != 0) return result;
-            result = right.Quantity.CompareTo(left.Quantity);
-            if (result != 0) return result;
-            result = left.DemandId.Value.CompareTo(right.DemandId.Value);
-            return result != 0 ? result : left.OfferId.Value.CompareTo(right.OfferId.Value);
-        }
-    }
 }

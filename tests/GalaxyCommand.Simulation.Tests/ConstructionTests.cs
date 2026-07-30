@@ -52,11 +52,15 @@ public sealed class ConstructionTests
                 new IdSequence<ReservationId>(),
                 inventory,
                 SimulationTime.Zero));
-        ConstructionOrder? materialized = null;
+        ConstructionMaterializationEffect materialization =
+            Assert.IsType<ConstructionMaterializationEffect>(
+                process.CompleteActive(completesAt));
         ConstructionOrder completed = Assert.IsType<ConstructionOrder>(
-            process.CompleteActive(completesAt, order => materialized = order));
+            process.GetCompletedOrder(orderId));
 
-        Assert.Same(completed, materialized);
+        Assert.Equal(facilityId, materialization.FacilityId);
+        Assert.Equal(orderId, materialization.OrderId);
+        Assert.Equal(design.Id, materialization.DesignId);
         Assert.Same(design, completed.Design);
         Assert.Equal(orderId, completed.Id);
         Assert.Equal(ConstructionOrderStatus.Completed, completed.Status);
@@ -92,7 +96,7 @@ public sealed class ConstructionTests
                 new IdSequence<ReservationId>(),
                 inventory,
                 SimulationTime.Zero));
-        process.CompleteActive(completesAt, _ => { });
+        process.CompleteActive(completesAt);
 
         Assert.Equal(firstOrder, process.GetCompletedOrder(firstOrder)?.Id);
         Assert.Equal(secondOrder, process.ActiveOrder?.Id);
@@ -113,7 +117,7 @@ public sealed class ConstructionTests
     }
 
     [Fact]
-    public void FailedProductMaterializationLeavesOrderRunning()
+    public void CompletionReturnsProductEffectWithoutMaterializingProduct()
     {
         FacilityId facilityId = new IdSequence<FacilityId>().Allocate();
         InventoryId inventoryId = new IdSequence<InventoryId>().Allocate();
@@ -134,14 +138,15 @@ public sealed class ConstructionTests
                 inventory,
                 SimulationTime.Zero));
 
-        Assert.Throws<InvalidOperationException>(() =>
-            process.CompleteActive(
-                completesAt,
-                _ => throw new InvalidOperationException("Product creation failed.")));
+        ConstructionMaterializationEffect materialization =
+            Assert.IsType<ConstructionMaterializationEffect>(
+                process.CompleteActive(completesAt));
 
-        Assert.Equal(orderId, process.ActiveOrder?.Id);
-        Assert.Equal(ConstructionOrderStatus.Running, process.ActiveOrder?.Status);
-        Assert.Null(process.GetCompletedOrder(orderId));
+        Assert.Equal(orderId, materialization.OrderId);
+        Assert.Null(process.ActiveOrder);
+        Assert.Equal(
+            ConstructionOrderStatus.Completed,
+            process.GetCompletedOrder(orderId)?.Status);
     }
 
     [Fact]
@@ -181,18 +186,14 @@ public sealed class ConstructionTests
                 new IdSequence<ReservationId>(),
                 inventory,
                 SimulationTime.Zero));
-        bool materialized = false;
-
         ScheduledEventDisposition disposition = process.CompleteScheduled(
             firstId,
             scheduledGeneration,
             completesAt,
-            _ => materialized = true,
-            out ConstructionOrder? completed);
+            out ConstructionMaterializationEffect? materialization);
 
         Assert.Equal(ScheduledEventDisposition.IgnoredStaleGeneration, disposition);
-        Assert.False(materialized);
-        Assert.Null(completed);
+        Assert.Null(materialization);
         Assert.Equal(ConstructionOrderStatus.Cancelled, first.Status);
         Assert.Equal(secondId, process.ActiveOrder?.Id);
         Assert.Equal(ConstructionOrderStatus.Running, process.ActiveOrder?.Status);

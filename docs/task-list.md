@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -13,19 +13,37 @@ rather than deleting them.
 
 ## Current focus
 
-The current architectural goal is to divide the Phase 1 runtime into explicit,
-parallel-ready owners without adding concurrent execution yet.
+The current architectural goal is to move the accepted economic behavior into
+reusable production systems and retire the monolithic `PhaseOneRuntime`.
+`PhaseOneScenario` remains a bounded acceptance harness over those systems.
 
-- [ ] **TASK-009: Split Phase 1 runtime orchestration into explicit systems**
-  - Separate production, construction, logistics, and order handling.
-  - Define system ownership, handled inputs, emitted facts, and deterministic
-    evaluation order.
+- [ ] **TASK-009: Establish production runtime systems and retire `PhaseOneRuntime`**
+  - Architecture accepted by the project owner on 2026-07-29; implementation
+    now covers production and construction readiness with immutable ordered
+    batches, typed reservation effects, deterministic commit, and completion
+    proposals; construction completion emits a typed materialization effect.
+  - Logistics publication and assignment now use typed proposals and complete
+    ranked candidate sets reduced in `ShipId` order. Transport advancement,
+    event handling, shared agenda commit, and actor-order alignment remain.
+  - A fixed economic coordinator now commits production, construction,
+    publication, and assignment in the accepted wave order and aggregates
+    per-domain measurements; persistent-runtime composition remains.
+  - Move production, product-neutral construction, logistics, and actor-order
+    handling behind reusable production owners.
+  - Keep Phase 1 fixture data, disruption controls, first-ship stopping,
+    reporting, fingerprints, and temporary ship materialization
+    acceptance-only.
+  - Define system ownership, handled inputs, current fact outputs, and
+    deterministic evaluation order; new economy facts remain in `TASK-032`.
   - Separate read/evaluate work from buffered effects and authoritative commit
     so independent batches can later execute concurrently.
   - Start with a fixed explicit dispatcher; do not add a dynamic plugin system
     without a demonstrated need.
   - Preserve the accepted `TASK-024` single-thread benchmark digests and expose
     per-domain measurement boundaries without enforcing timing.
+  - Remove `PhaseOneRuntime` after `PhaseOneScenario` delegates behavioral work
+    to the reusable composition.
+  - Context: [Runtime orchestration and domain ownership](runtime-orchestration.md)
 
 ## Near-term work
 
@@ -157,6 +175,15 @@ prerequisites and desired behavior are sufficiently defined.
   - Preserve the existing Phase 1 acceptance fingerprints until an explicitly
     approved fixture migration changes them.
   - Context: [Navigation and spatial architecture](navigation-architecture.md)
+
+- [ ] **TASK-032: Define semantic economy facts**
+  - Define gameplay-facing production, construction, and logistics lifecycle
+    facts after `TASK-009` establishes their commit owners.
+  - Coordinate construction completion with the entity-lifecycle contract from
+    `TASK-011`; do not expose Phase 1 diagnostic records as semantic facts.
+  - Preserve typed causes, deterministic proposal ordering, bounded retention,
+    and the existing distinction between facts and internal effects.
+  - Context: [Semantic game facts](semantic-game-facts.md) · [Runtime orchestration](runtime-orchestration.md)
 
 ## Completed foundations
 

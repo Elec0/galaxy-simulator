@@ -9,6 +9,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Vision and principles](docs/vision.md)
 - [Player experience](docs/player-experience.md)
 - [Simulation architecture](docs/simulation-architecture.md)
+- [Runtime orchestration and domain ownership](docs/runtime-orchestration.md)
 - [Navigation and spatial architecture](docs/navigation-architecture.md)
 - [Actor control and order lifecycle](docs/actor-control-and-orders.md)
 - [Semantic game facts](docs/semantic-game-facts.md)

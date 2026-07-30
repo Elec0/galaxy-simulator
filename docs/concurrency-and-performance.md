@@ -1,6 +1,6 @@
 # Concurrency and performance architecture
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Technical direction](technical-direction.md) · [Project task list](task-list.md)
+[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Technical direction](technical-direction.md) · [Project task list](task-list.md)
 
 ## Purpose
 
@@ -302,6 +302,10 @@ paths; correctness disagreement is the enforced failure.
    planning, or snapshot construction.
 8. Reconsider the global event agenda or storage model only if profiling shows
    that they have become limiting serial components.
+
+The concrete single-thread ownership and migration design for steps 3 and 4 is
+defined in
+[Runtime orchestration and domain ownership](runtime-orchestration.md).
 
 ## Decisions and deferred choices
 

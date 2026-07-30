@@ -169,6 +169,7 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
     private readonly IdSequence<CapacityReservationId> _capacityReservationIds;
     private readonly IdSequence<ShipId> _shipIds;
     private readonly IdSequence<InventoryId> _inventoryIds;
+    private readonly EconomicRuntimeCoordinator _economicCoordinator;
     private readonly RouteId _mineToRefineryRoute;
     private readonly MaterialId[] _knownMaterials;
     private readonly SortedDictionary<LocationId, string> _locationNames;
@@ -201,6 +202,28 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
         _inventoryIds = _world.InventoryIds;
         _locationNames = _world.LocationNames;
         _shipyard = fixture.Shipyard;
+        var constructionProcesses = new SortedDictionary<FacilityId, ConstructionProcess>(
+            EntityIdComparer<FacilityId>.Instance)
+        {
+            [_shipyard.FacilityId] = _shipyard.Process,
+        };
+        var constructionLocations = new SortedDictionary<FacilityId, LocationId>(
+            EntityIdComparer<FacilityId>.Instance)
+        {
+            [_shipyard.FacilityId] = _shipyard.LocationId,
+        };
+        _economicCoordinator = new EconomicRuntimeCoordinator(
+            _productionLines,
+            _productionOutputs,
+            _facilityLocations,
+            constructionProcesses,
+            constructionLocations,
+            _inventories,
+            _transportBoard,
+            _ships,
+            _navigation,
+            _transportIds,
+            _reservationIds);
         _mineToRefineryRoute = fixture.MineToRefineryRoute;
         _knownMaterials = fixture.KnownMaterials;
         _engine = new SimulationEngine<PhaseOneEvent>(this, _agenda);
@@ -429,27 +452,24 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
                 return productionDisposition;
 
             case PhaseOneEvent.ConstructionComplete construction:
-                if (construction.FacilityId != _shipyard.FacilityId)
+                ConstructionCompletionCommitResult constructionCommit =
+                    _economicCoordinator.CommitConstructionCompletion(
+                        construction.FacilityId,
+                        construction.OrderId,
+                        scheduled.Generation,
+                        now);
+                if (constructionCommit.Materialization is { } materialization)
                 {
-                    return ScheduledEventDisposition.IgnoredMissingReference;
+                    _constructedShipId = PhaseOneShipMaterializer.Materialize(
+                        materialization,
+                        _shipyard,
+                        _shipIds,
+                        _inventoryIds,
+                        _inventories,
+                        _ships);
                 }
 
-                ScheduledEventDisposition constructionDisposition =
-                    _shipyard.CompleteScheduled(
-                    construction.OrderId,
-                    scheduled.Generation,
-                    _shipIds,
-                    _inventoryIds,
-                    _inventories,
-                    _ships,
-                    now,
-                    out ShipId? constructedShipId);
-                if (constructionDisposition == ScheduledEventDisposition.Applied)
-                {
-                    _constructedShipId = constructedShipId;
-                }
-
-                return constructionDisposition;
+                return constructionCommit.Disposition;
 
             case PhaseOneEvent.RouteEnabled route:
                 _navigation.SetRouteEnabled(route.RouteId, route.Enabled);
@@ -462,154 +482,76 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
 
     private void Reconcile(SimulationTime now)
     {
-        PrepareProduction(now);
-        PrepareShipyard(now);
-        PublishDemands(now);
-        PublishSupplies();
-        AssignAndRetryFreighters(now);
+        EconomicReconciliationResult reconciliation =
+            _economicCoordinator.Reconcile(now);
+        RecordProductionCommit(reconciliation.Production.Commit);
+        RecordConstructionCommit(reconciliation.Construction.Commit);
+        AssignAndRetryFreighters(now, reconciliation.Assignment.Commit);
     }
 
-    private void PrepareProduction(SimulationTime now)
+    private void RecordProductionCommit(ProductionCommitResult commit)
     {
-        foreach ((FacilityId facilityId, ProductionLine line) in _productionLines)
-        {
-            Inventory inventory = GetInventory(line.InventoryId);
-            IReadOnlyDictionary<MaterialId, Quantity> inputs = line.ActiveJob?.Recipe.Inputs
-                ?? new Dictionary<MaterialId, Quantity>();
-            if (line.PrepareActive(_reservationIds, inventory, now) is not { } completesAt)
-            {
-                continue;
-            }
-
-            foreach ((MaterialId materialId, Quantity quantity) in inputs)
-            {
-                IncrementQuantity(
-                    _metrics.ConsumedMutable,
-                    (facilityId, materialId),
-                    quantity);
-            }
-
-            ProductionJob activeJob = line.ActiveJob
-                ?? throw new InvalidOperationException(
-                    $"Production facility {facilityId} started without an active job.");
-            _agenda.Schedule(
-                completesAt,
-                EventPhase.PhysicalCompletion,
-                activeJob.Generation,
-                new PhaseOneEvent.ProductionComplete(
-                    facilityId,
-                    activeJob.Id));
-        }
-    }
-
-    private void PrepareShipyard(SimulationTime now)
-    {
-        if (_shipyard.ActiveOrder is not { } activeOrder)
-        {
-            return;
-        }
-
-        Inventory inventory = GetInventory(_shipyard.InventoryId);
-        IReadOnlyDictionary<MaterialId, Quantity> inputs = activeOrder.Design.Recipe.Inputs;
-        if (_shipyard.PrepareActive(_reservationIds, inventory, now) is not { } completesAt)
-        {
-            return;
-        }
-
-        foreach ((MaterialId materialId, Quantity quantity) in inputs)
+        foreach (ProductionInputConsumption input in commit.ConsumedInputs)
         {
             IncrementQuantity(
                 _metrics.ConsumedMutable,
-                (_shipyard.FacilityId, materialId),
-                quantity);
+                (input.FacilityId, input.MaterialId),
+                input.Quantity);
         }
 
-        _agenda.Schedule(
-            completesAt,
-            EventPhase.PhysicalCompletion,
-            activeOrder.Generation,
-            new PhaseOneEvent.ConstructionComplete(
-                _shipyard.FacilityId,
-                activeOrder.Id));
-    }
-
-    private void PublishDemands(SimulationTime now)
-    {
-        var requirements = new List<(InventoryId, LocationId, MaterialId, Quantity)>();
-        foreach ((FacilityId facilityId, ProductionLine line) in _productionLines)
+        foreach (ProductionCompletionProposal completion in commit.CompletionProposals)
         {
-            Inventory inventory = GetInventory(line.InventoryId);
-            LocationId location = _facilityLocations[facilityId];
-            foreach ((MaterialId materialId, Quantity quantity) in line.UnmetInputs(inventory))
-            {
-                requirements.Add((line.InventoryId, location, materialId, quantity));
-            }
-        }
-
-        Inventory shipyardInventory = GetInventory(_shipyard.InventoryId);
-        foreach ((MaterialId materialId, Quantity quantity) in _shipyard.UnmetInputs(shipyardInventory))
-        {
-            requirements.Add((_shipyard.InventoryId, _shipyard.LocationId, materialId, quantity));
-        }
-
-        foreach ((InventoryId inventoryId, LocationId location, MaterialId material, Quantity required)
-            in requirements)
-        {
-            Quantity pending = _transportBoard.PendingDeliveryQuantity(inventoryId, material);
-            if (required > pending)
-            {
-                _transportBoard.PublishDemand(
-                    _transportIds,
-                    inventoryId,
-                    location,
-                    material,
-                    required.Subtract(pending),
-                    new DemandPriority(1),
-                    now);
-            }
+            _agenda.Schedule(
+                completion.Timestamp,
+                EventPhase.PhysicalCompletion,
+                completion.Generation,
+                new PhaseOneEvent.ProductionComplete(
+                    completion.FacilityId,
+                    completion.JobId));
         }
     }
 
-    private void PublishSupplies()
+    private void RecordConstructionCommit(ConstructionCommitResult commit)
     {
-        foreach ((FacilityId facilityId, MaterialId material) in _productionOutputs)
+        foreach (ConstructionInputConsumption input in commit.ConsumedInputs)
         {
-            ProductionLine line = _productionLines[facilityId];
-            Inventory inventory = GetInventory(line.InventoryId);
-            Quantity available = inventory.Available(material);
-            Quantity offered = _transportBoard.OfferedQuantity(line.InventoryId, material);
-            if (available > offered)
-            {
-                _transportBoard.PublishSupply(
-                    _transportIds,
-                    line.InventoryId,
-                    _facilityLocations[facilityId],
-                    material,
-                    available.Subtract(offered));
-            }
+            IncrementQuantity(
+                _metrics.ConsumedMutable,
+                (input.FacilityId, input.MaterialId),
+                input.Quantity);
+        }
+
+        foreach (ConstructionCompletionProposal completion in commit.CompletionProposals)
+        {
+            _agenda.Schedule(
+                completion.Timestamp,
+                EventPhase.PhysicalCompletion,
+                completion.Generation,
+                new PhaseOneEvent.ConstructionComplete(
+                    completion.FacilityId,
+                    completion.OrderId));
         }
     }
 
-    private void AssignAndRetryFreighters(SimulationTime now)
+    private void AssignAndRetryFreighters(
+        SimulationTime now,
+        LogisticsAssignmentCommitResult assignmentCommit)
     {
+        Dictionary<ShipId, TransportJobId> assignedByShip =
+            assignmentCommit.Assignments.ToDictionary(
+                assignment => assignment.ShipId,
+                assignment => assignment.JobId);
+
         foreach (ShipId shipId in _ships.FreighterIds.ToArray())
         {
             Freighter freighter = _ships.GetFreighter(shipId)
                 ?? throw new KeyNotFoundException($"Missing freighter {shipId}.");
-            TransportJobId? existingJobId = freighter.ActiveJobId;
-            TransportJobId? jobId = existingJobId ?? _transportBoard.AssignBest(
-                _transportIds,
-                _reservationIds,
-                freighter,
-                _inventories,
-                _navigation,
-                now);
-            if (jobId is not { } assignedJobId)
+            if (freighter.ActiveJobId is not { } assignedJobId)
             {
                 continue;
             }
 
-            if (existingJobId is null)
+            if (assignedByShip.ContainsKey(shipId))
             {
                 _metrics.TransportJobsCreated = checked(_metrics.TransportJobsCreated + 1);
                 _decisionRecords.Add(new DecisionRecord(

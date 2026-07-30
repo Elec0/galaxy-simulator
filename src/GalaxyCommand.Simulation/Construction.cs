@@ -84,6 +84,11 @@ public enum ConstructionOrderStatus
     Cancelled,
 }
 
+public sealed record ConstructionMaterializationEffect(
+    FacilityId FacilityId,
+    ConstructionOrderId OrderId,
+    ConstructionDesignId DesignId);
+
 /// <summary>
 /// Product-neutral runtime state for one finite construction request.
 /// </summary>
@@ -263,6 +268,79 @@ public sealed class ConstructionProcess
             order.AddReservation(materialId, reservationId);
         }
 
+        return StartPrepared(inventory, now);
+    }
+
+    internal bool MatchesActivePreparation(
+        ConstructionOrderId orderId,
+        EventGeneration generation) =>
+        ActiveOrder is
+        {
+            Status: ConstructionOrderStatus.WaitingForInputs,
+        } order
+        && order.Id == orderId
+        && order.Generation == generation;
+
+    internal Quantity MissingInput(Inventory inventory, MaterialId materialId)
+    {
+        RequireConfiguredInventory(inventory);
+        if (ActiveOrder is not
+            {
+                Status: ConstructionOrderStatus.WaitingForInputs,
+            } order
+            || !order.Design.Recipe.Inputs.TryGetValue(materialId, out Quantity required))
+        {
+            return Quantity.Zero;
+        }
+
+        return required.Subtract(order.ReservedInput(inventory, materialId));
+    }
+
+    internal void GrantInputReservation(
+        IdSequence<ReservationId> reservationIds,
+        Inventory inventory,
+        MaterialId materialId,
+        Quantity quantity)
+    {
+        RequireConfiguredInventory(inventory);
+        if (ActiveOrder is not
+            {
+                Status: ConstructionOrderStatus.WaitingForInputs,
+            } order)
+        {
+            throw new InvalidOperationException(
+                $"Construction facility {FacilityId} has no order waiting for inputs.");
+        }
+
+        Quantity missing = MissingInput(inventory, materialId);
+        if (quantity == Quantity.Zero || quantity > missing)
+        {
+            throw new InvalidOperationException(
+                $"Construction order {order.Id} cannot reserve {quantity.Units} units of material {materialId}; {missing.Units} units are missing.");
+        }
+
+        ReservationId reservationId = reservationIds.Allocate();
+        inventory.Reserve(
+            reservationId,
+            materialId,
+            quantity,
+            new ReservationOwner.ConstructionOrder(order.Id));
+        order.AddReservation(materialId, reservationId);
+    }
+
+    internal SimulationTime? StartPrepared(
+        Inventory inventory,
+        SimulationTime now)
+    {
+        RequireConfiguredInventory(inventory);
+        if (ActiveOrder is not
+            {
+                Status: ConstructionOrderStatus.WaitingForInputs,
+            } order)
+        {
+            return null;
+        }
+
         bool allReserved = order.Design.Recipe.Inputs.All(input =>
             order.ReservedInput(inventory, input.Key) == input.Value);
         if (!allReserved)
@@ -281,11 +359,8 @@ public sealed class ConstructionProcess
         return completesAt;
     }
 
-    public ConstructionOrder? CompleteActive(
-        SimulationTime now,
-        Action<ConstructionOrder> materializeProduct)
+    public ConstructionMaterializationEffect? CompleteActive(SimulationTime now)
     {
-        ArgumentNullException.ThrowIfNull(materializeProduct);
         if (ActiveOrder is not
             {
                 Status: ConstructionOrderStatus.Running,
@@ -296,7 +371,6 @@ public sealed class ConstructionProcess
             return null;
         }
 
-        materializeProduct(order);
         ActiveOrder = null;
         order.Status = ConstructionOrderStatus.Completed;
         _completed.Add(order.Id, order);
@@ -305,18 +379,19 @@ public sealed class ConstructionProcess
             ActiveOrder = next;
         }
 
-        return order;
+        return new ConstructionMaterializationEffect(
+            FacilityId,
+            order.Id,
+            order.DesignId);
     }
 
     public ScheduledEventDisposition CompleteScheduled(
         ConstructionOrderId orderId,
         EventGeneration generation,
         SimulationTime now,
-        Action<ConstructionOrder> materializeProduct,
-        out ConstructionOrder? completed)
+        out ConstructionMaterializationEffect? materialization)
     {
-        ArgumentNullException.ThrowIfNull(materializeProduct);
-        completed = null;
+        materialization = null;
         if (GetOrder(orderId) is not { } order)
         {
             return ScheduledEventDisposition.IgnoredMissingReference;
@@ -334,7 +409,7 @@ public sealed class ConstructionProcess
             return ScheduledEventDisposition.IgnoredStateMismatch;
         }
 
-        completed = CompleteActive(now, materializeProduct);
+        materialization = CompleteActive(now);
         return ScheduledEventDisposition.Applied;
     }
 

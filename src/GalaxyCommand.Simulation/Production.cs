@@ -244,6 +244,79 @@ public sealed class ProductionLine
             job.AddReservation(materialId, reservationId);
         }
 
+        return StartPrepared(inventory, now);
+    }
+
+    internal bool MatchesActivePreparation(
+        ProductionJobId jobId,
+        EventGeneration generation) =>
+        ActiveJob is
+        {
+            Status: ProductionJobStatus.WaitingForInputs,
+        } job
+        && job.Id == jobId
+        && job.Generation == generation;
+
+    internal Quantity MissingInput(Inventory inventory, MaterialId materialId)
+    {
+        RequireConfiguredInventory(inventory);
+        if (ActiveJob is not
+            {
+                Status: ProductionJobStatus.WaitingForInputs,
+            } job
+            || !job.Recipe.Inputs.TryGetValue(materialId, out Quantity required))
+        {
+            return Quantity.Zero;
+        }
+
+        return required.Subtract(job.ReservedInput(inventory, materialId));
+    }
+
+    internal void GrantInputReservation(
+        IdSequence<ReservationId> reservationIds,
+        Inventory inventory,
+        MaterialId materialId,
+        Quantity quantity)
+    {
+        RequireConfiguredInventory(inventory);
+        if (ActiveJob is not
+            {
+                Status: ProductionJobStatus.WaitingForInputs,
+            } job)
+        {
+            throw new InvalidOperationException(
+                $"Production facility {FacilityId} has no job waiting for inputs.");
+        }
+
+        Quantity missing = MissingInput(inventory, materialId);
+        if (quantity == Quantity.Zero || quantity > missing)
+        {
+            throw new InvalidOperationException(
+                $"Production job {job.Id} cannot reserve {quantity.Units} units of material {materialId}; {missing.Units} units are missing.");
+        }
+
+        ReservationId reservationId = reservationIds.Allocate();
+        inventory.Reserve(
+            reservationId,
+            materialId,
+            quantity,
+            new ReservationOwner.ProductionJob(job.Id));
+        job.AddReservation(materialId, reservationId);
+    }
+
+    internal SimulationTime? StartPrepared(
+        Inventory inventory,
+        SimulationTime now)
+    {
+        RequireConfiguredInventory(inventory);
+        if (ActiveJob is not
+            {
+                Status: ProductionJobStatus.WaitingForInputs,
+            } job)
+        {
+            return null;
+        }
+
         bool allReserved = job.Recipe.Inputs.All(input =>
             job.ReservedInput(inventory, input.Key) == input.Value);
         if (!allReserved)

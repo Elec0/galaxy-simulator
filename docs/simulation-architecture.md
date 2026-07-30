@@ -1,6 +1,6 @@
 # Simulation architecture
 
-[Project index](../README.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Concurrency and performance](concurrency-and-performance.md) · [Technical direction](technical-direction.md) · [Time and pacing](time-and-pacing.md)
+[Project index](../README.md) · [Runtime orchestration](runtime-orchestration.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Concurrency and performance](concurrency-and-performance.md) · [Technical direction](technical-direction.md) · [Time and pacing](time-and-pacing.md)
 
 ## Goals
 
@@ -62,6 +62,12 @@ flowchart LR
 
 Additional bounded fixtures belong under `Acceptance/`; they do not define the
 lifecycle or API of a normal game session.
+
+`TASK-009` replaces the combined `PhaseOneRuntime` with reusable production
+domain owners beneath a fixed coordinator. The Phase 1 scenario keeps only its
+fixture, stop rule, reports, and regression fingerprints. See
+[Runtime orchestration and domain ownership](runtime-orchestration.md) for the
+accepted target and migration sequence.
 
 ### Physical and logistical activity
 

@@ -30,6 +30,8 @@ public sealed class Shipyard
 
     public InventoryId InventoryId => _construction.InventoryId;
 
+    internal ConstructionProcess Process => _construction;
+
     public ConstructionOrder? ActiveOrder => _construction.ActiveOrder;
 
     public int QueuedOrderCount => _construction.QueuedOrderCount;
@@ -64,35 +66,16 @@ public sealed class Shipyard
         ShipRegistry ships,
         SimulationTime now)
     {
-        ShipId? constructedShipId = null;
-        ConstructionOrder? completed = _construction.CompleteActive(
-            now,
-            order =>
-            {
-                if (order.Design is not ShipDesign design)
-                {
-                    throw new InvalidOperationException(
-                        $"Shipyard cannot materialize construction design {order.Design.Id}.");
-                }
-
-                ShipId shipId = shipIds.Allocate();
-                InventoryId cargoInventoryId = inventoryIds.Allocate();
-                inventories.Add(new Inventory(cargoInventoryId, design.CargoCapacity));
-                ships.AddFreighter(new Ship(
-                    shipId,
-                    OrganizationId,
-                    design.Id,
-                    LocationId,
-                    cargoInventoryId));
-                _constructedShips.Add(order.Id, shipId);
-                constructedShipId = shipId;
-            });
-
-        return completed is null
+        ConstructionMaterializationEffect? materialization =
+            _construction.CompleteActive(now);
+        return materialization is null
             ? null
-            : constructedShipId
-                ?? throw new InvalidOperationException(
-                    $"Construction order {completed.Id} completed without creating a ship.");
+            : MaterializeShip(
+                materialization,
+                shipIds,
+                inventoryIds,
+                inventories,
+                ships);
     }
 
     public ScheduledEventDisposition CompleteScheduled(
@@ -105,37 +88,60 @@ public sealed class Shipyard
         SimulationTime now,
         out ShipId? constructedShipId)
     {
-        ShipId? materializedShipId = null;
         ScheduledEventDisposition disposition = _construction.CompleteScheduled(
             orderId,
             generation,
             now,
-            order =>
-            {
-                if (order.Design is not ShipDesign design)
-                {
-                    throw new InvalidOperationException(
-                        $"Shipyard cannot materialize construction design {order.Design.Id}.");
-                }
-
-                ShipId shipId = shipIds.Allocate();
-                InventoryId cargoInventoryId = inventoryIds.Allocate();
-                inventories.Add(new Inventory(cargoInventoryId, design.CargoCapacity));
-                ships.AddFreighter(new Ship(
-                    shipId,
-                    OrganizationId,
-                    design.Id,
-                    LocationId,
-                    cargoInventoryId));
-                _constructedShips.Add(order.Id, shipId);
-                materializedShipId = shipId;
-            },
-            out ConstructionOrder? completed);
-        constructedShipId = completed is null
+            out ConstructionMaterializationEffect? materialization);
+        constructedShipId = materialization is null
             ? null
-            : materializedShipId
-                ?? throw new InvalidOperationException(
-                    $"Construction order {completed.Id} completed without creating a ship.");
+            : MaterializeShip(
+                materialization,
+                shipIds,
+                inventoryIds,
+                inventories,
+                ships);
         return disposition;
+    }
+
+    internal void RecordConstructedShip(
+        ConstructionOrderId orderId,
+        ShipId shipId) =>
+        _constructedShips.Add(orderId, shipId);
+
+    private ShipId MaterializeShip(
+        ConstructionMaterializationEffect materialization,
+        IdSequence<ShipId> shipIds,
+        IdSequence<InventoryId> inventoryIds,
+        InventoryRegistry inventories,
+        ShipRegistry ships)
+    {
+        if (materialization.FacilityId != FacilityId)
+        {
+            throw new InvalidOperationException(
+                $"Shipyard {FacilityId} cannot materialize an effect for facility {materialization.FacilityId}.");
+        }
+
+        ConstructionOrder order = GetCompletedOrder(materialization.OrderId)
+            ?? throw new InvalidOperationException(
+                $"Construction order {materialization.OrderId} has not completed.");
+        if (order.DesignId != materialization.DesignId
+            || order.Design is not ShipDesign design)
+        {
+            throw new InvalidOperationException(
+                $"Shipyard cannot materialize construction design {materialization.DesignId}.");
+        }
+
+        ShipId shipId = shipIds.Allocate();
+        InventoryId cargoInventoryId = inventoryIds.Allocate();
+        inventories.Add(new Inventory(cargoInventoryId, design.CargoCapacity));
+        ships.AddFreighter(new Ship(
+            shipId,
+            OrganizationId,
+            design.Id,
+            LocationId,
+            cargoInventoryId));
+        RecordConstructedShip(order.Id, shipId);
+        return shipId;
     }
 }

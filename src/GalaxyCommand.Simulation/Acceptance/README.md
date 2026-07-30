@@ -10,5 +10,9 @@ stopping conditions, and exact regression fingerprints. They do not expose the
 mutable live world; those affordances remain test infrastructure rather than
 the application-facing gameplay API.
 
+Phase 1 also owns the temporary ship materializer that consumes reusable
+construction completion effects. Production entity materialization remains
+deferred to `TASK-011`.
+
 Godot and other gameplay callers use `GameSession`. The CLI may run an
 acceptance harness explicitly when a repeatable end-to-end proof is desired.

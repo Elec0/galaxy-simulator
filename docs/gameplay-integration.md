@@ -1,6 +1,6 @@
 # Gameplay integration issues and decisions
 
-[Project index](../README.md) · [Project task list](task-list.md) · [Simulation architecture](simulation-architecture.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Concurrency and performance](concurrency-and-performance.md) · [Technical direction](technical-direction.md) · [Initial roadmap](roadmap.md)
+[Project index](../README.md) · [Project task list](task-list.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Concurrency and performance](concurrency-and-performance.md) · [Technical direction](technical-direction.md) · [Initial roadmap](roadmap.md)
 
 This document tracks architectural work needed to turn the current deterministic
 simulation into an interactive game that can support player commands, dialogue,
@@ -245,7 +245,12 @@ or general-purpose event bus is not required.
 Each system boundary should also define stable read inputs, independently
 batchable evaluation work, buffered effects, and deterministic commit rules.
 This permits later concurrent execution without allowing worker scheduling or
-lock acquisition to determine simulation results. The full contract is in
+lock acquisition to determine simulation results. `TASK-009` also removes
+`PhaseOneRuntime`: Phase 1 remains a bounded acceptance composition over the
+same reusable economic systems used by production. The detailed ownership,
+wave, effect, commit, and migration contract is in
+[Runtime orchestration and domain ownership](runtime-orchestration.md); the
+project-wide parallelism contract remains in
 [Concurrency and performance architecture](concurrency-and-performance.md).
 
 ### 2.6 Complete cancellation and invalidation behavior
