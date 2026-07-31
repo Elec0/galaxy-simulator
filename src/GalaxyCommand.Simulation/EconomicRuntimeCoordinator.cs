@@ -6,17 +6,20 @@ public sealed class EconomicReconciliationResult
         ProductionReconciliationResult production,
         ConstructionReconciliationResult construction,
         LogisticsPublicationReconciliationResult publication,
-        LogisticsAssignmentReconciliationResult assignment)
+        LogisticsAssignmentReconciliationResult assignment,
+        TransportAdvanceReconciliationResult transportAdvance)
     {
         Production = production;
         Construction = construction;
         Publication = publication;
         Assignment = assignment;
+        TransportAdvance = transportAdvance;
         Measurements = Array.AsReadOnly(
             production.Measurements
                 .Concat(construction.Measurements)
                 .Concat(publication.Measurements)
                 .Concat(assignment.Measurements)
+                .Concat(transportAdvance.Measurements)
                 .ToArray());
     }
 
@@ -28,22 +31,27 @@ public sealed class EconomicReconciliationResult
 
     public LogisticsAssignmentReconciliationResult Assignment { get; }
 
+    public TransportAdvanceReconciliationResult TransportAdvance { get; }
+
     public IReadOnlyList<RuntimeMeasurement> Measurements { get; }
 }
 
 /// <summary>
 /// Fixed single-thread economic coordinator. It runs explicit production,
-/// construction, publication, and assignment waves with commit between waves.
+/// construction, publication, assignment, and transport-advance waves with
+/// commit between waves.
 /// </summary>
 public sealed class EconomicRuntimeCoordinator
 {
     private readonly ConstructionSystem _construction = new();
+    private readonly IdSequence<CapacityReservationId> _capacityReservationIds;
     private readonly IReadOnlyDictionary<FacilityId, LocationId> _constructionLocations;
     private readonly IReadOnlyDictionary<FacilityId, ConstructionProcess> _constructionProcesses;
     private readonly InventoryRegistry _inventories;
     private readonly LogisticsSystem _logistics = new();
     private readonly INavigation _navigation;
     private readonly IReadOnlyDictionary<FacilityId, LocationId> _productionLocations;
+    private readonly ProductionIdSequences _productionIds;
     private readonly IReadOnlyDictionary<FacilityId, ProductionLine> _productionLines;
     private readonly IReadOnlyDictionary<FacilityId, MaterialId> _productionOutputs;
     private readonly ProductionSystem _production = new();
@@ -51,6 +59,7 @@ public sealed class EconomicRuntimeCoordinator
     private readonly ShipRegistry _ships;
     private readonly TransportBoard _transportBoard;
     private readonly TransportIdSequences _transportIds;
+    private readonly TransportSystem _transport = new();
 
     public EconomicRuntimeCoordinator(
         IReadOnlyDictionary<FacilityId, ProductionLine> productionLines,
@@ -62,8 +71,10 @@ public sealed class EconomicRuntimeCoordinator
         TransportBoard transportBoard,
         ShipRegistry ships,
         INavigation navigation,
+        ProductionIdSequences productionIds,
         TransportIdSequences transportIds,
-        IdSequence<ReservationId> reservationIds)
+        IdSequence<ReservationId> reservationIds,
+        IdSequence<CapacityReservationId> capacityReservationIds)
     {
         _productionLines = productionLines
             ?? throw new ArgumentNullException(nameof(productionLines));
@@ -83,14 +94,20 @@ public sealed class EconomicRuntimeCoordinator
             ?? throw new ArgumentNullException(nameof(ships));
         _navigation = navigation
             ?? throw new ArgumentNullException(nameof(navigation));
+        _productionIds = productionIds
+            ?? throw new ArgumentNullException(nameof(productionIds));
         _transportIds = transportIds
             ?? throw new ArgumentNullException(nameof(transportIds));
         _reservationIds = reservationIds
             ?? throw new ArgumentNullException(nameof(reservationIds));
+        _capacityReservationIds = capacityReservationIds
+            ?? throw new ArgumentNullException(nameof(capacityReservationIds));
         ValidateConfiguration();
     }
 
-    public EconomicReconciliationResult Reconcile(SimulationTime now)
+    public EconomicReconciliationResult Reconcile(
+        SimulationTime now,
+        TransportTiming transportTiming)
     {
         ProductionReconciliationResult production = _production.Reconcile(
             _productionLines,
@@ -119,11 +136,21 @@ public sealed class EconomicRuntimeCoordinator
                 _inventories,
                 _navigation,
                 now);
+        TransportAdvanceReconciliationResult transportAdvance =
+            _transport.Reconcile(
+                _transportBoard,
+                _ships,
+                _inventories,
+                _capacityReservationIds,
+                _navigation,
+                transportTiming,
+                now);
         return new EconomicReconciliationResult(
             production,
             construction,
             publication,
-            assignment);
+            assignment,
+            transportAdvance);
     }
 
     public ConstructionCompletionCommitResult CommitConstructionCompletion(
@@ -137,6 +164,65 @@ public sealed class EconomicRuntimeCoordinator
             orderId,
             generation,
             now);
+
+    public ProductionCompletionCommitResult CommitProductionCompletion(
+        FacilityId facilityId,
+        ProductionJobId jobId,
+        EventGeneration generation,
+        SimulationTime now) =>
+        ProductionSystem.CommitCompletion(
+            _productionLines,
+            _productionIds,
+            _inventories,
+            facilityId,
+            jobId,
+            generation,
+            now);
+
+    public TransportEventReconciliationResult HandleTransportEvent(
+        TransportEvent transportEvent,
+        TransportTiming transportTiming,
+        SimulationTime now)
+    {
+        ArgumentNullException.ThrowIfNull(transportEvent);
+        TransportJob? job = _transportBoard.GetJob(transportEvent.JobId);
+        Freighter? freighter = job is null
+            ? null
+            : _ships.GetFreighter(job.ShipId);
+        TransportEventCoreCommit core = _transportBoard.CommitEventCore(
+            transportEvent,
+            freighter,
+            _inventories,
+            _navigation,
+            now);
+        if (core.Disposition != ScheduledEventDisposition.Applied
+            || core.ContinuationTarget is not { } target
+            || freighter is null)
+        {
+            return new TransportEventReconciliationResult(
+                core.Disposition,
+                new TransportAdvanceCommitResult([], 0));
+        }
+
+        TransportAdvanceEvaluation evaluation =
+            TransportSystem.EvaluateContinuation(
+                _transportBoard,
+                freighter,
+                _inventories,
+                target,
+                _navigation,
+                transportTiming,
+                now);
+        TransportAdvanceCommitResult continuation = _transport.Commit(
+            evaluation,
+            _transportBoard,
+            _ships,
+            _inventories,
+            _capacityReservationIds);
+        return new TransportEventReconciliationResult(
+            core.Disposition,
+            continuation);
+    }
 
     private IEnumerable<LogisticsDemandPublicationRead> CreateDemandReads()
     {

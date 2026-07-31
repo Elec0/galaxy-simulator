@@ -388,6 +388,114 @@ public sealed class TransportBoard
             now);
     }
 
+    internal TransportAdvanceCommit? CommitAdvance(
+        TransportAdvanceEffect effect,
+        Freighter? freighter,
+        InventoryRegistry inventories,
+        IdSequence<CapacityReservationId> capacityReservationIds)
+    {
+        if (GetJob(effect.JobId) is not { } job
+            || freighter is null
+            || job.ShipId != effect.ShipId
+            || freighter.ShipId != effect.ShipId
+            || freighter.ActiveJobId != job.Id
+            || job.Generation != effect.Generation
+            || job.Status != effect.ExpectedStatus
+            || freighter.LocationId != effect.ExpectedLocationId)
+        {
+            return null;
+        }
+
+        TransportJobStatus before = job.Status;
+        TransportEventProposal? eventProposal = null;
+        switch (effect)
+        {
+            case TransportAdvanceEffect.WaitForRoute wait:
+                SetJobState(
+                    job,
+                    wait.Target == TravelTarget.Source
+                        ? TransportJobStatus.WaitingForRouteToSource
+                        : TransportJobStatus.WaitingForRouteToDestination);
+                break;
+
+            case TransportAdvanceEffect.Travel travel:
+                SetJobState(
+                    job,
+                    travel.Target == TravelTarget.Source
+                        ? TransportJobStatus.TravelingToSource
+                        : TransportJobStatus.TravelingToDestination,
+                    travel.RouteId,
+                    travel.ArrivesAt);
+                eventProposal = new TransportEventProposal(
+                    effect.ShipId,
+                    job.Id,
+                    travel.ArrivesAt,
+                    job.Generation,
+                    new TransportEvent.Arrive(
+                        job.Id,
+                        job.Generation,
+                        travel.RouteId,
+                        travel.Target));
+                break;
+
+            case TransportAdvanceEffect.BeginLoading loading:
+                SetJobState(
+                    job,
+                    TransportJobStatus.Loading,
+                    transitionAt: loading.CompletesAt);
+                eventProposal = new TransportEventProposal(
+                    effect.ShipId,
+                    job.Id,
+                    loading.CompletesAt,
+                    job.Generation,
+                    new TransportEvent.FinishLoading(job.Id, job.Generation));
+                break;
+
+            case TransportAdvanceEffect.WaitForDestinationCapacity:
+                SetJobState(job, TransportJobStatus.WaitingForDestinationCapacity);
+                break;
+
+            case TransportAdvanceEffect.BeginUnloading unloading:
+                Inventory destination = inventories.Get(job.DestinationInventoryId)
+                    ?? throw new KeyNotFoundException(
+                        $"Unknown inventory {job.DestinationInventoryId}.");
+                if (job.Quantity > destination.RemainingCapacity)
+                {
+                    SetJobState(job, TransportJobStatus.WaitingForDestinationCapacity);
+                    break;
+                }
+
+                CapacityReservationId reservationId =
+                    capacityReservationIds.Allocate();
+                destination.ReserveCapacity(
+                    reservationId,
+                    job.Quantity,
+                    new ReservationOwner.TransportJob(job.Id));
+                job.DestinationCapacityReservationId = reservationId;
+                SetJobState(
+                    job,
+                    TransportJobStatus.Unloading,
+                    transitionAt: unloading.CompletesAt);
+                eventProposal = new TransportEventProposal(
+                    effect.ShipId,
+                    job.Id,
+                    unloading.CompletesAt,
+                    job.Generation,
+                    new TransportEvent.FinishUnloading(job.Id, job.Generation));
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(effect));
+        }
+
+        return new TransportAdvanceCommit(
+            effect.ShipId,
+            job.Id,
+            before,
+            job.Status,
+            eventProposal);
+    }
+
     public bool StartOrRetry(
         TransportJobId jobId,
         Freighter freighter,
@@ -465,24 +573,73 @@ public sealed class TransportBoard
         TransportTiming timing,
         SimulationTime now)
     {
+        TransportEventCoreCommit core = CommitEventCore(
+            transportEvent,
+            freighter,
+            inventories,
+            navigation,
+            now);
+        if (core.Disposition == ScheduledEventDisposition.Applied
+            && core.ContinuationTarget is { } target
+            && freighter is not null)
+        {
+            AdvanceToward(
+                transportEvent.JobId,
+                target,
+                freighter,
+                inventories,
+                capacityReservationIds,
+                navigation,
+                agenda,
+                wrapEvent,
+                timing,
+                now);
+        }
+
+        return core.Disposition;
+    }
+
+    internal TransportEventCoreCommit CommitEventCore(
+        TransportEvent transportEvent,
+        Freighter? freighter,
+        InventoryRegistry inventories,
+        INavigation navigation,
+        SimulationTime now)
+    {
         if (GetJob(transportEvent.JobId) is not { } job)
         {
-            return ScheduledEventDisposition.IgnoredMissingReference;
+            return new TransportEventCoreCommit(
+                ScheduledEventDisposition.IgnoredMissingReference,
+                null,
+                null,
+                null);
         }
 
         if (job.Generation != transportEvent.Generation)
         {
-            return ScheduledEventDisposition.IgnoredStaleGeneration;
+            return new TransportEventCoreCommit(
+                ScheduledEventDisposition.IgnoredStaleGeneration,
+                job.ShipId,
+                job.Id,
+                null);
         }
 
         if (freighter is null)
         {
-            return ScheduledEventDisposition.IgnoredMissingReference;
+            return new TransportEventCoreCommit(
+                ScheduledEventDisposition.IgnoredMissingReference,
+                job.ShipId,
+                job.Id,
+                null);
         }
 
         if (job.ShipId != freighter.ShipId || freighter.ActiveJobId != job.Id)
         {
-            return ScheduledEventDisposition.IgnoredStateMismatch;
+            return new TransportEventCoreCommit(
+                ScheduledEventDisposition.IgnoredStateMismatch,
+                job.ShipId,
+                job.Id,
+                null);
         }
 
         switch (transportEvent)
@@ -490,20 +647,30 @@ public sealed class TransportBoard
             case TransportEvent.Arrive arrive:
                 if (!TravelStateMatches(job, arrive.RouteId, arrive.Target, now))
                 {
-                    return ScheduledEventDisposition.IgnoredStateMismatch;
+                    return new TransportEventCoreCommit(
+                        ScheduledEventDisposition.IgnoredStateMismatch,
+                        job.ShipId,
+                        job.Id,
+                        null);
                 }
 
                 DirectedRoute route = navigation.GetRoute(arrive.RouteId)
                     ?? throw new KeyNotFoundException($"Unknown route {arrive.RouteId}.");
                 freighter.LocationId = route.Destination;
-                AdvanceToward(job.Id, arrive.Target, freighter, inventories,
-                    capacityReservationIds, navigation, agenda, wrapEvent, timing, now);
-                return ScheduledEventDisposition.Applied;
+                return new TransportEventCoreCommit(
+                    ScheduledEventDisposition.Applied,
+                    job.ShipId,
+                    job.Id,
+                    arrive.Target);
 
             case TransportEvent.FinishLoading:
                 if (job.Status != TransportJobStatus.Loading || job.TransitionAt != now)
                 {
-                    return ScheduledEventDisposition.IgnoredStateMismatch;
+                    return new TransportEventCoreCommit(
+                        ScheduledEventDisposition.IgnoredStateMismatch,
+                        job.ShipId,
+                        job.Id,
+                        null);
                 }
 
                 var owner = new ReservationOwner.TransportJob(job.Id);
@@ -519,17 +686,27 @@ public sealed class TransportBoard
                     or KeyNotFoundException or OverflowException)
                 {
                     FailBeforeLoading(job, freighter, inventories);
-                    return ScheduledEventDisposition.Applied;
+                    return new TransportEventCoreCommit(
+                        ScheduledEventDisposition.Applied,
+                        job.ShipId,
+                        job.Id,
+                        null);
                 }
 
-                AdvanceToward(job.Id, TravelTarget.Destination, freighter, inventories,
-                    capacityReservationIds, navigation, agenda, wrapEvent, timing, now);
-                return ScheduledEventDisposition.Applied;
+                return new TransportEventCoreCommit(
+                    ScheduledEventDisposition.Applied,
+                    job.ShipId,
+                    job.Id,
+                    TravelTarget.Destination);
 
             case TransportEvent.FinishUnloading:
                 if (job.Status != TransportJobStatus.Unloading || job.TransitionAt != now)
                 {
-                    return ScheduledEventDisposition.IgnoredStateMismatch;
+                    return new TransportEventCoreCommit(
+                        ScheduledEventDisposition.IgnoredStateMismatch,
+                        job.ShipId,
+                        job.Id,
+                        null);
                 }
 
                 CapacityReservationId capacityReservationId =
@@ -545,7 +722,11 @@ public sealed class TransportBoard
                     new ReservationOwner.TransportJob(job.Id));
                 SetJobState(job, TransportJobStatus.Completed);
                 freighter.ActiveJobId = null;
-                return ScheduledEventDisposition.Applied;
+                return new TransportEventCoreCommit(
+                    ScheduledEventDisposition.Applied,
+                    job.ShipId,
+                    job.Id,
+                    null);
 
             default:
                 throw new ArgumentOutOfRangeException(nameof(transportEvent));

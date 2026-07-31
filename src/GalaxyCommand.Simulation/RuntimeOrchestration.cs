@@ -75,6 +75,16 @@ public sealed record ProductionCompletionProposal(
     ProductionJobId JobId,
     EventGeneration Generation);
 
+public sealed record ProductionOutputStoredEffect(
+    FacilityId FacilityId,
+    ProductionJobId JobId,
+    MaterialId MaterialId,
+    Quantity Quantity);
+
+public sealed record ProductionCompletionCommitResult(
+    ScheduledEventDisposition Disposition,
+    ProductionOutputStoredEffect? OutputStored);
+
 public sealed class ProductionCommitResult
 {
     internal ProductionCommitResult(
@@ -347,5 +357,50 @@ public sealed class ProductionSystem
             commit.RejectedEffectCount));
 
         return new ProductionReconciliationResult(commit, measurements);
+    }
+
+    public static ProductionCompletionCommitResult CommitCompletion(
+        IReadOnlyDictionary<FacilityId, ProductionLine> productionLines,
+        ProductionIdSequences ids,
+        InventoryRegistry inventories,
+        FacilityId facilityId,
+        ProductionJobId jobId,
+        EventGeneration generation,
+        SimulationTime now)
+    {
+        ArgumentNullException.ThrowIfNull(productionLines);
+        ArgumentNullException.ThrowIfNull(ids);
+        ArgumentNullException.ThrowIfNull(inventories);
+        if (!productionLines.TryGetValue(facilityId, out ProductionLine? line))
+        {
+            return new ProductionCompletionCommitResult(
+                ScheduledEventDisposition.IgnoredMissingReference,
+                null);
+        }
+
+        Inventory inventory = inventories.Get(line.InventoryId)
+            ?? throw new KeyNotFoundException($"Unknown inventory {line.InventoryId}.");
+        (MaterialId MaterialId, Quantity Quantity)? output =
+            line.GetJob(jobId) is { } job
+            ? (job.Recipe.OutputMaterial, job.Recipe.OutputQuantity)
+            : null;
+        ScheduledEventDisposition disposition = line.CompleteScheduled(
+            jobId,
+            generation,
+            ids,
+            inventory,
+            now,
+            out bool outputStored);
+        ProductionOutputStoredEffect? effect =
+            disposition == ScheduledEventDisposition.Applied
+            && outputStored
+            && output is { } completed
+                ? new ProductionOutputStoredEffect(
+                    facilityId,
+                    jobId,
+                    completed.MaterialId,
+                    completed.Quantity)
+                : null;
+        return new ProductionCompletionCommitResult(disposition, effect);
     }
 }

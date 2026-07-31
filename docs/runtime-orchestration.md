@@ -30,9 +30,16 @@ materialization effect consumed by an acceptance-only ship materializer.
 Logistics publication and assignment use typed proposals and a complete
 candidate reducer ordered by `ShipId`. A fixed `EconomicRuntimeCoordinator`
 now owns the production, construction, publication, and assignment wave order
-and aggregates their measurement boundaries. Transport advancement and events,
-shared agenda commit, actor-order alignment, persistent-runtime composition,
-and final acceptance-runtime removal remain to be implemented.
+and aggregates their measurement boundaries. Decision-wave transport
+advancement now evaluates immutable assigned-job reads, revalidates shared
+destination capacity during `ShipId`-ordered commit, and emits typed event
+proposals. Production, construction, and decision-wave transport proposals use
+one agenda commit owner with stable merge keys and commit-time creation
+sequences. Production completion emits a typed stored-output effect, and
+transport completion handlers commit their physical transition before
+returning typed follow-on advancement and event proposals through the same
+owners. Actor-order alignment, persistent-runtime composition, and final
+acceptance-runtime removal remain to be implemented.
 
 **Accepted direction:** The Phase 1 economy should move behind
 reusable production systems. `PhaseOneScenario` remains a bounded acceptance

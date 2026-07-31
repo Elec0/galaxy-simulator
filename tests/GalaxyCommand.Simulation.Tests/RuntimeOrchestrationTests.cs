@@ -64,6 +64,24 @@ public sealed class RuntimeOrchestrationTests
             measurement => Assert.Equal(
                 RuntimeMeasurementStage.Commit,
                 measurement.Stage));
+
+        ProductionCompletionCommitResult completed =
+            ProductionSystem.CommitCompletion(
+                lines,
+                fixture.ProductionIds,
+                fixture.Inventories,
+                fixture.Line.FacilityId,
+                completion.JobId,
+                completion.Generation,
+                completion.Timestamp);
+        Assert.Equal(ScheduledEventDisposition.Applied, completed.Disposition);
+        Assert.Equal(
+            new ProductionOutputStoredEffect(
+                fixture.Line.FacilityId,
+                jobId,
+                fixture.Output,
+                new Quantity(2)),
+            completed.OutputStored);
     }
 
     [Fact]
@@ -307,11 +325,18 @@ public sealed class RuntimeOrchestrationTests
             new TransportBoard(),
             new ShipRegistry(),
             navigation,
+            new ProductionIdSequences(),
             new TransportIdSequences(),
-            new IdSequence<ReservationId>());
+            new IdSequence<ReservationId>(),
+            new IdSequence<CapacityReservationId>());
 
         EconomicReconciliationResult result =
-            coordinator.Reconcile(SimulationTime.Zero);
+            coordinator.Reconcile(
+                SimulationTime.Zero,
+                new TransportTiming(
+                    SimulationDuration.Zero,
+                    new TransferRate(1),
+                    new TransferRate(1)));
 
         Assert.Equal(ProductionJobStatus.Running, production.ActiveJob?.Status);
         Assert.Equal(
@@ -333,6 +358,9 @@ public sealed class RuntimeOrchestrationTests
                 "logistics-assignment",
                 "logistics-assignment",
                 "logistics-assignment",
+                "transport-advance",
+                "transport-advance",
+                "transport-advance",
             ],
             result.Measurements.Select(measurement => measurement.Domain));
     }

@@ -23,8 +23,12 @@ reusable production systems and retire the monolithic `PhaseOneRuntime`.
     batches, typed reservation effects, deterministic commit, and completion
     proposals; construction completion emits a typed materialization effect.
   - Logistics publication and assignment now use typed proposals and complete
-    ranked candidate sets reduced in `ShipId` order. Transport advancement,
-    event handling, shared agenda commit, and actor-order alignment remain.
+    ranked candidate sets reduced in `ShipId` order.
+  - Decision-wave transport advancement now uses immutable reads, typed
+    effects, `ShipId`-ordered capacity revalidation, and a shared agenda commit
+    owner for production, construction, and transport event proposals;
+    production and transport completion handlers now return typed output or
+    follow-on effects through those owners.
   - A fixed economic coordinator now commits production, construction,
     publication, and assignment in the accepted wave order and aggregates
     per-domain measurements; persistent-runtime composition remains.

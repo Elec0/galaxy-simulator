@@ -125,4 +125,91 @@ public sealed class EventAgendaTests
         Assert.Throws<OverflowException>(() =>
             new EventGeneration(ulong.MaxValue).Next());
     }
+
+    [Fact]
+    public void AgendaOwnerAllocatesSequencesByStableProposalOrder()
+    {
+        var agenda = new EventAgenda<string>();
+        var proposals = new[]
+        {
+            new AgendaEventProposal<string>(
+                new AgendaProposalOrder(
+                    RuntimeEvaluationWave.LogisticsAssignment,
+                    2,
+                    1,
+                    0,
+                    0),
+                new SimulationTime(10),
+                EventPhase.PhysicalCompletion,
+                new EventGeneration(0),
+                "second ship"),
+            new AgendaEventProposal<string>(
+                new AgendaProposalOrder(
+                    RuntimeEvaluationWave.ProductionReadiness,
+                    1,
+                    1,
+                    0,
+                    0),
+                new SimulationTime(20),
+                EventPhase.PhysicalCompletion,
+                new EventGeneration(0),
+                "production"),
+            new AgendaEventProposal<string>(
+                new AgendaProposalOrder(
+                    RuntimeEvaluationWave.LogisticsAssignment,
+                    1,
+                    2,
+                    0,
+                    0),
+                new SimulationTime(10),
+                EventPhase.PhysicalCompletion,
+                new EventGeneration(0),
+                "first ship"),
+        };
+
+        AgendaCommitResult result = AgendaCommitOwner.Commit(
+            agenda,
+            proposals.Reverse());
+
+        Assert.Equal([0UL, 1UL, 2UL], result.EventKeys.Select(key => key.CreationSequence));
+        agenda.AdvanceTo(new SimulationTime(10));
+        agenda.EnterPhase(EventPhase.PhysicalCompletion);
+        Assert.Equal(
+            "first ship",
+            agenda.PopNextInCurrentPhase()?.Payload);
+        Assert.Equal(
+            "second ship",
+            agenda.PopNextInCurrentPhase()?.Payload);
+    }
+
+    [Fact]
+    public void AgendaOwnerRejectsDuplicateOrderBeforeScheduling()
+    {
+        var agenda = new EventAgenda<string>();
+        var order = new AgendaProposalOrder(
+            RuntimeEvaluationWave.ProductionReadiness,
+            1,
+            1,
+            0,
+            0);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            AgendaCommitOwner.Commit(
+                agenda,
+                [
+                    new AgendaEventProposal<string>(
+                        order,
+                        new SimulationTime(10),
+                        EventPhase.PhysicalCompletion,
+                        new EventGeneration(0),
+                        "first"),
+                    new AgendaEventProposal<string>(
+                        order,
+                        new SimulationTime(20),
+                        EventPhase.PhysicalCompletion,
+                        new EventGeneration(0),
+                        "second"),
+                ]));
+        Assert.Equal(0, agenda.Count);
+    }
 }

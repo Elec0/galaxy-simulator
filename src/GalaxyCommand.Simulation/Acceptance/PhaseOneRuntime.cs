@@ -222,8 +222,10 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
             _transportBoard,
             _ships,
             _navigation,
+            _productionIds,
             _transportIds,
-            _reservationIds);
+            _reservationIds,
+            _capacityReservationIds);
         _mineToRefineryRoute = fixture.MineToRefineryRoute;
         _knownMaterials = fixture.KnownMaterials;
         _engine = new SimulationEngine<PhaseOneEvent>(this, _agenda);
@@ -386,20 +388,14 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
                 }
 
                 TransportJobStatus beforeStatus = before.Status;
-                Freighter? freighter = _ships.GetFreighter(before.ShipId);
-                ScheduledEventDisposition transportDisposition = _transportBoard.HandleEvent(
+                TransportEventReconciliationResult transportResult =
+                    _economicCoordinator.HandleTransportEvent(
                     transport.Event,
-                    freighter,
-                    _inventories,
-                    _capacityReservationIds,
-                    _navigation,
-                    _agenda,
-                    static transportEvent => new PhaseOneEvent.Transport(transportEvent),
                     TransportTiming(),
                     now);
-                if (transportDisposition != ScheduledEventDisposition.Applied)
+                if (transportResult.Disposition != ScheduledEventDisposition.Applied)
                 {
-                    return transportDisposition;
+                    return transportResult.Disposition;
                 }
 
                 TransportJob after = GetTransportJob(transport.Event.JobId);
@@ -419,37 +415,27 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
                     _metrics.TransportJobsFailed = checked(_metrics.TransportJobsFailed + 1);
                 }
 
+                CommitTransportEventProposals(
+                    transportResult.Continuation.EventProposals,
+                    RuntimeEvaluationWave.PhysicalCompletion);
                 return ScheduledEventDisposition.Applied;
 
             case PhaseOneEvent.ProductionComplete production:
-                if (!_productionLines.TryGetValue(production.FacilityId, out ProductionLine? line))
-                {
-                    return ScheduledEventDisposition.IgnoredMissingReference;
-                }
-
-                Inventory inventory = GetInventory(line.InventoryId);
-                (MaterialId Material, Quantity Quantity)? output =
-                    line.GetJob(production.JobId) is { } job
-                    ? (job.Recipe.OutputMaterial, job.Recipe.OutputQuantity)
-                    : null;
-                ScheduledEventDisposition productionDisposition = line.CompleteScheduled(
+                ProductionCompletionCommitResult productionCommit =
+                    _economicCoordinator.CommitProductionCompletion(
+                    production.FacilityId,
                     production.JobId,
                     scheduled.Generation,
-                    _productionIds,
-                    inventory,
-                    now,
-                    out bool outputStored);
-                if (productionDisposition == ScheduledEventDisposition.Applied
-                    && outputStored
-                    && output is { } completed)
+                    now);
+                if (productionCommit.OutputStored is { } output)
                 {
                     IncrementQuantity(
                         _metrics.ProducedMutable,
-                        (production.FacilityId, completed.Material),
-                        completed.Quantity);
+                        (output.FacilityId, output.MaterialId),
+                        output.Quantity);
                 }
 
-                return productionDisposition;
+                return productionCommit.Disposition;
 
             case PhaseOneEvent.ConstructionComplete construction:
                 ConstructionCompletionCommitResult constructionCommit =
@@ -483,15 +469,16 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
     private void Reconcile(SimulationTime now)
     {
         EconomicReconciliationResult reconciliation =
-            _economicCoordinator.Reconcile(now);
-        RecordProductionCommit(reconciliation.Production.Commit);
-        RecordConstructionCommit(reconciliation.Construction.Commit);
-        AssignAndRetryFreighters(now, reconciliation.Assignment.Commit);
+            _economicCoordinator.Reconcile(now, TransportTiming());
+        RecordEconomicCommit(now, reconciliation);
     }
 
-    private void RecordProductionCommit(ProductionCommitResult commit)
+    private void RecordEconomicCommit(
+        SimulationTime now,
+        EconomicReconciliationResult reconciliation)
     {
-        foreach (ProductionInputConsumption input in commit.ConsumedInputs)
+        foreach (ProductionInputConsumption input
+            in reconciliation.Production.Commit.ConsumedInputs)
         {
             IncrementQuantity(
                 _metrics.ConsumedMutable,
@@ -499,85 +486,130 @@ internal sealed class PhaseOneRuntime : ISimulationRuntime<PhaseOneEvent>
                 input.Quantity);
         }
 
-        foreach (ProductionCompletionProposal completion in commit.CompletionProposals)
+        foreach (ConstructionInputConsumption input
+            in reconciliation.Construction.Commit.ConsumedInputs)
         {
-            _agenda.Schedule(
+            IncrementQuantity(
+                _metrics.ConsumedMutable,
+                (input.FacilityId, input.MaterialId),
+                input.Quantity);
+        }
+
+        Dictionary<ShipId, TransportJobId> assignedByShip =
+            reconciliation.Assignment.Commit.Assignments.ToDictionary(
+                assignment => assignment.ShipId,
+                assignment => assignment.JobId);
+        _metrics.TransportJobsCreated = checked(
+            _metrics.TransportJobsCreated
+            + (ulong)assignedByShip.Count);
+        foreach (TransportAdvanceCommit transport
+            in reconciliation.TransportAdvance.Commit.Commits)
+        {
+            if (assignedByShip.TryGetValue(
+                    transport.ShipId,
+                    out TransportJobId assignedJobId))
+            {
+                _decisionRecords.Add(new DecisionRecord(
+                    now,
+                    transport.ShipId,
+                    assignedJobId,
+                    DecisionReason.HighestRankedReachableTransport));
+            }
+
+            if (transport.Before != transport.After
+                && WaitingReason(transport.After) is { } reason)
+            {
+                _decisionRecords.Add(new DecisionRecord(
+                    now,
+                    transport.ShipId,
+                    transport.JobId,
+                    reason));
+            }
+        }
+
+        var eventProposals = new List<AgendaEventProposal<PhaseOneEvent>>();
+        foreach (ProductionCompletionProposal completion
+            in reconciliation.Production.Commit.CompletionProposals)
+        {
+            eventProposals.Add(new AgendaEventProposal<PhaseOneEvent>(
+                new AgendaProposalOrder(
+                    RuntimeEvaluationWave.ProductionReadiness,
+                    completion.FacilityId.Value,
+                    completion.JobId.Value,
+                    0,
+                    0),
                 completion.Timestamp,
                 EventPhase.PhysicalCompletion,
                 completion.Generation,
                 new PhaseOneEvent.ProductionComplete(
                     completion.FacilityId,
-                    completion.JobId));
-        }
-    }
-
-    private void RecordConstructionCommit(ConstructionCommitResult commit)
-    {
-        foreach (ConstructionInputConsumption input in commit.ConsumedInputs)
-        {
-            IncrementQuantity(
-                _metrics.ConsumedMutable,
-                (input.FacilityId, input.MaterialId),
-                input.Quantity);
+                    completion.JobId)));
         }
 
-        foreach (ConstructionCompletionProposal completion in commit.CompletionProposals)
+        foreach (ConstructionCompletionProposal completion
+            in reconciliation.Construction.Commit.CompletionProposals)
         {
-            _agenda.Schedule(
+            eventProposals.Add(new AgendaEventProposal<PhaseOneEvent>(
+                new AgendaProposalOrder(
+                    RuntimeEvaluationWave.ConstructionReadiness,
+                    completion.FacilityId.Value,
+                    completion.OrderId.Value,
+                    0,
+                    0),
                 completion.Timestamp,
                 EventPhase.PhysicalCompletion,
                 completion.Generation,
                 new PhaseOneEvent.ConstructionComplete(
                     completion.FacilityId,
-                    completion.OrderId));
+                    completion.OrderId)));
         }
+
+        foreach (TransportEventProposal transport
+            in reconciliation.TransportAdvance.Commit.EventProposals)
+        {
+            eventProposals.Add(new AgendaEventProposal<PhaseOneEvent>(
+                new AgendaProposalOrder(
+                    RuntimeEvaluationWave.LogisticsAssignment,
+                    transport.ShipId.Value,
+                    transport.JobId.Value,
+                    TransportEventKind(transport.Event),
+                    0),
+                transport.Timestamp,
+                EventPhase.PhysicalCompletion,
+                transport.Generation,
+                new PhaseOneEvent.Transport(transport.Event)));
+        }
+
+        AgendaCommitOwner.Commit(_agenda, eventProposals);
     }
 
-    private void AssignAndRetryFreighters(
-        SimulationTime now,
-        LogisticsAssignmentCommitResult assignmentCommit)
-    {
-        Dictionary<ShipId, TransportJobId> assignedByShip =
-            assignmentCommit.Assignments.ToDictionary(
-                assignment => assignment.ShipId,
-                assignment => assignment.JobId);
-
-        foreach (ShipId shipId in _ships.FreighterIds.ToArray())
+    private static int TransportEventKind(TransportEvent transportEvent) =>
+        transportEvent switch
         {
-            Freighter freighter = _ships.GetFreighter(shipId)
-                ?? throw new KeyNotFoundException($"Missing freighter {shipId}.");
-            if (freighter.ActiveJobId is not { } assignedJobId)
-            {
-                continue;
-            }
+            TransportEvent.Arrive => 0,
+            TransportEvent.FinishLoading => 1,
+            TransportEvent.FinishUnloading => 2,
+            _ => throw new ArgumentOutOfRangeException(nameof(transportEvent)),
+        };
 
-            if (assignedByShip.ContainsKey(shipId))
-            {
-                _metrics.TransportJobsCreated = checked(_metrics.TransportJobsCreated + 1);
-                _decisionRecords.Add(new DecisionRecord(
-                    now,
-                    shipId,
-                    assignedJobId,
-                    DecisionReason.HighestRankedReachableTransport));
-            }
-
-            TransportJobStatus before = GetTransportJob(assignedJobId).Status;
-            _transportBoard.StartOrRetry(
-                assignedJobId,
-                freighter,
-                _inventories,
-                _capacityReservationIds,
-                _navigation,
-                _agenda,
-                static transportEvent => new PhaseOneEvent.Transport(transportEvent),
-                TransportTiming(),
-                now);
-            TransportJobStatus after = GetTransportJob(assignedJobId).Status;
-            if (before != after && WaitingReason(after) is { } reason)
-            {
-                _decisionRecords.Add(new DecisionRecord(now, shipId, assignedJobId, reason));
-            }
-        }
+    private void CommitTransportEventProposals(
+        IEnumerable<TransportEventProposal> transportEvents,
+        RuntimeEvaluationWave wave)
+    {
+        AgendaCommitOwner.Commit(
+            _agenda,
+            transportEvents.Select(transport =>
+                new AgendaEventProposal<PhaseOneEvent>(
+                    new AgendaProposalOrder(
+                        wave,
+                        transport.ShipId.Value,
+                        transport.JobId.Value,
+                        TransportEventKind(transport.Event),
+                        0),
+                    transport.Timestamp,
+                    EventPhase.PhysicalCompletion,
+                    transport.Generation,
+                    new PhaseOneEvent.Transport(transport.Event))));
     }
 
     private void AccrueFacilityTime(SimulationTime now)
