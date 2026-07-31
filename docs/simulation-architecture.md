@@ -38,34 +38,37 @@ reconciles systems, handles its event vocabulary, accrues time-based metrics,
 and declares its stopping condition. The engine has no knowledge of Phase 1
 materials, facilities, routes, or victory conditions.
 
-`GameSession` is the persistent application-facing facade. It owns a clean
-`GameRuntime`, command sequencing, a general game event vocabulary, immutable
-connector topology, hierarchical navigation, spatial movement, actor control,
-and active, queued, or suspended ship orders. It exposes immutable
-`GameSnapshot` and diagnostic records without exposing mutable state.
+`GameSession` is the persistent application-facing facade. It composes
+`ActorOrderRuntimeCoordinator`, command sequencing, a general game event
+vocabulary, immutable connector topology, hierarchical navigation, spatial
+movement, actor control, and active, queued, or suspended ship orders. It
+exposes immutable `GameSnapshot` and diagnostic records without exposing
+mutable state.
 
 `PhaseOneFixture` builds the proof-of-concept economic world.
-`Acceptance/PhaseOneScenario` is a separate bounded regression harness over
-`PhaseOneRuntime`. It retains the first-constructed-ship stopping condition and
-exact event and state fingerprints used by headless acceptance tests and the
-CLI. It is intentionally not used by `GameSession` or Godot.
+`Acceptance/PhaseOneScenario` is a separate bounded regression harness that
+directly composes `EconomicRuntimeSystem`. It retains the approved disruptions,
+first-constructed-ship stopping condition, temporary materialization adapter,
+and exact event and state fingerprints used by headless acceptance tests and
+the CLI. It is intentionally not used by `GameSession` or Godot.
 
 ```mermaid
 flowchart LR
     godot["Godot input and presentation"] --> session["GameSession"]
-    session --> game["GameRuntime<br/>orders, topology, and spatial movement"]
+    session --> game["ActorOrderRuntimeCoordinator<br/>orders, topology, and spatial movement"]
     cli["CLI and acceptance tests"] --> scenario["PhaseOneScenario"]
-    scenario --> phase_one["PhaseOneRuntime<br/>economic fixture"]
+    scenario --> economic["EconomicRuntimeSystem<br/>reusable economic dispatch"]
     game --> engine["SimulationEngine"]
-    phase_one --> engine
+    economic --> coordinator["EconomicRuntimeCoordinator<br/>deterministic waves"]
+    scenario --> engine
 ```
 
 Additional bounded fixtures belong under `Acceptance/`; they do not define the
 lifecycle or API of a normal game session.
 
-`TASK-009` replaces the combined `PhaseOneRuntime` with reusable production
-domain owners beneath a fixed coordinator. The Phase 1 scenario keeps only its
-fixture, stop rule, reports, and regression fingerprints. See
+`TASK-009` replaced the combined acceptance runtime with reusable production
+domain owners beneath fixed coordinators. The Phase 1 scenario keeps only its
+fixture and acceptance responsibilities. See
 [Runtime orchestration and domain ownership](runtime-orchestration.md) for the
 accepted target and migration sequence.
 

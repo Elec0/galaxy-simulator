@@ -13,41 +13,9 @@ rather than deleting them.
 
 ## Current focus
 
-The current architectural goal is to move the accepted economic behavior into
-reusable production systems and retire the monolithic `PhaseOneRuntime`.
-`PhaseOneScenario` remains a bounded acceptance harness over those systems.
-
-- [ ] **TASK-009: Establish production runtime systems and retire `PhaseOneRuntime`**
-  - Architecture accepted by the project owner on 2026-07-29; implementation
-    now covers production and construction readiness with immutable ordered
-    batches, typed reservation effects, deterministic commit, and completion
-    proposals; construction completion emits a typed materialization effect.
-  - Logistics publication and assignment now use typed proposals and complete
-    ranked candidate sets reduced in `ShipId` order.
-  - Decision-wave transport advancement now uses immutable reads, typed
-    effects, `ShipId`-ordered capacity revalidation, and a shared agenda commit
-    owner for production, construction, and transport event proposals;
-    production and transport completion handlers now return typed output or
-    follow-on effects through those owners.
-  - A fixed economic coordinator now commits production, construction,
-    publication, and assignment in the accepted wave order and aggregates
-    per-domain measurements; persistent-runtime composition remains.
-  - Move production, product-neutral construction, logistics, and actor-order
-    handling behind reusable production owners.
-  - Keep Phase 1 fixture data, disruption controls, first-ship stopping,
-    reporting, fingerprints, and temporary ship materialization
-    acceptance-only.
-  - Define system ownership, handled inputs, current fact outputs, and
-    deterministic evaluation order; new economy facts remain in `TASK-032`.
-  - Separate read/evaluate work from buffered effects and authoritative commit
-    so independent batches can later execute concurrently.
-  - Start with a fixed explicit dispatcher; do not add a dynamic plugin system
-    without a demonstrated need.
-  - Preserve the accepted `TASK-024` single-thread benchmark digests and expose
-    per-domain measurement boundaries without enforcing timing.
-  - Remove `PhaseOneRuntime` after `PhaseOneScenario` delegates behavioral work
-    to the reusable composition.
-  - Context: [Runtime orchestration and domain ownership](runtime-orchestration.md)
+`TASK-009` completed the reusable runtime-orchestration foundation. Select the
+next implementation task from the near-term list without broadening it into
+entity lifecycle, navigation migration, or new economy facts.
 
 ## Near-term work
 
@@ -191,6 +159,19 @@ prerequisites and desired behavior are sufficiently defined.
 
 ## Completed foundations
 
+- [x] **TASK-009: Establish production runtime systems and retire `PhaseOneRuntime`**
+  - Added fixed actor and economic coordinators, stable read/evaluate batches,
+    typed effects, deterministic reducers and commit owners, shared agenda
+    commit, and per-domain measurements on the single-thread reference path.
+  - `PhaseOneScenario` now directly composes reusable economic behavior while
+    retaining only fixture setup, disruptions, stopping, temporary
+    materialization, metrics, reports, and accepted fingerprints.
+  - Actor command results, movement, facts, all five canonical benchmark
+    digests, and the Phase 1 event/final-state digest remain unchanged.
+  - Entity lifecycle, legacy-location navigation migration, and semantic
+    economy facts remain in `TASK-011`, `TASK-031`, and `TASK-032`.
+  - Context: [Runtime orchestration and domain ownership](runtime-orchestration.md)
+
 - [x] **TASK-001: Define deterministic same-time processing**
   - The engine drains explicit physical-completion, state-update, and decision
     phases, reconciles once at the decision barrier, and completes the current
@@ -303,8 +284,8 @@ prerequisites and desired behavior are sufficiently defined.
     coverage. Heavy Phase 1, spatial, connector-navigation, and fact-retention
     scenarios require explicit `--suite full` selection.
   - The canonical Release full suite passed all five committed digests across
-    repeated iterations on 2026-07-28. Worker-count and long-running suites
-    remain in `TASK-009` and `TASK-029`.
+    repeated iterations on 2026-07-28. Concurrent worker-count and long-running
+    suites remain future work under `TASK-029`.
   - Context: [Scale targets and benchmark architecture](scale-and-benchmark-targets.md)
 
 - [x] **TASK-028: Establish hierarchical system-space navigation**

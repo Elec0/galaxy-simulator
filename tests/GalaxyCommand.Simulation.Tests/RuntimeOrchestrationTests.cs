@@ -270,7 +270,7 @@ public sealed class RuntimeOrchestrationTests
     }
 
     [Fact]
-    public void EconomicCoordinatorCommitsProductionBeforeConstruction()
+    public void EconomicRuntimeSystemCommitsWavesAndDispatchesCompletion()
     {
         var facilityIds = new IdSequence<FacilityId>();
         FacilityId productionFacility = facilityIds.Allocate();
@@ -330,8 +330,9 @@ public sealed class RuntimeOrchestrationTests
             new IdSequence<ReservationId>(),
             new IdSequence<CapacityReservationId>());
 
+        var system = new EconomicRuntimeSystem(coordinator);
         EconomicReconciliationResult result =
-            coordinator.Reconcile(
+            system.Reconcile(
                 SimulationTime.Zero,
                 new TransportTiming(
                     SimulationDuration.Zero,
@@ -363,6 +364,27 @@ public sealed class RuntimeOrchestrationTests
                 "transport-advance",
             ],
             result.Measurements.Select(measurement => measurement.Domain));
+
+        ProductionCompletionProposal completion = Assert.Single(
+            result.Production.Commit.CompletionProposals);
+        EconomicEventCommitResult commit = system.CommitEvent(
+            new EconomicEvent.ProductionComplete(
+                completion.FacilityId,
+                completion.JobId),
+            completion.Generation,
+            new TransportTiming(
+                SimulationDuration.Zero,
+                new TransferRate(1),
+                new TransferRate(1)),
+            completion.Timestamp);
+        var productionCommit =
+            Assert.IsType<EconomicEventCommitResult.Production>(commit);
+        Assert.Equal(
+            ScheduledEventDisposition.Applied,
+            productionCommit.Disposition);
+        Assert.Equal(
+            output,
+            productionCommit.Result.OutputStored?.MaterialId);
     }
 
     private static ProductionSystemFixture CreateSingleLineFixture()

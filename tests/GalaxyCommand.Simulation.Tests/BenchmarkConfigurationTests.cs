@@ -159,6 +159,14 @@ public sealed class BenchmarkConfigurationTests
             "\"Id\": \"baseline.phase-one\"",
             output.ToString(),
             StringComparison.Ordinal);
+        Assert.Contains(
+            "\"SchemaVersion\": 2",
+            output.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"DomainMeasurementsAvailability\": \"unavailable\"",
+            output.ToString(),
+            StringComparison.Ordinal);
         Assert.DoesNotContain("benchmark_failure", error.ToString(), StringComparison.Ordinal);
     }
 }

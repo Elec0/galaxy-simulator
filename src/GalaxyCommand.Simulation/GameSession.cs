@@ -6,7 +6,7 @@ namespace GalaxyCommand.Simulation;
 public sealed class GameSession : IGameplayCommandHandler
 {
     private readonly GameFactStore _facts;
-    private readonly GameRuntime _runtime;
+    private readonly ActorOrderRuntimeCoordinator _runtime;
     private readonly GameplayCommandProcessor _commands;
 
     public GameSession(
@@ -15,7 +15,7 @@ public sealed class GameSession : IGameplayCommandHandler
     {
         ArgumentNullException.ThrowIfNull(setup);
         _facts = new GameFactStore(setup.FactRetentionCapacity);
-        _runtime = new GameRuntime(setup, navigation, _facts);
+        _runtime = new ActorOrderRuntimeCoordinator(setup, navigation, _facts);
         _commands = new GameplayCommandProcessor(this, _facts);
     }
 

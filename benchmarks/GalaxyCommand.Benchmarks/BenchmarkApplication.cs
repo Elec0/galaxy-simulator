@@ -32,6 +32,7 @@ public sealed record BenchmarkScenarioReport(
     string Digest,
     ulong SimulatedMilliseconds,
     IReadOnlyDictionary<string, long> Counts,
+    string DomainMeasurementsAvailability,
     BenchmarkTiming Timing);
 
 public sealed record BenchmarkRunReport(
@@ -89,7 +90,7 @@ public static class BenchmarkApplication
             }
 
             var run = new BenchmarkRunReport(
-                1,
+                2,
                 DateTimeOffset.UtcNow,
                 request.Suite.ToString().ToLowerInvariant(),
                 CaptureMachine(),
@@ -178,6 +179,7 @@ public static class BenchmarkApplication
             correctness.Digest,
             correctness.SimulatedMilliseconds,
             correctness.Counts,
+            "unavailable",
             timing);
     }
 

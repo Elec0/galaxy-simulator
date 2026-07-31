@@ -256,6 +256,22 @@ public sealed record ConnectorTransitSnapshot(
     SimulationTime DepartedAt,
     SimulationTime ArrivesAt);
 
+/// <summary>
+/// Result of committing one local-motion transition. Future work is returned
+/// as an agenda proposal so event sequence allocation remains agenda-owned.
+/// </summary>
+public sealed record LocalMotionCommit<TEvent>(
+    LocalMotionSegment? Motion,
+    AgendaEventProposal<TEvent>? EventProposal);
+
+/// <summary>
+/// Result of committing one connector traversal. Future work is returned as an
+/// agenda proposal so event sequence allocation remains agenda-owned.
+/// </summary>
+public sealed record ConnectorTransitCommit<TEvent>(
+    ConnectorTransitSegment Transit,
+    AgendaEventProposal<TEvent> EventProposal);
+
 public abstract record ShipSpatialSnapshotState
 {
     private ShipSpatialSnapshotState()
@@ -338,23 +354,14 @@ public sealed class SpatialMovement
     /// Authoritative commit for one already planned local leg. Evaluation
     /// workers produce the leg; the owning coordinator invokes this method.
     /// </summary>
-    public LocalMotionSegment? CommitStartOrReplace<TEvent>(
+    public LocalMotionCommit<TEvent> CommitStartOrReplace<TEvent>(
         ShipId shipId,
         TravelLeg.Local leg,
         SimulationTime now,
-        EventAgenda<TEvent> agenda,
         Func<SpatialMovementEvent, TEvent> wrapEvent)
     {
         ArgumentNullException.ThrowIfNull(leg);
-        ArgumentNullException.ThrowIfNull(agenda);
         ArgumentNullException.ThrowIfNull(wrapEvent);
-        if (now != agenda.CurrentTime)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(now),
-                now,
-                $"Movement time {now.Milliseconds} ms does not match agenda time {agenda.CurrentTime.Milliseconds} ms.");
-        }
 
         ActorState actor = GetRequiredActor(shipId);
         SystemPosition current = CurrentPosition(actor, now);
@@ -372,7 +379,7 @@ public sealed class SpatialMovement
         {
             actor.Generation = generation;
             actor.State = new ShipSpatialState.AtPosition(leg.Destination);
-            return null;
+            return new LocalMotionCommit<TEvent>(null, null);
         }
 
         SimulationTime arrivesAt = now.Add(leg.Duration);
@@ -387,36 +394,34 @@ public sealed class SpatialMovement
             shipId,
             motion.Id,
             motion.Generation));
-        agenda.Schedule(
-            arrivesAt,
-            EventPhase.PhysicalCompletion,
-            motion.Generation,
-            wrappedEvent);
         actor.Generation = generation;
         actor.State = new ShipSpatialState.Moving(motion);
-        return motion;
+        return new LocalMotionCommit<TEvent>(
+            motion,
+            new AgendaEventProposal<TEvent>(
+                new AgendaProposalOrder(
+                    RuntimeEvaluationWave.ActorOrders,
+                    shipId.Value,
+                    motion.Id.Value,
+                    EffectKind: 1,
+                    LocalOrdinal: 0),
+                arrivesAt,
+                EventPhase.PhysicalCompletion,
+                motion.Generation,
+                wrappedEvent));
     }
 
     /// <summary>
     /// Authoritative commit for one validated connector traversal.
     /// </summary>
-    public ConnectorTransitSegment CommitStartConnector<TEvent>(
+    public ConnectorTransitCommit<TEvent> CommitStartConnector<TEvent>(
         ShipId shipId,
         TravelLeg.Connector leg,
         SimulationTime now,
-        EventAgenda<TEvent> agenda,
         Func<SpatialMovementEvent, TEvent> wrapEvent)
     {
         ArgumentNullException.ThrowIfNull(leg);
-        ArgumentNullException.ThrowIfNull(agenda);
         ArgumentNullException.ThrowIfNull(wrapEvent);
-        if (now != agenda.CurrentTime)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(now),
-                now,
-                $"Movement time {now.Milliseconds} ms does not match agenda time {agenda.CurrentTime.Milliseconds} ms.");
-        }
 
         ActorState actor = GetRequiredActor(shipId);
         if (actor.State is not ShipSpatialState.AtPosition atPosition
@@ -439,13 +444,20 @@ public sealed class SpatialMovement
             shipId,
             transit.Id,
             transit.Generation));
-        agenda.Schedule(
-            arrivesAt,
-            EventPhase.PhysicalCompletion,
-            transit.Generation,
-            wrappedEvent);
         actor.State = new ShipSpatialState.ConnectorTransit(transit);
-        return transit;
+        return new ConnectorTransitCommit<TEvent>(
+            transit,
+            new AgendaEventProposal<TEvent>(
+                new AgendaProposalOrder(
+                    RuntimeEvaluationWave.ActorOrders,
+                    shipId.Value,
+                    transit.Id.Value,
+                    EffectKind: 2,
+                    LocalOrdinal: 0),
+                arrivesAt,
+                EventPhase.PhysicalCompletion,
+                transit.Generation,
+                wrappedEvent));
     }
 
     /// <summary>

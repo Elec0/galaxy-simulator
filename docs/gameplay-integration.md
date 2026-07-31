@@ -211,8 +211,9 @@ semantic facts remain in `TASK-008`.
 
 `GameSessionSetup` explicitly supplies initial systems and spatial ships, while
 the navigation policy is injected separately. The session constructs a clean
-`GameRuntime` with its own event vocabulary, order owner, and spatial movement
-owner. It does not wrap `PhaseOneRuntime`.
+`ActorOrderRuntimeCoordinator` with its own event vocabulary, order owner, and
+spatial movement owner. It is independent of the bounded Phase 1 acceptance
+composition.
 
 ### 2.4 Separate setup APIs from runtime mutation
 
@@ -245,9 +246,9 @@ or general-purpose event bus is not required.
 Each system boundary should also define stable read inputs, independently
 batchable evaluation work, buffered effects, and deterministic commit rules.
 This permits later concurrent execution without allowing worker scheduling or
-lock acquisition to determine simulation results. `TASK-009` also removes
-`PhaseOneRuntime`: Phase 1 remains a bounded acceptance composition over the
-same reusable economic systems used by production. The detailed ownership,
+lock acquisition to determine simulation results. `TASK-009` removed the
+combined acceptance runtime: Phase 1 remains a bounded acceptance composition
+over the same reusable economic systems used by production. The detailed ownership,
 wave, effect, commit, and migration contract is in
 [Runtime orchestration and domain ownership](runtime-orchestration.md); the
 project-wide parallelism contract remains in

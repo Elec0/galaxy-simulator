@@ -5,6 +5,57 @@ namespace GalaxyCommand.Simulation.Tests;
 public sealed class SpatialMovementTests
 {
     [Fact]
+    public void MotionCommitReturnsFutureEventWithoutAllocatingAgendaSequence()
+    {
+        var movement = new SpatialMovement();
+        var agenda = new EventAgenda<SpatialMovementEvent>();
+        var shipId = new ShipId(4);
+        SystemPosition origin = Position(0, 0);
+        SystemPosition destination = Position(100, 50);
+        movement.Add(shipId, origin);
+
+        LocalMotionCommit<SpatialMovementEvent> commit =
+            movement.CommitStartOrReplace(
+                shipId,
+                new TravelLeg.Local(
+                    origin,
+                    destination,
+                    new SimulationDuration(100)),
+                SimulationTime.Zero,
+                static movementEvent => movementEvent);
+
+        LocalMotionSegment motion = Assert.IsType<LocalMotionSegment>(
+            commit.Motion);
+        AgendaEventProposal<SpatialMovementEvent> proposal =
+            Assert.IsType<AgendaEventProposal<SpatialMovementEvent>>(
+                commit.EventProposal);
+        Assert.Equal(0, agenda.Count);
+        Assert.Equal(
+            new AgendaProposalOrder(
+                RuntimeEvaluationWave.ActorOrders,
+                shipId.Value,
+                motion.Id.Value,
+                EffectKind: 1,
+                LocalOrdinal: 0),
+            proposal.Order);
+        Assert.Equal(motion.ArrivesAt, proposal.Timestamp);
+        Assert.Equal(EventPhase.PhysicalCompletion, proposal.Phase);
+        Assert.Equal(motion.Generation, proposal.Generation);
+
+        AgendaCommitResult result = AgendaCommitOwner.Commit(
+            agenda,
+            [proposal]);
+
+        Assert.Equal(1, agenda.Count);
+        Assert.Equal(
+            new EventKey(
+                motion.ArrivesAt,
+                EventPhase.PhysicalCompletion,
+                CreationSequence: 0),
+            Assert.Single(result.EventKeys));
+    }
+
+    [Fact]
     public void ScheduledLocalMotionInterpolatesAndCompletesAuthoritatively()
     {
         var fixture = new MovementFixture();
@@ -299,13 +350,21 @@ public sealed class SpatialMovementTests
         public LocalMotionSegment? Start(
             SystemPosition origin,
             SystemPosition destination,
-            SimulationDuration duration) =>
-            Movement.CommitStartOrReplace(
-                ShipId,
-                new TravelLeg.Local(origin, destination, duration),
-                Engine.CurrentTime,
-                Agenda,
-                static movementEvent => movementEvent);
+            SimulationDuration duration)
+        {
+            LocalMotionCommit<SpatialMovementEvent> commit =
+                Movement.CommitStartOrReplace(
+                    ShipId,
+                    new TravelLeg.Local(origin, destination, duration),
+                    Engine.CurrentTime,
+                    static movementEvent => movementEvent);
+            if (commit.EventProposal is { } eventProposal)
+            {
+                AgendaCommitOwner.Commit(Agenda, [eventProposal]);
+            }
+
+            return commit.Motion;
+        }
     }
 
     private sealed class MovementRuntime : ISimulationRuntime<SpatialMovementEvent>

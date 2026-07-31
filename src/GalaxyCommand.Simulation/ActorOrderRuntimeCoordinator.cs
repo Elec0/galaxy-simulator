@@ -27,9 +27,10 @@ internal abstract record GameEvent
 }
 
 /// <summary>
-/// Clean persistent runtime for the application-facing game session.
+/// Fixed persistent coordinator for actor commands, orders, movement, spatial
+/// events, and their semantic facts.
 /// </summary>
-internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
+internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEvent>
 {
     private readonly EventAgenda<GameEvent> _agenda = new();
     private readonly SimulationEngine<GameEvent> _engine;
@@ -43,7 +44,7 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
     private readonly GameFactStore _facts;
     private readonly List<GameEventRecord> _eventRecords = [];
 
-    internal GameRuntime(
+    internal ActorOrderRuntimeCoordinator(
         GameSessionSetup setup,
         ISpatialNavigationPlanner navigation,
         GameFactStore facts)
@@ -492,23 +493,28 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
         CommandSource source,
         BeginScriptedOverrideCommand command)
     {
-        ActorOverrideValidation validation = _control.ValidateBeginOverride(
-            command.ShipId,
+        BeginOverrideEvaluation evaluation = EvaluateBeginOverride(
             source,
-            command.ExpectedRevision);
-        if (RejectInvalidOverride(validation, command.ShipId) is { } rejection)
+            command);
+        if (evaluation.Rejection is { } rejection)
         {
             return new GameplayCommandHandlingResult(rejection);
         }
 
+        BeginOverrideProposal proposal = evaluation.Proposal
+            ?? throw new InvalidOperationException(
+                "Accepted begin-override evaluation produced no proposal.");
         var transitions = new List<ShipOrderTransition>();
         var factProposals = new List<GameFactProposal>();
         EndActiveLocalMotion(
-            command.ShipId,
+            proposal.ShipId,
             LocalMotionEndReason.SuspendedByScriptedOverride,
             factProposals);
-        _orders.BeginOverride(command.ShipId, transitions);
-        _control.BeginOverride(command.ShipId, source, command.Reason);
+        _orders.BeginOverride(proposal.ShipId, transitions);
+        _control.BeginOverride(
+            proposal.ShipId,
+            proposal.Source,
+            proposal.Reason);
         AddOrderTransitionProposals(transitions, factProposals);
         return new GameplayCommandHandlingResult(
             CommandResult.Accepted(),
@@ -519,34 +525,75 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
         CommandSource source,
         EndScriptedOverrideCommand command)
     {
-        ActorOverrideValidation validation = _control.ValidateEndOverride(
-            command.ShipId,
-            source,
-            command.ExpectedRevision);
-        if (RejectInvalidOverride(validation, command.ShipId) is { } rejection)
+        EndOverrideEvaluation evaluation = EvaluateEndOverride(source, command);
+        if (evaluation.Rejection is { } rejection)
         {
             return new GameplayCommandHandlingResult(rejection);
         }
 
+        EndOverrideProposal proposal = evaluation.Proposal
+            ?? throw new InvalidOperationException(
+                "Accepted end-override evaluation produced no proposal.");
         var transitions = new List<ShipOrderTransition>();
         var factProposals = new List<GameFactProposal>();
         EndActiveLocalMotion(
-            command.ShipId,
+            proposal.ShipId,
             LocalMotionEndReason.ScriptedOverrideEnded,
             factProposals);
         _orders.EndOverride(
-            command.ShipId,
-            command.ReleasePolicy,
+            proposal.ShipId,
+            proposal.ReleasePolicy,
             transitions);
-        _control.EndOverride(command.ShipId);
+        _control.EndOverride(proposal.ShipId);
         StartOrContinueOrders(
-            command.ShipId,
+            proposal.ShipId,
             transitions,
             factProposals);
         AddOrderTransitionProposals(transitions, factProposals);
         return new GameplayCommandHandlingResult(
             CommandResult.Accepted(),
             factProposals);
+    }
+
+    private BeginOverrideEvaluation EvaluateBeginOverride(
+        CommandSource source,
+        BeginScriptedOverrideCommand command)
+    {
+        ActorOverrideValidation validation = _control.ValidateBeginOverride(
+            command.ShipId,
+            source,
+            command.ExpectedRevision);
+        CommandResult? rejection = RejectInvalidOverride(
+            validation,
+            command.ShipId);
+        return rejection is null
+            ? new BeginOverrideEvaluation(
+                new BeginOverrideProposal(
+                    command.ShipId,
+                    source,
+                    command.Reason),
+                null)
+            : new BeginOverrideEvaluation(null, rejection);
+    }
+
+    private EndOverrideEvaluation EvaluateEndOverride(
+        CommandSource source,
+        EndScriptedOverrideCommand command)
+    {
+        ActorOverrideValidation validation = _control.ValidateEndOverride(
+            command.ShipId,
+            source,
+            command.ExpectedRevision);
+        CommandResult? rejection = RejectInvalidOverride(
+            validation,
+            command.ShipId);
+        return rejection is null
+            ? new EndOverrideEvaluation(
+                new EndOverrideProposal(
+                    command.ShipId,
+                    command.ReleasePolicy),
+                null)
+            : new EndOverrideEvaluation(null, rejection);
     }
 
     private void StartOrContinueOrders(
@@ -622,18 +669,25 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
             {
                 case TravelLeg.Local local:
                     {
-                        LocalMotionSegment? motion = _movement.CommitStartOrReplace(
-                            shipId,
-                            local,
-                            CurrentTime,
-                            _agenda,
-                            movement => new GameEvent.SpatialMovement(movement));
+                        LocalMotionCommit<GameEvent> commit =
+                            _movement.CommitStartOrReplace(
+                                shipId,
+                                local,
+                                CurrentTime,
+                                movement =>
+                                    (GameEvent)new GameEvent.SpatialMovement(movement));
+                        LocalMotionSegment? motion = commit.Motion;
                         if (motion is null)
                         {
                             _orders.CompleteLeg(shipId, active.Id, null);
                             continue;
                         }
 
+                        AgendaCommitOwner.Commit(
+                            _agenda,
+                            [commit.EventProposal
+                                ?? throw new InvalidOperationException(
+                                    $"Local motion {motion.Id} produced no arrival proposal.")]);
                         _orders.BindMotion(shipId, active.Id, motion.Id);
                         factProposals.Add(PhysicalWorkStartedProposal(
                             shipId,
@@ -646,13 +700,17 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
                     }
                 case TravelLeg.Connector connector:
                     {
-                        ConnectorTransitSegment transit =
+                        ConnectorTransitCommit<GameEvent> commit =
                             _movement.CommitStartConnector(
                                 shipId,
                                 connector,
                                 CurrentTime,
-                                _agenda,
-                                movement => new GameEvent.SpatialMovement(movement));
+                                movement =>
+                                    (GameEvent)new GameEvent.SpatialMovement(movement));
+                        ConnectorTransitSegment transit = commit.Transit;
+                        AgendaCommitOwner.Commit(
+                            _agenda,
+                            [commit.EventProposal]);
                         _orders.BindTransit(shipId, active.Id, transit.Id);
                         factProposals.Add(PhysicalWorkStartedProposal(
                             shipId,
@@ -929,5 +987,22 @@ internal sealed class GameRuntime : ISimulationRuntime<GameEvent>
 
     private sealed record CancelOrderEvaluation(
         CancelOrderProposal? Proposal,
+        CommandResult? Rejection);
+
+    private sealed record BeginOverrideProposal(
+        ShipId ShipId,
+        CommandSource Source,
+        ActorOverrideReasonId Reason);
+
+    private sealed record BeginOverrideEvaluation(
+        BeginOverrideProposal? Proposal,
+        CommandResult? Rejection);
+
+    private sealed record EndOverrideProposal(
+        ShipId ShipId,
+        ScriptedOverrideReleasePolicy ReleasePolicy);
+
+    private sealed record EndOverrideEvaluation(
+        EndOverrideProposal? Proposal,
         CommandResult? Rejection);
 }

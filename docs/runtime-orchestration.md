@@ -22,7 +22,7 @@ acceptance harness.
 
 **Decision status:** Accepted by the project owner on 2026-07-29.
 
-**Implementation status:** In progress. Production and construction readiness
+**Implementation status:** Complete. Production and construction readiness
 now use immutable ordered facility batches, typed reservation proposals,
 deterministic facility/material commit, and typed completion-event proposals
 on the single-thread path. Construction completion emits a typed
@@ -38,17 +38,22 @@ one agenda commit owner with stable merge keys and commit-time creation
 sequences. Production completion emits a typed stored-output effect, and
 transport completion handlers commit their physical transition before
 returning typed follow-on advancement and event proposals through the same
-owners. Actor-order alignment, persistent-runtime composition, and final
-acceptance-runtime removal remain to be implemented.
+owners. Actor-driven local motion and connector traversal now return typed
+movement commits with future event proposals, and the persistent runtime routes
+those proposals through the shared agenda owner without changing actor facts.
+`ActorOrderRuntimeCoordinator` now owns fixed actor command and event dispatch,
+and `EconomicRuntimeSystem` owns reusable economic reconciliation and event
+dispatch. `PhaseOneScenario` composes the economic system directly and retains
+only its acceptance fixture, adapters, stopping, metrics, reports, and
+fingerprints; the former combined `PhaseOneRuntime` has been removed.
 
-**Accepted direction:** The Phase 1 economy should move behind
-reusable production systems. `PhaseOneScenario` remains a bounded acceptance
-harness, while `PhaseOneRuntime` is a removal target rather than a production
-base class.
+**Implemented direction:** The Phase 1 economy is behind reusable production
+systems. `PhaseOneScenario` remains a bounded acceptance harness and the former
+combined runtime is not a production base class or compatibility layer.
 
-## Current problem
+## Starting problem
 
-There are presently two runtime compositions:
+Before this migration there were two runtime compositions:
 
 - `GameRuntime` is the persistent application runtime. It owns actor control,
   ship orders, spatial movement, command handling, scheduled movement events,
@@ -71,11 +76,11 @@ but the ownership and commit boundaries are implicit. A future worker could not
 evaluate one facility range independently without also receiving broad
 mutation authority.
 
-The persistent runtime has a similar concentration around actor orders:
+The persistent runtime had a similar concentration around actor orders:
 command evaluation, order mutation, planning, spatial mutation, event
-scheduling, and fact proposal creation are coordinated in `GameRuntime`.
-Existing proposal objects prove the desired direction, but the boundary is not
-yet a reusable orchestration model.
+scheduling, and fact proposal creation were coordinated in `GameRuntime`.
+Existing proposal objects proved the desired direction, but the boundary was
+not yet a reusable orchestration model.
 
 ## Goals
 

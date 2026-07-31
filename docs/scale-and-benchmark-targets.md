@@ -306,10 +306,10 @@ units without assigning any of them permanently to a thread:
 | Logistics | Ordered demand, supply, or freighter candidate range | Match, reservation, assignment, and movement proposals |
 | Actor orders | Ordered actor range within a system or spatial partition | Order transitions, movement requests, and fact proposals |
 
-This table defines architectural seams, not final public interfaces. Exact
-effect payloads belong to `TASK-009`, where current domain invariants can be
-inspected in detail. The accepted ownership, deterministic-wave, measurement,
-and `PhaseOneRuntime` migration contract is in
+This table defines architectural seams, not one general simulation-system
+interface. `TASK-009` implemented the current effect payloads, ownership,
+deterministic-wave, measurement, and acceptance-runtime migration contract
+described in
 [Runtime orchestration and domain ownership](runtime-orchestration.md).
 
 Later worker-count and batch-layout variants reuse the same scenario
