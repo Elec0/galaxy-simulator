@@ -28,9 +28,10 @@ for authoritative world state.
 
 **Decision status:** Accepted by the project owner on 2026-07-28.
 
-**Implementation status:** Completed by `TASK-008` on 2026-07-28. Presentation,
-persistent-script, save/load, and explanation-history integration remain with
-their owning follow-up tasks.
+**Implementation status:** Completed by `TASK-008` on 2026-07-28. `TASK-010`
+completed the presentation facade and cursor consumption. Persistent-script,
+save/load, and explanation-history integration remain with their owning
+follow-up tasks.
 
 ## Accepted model at a glance
 
@@ -476,7 +477,7 @@ avoidable allocation and make cursor handling unclear.
 
 Godot and other presentation callers keep a cursor, request new facts after
 refreshing world state, and build their own bounded notification views.
-`TASK-010` may add a presentation facade that composes a world snapshot with a
+`TASK-010` provides a presentation facade that composes a world snapshot with a
 fact batch without changing the underlying boundaries.
 
 ## 14. Save, load, and replay
@@ -545,7 +546,7 @@ session fact boundary.
 6. Add deterministic tests for same-time ordering, rejected commands, stale
    events, cancellation, connector transit, incremental advancement, retention,
    and worker/batch-layout invariance where batching exists.
-7. Let `TASK-010` consume the new fact query for presentation rather than
+7. `TASK-010` consumed the new fact query for presentation rather than
    embedding fact history in every world snapshot.
 
 ## Deferred choices

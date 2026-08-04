@@ -13,6 +13,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Navigation and spatial architecture](docs/navigation-architecture.md)
 - [Actor control and order lifecycle](docs/actor-control-and-orders.md)
 - [Semantic game facts](docs/semantic-game-facts.md)
+- [Presentation snapshots](docs/presentation-snapshots.md)
 - [Concurrency and performance architecture](docs/concurrency-and-performance.md)
 - [Scale targets and benchmark architecture](docs/scale-and-benchmark-targets.md)
 - [Economy and production](docs/economy.md)
@@ -97,10 +98,13 @@ acceptance scenario. The client advances automatically, renders authoritative
 system-local ship motion, and submits move or cancel commands through the same
 session boundary used by headless tests.
 
-Click a ship to select it, click empty system space to issue or replace its
-destination, Shift-click to append a destination, and right-click to cancel its
-active order. The status panel shows the active controller, queue length,
-current destination, order state and reason, and motion state.
+Click a ship to select and focus it. Shift-click ships to add or remove them
+from the local selection, while the focused ship remains the target for the
+current single-ship controls. Click empty system space to issue or replace its
+destination, Shift-click empty space to append a destination, and right-click
+to cancel its active order. The status panel shows the active controller, queue
+length, current destination, order state and reason, motion state, and bounded
+recent-fact feed status.
 
 Install the .NET edition of Godot, then open
 `src/GalaxyCommand.Godot/project.godot` in the editor. From this directory, the

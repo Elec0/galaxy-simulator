@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -13,18 +13,12 @@ rather than deleting them.
 
 ## Current focus
 
-`TASK-009` completed the reusable runtime-orchestration foundation. Select the
-next implementation task from the near-term list without broadening it into
-entity lifecycle, navigation migration, or new economy facts.
+`TASK-010` completed the presentation-snapshot foundation. Select the next
+implementation task from the near-term list without broadening it into entity
+lifecycle, navigation migration, economy facts, group commands, or new
+authoritative gameplay state.
 
 ## Near-term work
-
-- [ ] **TASK-010: Generalize presentation snapshots**
-  - Replace fixture-specific presentation assumptions incrementally.
-  - Add selection details, controller, current order, reason, and relevant
-    recent facts.
-  - Expose authoritative system-local spatial and motion state while preserving
-    rendering interpolation as non-authoritative presentation state.
 
 - [ ] **TASK-011: Define entity lifecycle and explicit spawning**
   - Distinguish causal construction from immediate scenario or scripted spawn.
@@ -157,7 +151,34 @@ prerequisites and desired behavior are sufficiently defined.
     and the existing distinction between facts and internal effects.
   - Context: [Semantic game facts](semantic-game-facts.md) · [Runtime orchestration](runtime-orchestration.md)
 
+- [ ] **TASK-033: Define selection sets and group or fleet commands**
+  - Define whether a command targets a transient presentation selection, a
+    persistent group, or both, without conflating either with simulation
+    authority.
+  - Define deterministic membership ordering, controller eligibility, command
+    acceptance, atomic versus partial outcomes, order ownership, cancellation,
+    failure, and semantic facts for multi-ship intent.
+  - Begin after `TASK-011` establishes entity lifecycle and identity. Build on
+    the shared actor-order lifecycle from `TASK-006` and the client-owned
+    selection contract in `TASK-010`.
+  - Context: [Presentation snapshots](presentation-snapshots.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
+
 ## Completed foundations
+
+- [x] **TASK-010: Generalize presentation snapshots**
+  - Added immutable presentation request, selection, and snapshot read models
+    around the existing clean-session world snapshot and cursor-based fact
+    query.
+  - Selection is a client-owned, `ShipId`-ordered set with an optional focused
+    ship. Resolution reports stale IDs without creating entity-lifecycle
+    semantics, and only explicitly ship-referencing facts appear in the
+    selected-ship subset.
+  - Godot now supports Shift-click multi-selection while retaining one focused
+    ship for its existing single-ship move and cancel commands. Cursor gaps
+    clear its bounded local fact feed and remain visible in status.
+  - Group commands remain in `TASK-033`; generic non-ship selection follows
+    entity lifecycle work in `TASK-011`.
+  - Context: [Presentation snapshots](presentation-snapshots.md)
 
 - [x] **TASK-009: Establish production runtime systems and retire `PhaseOneRuntime`**
   - Added fixed actor and economic coordinators, stable read/evaluate batches,
@@ -269,8 +290,8 @@ prerequisites and desired behavior are sufficiently defined.
     facts into world snapshots.
   - Deterministic tests cover rejection, cancellation, replacement, override
     restoration, connector traversal, stale events, retention, and incremental
-    advancement. Presentation consumption remains in `TASK-010`, persistent
-    scripts in `TASK-017`, and save boundaries in `TASK-014`.
+    advancement. Presentation consumption completed in `TASK-010`; persistent
+    scripts remain in `TASK-017`, and save boundaries in `TASK-014`.
   - Context: [Semantic game facts](semantic-game-facts.md)
 
 - [x] **TASK-024: Establish scale, performance, and concurrency targets**

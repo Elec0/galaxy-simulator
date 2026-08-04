@@ -6,26 +6,39 @@ namespace GalaxyCommand.GodotClient;
 public partial class GalaxyMap : Control
 {
 	private const float ShipHitRadius = 14.0f;
+	private readonly SortedSet<ShipId> _selectedShipIds = new(
+		Comparer<ShipId>.Create((first, second) =>
+			first.Value.CompareTo(second.Value)));
 	private GameSnapshot? _snapshot;
 
-	public event Action<ShipId>? ShipSelected;
+	public event Action? SelectionChanged;
 	public event Action<SystemPosition, OrderPlacement>? DestinationRequested;
 	public event Action<ShipId>? CancelRequested;
 
-	public ShipId? SelectedShipId { get; private set; }
+	public IReadOnlyList<ShipId> SelectedShipIds => _selectedShipIds.ToArray();
+
+	public ShipId? FocusedShipId { get; private set; }
 
 	public override void _Ready()
 	{
 		Resized += QueueRedraw;
 	}
 
-	public void Display(GameSnapshot snapshot)
+	public void Display(GamePresentationSnapshot presentation)
 	{
-		_snapshot = snapshot;
-		if (SelectedShipId is { } selected
-			&& snapshot.Ships.All(ship => ship.Id != selected))
+		ArgumentNullException.ThrowIfNull(presentation);
+		_snapshot = presentation.World;
+		foreach (ShipId unresolved in presentation.Selection.UnresolvedShipIds)
 		{
-			SelectedShipId = null;
+			_selectedShipIds.Remove(unresolved);
+		}
+
+		if (FocusedShipId is not { } focused
+			|| !_selectedShipIds.Contains(focused))
+		{
+			FocusedShipId = _selectedShipIds.Count == 0
+				? null
+				: _selectedShipIds.Min;
 		}
 
 		QueueRedraw();
@@ -42,9 +55,9 @@ public partial class GalaxyMap : Control
 
 		if (mouse.ButtonIndex == MouseButton.Right)
 		{
-			if (SelectedShipId is { } selected)
+			if (FocusedShipId is { } focused)
 			{
-				CancelRequested?.Invoke(selected);
+				CancelRequested?.Invoke(focused);
 				AcceptEvent();
 			}
 
@@ -63,14 +76,22 @@ public partial class GalaxyMap : Control
 				&& ToView(position).DistanceTo(mouse.Position) <= ShipHitRadius);
 		if (hit is not null)
 		{
-			SelectedShipId = hit.Id;
-			ShipSelected?.Invoke(hit.Id);
+			if (mouse.ShiftPressed)
+			{
+				ToggleSelection(hit.Id);
+			}
+			else
+			{
+				SelectOnly(hit.Id);
+			}
+
+			SelectionChanged?.Invoke();
 			QueueRedraw();
 			AcceptEvent();
 			return;
 		}
 
-		if (SelectedShipId is not null
+		if (FocusedShipId is not null
 			&& _snapshot.Systems.Count == 1)
 		{
 			OrderPlacement placement = mouse.ShiftPressed
@@ -130,7 +151,7 @@ public partial class GalaxyMap : Control
 				DrawCircle(target, 4.0f, new Color("70c7e8"), false, 1.5f, true);
 			}
 
-			bool selected = ship.Id == SelectedShipId;
+			bool selected = _selectedShipIds.Contains(ship.Id);
 			if (selected)
 			{
 				DrawArc(
@@ -156,6 +177,31 @@ public partial class GalaxyMap : Control
 
 	private static bool ShouldDrawRoute(ShipOrderSnapshot? order) =>
 		order?.Status is ShipOrderStatus.Active or ShipOrderStatus.Waiting;
+
+	private void SelectOnly(ShipId shipId)
+	{
+		_selectedShipIds.Clear();
+		_selectedShipIds.Add(shipId);
+		FocusedShipId = shipId;
+	}
+
+	private void ToggleSelection(ShipId shipId)
+	{
+		if (_selectedShipIds.Remove(shipId))
+		{
+			if (FocusedShipId == shipId)
+			{
+				FocusedShipId = _selectedShipIds.Count == 0
+					? null
+					: _selectedShipIds.Min;
+			}
+
+			return;
+		}
+
+		_selectedShipIds.Add(shipId);
+		FocusedShipId = shipId;
+	}
 
 	private Vector2 ToView(SystemPosition position) =>
 		new(

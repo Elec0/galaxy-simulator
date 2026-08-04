@@ -31,6 +31,17 @@ public sealed class GameSession : IGameplayCommandHandler
     public GameSnapshot CaptureSnapshot() =>
         _runtime.CaptureSnapshot();
 
+    public GamePresentationSnapshot CapturePresentation(
+        GamePresentationRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        GameSnapshot world = CaptureSnapshot();
+        GameFactReadResult facts = ReadFactsAfter(
+            request.FactCursor,
+            request.MaximumFactCount);
+        return GamePresentationSnapshotFactory.Create(world, request, facts);
+    }
+
     public GameplayCommandRecord SubmitCommand(
         CommandSource source,
         GameplayCommand command) =>

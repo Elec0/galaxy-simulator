@@ -6,6 +6,8 @@ namespace GalaxyCommand.GodotClient;
 public partial class Main : Node
 {
 	private const double SimulationMillisecondsPerRealSecond = 1_000;
+	private const int MaximumFactCountPerRefresh = 64;
+	private const int MaximumRecentFacts = 32;
 	private static readonly SystemId InitialSystemId = new(1);
 	private static readonly ShipId InitialShipId = new(1);
 
@@ -15,7 +17,11 @@ public partial class Main : Node
 	private GameSession _session = null!;
 	private GalaxyMap _map = null!;
 	private Label _status = null!;
+	private readonly List<GameFactEnvelope> _recentFacts = [];
 	private double _targetMilliseconds;
+	private GameFactSequence? _factCursor;
+	private bool _factHistoryTruncated;
+	private GamePresentationSnapshot _presentation = null!;
 	private string _lastCommandStatus = "Select a ship";
 
 	public override void _Ready()
@@ -23,7 +29,7 @@ public partial class Main : Node
 		_session = CreateSession();
 		_map = GetNode<GalaxyMap>("GalaxyMap");
 		_status = GetNode<Label>("Interface/StatusPanel/Margin/Status");
-		_map.ShipSelected += OnShipSelected;
+		_map.SelectionChanged += OnSelectionChanged;
 		_map.DestinationRequested += OnDestinationRequested;
 		_map.CancelRequested += OnCancelRequested;
 		AdvanceTo(SimulationTime.Zero);
@@ -57,9 +63,11 @@ public partial class Main : Node
 			new DirectLocalNavigationPlanner(new MapTravelTimeEstimator()));
 	}
 
-	private void OnShipSelected(ShipId shipId)
+	private void OnSelectionChanged()
 	{
-		_lastCommandStatus = $"Selected ship {shipId}";
+		_lastCommandStatus = _map.FocusedShipId is { } focused
+			? $"Focused ship {focused}"
+			: "Select a ship";
 		RefreshPresentation();
 	}
 
@@ -67,7 +75,7 @@ public partial class Main : Node
 		SystemPosition destination,
 		OrderPlacement placement)
 	{
-		if (_map.SelectedShipId is not { } shipId)
+		if (_map.FocusedShipId is not { } shipId)
 		{
 			return;
 		}
@@ -84,9 +92,10 @@ public partial class Main : Node
 
 	private void OnCancelRequested(ShipId shipId)
 	{
-		ShipOrderSnapshot? current = _session.CaptureSnapshot().Ships
-			.SingleOrDefault(ship => ship.Id == shipId)
-			?.CurrentOrder;
+		ShipOrderSnapshot? current = _presentation.Selection.FocusedShip is { } focused
+			&& focused.Id == shipId
+				? focused.CurrentOrder
+				: null;
 		if (current is null
 			|| current.Status is ShipOrderStatus.Completed
 				or ShipOrderStatus.Cancelled
@@ -112,12 +121,17 @@ public partial class Main : Node
 
 	private void RefreshPresentation()
 	{
-		GameSnapshot snapshot = _session.CaptureSnapshot();
-		_map.Display(snapshot);
+		_presentation = _session.CapturePresentation(
+			new GamePresentationRequest(
+				_map.SelectedShipIds,
+				_map.FocusedShipId,
+				_factCursor,
+				MaximumFactCountPerRefresh));
+		_map.Display(_presentation);
+		ConsumeFacts(_presentation.Facts);
 
-		GameShipSnapshot? selected = _map.SelectedShipId is { } selectedId
-			? snapshot.Ships.SingleOrDefault(ship => ship.Id == selectedId)
-			: null;
+		GameSnapshot snapshot = _presentation.World;
+		GameShipSnapshot? selected = _presentation.Selection.FocusedShip;
 		string order = selected?.CurrentOrder is { } current
 			? $"{current.Status} / {current.Reason} / {DescribeDestination(current.Destination)}"
 			: "No current order";
@@ -132,11 +146,34 @@ public partial class Main : Node
 		string queue = selected is null
 			? "QUEUE 0"
 			: $"QUEUE {selected.QueuedOrders.Count}";
+		string facts = _factHistoryTruncated
+			? "FACT HISTORY INCOMPLETE"
+			: $"FACTS {_recentFacts.Count}";
 
 		_status.Text =
 			$"SIM {FormatTime(snapshot.Time)}   |   SHIPS {snapshot.Ships.Count}   |   " +
 			$"{control}   |   {queue}   |   {_lastCommandStatus}   |   " +
-			$"{order}   |   {motion}";
+			$"{order}   |   {motion}   |   {facts}";
+	}
+
+	private void ConsumeFacts(GameFactReadResult facts)
+	{
+		if (facts.CursorGap)
+		{
+			_recentFacts.Clear();
+			_factHistoryTruncated = true;
+		}
+
+		foreach (GameFactEnvelope fact in facts.Facts)
+		{
+			_recentFacts.Add(fact);
+			_factCursor = fact.Sequence;
+		}
+
+		if (_recentFacts.Count > MaximumRecentFacts)
+		{
+			_recentFacts.RemoveRange(0, _recentFacts.Count - MaximumRecentFacts);
+		}
 	}
 
 	private static string DescribeResult(GameplayCommandRecord record) =>
