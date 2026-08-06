@@ -57,6 +57,9 @@ public sealed class Inventory
 
     public Quantity ReservedCapacity { get; private set; }
 
+    internal bool HasCommitments =>
+        _reservations.Count > 0 || _capacityReservations.Count > 0;
+
     public Quantity RemainingCapacity =>
         new(Capacity.Units - TotalStored.Units - ReservedCapacity.Units);
 
@@ -286,6 +289,9 @@ public sealed class InventoryRegistry
         _inventories.ContainsKey(inventoryId);
 
     public Inventory? Get(InventoryId inventoryId) => _inventories.GetValueOrDefault(inventoryId);
+
+    internal bool ApplyRemove(InventoryId inventoryId) =>
+        _inventories.Remove(inventoryId);
 
     public Reservation TransferReserved(
         InventoryId sourceId,

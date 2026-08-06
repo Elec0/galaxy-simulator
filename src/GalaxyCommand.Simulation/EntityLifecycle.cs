@@ -129,6 +129,76 @@ public abstract record ConstructionEntityMaterializationResult
         : ConstructionEntityMaterializationResult;
 }
 
+public enum EntityRemovalReason
+{
+    Despawned,
+    Destroyed,
+}
+
+public enum EntityCargoDisposition
+{
+    DiscardCargo,
+}
+
+public sealed record EntityRemovalRequest
+{
+    public EntityRemovalRequest(
+        EntityId entityId,
+        EntityRemovalReason reason,
+        EntityCargoDisposition cargoDisposition)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(entityId.Value);
+        if (!Enum.IsDefined(reason))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(reason),
+                reason,
+                "Unknown entity removal reason.");
+        }
+
+        if (!Enum.IsDefined(cargoDisposition))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(cargoDisposition),
+                cargoDisposition,
+                "Unknown entity cargo disposition.");
+        }
+
+        EntityId = entityId;
+        Reason = reason;
+        CargoDisposition = cargoDisposition;
+    }
+
+    public EntityId EntityId { get; }
+
+    public EntityRemovalReason Reason { get; }
+
+    public EntityCargoDisposition CargoDisposition { get; }
+}
+
+public enum EntityRemovalRejectionReason
+{
+    MissingEntity,
+    CargoHasCommitments,
+    OwnerConflict,
+}
+
+public abstract record EntityRemovalResult
+{
+    private EntityRemovalResult()
+    {
+    }
+
+    public sealed record Removed(
+        EntityRemovalRequest Request,
+        ShipId ShipId,
+        InventoryId CargoInventoryId) : EntityRemovalResult;
+
+    public sealed record Rejected(
+        EntityRemovalRequest Request,
+        EntityRemovalRejectionReason Reason) : EntityRemovalResult;
+}
+
 internal sealed class GameSessionShipRegistry
 {
     private readonly SortedDictionary<ShipId, GameSessionShip> _ships =
@@ -141,6 +211,9 @@ internal sealed class GameSessionShipRegistry
 
     internal void ApplyAdd(GameSessionShip ship) =>
         _ships.Add(ship.Id, ship);
+
+    internal bool ApplyRemove(ShipId shipId) =>
+        _ships.Remove(shipId);
 }
 
 /// <summary>
@@ -180,6 +253,40 @@ public sealed class EntityRegistry
         _shipsByEntity.Add(entityId, shipId);
         _entitiesByShip.Add(shipId, entityId);
     }
+
+    internal bool ApplyRemoveShip(EntityId entityId, ShipId shipId)
+    {
+        if (!_shipsByEntity.TryGetValue(entityId, out ShipId registeredShip)
+            || registeredShip != shipId
+            || !_entitiesByShip.TryGetValue(shipId, out EntityId registeredEntity)
+            || registeredEntity != entityId)
+        {
+            return false;
+        }
+
+        _shipsByEntity.Remove(entityId);
+        _entitiesByShip.Remove(shipId);
+        return true;
+    }
+}
+
+internal sealed record PreparedEntityRemoval(
+    EntityRemovalRequest Request,
+    ShipId ShipId,
+    InventoryId CargoInventoryId,
+    IReadOnlyList<TargetedShipOrder> InboundOrders);
+
+internal abstract record EntityRemovalPreparation
+{
+    private EntityRemovalPreparation()
+    {
+    }
+
+    internal sealed record Prepared(PreparedEntityRemoval Value)
+        : EntityRemovalPreparation;
+
+    internal sealed record Resolved(EntityRemovalResult Value)
+        : EntityRemovalPreparation;
 }
 
 /// <summary>
@@ -199,6 +306,8 @@ internal sealed class EntityLifecycleOwner
     private readonly SortedDictionary<FacilityId, ShipMaterializationPolicy> _policies;
     private readonly SortedDictionary<MaterializationKey, ConstructionEntityMaterializationResult.Materialized>
         _receipts = new();
+    private readonly SortedDictionary<EntityId, EntityRemovalResult.Removed> _removalReceipts =
+        new(EntityIdComparer<EntityId>.Instance);
     private readonly GameSessionShipRegistry _ships = new();
     private readonly IdSequence<ShipId> _shipIds = new();
 
@@ -417,6 +526,85 @@ internal sealed class EntityLifecycleOwner
         }
 
         return results.AsReadOnly();
+    }
+
+    internal EntityRemovalPreparation PrepareRemoval(EntityRemovalRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (_removalReceipts.TryGetValue(request.EntityId, out EntityRemovalResult.Removed? receipt))
+        {
+            return receipt.Request == request
+                ? new EntityRemovalPreparation.Resolved(receipt)
+                : new EntityRemovalPreparation.Resolved(
+                    new EntityRemovalResult.Rejected(
+                        request,
+                        EntityRemovalRejectionReason.MissingEntity));
+        }
+
+        ShipId? resolvedShipId = _entities.GetShipId(request.EntityId);
+        if (resolvedShipId is not { } shipId)
+        {
+            return new EntityRemovalPreparation.Resolved(
+                new EntityRemovalResult.Rejected(
+                    request,
+                    EntityRemovalRejectionReason.MissingEntity));
+        }
+
+        GameSessionShip? ship = _ships.Get(shipId);
+        Inventory? cargo = ship is null
+            ? null
+            : _inventories.Get(ship.CargoInventoryId);
+        if (ship is null
+            || cargo is null
+            || !_movement.Contains(shipId)
+            || !_control.Contains(shipId)
+            || !_orders.Contains(shipId)
+            || _entities.GetEntityId(shipId) != request.EntityId)
+        {
+            return new EntityRemovalPreparation.Resolved(
+                new EntityRemovalResult.Rejected(
+                    request,
+                    EntityRemovalRejectionReason.OwnerConflict));
+        }
+
+        if (cargo.HasCommitments)
+        {
+            return new EntityRemovalPreparation.Resolved(
+                new EntityRemovalResult.Rejected(
+                    request,
+                    EntityRemovalRejectionReason.CargoHasCommitments));
+        }
+
+        return new EntityRemovalPreparation.Prepared(
+            new PreparedEntityRemoval(
+                request,
+                shipId,
+                ship.CargoInventoryId,
+                _orders.PrepareTargetRemoval(request.EntityId, shipId)));
+    }
+
+    internal EntityRemovalResult ApplyRemoval(
+        PreparedEntityRemoval removal,
+        SimulationTime now)
+    {
+        ArgumentNullException.ThrowIfNull(removal);
+        if (!_movement.CommitRemove(removal.ShipId, now)
+            || !_orders.Remove(removal.ShipId)
+            || !_control.Remove(removal.ShipId)
+            || !_inventories.ApplyRemove(removal.CargoInventoryId)
+            || !_ships.ApplyRemove(removal.ShipId)
+            || !_entities.ApplyRemoveShip(removal.Request.EntityId, removal.ShipId))
+        {
+            throw new InvalidOperationException(
+                $"Prepared entity removal {removal.Request.EntityId} failed during apply; the session is no longer valid.");
+        }
+
+        var result = new EntityRemovalResult.Removed(
+            removal.Request,
+            removal.ShipId,
+            removal.CargoInventoryId);
+        _removalReceipts.Add(removal.Request.EntityId, result);
+        return result;
     }
 
     private ConstructionMaterializationDeferredReason? ValidateMaterialization(

@@ -26,7 +26,12 @@ retains a durable pending materialization until idempotent acknowledgement.
 Facility policies drive deterministic runtime ship materialization, including
 stable facility-order batching, complete component publication, committed
 identity receipts, and rejection atomicity. `PhaseOneShipMaterializer` remains
-acceptance-only. Complete removal and lifecycle facts remain pending.
+acceptance-only. Clean-session removal now invalidates active, queued, and
+suspended entity-target orders, cancels affected local motion, removes every
+live ship owner with entity publication removed last, rejects reserved cargo,
+records `EntityRemovedFact`, and leaves scheduled activity as deterministic
+missing-reference work. Construction materialization facts and integration with
+future clean-session economic and transport owners remain pending.
 
 ## Starting point
 
@@ -255,6 +260,14 @@ and suspended tests rather than leaving cleanup to a later navigation task.
 The lifecycle owner sends typed proposals to each owner and applies owner groups
 in this order, with stable IDs inside a group. It never relies on locks or
 concurrent completion order.
+
+The current clean `GameSession` does not host the legacy economic and transport
+runtime, so clean-session ships cannot yet acquire transport jobs or external
+inventory commitments. Removal nevertheless rejects a cargo inventory that has
+material or capacity reservations. When those owners join the clean session,
+their prepare and release operations must be inserted before cargo removal;
+this slice does not treat absence of that integration as completed transport
+cleanup.
 
 ## Facts, snapshots, and commands
 

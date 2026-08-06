@@ -51,6 +51,17 @@ public sealed record ScheduledEventFactCause : GameFactCause
     public EventKey Key { get; }
 }
 
+public sealed record EntityRemovalFactCause : GameFactCause
+{
+    public EntityRemovalFactCause(EntityRemovalRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        Request = request;
+    }
+
+    public EntityRemovalRequest Request { get; }
+}
+
 /// <summary>
 /// Typed gameplay meaning committed by the authoritative simulation.
 /// </summary>
@@ -59,6 +70,53 @@ public abstract record GameFact
     private protected GameFact()
     {
     }
+}
+
+public sealed record EntityRemovedFact : GameFact
+{
+    public EntityRemovedFact(
+        EntityId entityId,
+        EntityKind kind,
+        ShipId shipId,
+        EntityRemovalReason reason,
+        EntityCargoDisposition cargoDisposition)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(entityId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown entity kind.");
+        }
+
+        if (!Enum.IsDefined(reason))
+        {
+            throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unknown removal reason.");
+        }
+
+        if (!Enum.IsDefined(cargoDisposition))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(cargoDisposition),
+                cargoDisposition,
+                "Unknown cargo disposition.");
+        }
+
+        EntityId = entityId;
+        Kind = kind;
+        ShipId = shipId;
+        Reason = reason;
+        CargoDisposition = cargoDisposition;
+    }
+
+    public EntityId EntityId { get; }
+
+    public EntityKind Kind { get; }
+
+    public ShipId ShipId { get; }
+
+    public EntityRemovalReason Reason { get; }
+
+    public EntityCargoDisposition CargoDisposition { get; }
 }
 
 public sealed record CommandAcceptedFact : GameFact
@@ -180,6 +238,7 @@ public enum LocalMotionEndReason
     ReplacedByCommand,
     SuspendedByScriptedOverride,
     ScriptedOverrideEnded,
+    TargetRemoved,
 }
 
 public sealed record ShipLocalMotionStartedFact : GameFact
@@ -389,6 +448,7 @@ internal enum GameFactCommitCategory
     PhysicalWorkEnded,
     OrderTransition,
     PhysicalWorkStarted,
+    EntityLifecycle,
 }
 
 internal readonly record struct GameFactProposalKey(

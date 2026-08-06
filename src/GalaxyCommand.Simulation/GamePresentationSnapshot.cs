@@ -182,6 +182,7 @@ internal static class GamePresentationSnapshotFactory
             ShipLocalMotionEndedFact ended => ended.ShipId,
             ShipConnectorTransitStartedFact started => started.ShipId,
             ShipConnectorTransitCompletedFact completed => completed.ShipId,
+            EntityRemovedFact removed => removed.ShipId,
             _ => null,
         };
     }

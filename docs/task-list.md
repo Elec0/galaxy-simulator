@@ -26,8 +26,11 @@ migration, group commands, or a general entity-storage model.
     registration, explicit setup ID high-water marks, snapshot identity, and the
     durable construction materialization handoff are implemented. Facility
     policies now drive stable-order, atomic runtime ship materialization with
-    idempotent committed-identity receipts. Complete removal and lifecycle
-    facts remain pending. Context:
+    idempotent committed-identity receipts. Clean-session removal now covers
+    entity-target order invalidation, spatial/control/order/cargo cleanup,
+    idempotent removal, stale events, presentation resolution, and removal
+    facts. Construction materialization facts and future clean-session
+    economic/transport owner integration remain pending. Context:
     [Entity lifecycle and explicit spawning](entity-lifecycle.md).
   - Distinguish causal construction from immediate scenario or scripted spawn.
   - Define spawn validation, ownership, design, system-local position, initial

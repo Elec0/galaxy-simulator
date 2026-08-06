@@ -155,23 +155,69 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         };
     }
 
-    /// <summary>
-    /// Internal cleanup boundary for the future actor-destruction command.
-    /// TASK-011 remains responsible for deciding when destruction is valid.
-    /// </summary>
-    internal void RemoveActor(ShipId shipId)
+    internal EntityRemovalResult RemoveEntity(EntityRemovalRequest request)
     {
-        if (!_orders.Contains(shipId)
-            || !_control.Contains(shipId)
-            || !_movement.Contains(shipId))
+        EntityRemovalPreparation preparation = _lifecycle.PrepareRemoval(request);
+        if (preparation is EntityRemovalPreparation.Resolved resolved)
         {
-            throw new InvalidOperationException(
-                $"Actor {shipId} did not exist in every runtime owner.");
+            return resolved.Value;
         }
 
-        _movement.CommitRemove(shipId, CurrentTime);
-        _orders.Remove(shipId);
-        _control.Remove(shipId);
+        PreparedEntityRemoval removal =
+            ((EntityRemovalPreparation.Prepared)preparation).Value;
+        var transitions = new List<ShipOrderTransition>();
+        var factProposals = new List<GameFactProposal>();
+        TargetedShipOrder[] applyOrder = removal.InboundOrders
+            .OrderBy(targeted => targeted.WasCurrentActive)
+            .ThenBy(targeted => targeted.ShipId.Value)
+            .ThenBy(targeted => targeted.OrderId.Value)
+            .ToArray();
+        foreach (TargetedShipOrder targeted in applyOrder)
+        {
+            if (targeted.WasCurrentActive)
+            {
+                EndActiveLocalMotion(
+                    targeted.ShipId,
+                    LocalMotionEndReason.TargetRemoved,
+                    factProposals);
+            }
+
+            _orders.ApplyTargetRemoval(targeted, transitions);
+        }
+
+        EntityRemovalResult result = _lifecycle.ApplyRemoval(removal, CurrentTime);
+        foreach (ShipId shipId in removal.InboundOrders
+                     .Where(targeted => targeted.WasCurrentActive)
+                     .Select(targeted => targeted.ShipId)
+                     .Distinct()
+                     .OrderBy(shipId => shipId.Value))
+        {
+            StartOrContinueOrders(shipId, transitions, factProposals);
+        }
+
+        AddOrderTransitionProposals(
+            transitions
+                .OrderBy(transition => transition.ShipId.Value)
+                .ThenBy(transition => transition.OrderId.Value),
+            factProposals);
+        var removed = (EntityRemovalResult.Removed)result;
+        factProposals.Add(new GameFactProposal(
+            new GameFactProposalKey(
+                GameFactCommitCategory.EntityLifecycle,
+                removed.Request.EntityId.Value,
+                removed.ShipId.Value,
+                0),
+            new EntityRemovedFact(
+                removed.Request.EntityId,
+                EntityKind.Ship,
+                removed.ShipId,
+                removed.Request.Reason,
+                removed.Request.CargoDisposition)));
+        _facts.Commit(
+            CurrentTime,
+            new EntityRemovalFactCause(removed.Request),
+            factProposals);
+        return result;
     }
 
     public void Reconcile(SimulationTime now, EventAgenda<GameEvent> agenda)
@@ -867,12 +913,36 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     private NavigationPlanResult Plan(
         ShipId shipId,
         SystemPosition origin,
-        NavigationDestination destination) =>
-        _navigation.Plan(new NavigationRequest(
+        NavigationDestination destination)
+    {
+        NavigationDestination planningDestination = destination;
+        if (destination is NavigationDestination.Entity entity)
+        {
+            ShipId? targetShipId = _lifecycle.Entities.GetShipId(entity.EntityId);
+            SystemPosition? targetPosition = targetShipId is { } target
+                ? _movement.PositionAt(target, CurrentTime)
+                : null;
+            if (targetPosition is null)
+            {
+                return new NavigationPlanResult.Unreachable(
+                    NavigationFailureReason.EntityUnavailable);
+            }
+
+            planningDestination = new NavigationDestination.Position(
+                targetPosition.Value);
+        }
+
+        NavigationPlanResult result = _navigation.Plan(new NavigationRequest(
             shipId,
             origin,
-            destination,
+            planningDestination,
             CurrentTime));
+        return result is NavigationPlanResult.Planned planned
+            && planningDestination != destination
+            ? new NavigationPlanResult.Planned(
+                new TravelPlan(destination, planned.Plan.Legs))
+            : result;
+    }
 
     private void ValidateExecutablePlan(
         SystemPosition origin,
@@ -911,14 +981,9 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             }
         }
 
-        bool destinationSatisfied = destination switch
-        {
-            NavigationDestination.Position position =>
-                expectedOrigin == position.Value,
-            NavigationDestination.System system =>
-                expectedOrigin.SystemId == system.SystemId,
-            _ => false,
-        };
+        bool destinationSatisfied = DestinationSatisfied(
+            expectedOrigin,
+            destination);
         if (!destinationSatisfied)
         {
             throw new InvalidOperationException(
@@ -946,7 +1011,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         }
     }
 
-    private static bool DestinationSatisfied(
+    private bool DestinationSatisfied(
         SystemPosition current,
         NavigationDestination destination) =>
         destination switch
@@ -955,6 +1020,9 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                 current == position.Value,
             NavigationDestination.System system =>
                 current.SystemId == system.SystemId,
+            NavigationDestination.Entity entity =>
+                _lifecycle.Entities.GetShipId(entity.EntityId) is { } targetShipId
+                && _movement.PositionAt(targetShipId, CurrentTime) == current,
             _ => false,
         };
 

@@ -258,6 +258,17 @@ public abstract record NavigationDestination
 
         public SystemId SystemId { get; }
     }
+
+    public sealed record Entity : NavigationDestination
+    {
+        public Entity(EntityId entityId)
+        {
+            ArgumentOutOfRangeException.ThrowIfZero(entityId.Value);
+            EntityId = entityId;
+        }
+
+        public EntityId EntityId { get; }
+    }
 }
 
 /// <summary>
@@ -405,6 +416,7 @@ public enum NavigationFailureReason
 {
     InterSystemConnectorRequired,
     NoConnectorPath,
+    EntityUnavailable,
 }
 
 /// <summary>

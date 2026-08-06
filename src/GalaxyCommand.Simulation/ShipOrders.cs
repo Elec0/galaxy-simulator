@@ -31,6 +31,7 @@ public enum ShipOrderReason
     ScriptedOverrideEnded,
     WaitingForConnectorTransitCompletion,
     DestinationBecameUnreachable,
+    TargetRemoved,
 }
 
 public sealed record ShipOrderSnapshot(
@@ -55,6 +56,12 @@ internal sealed record ShipOrderTransition(
     ShipOrderStatus? PreviousStatus,
     ShipOrderStatus NextStatus,
     ShipOrderReason Reason);
+
+internal sealed record TargetedShipOrder(
+    ShipId ShipId,
+    ShipOrderId OrderId,
+    EntityId TargetEntityId,
+    bool WasCurrentActive);
 
 internal sealed class ShipOrderCoordinator
 {
@@ -407,6 +414,103 @@ internal sealed class ShipOrderCoordinator
         return actor.Base.Active;
     }
 
+    internal IReadOnlyList<TargetedShipOrder> PrepareTargetRemoval(
+        EntityId targetEntityId,
+        ShipId removedShipId)
+    {
+        var targeted = new List<TargetedShipOrder>();
+        foreach ((ShipId shipId, ActorOrders actor) in _actors)
+        {
+            if (shipId == removedShipId)
+            {
+                continue;
+            }
+
+            AddTargetedOrders(
+                targeted,
+                shipId,
+                actor,
+                actor.Base,
+                targetEntityId);
+            if (actor.Override is { } overrideWork)
+            {
+                AddTargetedOrders(
+                    targeted,
+                    shipId,
+                    actor,
+                    overrideWork,
+                    targetEntityId);
+            }
+        }
+
+        return targeted
+            .OrderBy(reference => reference.ShipId.Value)
+            .ThenBy(reference => reference.OrderId.Value)
+            .ToArray();
+    }
+
+    internal void ApplyTargetRemoval(
+        TargetedShipOrder targeted,
+        ICollection<ShipOrderTransition> transitions)
+    {
+        ArgumentNullException.ThrowIfNull(targeted);
+        ArgumentNullException.ThrowIfNull(transitions);
+        ActorOrders actor = GetRequired(targeted.ShipId);
+        (WorkSet Work, ShipOrder Order, bool IsActive)? located =
+            FindOrder(actor, targeted.OrderId);
+        if (located is not { } match
+            || match.Order.Destination is not NavigationDestination.Entity entity
+            || entity.EntityId != targeted.TargetEntityId)
+        {
+            throw new InvalidOperationException(
+                $"Prepared targeted order {targeted.OrderId} changed before removal commit.");
+        }
+
+        bool isCurrentActive = match.IsActive
+            && ReferenceEquals(CurrentWork(actor), match.Work);
+        if (isCurrentActive != targeted.WasCurrentActive)
+        {
+            throw new InvalidOperationException(
+                $"Prepared targeted order {targeted.OrderId} changed activity before removal commit.");
+        }
+
+        if (match.IsActive)
+        {
+            Finish(
+                targeted.ShipId,
+                match.Work,
+                match.Order,
+                ShipOrderStatus.Failed,
+                ShipOrderReason.TargetRemoved,
+                transitions);
+            if (ReferenceEquals(CurrentWork(actor), match.Work))
+            {
+                Promote(targeted.ShipId, match.Work, transitions);
+            }
+            else if (ReferenceEquals(actor.Base, match.Work)
+                     && actor.Override is not null)
+            {
+                PromoteSuspended(targeted.ShipId, match.Work, transitions);
+            }
+
+            return;
+        }
+
+        if (!match.Work.Queue.Remove(match.Order))
+        {
+            throw new InvalidOperationException(
+                $"Prepared queued order {targeted.OrderId} disappeared before removal commit.");
+        }
+
+        Transition(
+            targeted.ShipId,
+            match.Order,
+            ShipOrderStatus.Failed,
+            ShipOrderReason.TargetRemoved,
+            transitions);
+        match.Work.LastTerminal = match.Order;
+    }
+
     internal bool Remove(ShipId shipId) =>
         _actors.Remove(shipId);
 
@@ -480,6 +584,84 @@ internal sealed class ShipOrderCoordinator
             next,
             ShipOrderReason.MovingToDestination,
             transitions);
+    }
+
+    private static void PromoteSuspended(
+        ShipId shipId,
+        WorkSet work,
+        ICollection<ShipOrderTransition> transitions)
+    {
+        if (work.Active is not null || work.Queue.Count == 0)
+        {
+            return;
+        }
+
+        ShipOrder next = work.Queue[0];
+        work.Queue.RemoveAt(0);
+        Transition(
+            shipId,
+            next,
+            ShipOrderStatus.Suspended,
+            ShipOrderReason.SuspendedByScriptedOverride,
+            transitions);
+        work.Active = next;
+    }
+
+    private static void AddTargetedOrders(
+        List<TargetedShipOrder> targeted,
+        ShipId shipId,
+        ActorOrders actor,
+        WorkSet work,
+        EntityId targetEntityId)
+    {
+        if (work.Active is { } active
+            && Targets(active, targetEntityId))
+        {
+            targeted.Add(new TargetedShipOrder(
+                shipId,
+                active.Id,
+                targetEntityId,
+                ReferenceEquals(CurrentWork(actor), work)));
+        }
+
+        foreach (ShipOrder queued in work.Queue)
+        {
+            if (Targets(queued, targetEntityId))
+            {
+                targeted.Add(new TargetedShipOrder(
+                    shipId,
+                    queued.Id,
+                    targetEntityId,
+                    false));
+            }
+        }
+    }
+
+    private static bool Targets(ShipOrder order, EntityId targetEntityId) =>
+        order.Destination is NavigationDestination.Entity entity
+        && entity.EntityId == targetEntityId;
+
+    private static (WorkSet Work, ShipOrder Order, bool IsActive)? FindOrder(
+        ActorOrders actor,
+        ShipOrderId orderId)
+    {
+        foreach (WorkSet work in actor.Override is { } overrideWork
+                     ? new[] { actor.Base, overrideWork }
+                     : new[] { actor.Base })
+        {
+            if (work.Active is { } active && active.Id == orderId)
+            {
+                return (work, active, true);
+            }
+
+            ShipOrder? queued = work.Queue.FirstOrDefault(order => order.Id == orderId);
+            if (queued is not null)
+            {
+                return (work, queued, false);
+            }
+        }
+
+        return null;
     }
 
     private static void CancelWork(

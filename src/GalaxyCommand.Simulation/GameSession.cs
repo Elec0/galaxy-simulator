@@ -41,6 +41,9 @@ public sealed class GameSession : IGameplayCommandHandler
             IEnumerable<ConstructionProcess> sources) =>
         _runtime.MaterializePendingConstruction(sources);
 
+    public EntityRemovalResult RemoveEntity(EntityRemovalRequest request) =>
+        _runtime.RemoveEntity(request);
+
     public RunReport AdvanceTo(SimulationTime target) =>
         _runtime.AdvanceTo(target);
 
