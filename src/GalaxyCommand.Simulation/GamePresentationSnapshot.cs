@@ -172,6 +172,10 @@ internal static class GamePresentationSnapshotFactory
         HashSet<ShipId> selectedIds) =>
         GetShipId(fact) is { } shipId && selectedIds.Contains(shipId);
 
+    /// <summary>
+    /// Resolves the ship identity carried by fact kinds that participate in
+    /// selected-ship presentation filtering.
+    /// </summary>
     private static ShipId? GetShipId(GameFact fact)
     {
         ArgumentNullException.ThrowIfNull(fact);
@@ -182,6 +186,7 @@ internal static class GamePresentationSnapshotFactory
             ShipLocalMotionEndedFact ended => ended.ShipId,
             ShipConnectorTransitStartedFact started => started.ShipId,
             ShipConnectorTransitCompletedFact completed => completed.ShipId,
+            EntityMaterializedFact materialized => materialized.ShipId,
             EntityRemovedFact removed => removed.ShipId,
             _ => null,
         };

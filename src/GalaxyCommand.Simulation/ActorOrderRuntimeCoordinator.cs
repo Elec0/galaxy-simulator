@@ -84,13 +84,74 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
 
     internal ConstructionEntityMaterializationResult MaterializeConstruction(
         ConstructionProcess source,
-        ConstructionMaterializationEffect effect) =>
-        _lifecycle.MaterializeConstruction(source, effect, CurrentTime);
+        ConstructionMaterializationEffect effect)
+    {
+        ConstructionMaterializationCommit commit =
+            _lifecycle.MaterializeConstruction(source, effect, CurrentTime);
+        CommitMaterializationFact(commit);
+        return commit.Result;
+    }
 
+    /// <summary>
+    /// Commits pending construction in lifecycle-defined stable order and
+    /// records facts in that same order for newly applied results.
+    /// </summary>
     internal IReadOnlyList<ConstructionEntityMaterializationResult>
         MaterializePendingConstruction(
-            IEnumerable<ConstructionProcess> sources) =>
-        _lifecycle.MaterializePendingConstruction(sources, CurrentTime);
+            IEnumerable<ConstructionProcess> sources)
+    {
+        IReadOnlyList<ConstructionMaterializationCommit> commits =
+            _lifecycle.MaterializePendingConstruction(sources, CurrentTime);
+        foreach (ConstructionMaterializationCommit commit in commits)
+        {
+            CommitMaterializationFact(commit);
+        }
+
+        return commits.Select(commit => commit.Result).ToArray();
+    }
+
+    /// <summary>
+    /// Emits one lifecycle fact for a newly applied materialization and emits
+    /// nothing for deferred or idempotently repeated results.
+    /// </summary>
+    private void CommitMaterializationFact(ConstructionMaterializationCommit commit)
+    {
+        if (!commit.WasApplied
+            || commit.Result is not ConstructionEntityMaterializationResult.Materialized materialized)
+        {
+            return;
+        }
+
+        GameSessionShip ship = _lifecycle.GetRequiredShip(materialized.ShipId);
+        SystemPosition position = _movement.PositionAt(materialized.ShipId, CurrentTime)
+            ?? throw new InvalidOperationException(
+                $"Materialized ship {materialized.ShipId} has no initial position.");
+        GameFactCause cause = materialized.Effect.CompletionEventKey is { } eventKey
+            ? new ScheduledEventFactCause(eventKey)
+            : new ConstructionMaterializationFactCause(
+                materialized.Effect.FacilityId,
+                materialized.Effect.OrderId,
+                materialized.Effect.Generation);
+        _facts.Commit(
+            CurrentTime,
+            cause,
+            [
+                new GameFactProposal(
+                    new GameFactProposalKey(
+                        GameFactCommitCategory.EntityLifecycle,
+                        materialized.EntityId.Value,
+                        materialized.ShipId.Value,
+                        0),
+                    new EntityMaterializedFact(
+                        materialized.EntityId,
+                        EntityKind.Ship,
+                        materialized.ShipId,
+                        EntityMaterializationSourceKind.Construction,
+                        ship.OrganizationId,
+                        ship.DesignId,
+                        position)),
+            ]);
+    }
 
     public bool ShouldStop => false;
 
@@ -155,6 +216,10 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         };
     }
 
+    /// <summary>
+    /// Applies a prepared entity removal, invalidates inbound entity-target
+    /// orders, and commits their facts before the removal fact.
+    /// </summary>
     internal EntityRemovalResult RemoveEntity(EntityRemovalRequest request)
     {
         EntityRemovalPreparation preparation = _lifecycle.PrepareRemoval(request);

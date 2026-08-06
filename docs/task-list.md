@@ -13,37 +13,12 @@ rather than deleting them.
 
 ## Current focus
 
-`TASK-011` is selected for architecture and implementation planning. Its
-proposed scope is a narrow lifecycle owner for ships, setup registration,
-construction materialization, and mechanically complete removal. Do not
-broaden it into combat, salvage, capture, faction behavior, Phase 1 navigation
-migration, group commands, or a general entity-storage model.
+`TASK-011` completed the clean-session entity lifecycle foundation. Select the
+next implementation task from the near-term list. Economic and transport owner
+integration is tracked separately in `TASK-034` and should begin only after
+those owners join the clean `GameSession`.
 
 ## Near-term work
-
-- [ ] **TASK-011: Define entity lifecycle and explicit spawning**
-  - Implementation in progress. Session-wide entity identity, prepared setup
-    registration, explicit setup ID high-water marks, snapshot identity, and the
-    durable construction materialization handoff are implemented. Facility
-    policies now drive stable-order, atomic runtime ship materialization with
-    idempotent committed-identity receipts. Clean-session removal now covers
-    entity-target order invalidation, spatial/control/order/cargo cleanup,
-    idempotent removal, stale events, presentation resolution, and removal
-    facts. Construction materialization facts and future clean-session
-    economic/transport owner integration remain pending. Context:
-    [Entity lifecycle and explicit spawning](entity-lifecycle.md).
-  - Distinguish causal construction from immediate scenario or scripted spawn.
-  - Define spawn validation, ownership, design, system-local position, initial
-    stationary state, and explicit no-initial-order policy.
-  - Define destruction and despawn cleanup for cargo, reservations, orders,
-    controllers, spatial state, entity registration, and pending events.
-  - Use a durable, idempotent construction handoff and an authoritative
-    facility materialization policy for ownership, position, and control.
-  - Prepare every owner mutation before allocation or apply, and advance runtime
-    ID sequences beyond explicit setup high-water marks.
-  - Add entity navigation destinations after spatial-entity identity,
-    locatability, and inbound-order invalidation behavior are authoritative.
-  - Preserve deterministic identifier allocation and fact ordering.
 
 - [ ] **TASK-012: Define faction and relationship state**
   - Give organizations the state needed for ownership, hostility, reputation,
@@ -178,7 +153,31 @@ prerequisites and desired behavior are sufficiently defined.
     selection contract in `TASK-010`.
   - Context: [Presentation snapshots](presentation-snapshots.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
+- [ ] **TASK-034: Integrate clean-session economy and transport with entity lifecycle**
+  - Begin only after reusable economic and transport owners join the clean
+    `GameSession`; do not pull acceptance-only Phase 1 ownership into production.
+  - Add owner-provided prepare and release operations for jobs, reservations,
+    capacity commitments, and scheduled work that reference a removed ship or
+    cargo inventory.
+  - Preserve lifecycle rejection atomicity, deterministic owner ordering,
+    missing-reference event behavior, and lifecycle fact ordering.
+  - Context: [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Runtime orchestration](runtime-orchestration.md)
+
 ## Completed foundations
+
+- [x] **TASK-011: Define entity lifecycle and explicit spawning**
+  - Added session-wide entity identity, prepared setup registration, explicit
+    allocator high-water marks, complete ship snapshots, and entity navigation
+    destinations.
+  - Added durable, idempotent construction materialization with authoritative
+    facility policy, stable batching, complete ship/cargo publication, and
+    causal lifecycle facts.
+  - Added deterministic removal across current clean-session owners, including
+    active, queued, and suspended target invalidation, reserved-cargo rejection,
+    stale scheduled-event handling, presentation resolution, and removal facts.
+  - Future clean-session economic and transport owner cleanup is tracked in
+    `TASK-034`; legacy spatial migration remains in `TASK-031`.
+  - Context: [Entity lifecycle and explicit spawning](entity-lifecycle.md)
 
 - [x] **TASK-010: Generalize presentation snapshots**
   - Added immutable presentation request, selection, and snapshot read models
@@ -204,8 +203,8 @@ prerequisites and desired behavior are sufficiently defined.
     materialization, metrics, reports, and accepted fingerprints.
   - Actor command results, movement, facts, all five canonical benchmark
     digests, and the Phase 1 event/final-state digest remain unchanged.
-  - Entity lifecycle, legacy-location navigation migration, and semantic
-    economy facts remain in `TASK-011`, `TASK-031`, and `TASK-032`.
+  - Entity lifecycle completed in `TASK-011`; legacy-location navigation
+    migration and semantic economy facts remain in `TASK-031` and `TASK-032`.
   - Context: [Runtime orchestration and domain ownership](runtime-orchestration.md)
 
 - [x] **TASK-001: Define deterministic same-time processing**
@@ -276,9 +275,8 @@ prerequisites and desired behavior are sufficiently defined.
     and emergence wake, while target invalidation in `TASK-011` retains the
     first concrete failure proof. `TASK-008` completed semantic order
     transitions for the current lifecycle.
-  - An internal coordinated actor-cleanup boundary invalidates pending movement
-    before removing spatial, control, and order ownership; destruction policy
-    and commands remain in `TASK-011`.
+  - `TASK-011` completed coordinated entity removal and target invalidation on
+    top of the actor cleanup boundary.
   - The current runtime still does not execute long-running scripted behavior;
     scheduling, checkpointing, and persistence remain in `TASK-017`.
   - Context: [Actor control and order lifecycle](actor-control-and-orders.md)
@@ -290,8 +288,8 @@ prerequisites and desired behavior are sufficiently defined.
   - Ignored events are deterministic no-ops with recorded stale-generation,
     missing-reference, or state-mismatch diagnostics.
   - Actor movement and order cancellation apply this contract through
-    `TASK-006`; `TASK-008` completed semantic cancellation facts, while
-    destruction cleanup remains in `TASK-011`.
+    `TASK-006`; `TASK-008` completed semantic cancellation facts, and
+    `TASK-011` completed entity-removal invalidation.
   - Context: [Gameplay integration §1.5 and §2.6](gameplay-integration.md#15-scheduled-work-has-an-incomplete-cancellation-contract)
 
 - [x] **TASK-008: Introduce semantic game facts**
@@ -333,9 +331,8 @@ prerequisites and desired behavior are sufficiently defined.
     scheduled emergence, and discriminated spatial snapshots.
   - Cancellation and replacement are generation-safe; connector transit is
     non-interruptible, and replacement orders wait and wake on emergence.
-  - Runtime connector availability and access remain in `TASK-030`; entity
-    destinations remain in `TASK-011`; Phase 1 migration remains in
-    `TASK-031`.
+  - Runtime connector availability and access remain in `TASK-030`; `TASK-011`
+    completed entity destinations, and Phase 1 migration remains in `TASK-031`.
   - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 - [x] **DONE-001: Establish the project vision and modular design documents**

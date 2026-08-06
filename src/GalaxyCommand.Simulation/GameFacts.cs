@@ -63,6 +63,31 @@ public sealed record EntityRemovalFactCause : GameFactCause
 }
 
 /// <summary>
+/// Causal construction identity used when completion was not dispatched from
+/// a scheduled event carrying an <see cref="EventKey"/>.
+/// </summary>
+public sealed record ConstructionMaterializationFactCause : GameFactCause
+{
+    public ConstructionMaterializationFactCause(
+        FacilityId facilityId,
+        ConstructionOrderId orderId,
+        EventGeneration generation)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(facilityId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(orderId.Value);
+        FacilityId = facilityId;
+        OrderId = orderId;
+        Generation = generation;
+    }
+
+    public FacilityId FacilityId { get; }
+
+    public ConstructionOrderId OrderId { get; }
+
+    public EventGeneration Generation { get; }
+}
+
+/// <summary>
 /// Typed gameplay meaning committed by the authoritative simulation.
 /// </summary>
 public abstract record GameFact
@@ -70,6 +95,70 @@ public abstract record GameFact
     private protected GameFact()
     {
     }
+}
+
+/// <summary>
+/// Authoritative source category that requested an entity materialization.
+/// </summary>
+public enum EntityMaterializationSourceKind
+{
+    Construction,
+}
+
+/// <summary>
+/// Semantic record of a fully committed entity becoming publicly live.
+/// </summary>
+public sealed record EntityMaterializedFact : GameFact
+{
+    public EntityMaterializedFact(
+        EntityId entityId,
+        EntityKind kind,
+        ShipId shipId,
+        EntityMaterializationSourceKind sourceKind,
+        OrganizationId organizationId,
+        ConstructionDesignId designId,
+        SystemPosition initialPosition)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(entityId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(organizationId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(designId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(initialPosition.SystemId.Value);
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown entity kind.");
+        }
+
+        if (!Enum.IsDefined(sourceKind))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(sourceKind),
+                sourceKind,
+                "Unknown materialization source kind.");
+        }
+
+        EntityId = entityId;
+        Kind = kind;
+        ShipId = shipId;
+        SourceKind = sourceKind;
+        OrganizationId = organizationId;
+        DesignId = designId;
+        InitialPosition = initialPosition;
+    }
+
+    public EntityId EntityId { get; }
+
+    public EntityKind Kind { get; }
+
+    public ShipId ShipId { get; }
+
+    public EntityMaterializationSourceKind SourceKind { get; }
+
+    public OrganizationId OrganizationId { get; }
+
+    public ConstructionDesignId DesignId { get; }
+
+    public SystemPosition InitialPosition { get; }
 }
 
 public sealed record EntityRemovedFact : GameFact

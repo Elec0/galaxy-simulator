@@ -31,16 +31,28 @@ public sealed class GameSession : IGameplayCommandHandler
     public EntityId? ResolveEntity(ShipId shipId) =>
         _runtime.ResolveEntity(shipId);
 
+    /// <summary>
+    /// Materializes one completed construction effect through the session
+    /// lifecycle and records its semantic fact after successful commit.
+    /// </summary>
     public ConstructionEntityMaterializationResult MaterializeConstruction(
         ConstructionProcess source,
         ConstructionMaterializationEffect effect) =>
         _runtime.MaterializeConstruction(source, effect);
 
+    /// <summary>
+    /// Materializes all pending construction effects in stable facility and
+    /// order order, returning one result for each proposed effect.
+    /// </summary>
     public IReadOnlyList<ConstructionEntityMaterializationResult>
         MaterializePendingConstruction(
             IEnumerable<ConstructionProcess> sources) =>
         _runtime.MaterializePendingConstruction(sources);
 
+    /// <summary>
+    /// Removes one live entity through deterministic cross-owner cleanup and
+    /// returns the prior receipt when the same removal is repeated.
+    /// </summary>
     public EntityRemovalResult RemoveEntity(EntityRemovalRequest request) =>
         _runtime.RemoveEntity(request);
 

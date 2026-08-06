@@ -129,6 +129,10 @@ public abstract record ConstructionEntityMaterializationResult
         : ConstructionEntityMaterializationResult;
 }
 
+internal sealed record ConstructionMaterializationCommit(
+    ConstructionEntityMaterializationResult Result,
+    bool WasApplied);
+
 public enum EntityRemovalReason
 {
     Despawned,
@@ -397,7 +401,11 @@ internal sealed class EntityLifecycleOwner
             ship.BaseController);
     }
 
-    internal ConstructionEntityMaterializationResult MaterializeConstruction(
+    /// <summary>
+    /// Validates and atomically commits one durable construction effect, or
+    /// resolves it to its prior receipt without applying a second entity.
+    /// </summary>
+    internal ConstructionMaterializationCommit MaterializeConstruction(
         ConstructionProcess source,
         ConstructionMaterializationEffect effect,
         SimulationTime now)
@@ -409,27 +417,32 @@ internal sealed class EntityLifecycleOwner
                 key,
                 out ConstructionEntityMaterializationResult.Materialized? receipt))
         {
-            return receipt.Effect == effect
+            ConstructionEntityMaterializationResult repeated = receipt.Effect == effect
                 ? receipt
                 : new ConstructionEntityMaterializationResult.Deferred(
                     effect,
                     ConstructionMaterializationDeferredReason.MismatchedPendingMaterialization);
+            return new ConstructionMaterializationCommit(repeated, WasApplied: false);
         }
 
         ConstructionMaterializationDeferredReason? rejection =
             ValidateMaterialization(source, effect, now, out ShipMaterializationPolicy? policy, out ShipDesign? design);
         if (rejection is { } reason)
         {
-            return new ConstructionEntityMaterializationResult.Deferred(effect, reason);
+            return new ConstructionMaterializationCommit(
+                new ConstructionEntityMaterializationResult.Deferred(effect, reason),
+                WasApplied: false);
         }
 
         if (!_entityIds.TryPeek(out EntityId entityId)
             || !_shipIds.TryPeek(out ShipId shipId)
             || !_inventoryIds.TryPeek(out InventoryId inventoryId))
         {
-            return new ConstructionEntityMaterializationResult.Deferred(
-                effect,
-                ConstructionMaterializationDeferredReason.IdentifierCapacityExhausted);
+            return new ConstructionMaterializationCommit(
+                new ConstructionEntityMaterializationResult.Deferred(
+                    effect,
+                    ConstructionMaterializationDeferredReason.IdentifierCapacityExhausted),
+                WasApplied: false);
         }
 
         if (!_entities.CanAddShip(entityId, shipId)
@@ -439,9 +452,11 @@ internal sealed class EntityLifecycleOwner
             || _ships.Contains(shipId)
             || _inventories.Contains(inventoryId))
         {
-            return new ConstructionEntityMaterializationResult.Deferred(
-                effect,
-                ConstructionMaterializationDeferredReason.OwnerConflict);
+            return new ConstructionMaterializationCommit(
+                new ConstructionEntityMaterializationResult.Deferred(
+                    effect,
+                    ConstructionMaterializationDeferredReason.OwnerConflict),
+                WasApplied: false);
         }
 
         EntityId allocatedEntityId = _entityIds.Allocate();
@@ -484,10 +499,14 @@ internal sealed class EntityLifecycleOwner
             shipId,
             inventoryId);
         _receipts.Add(key, result);
-        return result;
+        return new ConstructionMaterializationCommit(result, WasApplied: true);
     }
 
-    internal IReadOnlyList<ConstructionEntityMaterializationResult>
+    /// <summary>
+    /// Normalizes construction sources into stable facility and order order,
+    /// then commits each pending materialization through the single-item path.
+    /// </summary>
+    internal IReadOnlyList<ConstructionMaterializationCommit>
         MaterializePendingConstruction(
             IEnumerable<ConstructionProcess> sources,
             SimulationTime now)
@@ -515,7 +534,7 @@ internal sealed class EntityLifecycleOwner
             orderedSources.Add(source.FacilityId, source);
         }
 
-        var results = new List<ConstructionEntityMaterializationResult>();
+        var results = new List<ConstructionMaterializationCommit>();
         foreach (ConstructionProcess source in orderedSources.Values)
         {
             foreach (ConstructionMaterializationEffect effect in

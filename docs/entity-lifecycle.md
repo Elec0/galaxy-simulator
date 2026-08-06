@@ -19,7 +19,8 @@ the same boundary only after their design and component requirements exist.
 
 **Decision status:** Accepted by the project owner on 2026-08-04.
 
-**Implementation status:** In progress. The clean `GameSession` now has
+**Implementation status:** Completed by `TASK-011` on 2026-08-05. The clean
+`GameSession` now has
 session-wide entity identity, prepared setup registration, explicit setup ID
 high-water marks, and complete ship identity in snapshots. Construction now
 retains a durable pending materialization until idempotent acknowledgement.
@@ -30,8 +31,10 @@ acceptance-only. Clean-session removal now invalidates active, queued, and
 suspended entity-target orders, cancels affected local motion, removes every
 live ship owner with entity publication removed last, rejects reserved cargo,
 records `EntityRemovedFact`, and leaves scheduled activity as deterministic
-missing-reference work. Construction materialization facts and integration with
-future clean-session economic and transport owners remain pending.
+missing-reference work. Construction commits now record one idempotent
+`EntityMaterializedFact` in stable batch order, preserving the originating
+scheduled-event key when present. Integration with future clean-session
+economic and transport owners is tracked separately in `TASK-034`.
 
 ## Starting point
 
@@ -266,8 +269,8 @@ runtime, so clean-session ships cannot yet acquire transport jobs or external
 inventory commitments. Removal nevertheless rejects a cargo inventory that has
 material or capacity reservations. When those owners join the clean session,
 their prepare and release operations must be inserted before cargo removal;
-this slice does not treat absence of that integration as completed transport
-cleanup.
+`TASK-034` owns that integration without reopening the completed clean-session
+lifecycle foundation.
 
 ## Facts, snapshots, and commands
 
@@ -281,6 +284,8 @@ Successful transitions propose lifecycle facts after component commit:
 The construction-completion event, or a future accepted source command or event,
 is the immediate cause. The fact owner assigns its sequence after deterministic
 lifecycle commit. Economy-specific construction facts remain `TASK-032`.
+Direct construction completion without a scheduled event uses the stable
+facility, order, and generation tuple as its materialization fact cause.
 
 Before materialization, no typed ID is visible for commands. After removal,
 commands reject as missing actors. Snapshots omit the entity, and presentation

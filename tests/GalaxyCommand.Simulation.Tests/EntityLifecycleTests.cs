@@ -121,12 +121,38 @@ public sealed class EntityLifecycleTests
                 result.ShipId,
                 result.CargoInventoryId),
             process.GetMaterializationReceipt(orderId)?.Identity);
+        GameFactEnvelope materializationEnvelope = Assert.Single(
+            session.ReadFactsAfter(null, 256).Facts);
+        var cause = Assert.IsType<ConstructionMaterializationFactCause>(
+            materializationEnvelope.Cause);
+        var fact = Assert.IsType<EntityMaterializedFact>(
+            materializationEnvelope.Fact);
+        Assert.Equal(facilityId, cause.FacilityId);
+        Assert.Equal(orderId, cause.OrderId);
+        Assert.Equal(effect.Generation, cause.Generation);
+        Assert.Equal(result.EntityId, fact.EntityId);
+        Assert.Equal(EntityKind.Ship, fact.Kind);
+        Assert.Equal(result.ShipId, fact.ShipId);
+        Assert.Equal(EntityMaterializationSourceKind.Construction, fact.SourceKind);
+        Assert.Equal(GameSessionTestFixture.Organization, fact.OrganizationId);
+        Assert.Equal(design.Id, fact.DesignId);
+        Assert.Equal(GameSessionTestFixture.Position(20, 30), fact.InitialPosition);
+        GamePresentationSnapshot presentation = session.CapturePresentation(
+            new GamePresentationRequest(
+                [result.ShipId],
+                result.ShipId,
+                factCursor: null,
+                maximumFactCount: 256));
+        Assert.Contains(
+            presentation.SelectedShipFacts,
+            envelope => envelope.Fact == fact);
 
         ConstructionEntityMaterializationResult repeated =
             session.MaterializeConstruction(process, effect);
 
         Assert.Equal(result, repeated);
         Assert.Equal(2, session.CaptureSnapshot().Ships.Count);
+        Assert.Single(session.ReadFactsAfter(null, 256).Facts);
     }
 
     [Fact]
@@ -165,6 +191,7 @@ public sealed class EntityLifecycleTests
             rejectedProcess.GetPendingMaterialization(rejectedOrderId));
         Assert.Null(rejectedProcess.GetMaterializationReceipt(rejectedOrderId));
         Assert.Single(session.CaptureSnapshot().Ships);
+        Assert.Empty(session.ReadFactsAfter(null, 256).Facts);
 
         (ConstructionProcess allowedProcess, _) =
             PrepareCompletedConstruction(facilityId, allowedDesign);
@@ -177,6 +204,7 @@ public sealed class EntityLifecycleTests
         Assert.Equal(new EntityId(2), materialized.EntityId);
         Assert.Equal(new ShipId(2), materialized.ShipId);
         Assert.Equal(new InventoryId(2), materialized.CargoInventoryId);
+        Assert.Single(session.ReadFactsAfter(null, 256).Facts);
     }
 
     [Fact]
@@ -238,6 +266,40 @@ public sealed class EntityLifecycleTests
             [new ShipId(2), new ShipId(3)],
             materialized.Select(result => result.ShipId));
         Assert.Equal(3, session.CaptureSnapshot().Ships.Count);
+        EntityMaterializedFact[] facts = session.ReadFactsAfter(null, 256).Facts
+            .Select(envelope => Assert.IsType<EntityMaterializedFact>(envelope.Fact))
+            .ToArray();
+        Assert.Equal(
+            [new EntityId(2), new EntityId(3)],
+            facts.Select(fact => fact.EntityId));
+    }
+
+    [Fact]
+    public void ScheduledConstructionEventRemainsMaterializationFactCause()
+    {
+        var facilityId = new FacilityId(1);
+        var design = new ShipDesign(
+            new ConstructionDesignId(2),
+            "Scheduled Ship",
+            new ConstructionRecipe([], new Work(1)),
+            new Quantity(25));
+        GameSession session = CreateSession(facilityId, design);
+        (ConstructionProcess process, _) =
+            PrepareCompletedConstruction(facilityId, design);
+        session.AdvanceTo(new SimulationTime(1000));
+        var eventKey = new EventKey(
+            session.CurrentTime,
+            EventPhase.PhysicalCompletion,
+            CreationSequence: 7);
+        ConstructionMaterializationEffect effect = Assert.IsType<ConstructionMaterializationEffect>(
+            process.CompleteActive(session.CurrentTime, eventKey));
+
+        session.MaterializeConstruction(process, effect);
+
+        GameFactEnvelope envelope = Assert.Single(
+            session.ReadFactsAfter(null, 256).Facts);
+        Assert.Equal(eventKey, Assert.IsType<ScheduledEventFactCause>(envelope.Cause).Key);
+        Assert.IsType<EntityMaterializedFact>(envelope.Fact);
     }
 
     [Fact]
