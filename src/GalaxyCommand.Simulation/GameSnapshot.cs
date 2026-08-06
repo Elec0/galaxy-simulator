@@ -27,7 +27,12 @@ public sealed record TransitConnectionSnapshot(
     SimulationDuration Duration);
 
 public sealed record GameShipSnapshot(
+    EntityId EntityId,
     ShipId Id,
+    OrganizationId OrganizationId,
+    ConstructionDesignId DesignId,
+    InventoryId CargoInventoryId,
+    Quantity CargoCapacity,
     ShipSpatialSnapshotState SpatialState,
     ActorControlSnapshot Control,
     ShipOrderSnapshot? CurrentOrder,

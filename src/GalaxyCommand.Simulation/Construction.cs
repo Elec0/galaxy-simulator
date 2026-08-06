@@ -80,6 +80,7 @@ public enum ConstructionOrderStatus
 {
     WaitingForInputs,
     Running,
+    AwaitingMaterialization,
     Completed,
     Cancelled,
 }
@@ -87,7 +88,34 @@ public enum ConstructionOrderStatus
 public sealed record ConstructionMaterializationEffect(
     FacilityId FacilityId,
     ConstructionOrderId OrderId,
-    ConstructionDesignId DesignId);
+    ConstructionDesignId DesignId,
+    SimulationTime CompletedAt,
+    EventGeneration Generation,
+    EventKey? CompletionEventKey);
+
+public enum ConstructionMaterializationAcknowledgement
+{
+    Applied,
+    AlreadyAcknowledged,
+    Missing,
+    MismatchedMaterialization,
+}
+
+public abstract record ConstructionMaterializationIdentity
+{
+    private ConstructionMaterializationIdentity()
+    {
+    }
+
+    public sealed record Ship(
+        EntityId EntityId,
+        ShipId ShipId,
+        InventoryId CargoInventoryId) : ConstructionMaterializationIdentity;
+}
+
+public sealed record ConstructionMaterializationReceipt(
+    ConstructionMaterializationEffect Effect,
+    ConstructionMaterializationIdentity? Identity);
 
 /// <summary>
 /// Product-neutral runtime state for one finite construction request.
@@ -171,6 +199,10 @@ public sealed class ConstructionProcess
         new(EntityIdComparer<ConstructionOrderId>.Instance);
     private readonly SortedDictionary<ConstructionOrderId, ConstructionOrder> _completed =
         new(EntityIdComparer<ConstructionOrderId>.Instance);
+    private readonly SortedDictionary<ConstructionOrderId, ConstructionMaterializationReceipt>
+        _acknowledgedMaterializations = new(EntityIdComparer<ConstructionOrderId>.Instance);
+    private readonly SortedDictionary<ConstructionOrderId, ConstructionMaterializationEffect>
+        _pendingMaterializations = new(EntityIdComparer<ConstructionOrderId>.Instance);
 
     public ConstructionProcess(
         FacilityId facilityId,
@@ -192,6 +224,17 @@ public sealed class ConstructionProcess
 
     public ConstructionOrder? GetCompletedOrder(ConstructionOrderId orderId) =>
         _completed.GetValueOrDefault(orderId);
+
+    public ConstructionMaterializationEffect? GetPendingMaterialization(
+        ConstructionOrderId orderId) =>
+        _pendingMaterializations.GetValueOrDefault(orderId);
+
+    public IReadOnlyList<ConstructionMaterializationEffect> PendingMaterializations =>
+        Array.AsReadOnly(_pendingMaterializations.Values.ToArray());
+
+    public ConstructionMaterializationReceipt? GetMaterializationReceipt(
+        ConstructionOrderId orderId) =>
+        _acknowledgedMaterializations.GetValueOrDefault(orderId);
 
     public ConstructionOrder? GetOrder(ConstructionOrderId orderId) =>
         _orders.GetValueOrDefault(orderId);
@@ -359,7 +402,9 @@ public sealed class ConstructionProcess
         return completesAt;
     }
 
-    public ConstructionMaterializationEffect? CompleteActive(SimulationTime now)
+    public ConstructionMaterializationEffect? CompleteActive(
+        SimulationTime now,
+        EventKey? completionEventKey = null)
     {
         if (ActiveOrder is not
             {
@@ -372,23 +417,28 @@ public sealed class ConstructionProcess
         }
 
         ActiveOrder = null;
-        order.Status = ConstructionOrderStatus.Completed;
-        _completed.Add(order.Id, order);
+        order.Status = ConstructionOrderStatus.AwaitingMaterialization;
         if (_queued.TryDequeue(out ConstructionOrder? next))
         {
             ActiveOrder = next;
         }
 
-        return new ConstructionMaterializationEffect(
+        var materialization = new ConstructionMaterializationEffect(
             FacilityId,
             order.Id,
-            order.DesignId);
+            order.DesignId,
+            now,
+            order.Generation,
+            completionEventKey);
+        _pendingMaterializations.Add(order.Id, materialization);
+        return materialization;
     }
 
     public ScheduledEventDisposition CompleteScheduled(
         ConstructionOrderId orderId,
         EventGeneration generation,
         SimulationTime now,
+        EventKey? completionEventKey,
         out ConstructionMaterializationEffect? materialization)
     {
         materialization = null;
@@ -409,8 +459,58 @@ public sealed class ConstructionProcess
             return ScheduledEventDisposition.IgnoredStateMismatch;
         }
 
-        materialization = CompleteActive(now);
+        materialization = CompleteActive(now, completionEventKey);
         return ScheduledEventDisposition.Applied;
+    }
+
+    public ConstructionMaterializationAcknowledgement AcknowledgeMaterialization(
+        ConstructionMaterializationEffect materialization,
+        ConstructionMaterializationIdentity? identity = null)
+    {
+        ArgumentNullException.ThrowIfNull(materialization);
+        if (materialization.FacilityId != FacilityId)
+        {
+            return ConstructionMaterializationAcknowledgement.Missing;
+        }
+
+        if (!_pendingMaterializations.TryGetValue(
+                materialization.OrderId,
+                out ConstructionMaterializationEffect? pending))
+        {
+            if (!_acknowledgedMaterializations.TryGetValue(
+                    materialization.OrderId,
+                    out ConstructionMaterializationReceipt? acknowledged))
+            {
+                return ConstructionMaterializationAcknowledgement.Missing;
+            }
+
+            return acknowledged.Effect == materialization
+                && acknowledged.Identity == identity
+                ? ConstructionMaterializationAcknowledgement.AlreadyAcknowledged
+                : ConstructionMaterializationAcknowledgement.MismatchedMaterialization;
+        }
+
+        if (pending != materialization)
+        {
+            return ConstructionMaterializationAcknowledgement.MismatchedMaterialization;
+        }
+
+        ConstructionOrder order = GetOrder(materialization.OrderId)
+            ?? throw new InvalidOperationException(
+                $"Pending materialization {materialization.OrderId} has no construction order.");
+        if (order.Status != ConstructionOrderStatus.AwaitingMaterialization)
+        {
+            throw new InvalidOperationException(
+                $"Pending materialization {materialization.OrderId} belongs to an order in state {order.Status}.");
+        }
+
+        order.Status = ConstructionOrderStatus.Completed;
+        _pendingMaterializations.Remove(order.Id);
+        _acknowledgedMaterializations.Add(
+            order.Id,
+            new ConstructionMaterializationReceipt(materialization, identity));
+        _completed.Add(order.Id, order);
+        return ConstructionMaterializationAcknowledgement.Applied;
     }
 
     public bool CancelActive(Inventory inventory)

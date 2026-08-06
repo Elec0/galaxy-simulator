@@ -9,7 +9,15 @@ public partial class Main : Node
 	private const int MaximumFactCountPerRefresh = 64;
 	private const int MaximumRecentFacts = 32;
 	private static readonly SystemId InitialSystemId = new(1);
+	private static readonly EntityId InitialEntityId = new(1);
 	private static readonly ShipId InitialShipId = new(1);
+	private static readonly InventoryId InitialCargoInventoryId = new(1);
+	private static readonly OrganizationId InitialOrganizationId = new(1);
+	private static readonly ShipDesign InitialShipDesign = new(
+		new ConstructionDesignId(1),
+		"Starter Ship",
+		new ConstructionRecipe([], new Work(1)),
+		new Quantity(100));
 
 	private readonly CommandSource _player = new(
 		CommandSourceKind.Player,
@@ -53,7 +61,11 @@ public partial class Main : Node
 			[new StarSystem(InitialSystemId, "Initial System")],
 			[
 				new InitialShipSetup(
+					InitialEntityId,
 					InitialShipId,
+					InitialCargoInventoryId,
+					InitialOrganizationId,
+					InitialShipDesign,
 					position,
 					new ActorController(ActorControllerKind.Player, new CommandSourceId("local-player"))),
 			],

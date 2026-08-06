@@ -69,6 +69,7 @@ public sealed class EconomicRuntimeSystem
 
     public EconomicEventCommitResult CommitEvent(
         EconomicEvent economicEvent,
+        EventKey eventKey,
         EventGeneration scheduledGeneration,
         TransportTiming transportTiming,
         SimulationTime now)
@@ -95,7 +96,8 @@ public sealed class EconomicRuntimeSystem
                         construction.FacilityId,
                         construction.OrderId,
                         scheduledGeneration,
-                        now)),
+                        now,
+                        eventKey)),
             _ => throw new ArgumentOutOfRangeException(nameof(economicEvent)),
         };
     }

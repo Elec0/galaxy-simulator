@@ -67,7 +67,11 @@ public sealed class ActorControlAndOrderTests
 
         Assert.Throws<ArgumentException>(() =>
             new InitialShipSetup(
+                GameSessionTestFixture.Entity,
                 GameSessionTestFixture.Ship,
+                GameSessionTestFixture.CargoInventory,
+                GameSessionTestFixture.Organization,
+                GameSessionTestFixture.Design,
                 GameSessionTestFixture.Position(0, 0),
                 scriptController));
     }

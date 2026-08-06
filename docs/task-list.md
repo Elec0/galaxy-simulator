@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -13,21 +13,33 @@ rather than deleting them.
 
 ## Current focus
 
-`TASK-010` completed the presentation-snapshot foundation. Select the next
-implementation task from the near-term list without broadening it into entity
-lifecycle, navigation migration, economy facts, group commands, or new
-authoritative gameplay state.
+`TASK-011` is selected for architecture and implementation planning. Its
+proposed scope is a narrow lifecycle owner for ships, setup registration,
+construction materialization, and mechanically complete removal. Do not
+broaden it into combat, salvage, capture, faction behavior, Phase 1 navigation
+migration, group commands, or a general entity-storage model.
 
 ## Near-term work
 
 - [ ] **TASK-011: Define entity lifecycle and explicit spawning**
+  - Implementation in progress. Session-wide entity identity, prepared setup
+    registration, explicit setup ID high-water marks, snapshot identity, and the
+    durable construction materialization handoff are implemented. Facility
+    policies now drive stable-order, atomic runtime ship materialization with
+    idempotent committed-identity receipts. Complete removal and lifecycle
+    facts remain pending. Context:
+    [Entity lifecycle and explicit spawning](entity-lifecycle.md).
   - Distinguish causal construction from immediate scenario or scripted spawn.
-  - Define spawn validation, ownership, design, location, initial state, and
-    initial order.
+  - Define spawn validation, ownership, design, system-local position, initial
+    stationary state, and explicit no-initial-order policy.
   - Define destruction and despawn cleanup for cargo, reservations, orders,
-    controllers, and pending events.
+    controllers, spatial state, entity registration, and pending events.
+  - Use a durable, idempotent construction handoff and an authoritative
+    facility materialization policy for ownership, position, and control.
+  - Prepare every owner mutation before allocation or apply, and advance runtime
+    ID sequences beyond explicit setup high-water marks.
   - Add entity navigation destinations after spatial-entity identity,
-    locatability, and invalidation behavior are authoritative.
+    locatability, and inbound-order invalidation behavior are authoritative.
   - Preserve deterministic identifier allocation and fact ordering.
 
 - [ ] **TASK-012: Define faction and relationship state**

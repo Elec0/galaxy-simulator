@@ -19,9 +19,19 @@ internal static class PhaseOneShipMaterializer
                 $"Shipyard {shipyard.FacilityId} cannot materialize an effect for facility {materialization.FacilityId}.");
         }
 
-        ConstructionOrder order = shipyard.GetCompletedOrder(materialization.OrderId)
+        if (shipyard.GetConstructedShipId(materialization.OrderId) is { } existing)
+        {
+            return existing;
+        }
+
+        ConstructionOrder order = shipyard.Process.GetOrder(materialization.OrderId)
             ?? throw new InvalidOperationException(
-                $"Construction order {materialization.OrderId} has not completed.");
+                $"Construction order {materialization.OrderId} does not exist.");
+        if (shipyard.GetPendingMaterialization(materialization.OrderId) != materialization)
+        {
+            throw new InvalidOperationException(
+                $"Construction order {materialization.OrderId} has no matching pending materialization.");
+        }
         if (order.DesignId != materialization.DesignId
             || order.Design is not ShipDesign design)
         {

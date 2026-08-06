@@ -9,11 +9,19 @@ namespace GalaxyCommand.Simulation;
 public sealed record InitialShipSetup
 {
     public InitialShipSetup(
+        EntityId entityId,
         ShipId id,
+        InventoryId cargoInventoryId,
+        OrganizationId organizationId,
+        ShipDesign design,
         SystemPosition position,
         ActorController baseController)
     {
+        ArgumentOutOfRangeException.ThrowIfZero(entityId.Value);
         ArgumentOutOfRangeException.ThrowIfZero(id.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(cargoInventoryId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(organizationId.Value);
+        ArgumentNullException.ThrowIfNull(design);
         ArgumentOutOfRangeException.ThrowIfZero(position.SystemId.Value);
         ArgumentNullException.ThrowIfNull(baseController);
         if (baseController.Kind == ActorControllerKind.Script)
@@ -23,12 +31,24 @@ public sealed record InitialShipSetup
                 nameof(baseController));
         }
 
+        EntityId = entityId;
         Id = id;
+        CargoInventoryId = cargoInventoryId;
+        OrganizationId = organizationId;
+        Design = design;
         Position = position;
         BaseController = baseController;
     }
 
+    public EntityId EntityId { get; }
+
     public ShipId Id { get; }
+
+    public InventoryId CargoInventoryId { get; }
+
+    public OrganizationId OrganizationId { get; }
+
+    public ShipDesign Design { get; }
 
     public SystemPosition Position { get; }
 
@@ -50,6 +70,7 @@ public sealed class GameSessionSetup
             new ConnectorTopology(
                 Array.Empty<ConnectorEndpoint>(),
                 Array.Empty<TransitConnection>()),
+            Array.Empty<ShipMaterializationPolicy>(),
             factRetentionCapacity)
     {
     }
@@ -59,15 +80,32 @@ public sealed class GameSessionSetup
         IEnumerable<InitialShipSetup> ships,
         ConnectorTopology connectorTopology,
         int factRetentionCapacity)
+        : this(
+            systems,
+            ships,
+            connectorTopology,
+            Array.Empty<ShipMaterializationPolicy>(),
+            factRetentionCapacity)
+    {
+    }
+
+    public GameSessionSetup(
+        IEnumerable<StarSystem> systems,
+        IEnumerable<InitialShipSetup> ships,
+        ConnectorTopology connectorTopology,
+        IEnumerable<ShipMaterializationPolicy> materializationPolicies,
+        int factRetentionCapacity)
     {
         ArgumentNullException.ThrowIfNull(systems);
         ArgumentNullException.ThrowIfNull(ships);
         ArgumentNullException.ThrowIfNull(connectorTopology);
+        ArgumentNullException.ThrowIfNull(materializationPolicies);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(
             factRetentionCapacity);
 
         StarSystem[] systemValues = systems.ToArray();
         InitialShipSetup[] shipValues = ships.ToArray();
+        ShipMaterializationPolicy[] policyValues = materializationPolicies.ToArray();
         var systemIds = new HashSet<SystemId>();
         foreach (StarSystem system in systemValues)
         {
@@ -81,6 +119,8 @@ public sealed class GameSessionSetup
         }
 
         var shipIds = new HashSet<ShipId>();
+        var entityIds = new HashSet<EntityId>();
+        var cargoInventoryIds = new HashSet<InventoryId>();
         foreach (InitialShipSetup ship in shipValues)
         {
             ArgumentNullException.ThrowIfNull(ship);
@@ -88,6 +128,20 @@ public sealed class GameSessionSetup
             {
                 throw new ArgumentException(
                     $"Duplicate ship {ship.Id}.",
+                    nameof(ships));
+            }
+
+            if (!entityIds.Add(ship.EntityId))
+            {
+                throw new ArgumentException(
+                    $"Duplicate entity {ship.EntityId}.",
+                    nameof(ships));
+            }
+
+            if (!cargoInventoryIds.Add(ship.CargoInventoryId))
+            {
+                throw new ArgumentException(
+                    $"Duplicate cargo inventory {ship.CargoInventoryId}.",
                     nameof(ships));
             }
 
@@ -109,9 +163,30 @@ public sealed class GameSessionSetup
             }
         }
 
+        var policyFacilityIds = new HashSet<FacilityId>();
+        foreach (ShipMaterializationPolicy policy in policyValues)
+        {
+            ArgumentNullException.ThrowIfNull(policy);
+            if (!policyFacilityIds.Add(policy.FacilityId))
+            {
+                throw new ArgumentException(
+                    $"Duplicate materialization policy for facility {policy.FacilityId}.",
+                    nameof(materializationPolicies));
+            }
+
+            if (!systemIds.Contains(policy.Position.SystemId))
+            {
+                throw new ArgumentException(
+                    $"Materialization policy {policy.FacilityId} references unknown system {policy.Position.SystemId}.",
+                    nameof(materializationPolicies));
+            }
+        }
+
         Systems = new ReadOnlyCollection<StarSystem>(systemValues);
         Ships = new ReadOnlyCollection<InitialShipSetup>(shipValues);
         ConnectorTopology = connectorTopology;
+        MaterializationPolicies =
+            new ReadOnlyCollection<ShipMaterializationPolicy>(policyValues);
         FactRetentionCapacity = factRetentionCapacity;
     }
 
@@ -120,6 +195,8 @@ public sealed class GameSessionSetup
     public IReadOnlyList<InitialShipSetup> Ships { get; }
 
     public ConnectorTopology ConnectorTopology { get; }
+
+    public IReadOnlyList<ShipMaterializationPolicy> MaterializationPolicies { get; }
 
     public int FactRetentionCapacity { get; }
 }

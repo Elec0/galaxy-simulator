@@ -210,7 +210,15 @@ public sealed class ConnectorTraversalTests
             ],
             [
                 new InitialShipSetup(
+                    new EntityId(1),
                     Ship,
+                    new InventoryId(1),
+                    new OrganizationId(1),
+                    new ShipDesign(
+                        new ConstructionDesignId(1),
+                        "Connector Test Ship",
+                        new ConstructionRecipe([], new Work(1)),
+                        new Quantity(10)),
                     Position(OriginSystem, 0),
                     new ActorController(
                         ActorControllerKind.Player,

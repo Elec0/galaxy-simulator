@@ -282,6 +282,9 @@ public sealed class InventoryRegistry
         }
     }
 
+    public bool Contains(InventoryId inventoryId) =>
+        _inventories.ContainsKey(inventoryId);
+
     public Inventory? Get(InventoryId inventoryId) => _inventories.GetValueOrDefault(inventoryId);
 
     public Reservation TransferReserved(

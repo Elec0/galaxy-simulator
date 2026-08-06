@@ -379,6 +379,7 @@ namespace GalaxyCommand.Simulation.Acceptance
                 case PhaseOneEvent.Economic economic:
                     return HandleEconomicEvent(
                         economic.Event,
+                        scheduled.Key,
                         scheduled.Generation,
                         now);
 
@@ -400,6 +401,7 @@ namespace GalaxyCommand.Simulation.Acceptance
 
         private ScheduledEventDisposition HandleEconomicEvent(
             EconomicEvent economicEvent,
+            EventKey eventKey,
             EventGeneration scheduledGeneration,
             SimulationTime now)
         {
@@ -409,6 +411,7 @@ namespace GalaxyCommand.Simulation.Acceptance
                 : null;
             EconomicEventCommitResult commit = _economicSystem.CommitEvent(
                 economicEvent,
+                eventKey,
                 scheduledGeneration,
                 TransportTiming(),
                 now);

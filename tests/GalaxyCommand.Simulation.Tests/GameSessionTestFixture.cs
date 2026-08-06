@@ -8,6 +8,18 @@ internal static class GameSessionTestFixture
 
     internal static ShipId Ship { get; } = new(1);
 
+    internal static EntityId Entity { get; } = new(1);
+
+    internal static InventoryId CargoInventory { get; } = new(1);
+
+    internal static OrganizationId Organization { get; } = new(1);
+
+    internal static ShipDesign Design { get; } = new(
+        new ConstructionDesignId(1),
+        "Test Ship",
+        new ConstructionRecipe([], new Work(1)),
+        new Quantity(10));
+
     internal static CommandSource Player { get; } = new(
         CommandSourceKind.Player,
         new CommandSourceId("test-player"));
@@ -25,7 +37,11 @@ internal static class GameSessionTestFixture
             [new StarSystem(System, "Test System")],
             [
                 new InitialShipSetup(
+                    Entity,
                     Ship,
+                    CargoInventory,
+                    Organization,
+                    Design,
                     Position(0, 0),
                     baseController ?? PlayerController),
             ],

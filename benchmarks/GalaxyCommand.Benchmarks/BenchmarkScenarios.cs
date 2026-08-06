@@ -236,6 +236,12 @@ internal static class ScenarioSetup
 {
     private static readonly CommandSourceId BenchmarkSourceId =
         new("benchmark-autonomous");
+    private static readonly OrganizationId BenchmarkOrganizationId = new(1);
+    private static readonly ShipDesign BenchmarkShipDesign = new(
+        new ConstructionDesignId(1),
+        "Benchmark Ship",
+        new ConstructionRecipe([], new Work(1)),
+        new Quantity(100));
 
     internal static CommandSource AutonomousSource { get; } =
         new(CommandSourceKind.Autonomous, BenchmarkSourceId);
@@ -266,8 +272,13 @@ internal static class ScenarioSetup
         {
             int systemIndex = index % systemCount + 1;
             long x = index / systemCount;
+            ulong id = checked((ulong)index + 1);
             ships[index] = new InitialShipSetup(
-                new ShipId(checked((ulong)index + 1)),
+                new EntityId(id),
+                new ShipId(id),
+                new InventoryId(id),
+                BenchmarkOrganizationId,
+                BenchmarkShipDesign,
                 Position(systemIndex, x, 0),
                 controller);
         }

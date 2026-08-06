@@ -10,6 +10,14 @@ public interface IEntityId<TSelf> where TSelf : struct, IEntityId<TSelf>
     ulong Value { get; }
 }
 
+public readonly record struct EntityId : IEntityId<EntityId>
+{
+    public EntityId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
+    public ulong Value { get; }
+    public static EntityId Create(ulong value) => new(value);
+    public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
 public readonly record struct LocationId : IEntityId<LocationId>
 {
     public LocationId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
@@ -184,6 +192,41 @@ public readonly record struct DemandRequestId : IEntityId<DemandRequestId>
 public sealed class IdSequence<TId> where TId : struct, IEntityId<TId>
 {
     private ulong? _next = 1;
+
+    public bool TryPeek(out TId next)
+    {
+        if (_next is not { } value)
+        {
+            next = default;
+            return false;
+        }
+
+        next = TId.Create(value);
+        return true;
+    }
+
+    public bool CanAllocate(ulong count)
+    {
+        if (count == 0)
+        {
+            return true;
+        }
+
+        return _next is { } next
+            && count - 1 <= ulong.MaxValue - next;
+    }
+
+    public void AdvancePast(TId existing)
+    {
+        if (_next is not { } next || existing.Value < next)
+        {
+            return;
+        }
+
+        _next = existing.Value == ulong.MaxValue
+            ? null
+            : existing.Value + 1;
+    }
 
     public TId Allocate()
     {

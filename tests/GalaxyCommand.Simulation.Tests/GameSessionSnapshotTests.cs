@@ -18,7 +18,12 @@ public sealed class GameSessionSnapshotTests
         Assert.Empty(snapshot.ConnectorEndpoints);
         Assert.Empty(snapshot.TransitConnections);
         GameShipSnapshot ship = Assert.Single(snapshot.Ships);
+        Assert.Equal(GameSessionTestFixture.Entity, ship.EntityId);
         Assert.Equal(GameSessionTestFixture.Ship, ship.Id);
+        Assert.Equal(GameSessionTestFixture.Organization, ship.OrganizationId);
+        Assert.Equal(GameSessionTestFixture.Design.Id, ship.DesignId);
+        Assert.Equal(GameSessionTestFixture.CargoInventory, ship.CargoInventoryId);
+        Assert.Equal(GameSessionTestFixture.Design.CargoCapacity, ship.CargoCapacity);
         Assert.Equal(GameSessionTestFixture.Position(0, 0), ship.Position);
         Assert.Null(ship.Motion);
         Assert.Null(ship.CurrentOrder);
@@ -49,7 +54,12 @@ public sealed class GameSessionSnapshotTests
                 new SimulationDuration(1))));
         Assert.Throws<NotSupportedException>(() =>
             ships.Add(new GameShipSnapshot(
+                new EntityId(99),
                 new ShipId(99),
+                new OrganizationId(99),
+                new ConstructionDesignId(99),
+                new InventoryId(99),
+                new Quantity(99),
                 new ShipSpatialSnapshotState.AtPosition(
                     GameSessionTestFixture.Position(0, 0)),
                 new ActorControlSnapshot(
@@ -67,7 +77,11 @@ public sealed class GameSessionSnapshotTests
     public void SetupRejectsShipsInUnknownSystems()
     {
         var ship = new InitialShipSetup(
+            GameSessionTestFixture.Entity,
             GameSessionTestFixture.Ship,
+            GameSessionTestFixture.CargoInventory,
+            GameSessionTestFixture.Organization,
+            GameSessionTestFixture.Design,
             new SystemPosition(
                 new SystemId(2),
                 new SpatialPosition(
@@ -100,7 +114,11 @@ public sealed class GameSessionSnapshotTests
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
                 [
                     new InitialShipSetup(
+                        GameSessionTestFixture.Entity,
                         GameSessionTestFixture.Ship,
+                        GameSessionTestFixture.CargoInventory,
+                        GameSessionTestFixture.Organization,
+                        GameSessionTestFixture.Design,
                         GameSessionTestFixture.Position(0, 0),
                         GameSessionTestFixture.PlayerController),
                 ],
@@ -116,7 +134,11 @@ public sealed class GameSessionSnapshotTests
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
                 [
                     new InitialShipSetup(
+                        GameSessionTestFixture.Entity,
                         GameSessionTestFixture.Ship,
+                        GameSessionTestFixture.CargoInventory,
+                        GameSessionTestFixture.Organization,
+                        GameSessionTestFixture.Design,
                         GameSessionTestFixture.Position(0, 0),
                         GameSessionTestFixture.PlayerController),
                 ],

@@ -352,7 +352,8 @@ public sealed class ConstructionSystem
         FacilityId facilityId,
         ConstructionOrderId orderId,
         EventGeneration generation,
-        SimulationTime now)
+        SimulationTime now,
+        EventKey? completionEventKey = null)
     {
         ArgumentNullException.ThrowIfNull(processes);
         if (!processes.TryGetValue(facilityId, out ConstructionProcess? process))
@@ -366,6 +367,7 @@ public sealed class ConstructionSystem
             orderId,
             generation,
             now,
+            completionEventKey,
             out ConstructionMaterializationEffect? materialization);
         return new ConstructionCompletionCommitResult(disposition, materialization);
     }

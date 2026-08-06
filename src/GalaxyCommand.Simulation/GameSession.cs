@@ -25,6 +25,22 @@ public sealed class GameSession : IGameplayCommandHandler
 
     public IReadOnlyList<GameplayCommandRecord> CommandRecords => _commands.Records;
 
+    public ShipId? ResolveShip(EntityId entityId) =>
+        _runtime.ResolveShip(entityId);
+
+    public EntityId? ResolveEntity(ShipId shipId) =>
+        _runtime.ResolveEntity(shipId);
+
+    public ConstructionEntityMaterializationResult MaterializeConstruction(
+        ConstructionProcess source,
+        ConstructionMaterializationEffect effect) =>
+        _runtime.MaterializeConstruction(source, effect);
+
+    public IReadOnlyList<ConstructionEntityMaterializationResult>
+        MaterializePendingConstruction(
+            IEnumerable<ConstructionProcess> sources) =>
+        _runtime.MaterializePendingConstruction(sources);
+
     public RunReport AdvanceTo(SimulationTime target) =>
         _runtime.AdvanceTo(target);
 

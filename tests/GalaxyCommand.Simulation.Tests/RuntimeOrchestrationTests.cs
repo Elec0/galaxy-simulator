@@ -178,12 +178,17 @@ public sealed class RuntimeOrchestrationTests
             SimulationTime.Zero);
         ConstructionCompletionProposal completion =
             Assert.Single(reconciliation.Commit.CompletionProposals);
+        var completionEventKey = new EventKey(
+            completion.Timestamp,
+            EventPhase.PhysicalCompletion,
+            17);
         ConstructionCompletionCommitResult completed = ConstructionSystem.CommitCompletion(
             processes,
             completion.FacilityId,
             completion.OrderId,
             completion.Generation,
-            completion.Timestamp);
+            completion.Timestamp,
+            completionEventKey);
 
         Assert.Equal(orderId, completion.OrderId);
         Assert.Equal<ulong>(1_250, completion.Timestamp.Milliseconds);
@@ -192,12 +197,16 @@ public sealed class RuntimeOrchestrationTests
             new ConstructionMaterializationEffect(
                 fixture.Process.FacilityId,
                 orderId,
-                fixture.DesignId),
+                fixture.DesignId,
+                completion.Timestamp,
+                completion.Generation,
+                completionEventKey),
             completed.Materialization);
         Assert.Equal(Quantity.Zero, fixture.Inventory.Stored(fixture.Material));
         Assert.Equal(
-            ConstructionOrderStatus.Completed,
-            fixture.Process.GetCompletedOrder(orderId)?.Status);
+            ConstructionOrderStatus.AwaitingMaterialization,
+            fixture.Process.GetOrder(orderId)?.Status);
+        Assert.Null(fixture.Process.GetCompletedOrder(orderId));
         Assert.Collection(
             reconciliation.Measurements,
             measurement => Assert.Equal(
@@ -371,6 +380,10 @@ public sealed class RuntimeOrchestrationTests
             new EconomicEvent.ProductionComplete(
                 completion.FacilityId,
                 completion.JobId),
+            new EventKey(
+                completion.Timestamp,
+                EventPhase.PhysicalCompletion,
+                0),
             completion.Generation,
             new TransportTiming(
                 SimulationDuration.Zero,

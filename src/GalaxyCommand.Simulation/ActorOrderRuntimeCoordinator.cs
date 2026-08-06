@@ -41,6 +41,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     private readonly ShipOrderCoordinator _orders = new();
     private readonly ConnectorTopology _topology;
     private readonly ISpatialNavigationPlanner _navigation;
+    private readonly EntityLifecycleOwner _lifecycle;
     private readonly GameFactStore _facts;
     private readonly List<GameEventRecord> _eventRecords = [];
 
@@ -55,18 +56,18 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         _topology = setup.ConnectorTopology;
         _navigation = navigation;
         _facts = facts;
+        _lifecycle = new EntityLifecycleOwner(
+            _movement,
+            _control,
+            _orders,
+            setup.MaterializationPolicies);
 
         foreach (StarSystem system in setup.Systems)
         {
             _systems.Add(system.Id, system);
         }
 
-        foreach (InitialShipSetup ship in setup.Ships)
-        {
-            _movement.Add(ship.Id, ship.Position);
-            _control.Add(ship.Id, ship.BaseController);
-            _orders.Add(ship.Id);
-        }
+        _lifecycle.RegisterSetup(setup.Ships);
 
         _engine = new SimulationEngine<GameEvent>(this, _agenda);
     }
@@ -74,6 +75,22 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     internal SimulationTime CurrentTime => _engine.CurrentTime;
 
     internal IReadOnlyList<GameEventRecord> EventRecords => _eventRecords.AsReadOnly();
+
+    internal ShipId? ResolveShip(EntityId entityId) =>
+        _lifecycle.Entities.GetShipId(entityId);
+
+    internal EntityId? ResolveEntity(ShipId shipId) =>
+        _lifecycle.Entities.GetEntityId(shipId);
+
+    internal ConstructionEntityMaterializationResult MaterializeConstruction(
+        ConstructionProcess source,
+        ConstructionMaterializationEffect effect) =>
+        _lifecycle.MaterializeConstruction(source, effect, CurrentTime);
+
+    internal IReadOnlyList<ConstructionEntityMaterializationResult>
+        MaterializePendingConstruction(
+            IEnumerable<ConstructionProcess> sources) =>
+        _lifecycle.MaterializePendingConstruction(sources, CurrentTime);
 
     public bool ShouldStop => false;
 
@@ -99,13 +116,24 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                     connection.DestinationEndpointId,
                     connection.Duration))),
             GameSnapshotCollection.Copy(spatial.Select(ship =>
-                new GameShipSnapshot(
+            {
+                GameSessionShip record = _lifecycle.GetRequiredShip(ship.ShipId);
+                Inventory cargo = _lifecycle.GetRequiredCargo(ship.ShipId);
+                return new GameShipSnapshot(
+                    _lifecycle.Entities.GetEntityId(ship.ShipId)
+                        ?? throw new InvalidOperationException(
+                            $"Ship {ship.ShipId} has no live entity registration."),
                     ship.ShipId,
+                    record.OrganizationId,
+                    record.DesignId,
+                    record.CargoInventoryId,
+                    cargo.Capacity,
                     ship.State,
                     _control.Capture(ship.ShipId),
                     _orders.CaptureCurrent(ship.ShipId),
                     _orders.CaptureQueue(ship.ShipId),
-                    _orders.CaptureSuspended(ship.ShipId)))));
+                    _orders.CaptureSuspended(ship.ShipId));
+            })));
     }
 
     internal GameplayCommandHandlingResult Handle(

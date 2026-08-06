@@ -55,16 +55,35 @@ public sealed class ConstructionTests
         ConstructionMaterializationEffect materialization =
             Assert.IsType<ConstructionMaterializationEffect>(
                 process.CompleteActive(completesAt));
-        ConstructionOrder completed = Assert.IsType<ConstructionOrder>(
-            process.GetCompletedOrder(orderId));
+        ConstructionOrder pending = Assert.IsType<ConstructionOrder>(
+            process.GetOrder(orderId));
 
         Assert.Equal(facilityId, materialization.FacilityId);
         Assert.Equal(orderId, materialization.OrderId);
         Assert.Equal(design.Id, materialization.DesignId);
-        Assert.Same(design, completed.Design);
-        Assert.Equal(orderId, completed.Id);
-        Assert.Equal(ConstructionOrderStatus.Completed, completed.Status);
-        Assert.Same(completed, process.GetCompletedOrder(orderId));
+        Assert.Equal(completesAt, materialization.CompletedAt);
+        Assert.Equal(default, materialization.Generation);
+        Assert.Null(materialization.CompletionEventKey);
+        Assert.Same(design, pending.Design);
+        Assert.Equal(ConstructionOrderStatus.AwaitingMaterialization, pending.Status);
+        Assert.Null(process.GetCompletedOrder(orderId));
+        Assert.Equal(
+            ConstructionMaterializationAcknowledgement.Applied,
+            process.AcknowledgeMaterialization(materialization));
+        Assert.Equal(ConstructionOrderStatus.Completed, pending.Status);
+        Assert.Same(pending, process.GetCompletedOrder(orderId));
+        Assert.Equal(
+            ConstructionMaterializationAcknowledgement.AlreadyAcknowledged,
+            process.AcknowledgeMaterialization(materialization));
+        Assert.Equal(
+            ConstructionMaterializationAcknowledgement.MismatchedMaterialization,
+            process.AcknowledgeMaterialization(materialization with
+            {
+                CompletionEventKey = new EventKey(
+                    completesAt,
+                    EventPhase.PhysicalCompletion,
+                    1),
+            }));
         Assert.Equal(Quantity.Zero, inventory.Stored(materialId));
     }
 
@@ -96,11 +115,16 @@ public sealed class ConstructionTests
                 new IdSequence<ReservationId>(),
                 inventory,
                 SimulationTime.Zero));
-        process.CompleteActive(completesAt);
+        ConstructionMaterializationEffect materialization =
+            Assert.IsType<ConstructionMaterializationEffect>(
+                process.CompleteActive(completesAt));
 
-        Assert.Equal(firstOrder, process.GetCompletedOrder(firstOrder)?.Id);
+        Assert.Equal(firstOrder, process.GetPendingMaterialization(firstOrder)?.OrderId);
         Assert.Equal(secondOrder, process.ActiveOrder?.Id);
         Assert.Same(second, process.ActiveOrder?.Design);
+        Assert.Equal(
+            ConstructionMaterializationAcknowledgement.Applied,
+            process.AcknowledgeMaterialization(materialization));
     }
 
     [Fact]
@@ -117,7 +141,7 @@ public sealed class ConstructionTests
     }
 
     [Fact]
-    public void CompletionReturnsProductEffectWithoutMaterializingProduct()
+    public void CompletionRetainsProductEffectUntilAcknowledged()
     {
         FacilityId facilityId = new IdSequence<FacilityId>().Allocate();
         InventoryId inventoryId = new IdSequence<InventoryId>().Allocate();
@@ -145,8 +169,12 @@ public sealed class ConstructionTests
         Assert.Equal(orderId, materialization.OrderId);
         Assert.Null(process.ActiveOrder);
         Assert.Equal(
-            ConstructionOrderStatus.Completed,
-            process.GetCompletedOrder(orderId)?.Status);
+            ConstructionOrderStatus.AwaitingMaterialization,
+            process.GetOrder(orderId)?.Status);
+        Assert.Same(
+            materialization,
+            process.GetPendingMaterialization(orderId));
+        Assert.Null(process.GetCompletedOrder(orderId));
     }
 
     [Fact]
@@ -190,6 +218,7 @@ public sealed class ConstructionTests
             firstId,
             scheduledGeneration,
             completesAt,
+            null,
             out ConstructionMaterializationEffect? materialization);
 
         Assert.Equal(ScheduledEventDisposition.IgnoredStaleGeneration, disposition);

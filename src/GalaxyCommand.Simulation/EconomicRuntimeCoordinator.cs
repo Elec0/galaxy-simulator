@@ -157,13 +157,15 @@ public sealed class EconomicRuntimeCoordinator
         FacilityId facilityId,
         ConstructionOrderId orderId,
         EventGeneration generation,
-        SimulationTime now) =>
+        SimulationTime now,
+        EventKey completionEventKey) =>
         ConstructionSystem.CommitCompletion(
             _constructionProcesses,
             facilityId,
             orderId,
             generation,
-            now);
+            now,
+            completionEventKey);
 
     public ProductionCompletionCommitResult CommitProductionCompletion(
         FacilityId facilityId,

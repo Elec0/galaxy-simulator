@@ -39,8 +39,14 @@ public sealed class Shipyard
     public ConstructionOrder? GetCompletedOrder(ConstructionOrderId orderId) =>
         _construction.GetCompletedOrder(orderId);
 
+    public ConstructionMaterializationEffect? GetPendingMaterialization(
+        ConstructionOrderId orderId) =>
+        _construction.GetPendingMaterialization(orderId);
+
     public ShipId? GetConstructedShipId(ConstructionOrderId orderId) =>
-        _constructedShips.GetValueOrDefault(orderId);
+        _constructedShips.TryGetValue(orderId, out ShipId shipId)
+            ? shipId
+            : null;
 
     public IReadOnlyDictionary<MaterialId, Quantity> UnmetInputs(Inventory inventory) =>
         _construction.UnmetInputs(inventory);
@@ -92,6 +98,7 @@ public sealed class Shipyard
             orderId,
             generation,
             now,
+            null,
             out ConstructionMaterializationEffect? materialization);
         constructedShipId = materialization is null
             ? null
@@ -106,8 +113,32 @@ public sealed class Shipyard
 
     internal void RecordConstructedShip(
         ConstructionOrderId orderId,
-        ShipId shipId) =>
+        ShipId shipId)
+    {
+        if (_constructedShips.TryGetValue(orderId, out ShipId existing))
+        {
+            if (existing != shipId)
+            {
+                throw new InvalidOperationException(
+                    $"Construction order {orderId} already materialized ship {existing}, not {shipId}.");
+            }
+
+            return;
+        }
+
+        ConstructionMaterializationEffect materialization =
+            GetPendingMaterialization(orderId)
+            ?? throw new InvalidOperationException(
+                $"Construction order {orderId} has no pending materialization.");
         _constructedShips.Add(orderId, shipId);
+        ConstructionMaterializationAcknowledgement acknowledgement =
+            _construction.AcknowledgeMaterialization(materialization);
+        if (acknowledgement != ConstructionMaterializationAcknowledgement.Applied)
+        {
+            throw new InvalidOperationException(
+                $"Construction order {orderId} acknowledgement returned {acknowledgement}.");
+        }
+    }
 
     private ShipId MaterializeShip(
         ConstructionMaterializationEffect materialization,
@@ -122,9 +153,19 @@ public sealed class Shipyard
                 $"Shipyard {FacilityId} cannot materialize an effect for facility {materialization.FacilityId}.");
         }
 
-        ConstructionOrder order = GetCompletedOrder(materialization.OrderId)
+        if (GetConstructedShipId(materialization.OrderId) is { } existing)
+        {
+            return existing;
+        }
+
+        ConstructionOrder order = _construction.GetOrder(materialization.OrderId)
             ?? throw new InvalidOperationException(
-                $"Construction order {materialization.OrderId} has not completed.");
+                $"Construction order {materialization.OrderId} does not exist.");
+        if (GetPendingMaterialization(materialization.OrderId) != materialization)
+        {
+            throw new InvalidOperationException(
+                $"Construction order {materialization.OrderId} has no matching pending materialization.");
+        }
         if (order.DesignId != materialization.DesignId
             || order.Design is not ShipDesign design)
         {

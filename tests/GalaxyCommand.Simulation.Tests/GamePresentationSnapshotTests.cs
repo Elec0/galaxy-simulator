@@ -126,11 +126,19 @@ public sealed class GamePresentationSnapshotTests
             [new StarSystem(GameSessionTestFixture.System, "Test System")],
             [
                 new InitialShipSetup(
+                    GameSessionTestFixture.Entity,
                     GameSessionTestFixture.Ship,
+                    GameSessionTestFixture.CargoInventory,
+                    GameSessionTestFixture.Organization,
+                    GameSessionTestFixture.Design,
                     GameSessionTestFixture.Position(0, 0),
                     GameSessionTestFixture.PlayerController),
                 new InitialShipSetup(
+                    new EntityId(2),
                     secondShip,
+                    new InventoryId(2),
+                    GameSessionTestFixture.Organization,
+                    GameSessionTestFixture.Design,
                     GameSessionTestFixture.Position(10, 0),
                     GameSessionTestFixture.PlayerController),
             ],
