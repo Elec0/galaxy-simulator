@@ -13,19 +13,22 @@ rather than deleting them.
 
 ## Current focus
 
-`TASK-011` completed the clean-session entity lifecycle foundation. Select the
-next implementation task from the near-term list. Economic and transport owner
-integration is tracked separately in `TASK-034` and should begin only after
-those owners join the clean `GameSession`.
+`TASK-035` completed the first relational gameplay model and unblocked the
+architecture work in `TASK-012`. Economic and transport owner integration is
+tracked separately in `TASK-034` and should begin only after those owners join
+the clean `GameSession`.
 
 ## Near-term work
 
-- [ ] **TASK-012: Define faction and relationship state**
-  - Give organizations the state needed for ownership, hostility, reputation,
-    objectives, and strategic priorities.
-  - Define the boundary between authoritative knowledge and what a faction
-    currently knows.
-  - Keep faction-specific scripts above the shared faction and command models.
+- [ ] **TASK-012: Translate relational gameplay into simulation architecture**
+  - Begin only after `TASK-035` establishes the approved relational gameplay
+    model and terminology.
+  - Translate that game design into authoritative deterministic state,
+    ownership boundaries, commands, facts, snapshots, and persistence needs
+    without extending the approved concepts.
+  - Keep content-specific and scripted behavior above the shared relationship,
+    strategic-state, and command models.
+  - Context: [Relational gameplay model](factions.md)
 
 - [ ] **TASK-013: Define pause, speed, and input timing**
   - Define when commands submitted while paused take effect.
@@ -163,7 +166,34 @@ prerequisites and desired behavior are sufficiently defined.
     missing-reference event behavior, and lifecycle fact ordering.
   - Context: [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Runtime orchestration](runtime-orchestration.md)
 
+- [ ] **TASK-036: Define piracy and its relationship consequences**
+  - Define which acts count as piracy and distinguish piracy from ordinary
+    trade, territorial violations, salvage, privateering, and declared war.
+  - Define victim, witness, attribution, jurisdiction, stolen-property, mission,
+    and retaliation rules before assigning reputation consequences.
+  - Define how piracy affects the offender, asset owner, controller, victim,
+    territorial authority, and informed third parties without adding automatic
+    economic guilt by association.
+  - Coordinate with combat in `TASK-019`, player knowledge in `TASK-020`, and
+    the accepted relational gameplay model before choosing simulation state or
+    commands.
+  - Context: [Relational gameplay model](factions.md)
+
 ## Completed foundations
+
+- [x] **TASK-035: Define the relational gameplay model**
+  - Established the independent-trader starting position, provisional power
+    concept, directional standing, explicit diplomacy, and the initial five
+    relationship bands.
+  - Defined standing-dependent grants, enforceable restricted space,
+    territorial authority, explainable reputation changes, and third-party
+    consequences limited to explicit known actions rather than economic
+    activity.
+  - Defined ownership, control, affiliation, strategic-goal, and information
+    boundaries without selecting implementation types or storage.
+  - Piracy-specific attribution and relationship design remains in `TASK-036`;
+    simulation architecture follows in `TASK-012`.
+  - Context: [Relational gameplay model](factions.md)
 
 - [x] **TASK-011: Define entity lifecycle and explicit spawning**
   - Added session-wide entity identity, prepared setup registration, explicit
