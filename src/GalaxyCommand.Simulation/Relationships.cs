@@ -1226,18 +1226,6 @@ public sealed class RelationshipSetup
                     $"Duplicate initial relationship grant {grant.Id.Value}.",
                     nameof(grants));
             }
-
-            StandingValue issuerStanding = standingValues
-                .Where(value => value.AssessingPrincipalId == grant.IssuerPrincipalId
-                    && value.SubjectPrincipalId == grant.HolderPrincipalId)
-                .Select(value => value.Value)
-                .SingleOrDefault(standingPolicy.Initial);
-            if (standingPolicy.GetBand(issuerStanding) < grant.MinimumStandingBand)
-            {
-                throw new ArgumentException(
-                    "Initial relationship grant standing requirement is not met.",
-                    nameof(grants));
-            }
         }
 
         Principals = new ReadOnlyCollection<PrincipalDefinition>(principalValues);

@@ -424,7 +424,7 @@ public sealed class RelationshipTests
     }
 
     [Fact]
-    public void RelationshipSetupCanonicalizesDiplomacyAndValidatesInitialGrants()
+    public void RelationshipSetupCanonicalizesDiplomacyAndValidatesInitialGrantStructure()
     {
         RelationshipSetup setup = CreateRelationshipSetup(
             [
@@ -448,7 +448,7 @@ public sealed class RelationshipTests
         Assert.Equal(RegionalPrincipal, diplomacy.UpperPrincipalId);
         Assert.Single(setup.Grants);
 
-        Assert.Throws<ArgumentException>(() => CreateRelationshipSetup(
+        RelationshipSetup suspendedSetup = CreateRelationshipSetup(
             setup.Principals,
             [],
             [],
@@ -457,7 +457,35 @@ public sealed class RelationshipTests
                 PlayerPrincipal,
                 RegionalPrincipal,
                 GrantKind(),
-                StandingBand.Favorable)]));
+                StandingBand.Favorable)]);
+        GameSession suspendedSession = CreateRelationshipSession(
+            grants: suspendedSetup.Grants);
+        RelationshipGrantSnapshot suspendedGrant = Assert.Single(
+            suspendedSession.CaptureSnapshot().Relationships.Grants);
+        Assert.True(suspendedGrant.IsIssued);
+        Assert.False(suspendedGrant.IsEffective);
+
+        Assert.Throws<ArgumentException>(() => CreateRelationshipSetup(
+            setup.Principals,
+            [],
+            [],
+            [new InitialRelationshipGrantSetup(
+                new RelationshipGrantId(6),
+                new PrincipalId(99),
+                RegionalPrincipal,
+                GrantKind(),
+                StandingBand.Neutral)]));
+        InitialRelationshipGrantSetup duplicateGrant = new(
+            new RelationshipGrantId(7),
+            PlayerPrincipal,
+            RegionalPrincipal,
+            GrantKind(),
+            StandingBand.Neutral);
+        Assert.Throws<ArgumentException>(() => CreateRelationshipSetup(
+            setup.Principals,
+            [],
+            [],
+            [duplicateGrant, duplicateGrant]));
         Assert.Throws<ArgumentException>(() => CreateRelationshipSetup(
             setup.Principals,
             [],

@@ -13,40 +13,12 @@ rather than deleting them.
 
 ## Current focus
 
-`TASK-035` completed the first relational gameplay model and unblocked the
-architecture and implementation work in `TASK-012`. Economic and transport
-owner integration is tracked separately in `TASK-034` and should begin only
-after those owners join the clean `GameSession`.
+`TASK-012` completed the first shared relational simulation foundation from the
+gameplay model accepted in `TASK-035`. Economic and transport owner integration
+is tracked separately in `TASK-034` and should begin only after those owners
+join the clean `GameSession`.
 
 ## Near-term work
-
-- [ ] **TASK-012: Translate relational gameplay into simulation architecture**
-  - Begin only after `TASK-035` establishes the approved relational gameplay
-    model and terminology.
-  - Translate that game design into authoritative deterministic state,
-    ownership boundaries, commands, facts, snapshots, and persistence needs
-    without extending the approved concepts.
-  - Keep content-specific and scripted behavior above the shared relationship,
-    strategic-state, and command models.
-  - Accepted architecture defines principal identity, directional standing,
-    mutual diplomacy, explicit grants, deterministic effects, scoped reads,
-    and save inventory; implementation is in progress.
-  - Implemented the first two slices: principal definitions, configurable
-    standing policy, canonical setup validation, immutable relationship
-    ownership, complete directional diagnostic snapshots, and clean-session
-    `OrganizationId` to `PrincipalId` ownership migration.
-  - Added source-scoped idempotent standing batches, stable per-direction
-    contribution reduction, checked and clamped rejection-atomic commits,
-    mutation receipts, and ordered `StandingChangedFact` publication.
-  - Added canonical mutual `Peace` and `War` state, source-scoped idempotent
-    diplomacy and grant batches, explicit issued and revoked grants,
-    standing-dependent effectiveness queries, immutable diagnostics, and
-    ordered diplomacy and grant facts.
-  - Added observer-scoped relationship presentation with public identities and
-    diplomacy, incoming treatment, issued grants to the observer, filtered
-    relationship facts, and an opaque scanned-fact cursor. Complete private
-    relationship diagnostics no longer reach Godot through presentation.
-  - Context: [Relational gameplay model](factions.md) · [Relational simulation architecture](relational-simulation-architecture.md)
 
 - [ ] **TASK-013: Define pause, speed, and input timing**
   - Define when commands submitted while paused take effect.
@@ -59,7 +31,11 @@ after those owners join the clean `GameSession`.
   - Include simulation time, pending agenda, creation sequences, random state,
     system topology, spatial and motion state, controllers, orders, generations,
     objectives, and script or dialogue progress.
+  - Incorporate the complete relationship state, source-scoped committed batch
+    receipts, direct atomic restoration requirement, and non-authoritative
+    exclusions recorded by `TASK-012`.
   - Defer the final serialization format until the state boundary is tested.
+  - Context: [Relational simulation architecture § Authoritative relationship save inventory](relational-simulation-architecture.md#authoritative-relationship-save-inventory)
 
 ## Future parking lot
 
@@ -213,6 +189,22 @@ prerequisites and desired behavior are sufficiently defined.
 
 ## Completed foundations
 
+- [x] **TASK-012: Translate relational gameplay into simulation architecture**
+  - Added `PrincipalId` identity, configurable directional standing, canonical
+    mutual diplomacy, explicit standing-dependent grants, and clean-session
+    asset ownership without conflating ownership and actor control.
+  - Added rejection-atomic, source-scoped idempotent relationship effects,
+    stable reduction, immutable diagnostic snapshots, and ordered semantic
+    facts while preserving the single-thread deterministic reference path.
+  - Added observer-scoped presentation that exposes public diplomacy, incoming
+    treatment, and grants issued to the observer without leaking private reverse
+    standing through snapshots or facts.
+  - Recorded the exact authoritative relationship save inventory and direct
+    atomic restoration contract for `TASK-014`. Save encoding remains
+    `TASK-022`, content-reference migration remains `TASK-037`, and gameplay
+    policy remains with its owning domains, including piracy in `TASK-036`.
+  - Context: [Relational gameplay model](factions.md) · [Relational simulation architecture](relational-simulation-architecture.md)
+
 - [x] **TASK-035: Define the relational gameplay model**
   - Established the independent-trader starting position, provisional power
     concept, directional standing, explicit diplomacy, and the initial five
@@ -224,7 +216,7 @@ prerequisites and desired behavior are sufficiently defined.
   - Defined ownership, control, affiliation, strategic-goal, and information
     boundaries without selecting implementation types or storage.
   - Piracy-specific attribution and relationship design remains in `TASK-036`;
-    simulation architecture follows in `TASK-012`.
+    simulation architecture was completed in `TASK-012`.
   - Context: [Relational gameplay model](factions.md)
 
 - [x] **TASK-011: Define entity lifecycle and explicit spawning**

@@ -20,18 +20,19 @@ The first implementation must answer four questions consistently:
 
 **Decision status:** Accepted by the project owner on 2026-08-06.
 
-**Implementation status:** Implementation is in progress under `TASK-012`.
-The first slice now provides principal identity and definitions, standing policy
-and setup validation, an immutable relationship owner, complete diagnostic
+**Implementation status:** Completed by `TASK-012` on 2026-08-06.
+The implementation provides principal identity and definitions, standing policy
+and setup validation, a session relationship owner, complete diagnostic
 standing snapshots, and clean-session asset ownership through `PrincipalId`.
-The third slice adds source-scoped idempotent standing batches, stable
+It adds source-scoped idempotent standing batches, stable
 contribution reduction, rejection-atomic prepared commit, and semantic standing
-facts. The fourth slice adds canonical mutual diplomacy, explicit issued and
+facts. It also adds canonical mutual diplomacy, explicit issued and
 revoked grant state, standing-dependent effectiveness queries, rejection-atomic
-policy batches, and typed diplomacy and grant facts. The fifth slice requires
+policy batches, and typed diplomacy and grant facts. Presentation requires
 an observing `PrincipalId`, removes complete relationship diagnostics from the
 presentation world, and returns a separate scoped relationship projection and
-fact feed.
+fact feed. The authoritative save inventory and restoration contract are now
+recorded for `TASK-014`.
 
 ## Decision summary
 
@@ -242,11 +243,13 @@ construction, policing, information, or restricted-space grant kinds. The
 system that introduces one must define its stable kind and the behavior that
 checks it.
 
-A grant can be issued only when the issuer's standing toward the holder meets
-its minimum band. An issued grant is effective only while that condition
-continues to hold. Falling below the threshold suspends its use without
-rewriting its issued state; explicit revocation remains distinguishable. This
-keeps standing-dependent access deterministic and makes revocation explainable.
+A gameplay issue effect can commit only when the issuer's standing toward the
+holder meets its minimum band. Initial setup may declare an already-issued
+grant below that threshold, representing a permission that begins suspended.
+An issued grant is effective only while its standing condition holds. Falling
+below the threshold suspends its use without rewriting its issued state;
+explicit revocation remains distinguishable. This keeps standing-dependent
+access deterministic and makes revocation explainable.
 
 Grant checks use one stable relationship view captured for the evaluation
 wave. A worker does not observe a standing change committed midway through its
@@ -452,24 +455,82 @@ Initial `GameSessionSetup` additions are:
 Setup canonicalizes all collections and rejects invalid cross-references before
 constructing any runtime owner. Omitted directional relationships use the
 standing policy's initial value. Omitted diplomacy uses peace. Setup does not
-silently create principals referenced only by an asset or relationship.
+silently create principals referenced only by an asset or relationship. An
+initial issued grant may begin below its minimum standing band; setup retains
+the issued state and derives it as ineffective.
 
-`TASK-014` should include the following authoritative inventory:
+### Authoritative relationship save inventory
 
-- Every principal's stable runtime and content identity
-- Player principal identity
-- Directional standing values
-- Mutual diplomatic conditions
-- Issued and revoked grant state
-- Next grant identifier or other deterministic allocation state
-- Standing policy identity and compatibility information
-- Committed standing batch identities, canonical contributions, and receipts
-  required to preserve idempotent delivery across restoration
+`TASK-012` contributes the following exact inventory to `TASK-014`. The save
+format may encode it differently, but it must be sufficient to reconstruct the
+same authoritative state and idempotency behavior:
 
-Restore validates the whole relational section before publishing the session.
-It restores state directly rather than replaying relational facts. The retained
-fact window is optional presentation and explanation history, not relational
-truth.
+| Owner state | Required information |
+| --- | --- |
+| Principal registry | Every `PrincipalId`, stable `PrincipalContentId`, and the content reference needed to reconstruct its authored display metadata; the player `PrincipalId` must remain registered. |
+| Standing policy | `StandingPolicyId`, minimum, maximum, initial value, and all four ordered band thresholds, or a versioned content reference proven to resolve to exactly those values. |
+| Directional standing | The exact `StandingValue` for every non-self assessing and subject pair. Bands are derived from the restored policy and are not independent save authority. An encoding may omit policy-default values only if omission reconstructs the identical matrix. |
+| Mutual diplomacy | The `DiplomaticCondition` for every canonical unordered pair. An encoding may omit `Peace` only when omission has that exact default meaning. |
+| Explicit grants | Every `RelationshipGrantId`, issuer, holder, content-defined kind, minimum standing band, and issued or revoked state. Effectiveness is derived from issued state and current issuer-to-holder standing. |
+| Standing delivery receipts | Every committed source-scoped `StandingChangeBatchId`, its canonical directional proposals and ordered contributions, and the applied receipt needed to return the same prior and resulting values on repeated delivery. |
+| Diplomacy and grant delivery receipts | Every committed source-scoped `RelationshipPolicyChangeBatchId`, its canonical closed proposal values, and the applied diplomatic and grant outcomes needed for identical repeated delivery. |
+
+Rejected deliveries are not committed owner state and are not retained.
+Committed no-op deliveries are retained because their identities must remain
+idempotent after load. Receipt encodings may omit derived bands and combined
+standing deltas only when restore recomputes and validates the identical
+values.
+
+The relationship owner has no internal identity allocator, random state,
+scheduled work, or simulation clock. Grant IDs and both batch ID families are
+supplied by their source domains. Any future source-domain allocator belongs to
+that domain's `TASK-014` inventory rather than this owner.
+
+### Restoration contract
+
+New-session setup and restoration both permit an issued grant below its minimum
+standing band and derive `IsEffective` as false. Restoration still requires a
+separate owner-level path because setup does not contain committed idempotency
+receipts or the complete cross-owner state needed for atomic publication.
+
+```mermaid
+flowchart LR
+    payload["Decoded relationship section"]
+    content["Versioned content and standing policy"]
+    validate["Validate complete state and receipts"]
+    prepared["Prepared relationship restoration"]
+    owner["Published relationship owner"]
+
+    payload --> validate
+    content --> validate
+    validate --> prepared --> owner
+```
+
+Before publishing a session, the restore path must:
+
+1. Resolve the required content and standing policy compatibility through the
+   boundaries owned by `TASK-037` and `TASK-022`.
+2. Validate principal and content identities, the player reference, policy
+   ordering, standing ranges, canonical diplomacy pairs, grant identities and
+   references, enum values, and non-blank grant kinds.
+3. Validate committed batch uniqueness, canonical proposal ordering,
+   contribution uniqueness and checked sums, receipt outcomes, and consistency
+   with the restored policy.
+4. Construct the complete relationship state and committed-receipt maps without
+   mutating a live owner.
+5. Publish the prepared owner only after every relationship and cross-owner
+   reference validates.
+
+Restore assigns authoritative state directly. It does not replay relational
+effects or semantic facts. `RelationshipSnapshot`, observer projections,
+derived bands, grant effectiveness, selection, fact cursors, and presentation
+facts are read models rather than relationship save authority. The retained
+fact window may be preserved separately for presentation or explanation, but it
+cannot reconstruct relationship truth or idempotency receipts.
+
+The current diagnostic snapshot does not expose committed delivery receipts.
+`TASK-014` therefore needs an owner-level save capture taken at a completed
+commit boundary rather than treating `GameSnapshot` as a serialization model.
 
 Save encoding and schema migration remain `TASK-022`. Versioned content
 catalogs, mod provenance, and migration of saved content references remain
@@ -494,8 +555,8 @@ Implementation proceeds in dependency order:
 6. Record the authoritative save inventory for `TASK-014`; do not implement a
    serialization format inside `TASK-012`.
 
-Slices 1 through 5 are implemented. Slice 6 is the next dependency-ordered
-work.
+Slices 1 through 6 are implemented. The accepted `TASK-012` architecture and
+implementation are complete.
 
 Each slice needs focused tests for setup rejection atomicity, directional
 asymmetry, stable ordering, immutable snapshots, worker and batch-order
