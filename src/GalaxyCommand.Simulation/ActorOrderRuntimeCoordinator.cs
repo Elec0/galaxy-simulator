@@ -42,6 +42,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     private readonly ConnectorTopology _topology;
     private readonly ISpatialNavigationPlanner _navigation;
     private readonly EntityLifecycleOwner _lifecycle;
+    private readonly RelationshipOwner _relationships;
     private readonly GameFactStore _facts;
     private readonly List<GameEventRecord> _eventRecords = [];
 
@@ -56,6 +57,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         _topology = setup.ConnectorTopology;
         _navigation = navigation;
         _facts = facts;
+        _relationships = new RelationshipOwner(setup.Relationships);
         _lifecycle = new EntityLifecycleOwner(
             _movement,
             _control,
@@ -147,7 +149,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                         EntityKind.Ship,
                         materialized.ShipId,
                         EntityMaterializationSourceKind.Construction,
-                        ship.OrganizationId,
+                        ship.PrincipalId,
                         ship.DesignId,
                         position)),
             ]);
@@ -176,6 +178,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                     connection.SourceEndpointId,
                     connection.DestinationEndpointId,
                     connection.Duration))),
+            _relationships.CaptureSnapshot(),
             GameSnapshotCollection.Copy(spatial.Select(ship =>
             {
                 GameSessionShip record = _lifecycle.GetRequiredShip(ship.ShipId);
@@ -185,7 +188,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                         ?? throw new InvalidOperationException(
                             $"Ship {ship.ShipId} has no live entity registration."),
                     ship.ShipId,
-                    record.OrganizationId,
+                    record.PrincipalId,
                     record.DesignId,
                     record.CargoInventoryId,
                     cargo.Capacity,

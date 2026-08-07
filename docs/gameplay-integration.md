@@ -397,6 +397,9 @@ strategic behavior, dialogue, hostility, ownership transfer, or enemy
 classification. Relationships, objectives, priorities, and known information
 need authoritative homes before faction-specific scripts are added.
 
+`TASK-012` translates the accepted gameplay model into those authoritative
+boundaries in [Relational simulation architecture](relational-simulation-architecture.md).
+
 ### 3.6 Pause, speed, and input timing
 
 Define when commands submitted while paused take effect, how commands are

@@ -12,7 +12,7 @@ public partial class Main : Node
 	private static readonly EntityId InitialEntityId = new(1);
 	private static readonly ShipId InitialShipId = new(1);
 	private static readonly InventoryId InitialCargoInventoryId = new(1);
-	private static readonly OrganizationId InitialOrganizationId = new(1);
+	private static readonly PrincipalId InitialPrincipalId = new(1);
 	private static readonly ShipDesign InitialShipDesign = new(
 		new ConstructionDesignId(1),
 		"Starter Ship",
@@ -64,11 +64,29 @@ public partial class Main : Node
 					InitialEntityId,
 					InitialShipId,
 					InitialCargoInventoryId,
-					InitialOrganizationId,
+					InitialPrincipalId,
 					InitialShipDesign,
 					position,
 					new ActorController(ActorControllerKind.Player, new CommandSourceId("local-player"))),
 			],
+			new RelationshipSetup(
+				[
+					new PrincipalDefinition(
+						InitialPrincipalId,
+						new PrincipalContentId("player"),
+						"Player"),
+				],
+				InitialPrincipalId,
+				new StandingPolicy(
+					new StandingPolicyId("default-standing"),
+					new StandingValue(-100),
+					new StandingValue(100),
+					new StandingValue(0),
+					new StandingValue(-50),
+					new StandingValue(0),
+					new StandingValue(50),
+					new StandingValue(90)),
+				[]),
 			factRetentionCapacity: 1024);
 		return new GameSession(
 			setup,

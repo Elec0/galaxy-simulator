@@ -5,7 +5,7 @@
 ## Purpose
 
 A constructed ship needs more than a `ShipRegistry` entry. It needs a stable
-identity, organization, design, cargo inventory, spatial state, controller,
+identity, principal, design, cargo inventory, spatial state, controller,
 orders, and a presentation lifetime. Removal requires the inverse operation
 across those owners, including scheduled and economic work.
 
@@ -59,7 +59,7 @@ economic and transport owners is tracked separately in `TASK-034`.
 | ID allocation | Lifecycle commit allocates IDs only after a complete prepared-commit validation. Setup advances each runtime allocator beyond its explicit high-water mark without treating setup IDs as runtime allocations. |
 | Construction source | Construction retains a durable pending materialization keyed by facility and order. Lifecycle joins it to an authoritative facility materialization policy and acknowledges it only after atomic entity commit. |
 | Setup and scripts | Setup uses common internal registration with explicit IDs. Future scripts may propose a typed effect, but this task adds no script-spawn command. |
-| Initial state | Required organization, design, `SystemPosition`, cargo capacity, non-script base controller, and explicitly no initial order. |
+| Initial state | Required principal, design, `SystemPosition`, cargo capacity, non-script base controller, and explicitly no initial order. |
 | Removal | Detach economic work, invalidate scheduled activity, then remove cargo, actor, spatial, control, order, and entity registrations deterministically. |
 | Initial cargo policy | Removal names a disposition. The first supported policy discards cargo only after reservations and transport commitments are released. |
 | Client visibility | Snapshots contain fully live entities or none. Typed lifecycle facts record successful materialization and removal. |
@@ -163,7 +163,7 @@ registration and high-water-mark rule under `TASK-014`.
 Each construction facility has an immutable, authoritative
 `ShipMaterializationPolicy` configured and validated with the facility. It names:
 
-- The owning `OrganizationId`
+- The owning `PrincipalId`
 - The facility-backed stationary `SystemPosition`
 - The non-script base `ActorController`
 - The ship designs the facility may materialize
@@ -205,7 +205,7 @@ completed. Its lifecycle request must additionally supply and validate:
 - The facility and completed order for one-time linkage
 - The `ShipDesign` and derived cargo capacity
 - The facility's materialization policy and allowed design
-- The policy's owning `OrganizationId`, stationary `SystemPosition`, valid
+- The policy's owning `PrincipalId`, stationary `SystemPosition`, valid
   non-script base `ActorController`, and `NoInitialOrder`
 - The exact pending construction generation and idempotency key
 
@@ -277,7 +277,7 @@ lifecycle foundation.
 Successful transitions propose lifecycle facts after component commit:
 
 - `EntityMaterializedFact`: `EntityId`, kind, typed identity, source kind,
-  organization, design, and initial system position.
+  principal, design, and initial system position.
 - `EntityRemovedFact`: former `EntityId`, kind, typed identity, removal reason,
   and cargo disposition.
 

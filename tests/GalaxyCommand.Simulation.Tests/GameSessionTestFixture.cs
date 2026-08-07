@@ -12,7 +12,23 @@ internal static class GameSessionTestFixture
 
     internal static InventoryId CargoInventory { get; } = new(1);
 
-    internal static OrganizationId Organization { get; } = new(1);
+    internal static PrincipalId Principal { get; } = new(1);
+
+    internal static StandingPolicy StandingPolicy { get; } = new(
+        new StandingPolicyId("test-standing"),
+        new StandingValue(-100),
+        new StandingValue(100),
+        new StandingValue(0),
+        new StandingValue(-50),
+        new StandingValue(0),
+        new StandingValue(50),
+        new StandingValue(90));
+
+    internal static RelationshipSetup Relationships { get; } = new(
+        [new PrincipalDefinition(Principal, new PrincipalContentId("test-player"), "Test Player")],
+        Principal,
+        StandingPolicy,
+        []);
 
     internal static ShipDesign Design { get; } = new(
         new ConstructionDesignId(1),
@@ -40,11 +56,12 @@ internal static class GameSessionTestFixture
                     Entity,
                     Ship,
                     CargoInventory,
-                    Organization,
+                    Principal,
                     Design,
                     Position(0, 0),
                     baseController ?? PlayerController),
             ],
+            Relationships,
             factRetentionCapacity);
         return new GameSession(
             setup,

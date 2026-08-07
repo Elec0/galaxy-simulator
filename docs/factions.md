@@ -1,6 +1,6 @@
 # Relational gameplay model
 
-[Project index](../README.md) · [Vision](vision.md) · [Player experience](player-experience.md) · [Economy](economy.md) · [Time and pacing](time-and-pacing.md) · [Project task list](task-list.md)
+[Project index](../README.md) · [Vision](vision.md) · [Player experience](player-experience.md) · [Economy](economy.md) · [Time and pacing](time-and-pacing.md) · [Relational simulation architecture](relational-simulation-architecture.md) · [Project task list](task-list.md)
 
 ## Purpose
 
@@ -18,7 +18,8 @@ also does not decide whether those terms describe one concept or several.
 **Decision status:** Accepted by the project owner on 2026-08-05.
 
 **Implementation status:** No implementation was added by `TASK-035`. `TASK-012`
-may now translate this gameplay contract into simulation architecture and code
+is translating this gameplay contract in
+[Relational simulation architecture](relational-simulation-architecture.md)
 without extending it.
 
 ## Starting reference: X4

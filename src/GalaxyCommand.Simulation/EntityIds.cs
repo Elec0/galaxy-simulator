@@ -122,6 +122,27 @@ public readonly record struct OrganizationId : IEntityId<OrganizationId>
     public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }
 
+/// <summary>
+/// Stable identity of an accountable participant that can own assets and hold
+/// relationships in the clean game session.
+/// </summary>
+public readonly record struct PrincipalId : IEntityId<PrincipalId>
+{
+    /// <summary>
+    /// Creates a non-zero principal identity.
+    /// </summary>
+    public PrincipalId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
+    public ulong Value { get; }
+
+    /// <summary>
+    /// Creates a principal identity for generic deterministic allocation.
+    /// </summary>
+    public static PrincipalId Create(ulong value) => new(value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
 public readonly record struct ConstructionDesignId : IEntityId<ConstructionDesignId>
 {
     public ConstructionDesignId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }

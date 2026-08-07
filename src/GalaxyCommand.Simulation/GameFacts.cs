@@ -110,18 +110,21 @@ public enum EntityMaterializationSourceKind
 /// </summary>
 public sealed record EntityMaterializedFact : GameFact
 {
+    /// <summary>
+    /// Creates the semantic record for one fully committed ship materialization.
+    /// </summary>
     public EntityMaterializedFact(
         EntityId entityId,
         EntityKind kind,
         ShipId shipId,
         EntityMaterializationSourceKind sourceKind,
-        OrganizationId organizationId,
+        PrincipalId principalId,
         ConstructionDesignId designId,
         SystemPosition initialPosition)
     {
         ArgumentOutOfRangeException.ThrowIfZero(entityId.Value);
         ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
-        ArgumentOutOfRangeException.ThrowIfZero(organizationId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(principalId.Value);
         ArgumentOutOfRangeException.ThrowIfZero(designId.Value);
         ArgumentOutOfRangeException.ThrowIfZero(initialPosition.SystemId.Value);
         if (!Enum.IsDefined(kind))
@@ -141,7 +144,7 @@ public sealed record EntityMaterializedFact : GameFact
         Kind = kind;
         ShipId = shipId;
         SourceKind = sourceKind;
-        OrganizationId = organizationId;
+        PrincipalId = principalId;
         DesignId = designId;
         InitialPosition = initialPosition;
     }
@@ -154,7 +157,7 @@ public sealed record EntityMaterializedFact : GameFact
 
     public EntityMaterializationSourceKind SourceKind { get; }
 
-    public OrganizationId OrganizationId { get; }
+    public PrincipalId PrincipalId { get; }
 
     public ConstructionDesignId DesignId { get; }
 

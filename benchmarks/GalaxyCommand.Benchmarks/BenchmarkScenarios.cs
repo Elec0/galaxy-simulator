@@ -73,6 +73,7 @@ internal sealed class SpatialBenchmarkScenario : IBenchmarkScenario
             new GameSessionSetup(
                 systems,
                 ships,
+                ScenarioSetup.Relationships,
                 configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity)),
             new DirectLocalNavigationPlanner(
                 new FixedTravelTimeEstimator(travelDuration)));
@@ -119,6 +120,7 @@ internal sealed class ConnectorNavigationBenchmarkScenario : IBenchmarkScenario
                 systems,
                 ships,
                 topology,
+                ScenarioSetup.Relationships,
                 configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity)),
             new HierarchicalNavigationPlanner(
                 topology,
@@ -183,6 +185,7 @@ internal sealed class FactBenchmarkScenario : IBenchmarkScenario
             new GameSessionSetup(
                 systems,
                 ships,
+                ScenarioSetup.Relationships,
                 configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity)),
             new DirectLocalNavigationPlanner(
                 new FixedTravelTimeEstimator(duration)));
@@ -236,7 +239,7 @@ internal static class ScenarioSetup
 {
     private static readonly CommandSourceId BenchmarkSourceId =
         new("benchmark-autonomous");
-    private static readonly OrganizationId BenchmarkOrganizationId = new(1);
+    private static readonly PrincipalId BenchmarkPrincipalId = new(1);
     private static readonly ShipDesign BenchmarkShipDesign = new(
         new ConstructionDesignId(1),
         "Benchmark Ship",
@@ -245,6 +248,25 @@ internal static class ScenarioSetup
 
     internal static CommandSource AutonomousSource { get; } =
         new(CommandSourceKind.Autonomous, BenchmarkSourceId);
+
+    internal static RelationshipSetup Relationships { get; } = new(
+        [
+            new PrincipalDefinition(
+                BenchmarkPrincipalId,
+                new PrincipalContentId("benchmark"),
+                "Benchmark Principal"),
+        ],
+        BenchmarkPrincipalId,
+        new StandingPolicy(
+            new StandingPolicyId("benchmark-standing"),
+            new StandingValue(-100),
+            new StandingValue(100),
+            new StandingValue(0),
+            new StandingValue(-50),
+            new StandingValue(0),
+            new StandingValue(50),
+            new StandingValue(90)),
+        []);
 
     internal static StarSystem[] CreateSystems(int count)
     {
@@ -277,7 +299,7 @@ internal static class ScenarioSetup
                 new EntityId(id),
                 new ShipId(id),
                 new InventoryId(id),
-                BenchmarkOrganizationId,
+                BenchmarkPrincipalId,
                 BenchmarkShipDesign,
                 Position(systemIndex, x, 0),
                 controller);

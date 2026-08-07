@@ -10,6 +10,7 @@ public sealed record GameSnapshot(
     IReadOnlyList<GameSystemSnapshot> Systems,
     IReadOnlyList<ConnectorEndpointSnapshot> ConnectorEndpoints,
     IReadOnlyList<TransitConnectionSnapshot> TransitConnections,
+    RelationshipSnapshot Relationships,
     IReadOnlyList<GameShipSnapshot> Ships);
 
 public sealed record GameSystemSnapshot(
@@ -29,7 +30,7 @@ public sealed record TransitConnectionSnapshot(
 public sealed record GameShipSnapshot(
     EntityId EntityId,
     ShipId Id,
-    OrganizationId OrganizationId,
+    PrincipalId PrincipalId,
     ConstructionDesignId DesignId,
     InventoryId CargoInventoryId,
     Quantity CargoCapacity,

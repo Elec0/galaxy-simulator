@@ -129,7 +129,7 @@ public sealed class GamePresentationSnapshotTests
                     GameSessionTestFixture.Entity,
                     GameSessionTestFixture.Ship,
                     GameSessionTestFixture.CargoInventory,
-                    GameSessionTestFixture.Organization,
+                    GameSessionTestFixture.Principal,
                     GameSessionTestFixture.Design,
                     GameSessionTestFixture.Position(0, 0),
                     GameSessionTestFixture.PlayerController),
@@ -137,11 +137,12 @@ public sealed class GamePresentationSnapshotTests
                     new EntityId(2),
                     secondShip,
                     new InventoryId(2),
-                    GameSessionTestFixture.Organization,
+                    GameSessionTestFixture.Principal,
                     GameSessionTestFixture.Design,
                     GameSessionTestFixture.Position(10, 0),
                     GameSessionTestFixture.PlayerController),
             ],
+            GameSessionTestFixture.Relationships,
             factRetentionCapacity: 256);
         return new GameSession(
             setup,

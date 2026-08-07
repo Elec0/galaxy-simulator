@@ -14,9 +14,9 @@ rather than deleting them.
 ## Current focus
 
 `TASK-035` completed the first relational gameplay model and unblocked the
-architecture work in `TASK-012`. Economic and transport owner integration is
-tracked separately in `TASK-034` and should begin only after those owners join
-the clean `GameSession`.
+architecture and implementation work in `TASK-012`. Economic and transport
+owner integration is tracked separately in `TASK-034` and should begin only
+after those owners join the clean `GameSession`.
 
 ## Near-term work
 
@@ -28,7 +28,14 @@ the clean `GameSession`.
     without extending the approved concepts.
   - Keep content-specific and scripted behavior above the shared relationship,
     strategic-state, and command models.
-  - Context: [Relational gameplay model](factions.md)
+  - Accepted architecture defines principal identity, directional standing,
+    mutual diplomacy, explicit grants, deterministic effects, scoped reads,
+    and save inventory; implementation is in progress.
+  - Implemented the first slice: principal definitions, configurable standing
+    policy, canonical setup validation, immutable relationship ownership,
+    complete directional diagnostic snapshots, and clean-session
+    `OrganizationId` to `PrincipalId` ownership migration.
+  - Context: [Relational gameplay model](factions.md) · [Relational simulation architecture](relational-simulation-architecture.md)
 
 - [ ] **TASK-013: Define pause, speed, and input timing**
   - Define when commands submitted while paused take effect.
@@ -88,11 +95,25 @@ prerequisites and desired behavior are sufficiently defined.
 
 - [ ] **TASK-022: Select save format, versioning, and migration strategy**
   - Begin only after the authoritative save boundary is understood.
+  - Own save schema and serialization migration; `TASK-037` separately owns
+    versioned content catalogs and migration of saved content references.
 
 - [ ] **TASK-023: Decide the gameplay content format**
   - Determine which content is code-defined, data-defined, or externally
     scriptable.
   - Revisit modding goals and security constraints at that time.
+  - Feed the selected content identity and provenance model into `TASK-037`.
+
+- [ ] **TASK-037: Version content catalogs and migrate saved content references**
+  - Begin after `TASK-022` selects save versioning and `TASK-023` selects the
+    gameplay content format.
+  - Define stable content catalog identities, versions, dependency metadata,
+    and source provenance for built-in and mod-provided content.
+  - Detect identifier collisions across combined content sources without
+    silently replacing definitions, and report both conflicting sources.
+  - Define deterministic migrations or clear incompatibility diagnostics when
+    an older save references renamed, replaced, removed, or changed content.
+  - Context: [Relational simulation architecture](relational-simulation-architecture.md)
 
 - [ ] **TASK-025: Define bounded explanation history**
   - Retain enough decisions and facts to explain behavior to the player without

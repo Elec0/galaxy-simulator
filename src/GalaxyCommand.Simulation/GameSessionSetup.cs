@@ -8,11 +8,14 @@ namespace GalaxyCommand.Simulation;
 /// </summary>
 public sealed record InitialShipSetup
 {
+    /// <summary>
+    /// Creates validated initial state for one principal-owned ship.
+    /// </summary>
     public InitialShipSetup(
         EntityId entityId,
         ShipId id,
         InventoryId cargoInventoryId,
-        OrganizationId organizationId,
+        PrincipalId principalId,
         ShipDesign design,
         SystemPosition position,
         ActorController baseController)
@@ -20,7 +23,7 @@ public sealed record InitialShipSetup
         ArgumentOutOfRangeException.ThrowIfZero(entityId.Value);
         ArgumentOutOfRangeException.ThrowIfZero(id.Value);
         ArgumentOutOfRangeException.ThrowIfZero(cargoInventoryId.Value);
-        ArgumentOutOfRangeException.ThrowIfZero(organizationId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(principalId.Value);
         ArgumentNullException.ThrowIfNull(design);
         ArgumentOutOfRangeException.ThrowIfZero(position.SystemId.Value);
         ArgumentNullException.ThrowIfNull(baseController);
@@ -34,7 +37,7 @@ public sealed record InitialShipSetup
         EntityId = entityId;
         Id = id;
         CargoInventoryId = cargoInventoryId;
-        OrganizationId = organizationId;
+        PrincipalId = principalId;
         Design = design;
         Position = position;
         BaseController = baseController;
@@ -46,7 +49,7 @@ public sealed record InitialShipSetup
 
     public InventoryId CargoInventoryId { get; }
 
-    public OrganizationId OrganizationId { get; }
+    public PrincipalId PrincipalId { get; }
 
     public ShipDesign Design { get; }
 
@@ -60,9 +63,13 @@ public sealed record InitialShipSetup
 /// </summary>
 public sealed class GameSessionSetup
 {
+    /// <summary>
+    /// Creates setup without connector topology or materialization policies.
+    /// </summary>
     public GameSessionSetup(
         IEnumerable<StarSystem> systems,
         IEnumerable<InitialShipSetup> ships,
+        RelationshipSetup relationships,
         int factRetentionCapacity)
         : this(
             systems,
@@ -71,41 +78,54 @@ public sealed class GameSessionSetup
                 Array.Empty<ConnectorEndpoint>(),
                 Array.Empty<TransitConnection>()),
             Array.Empty<ShipMaterializationPolicy>(),
+            relationships,
             factRetentionCapacity)
     {
     }
 
+    /// <summary>
+    /// Creates setup with connector topology and no materialization policies.
+    /// </summary>
     public GameSessionSetup(
         IEnumerable<StarSystem> systems,
         IEnumerable<InitialShipSetup> ships,
         ConnectorTopology connectorTopology,
+        RelationshipSetup relationships,
         int factRetentionCapacity)
         : this(
             systems,
             ships,
             connectorTopology,
             Array.Empty<ShipMaterializationPolicy>(),
+            relationships,
             factRetentionCapacity)
     {
     }
 
+    /// <summary>
+    /// Validates and canonicalizes the complete initial clean-session state.
+    /// </summary>
     public GameSessionSetup(
         IEnumerable<StarSystem> systems,
         IEnumerable<InitialShipSetup> ships,
         ConnectorTopology connectorTopology,
         IEnumerable<ShipMaterializationPolicy> materializationPolicies,
+        RelationshipSetup relationships,
         int factRetentionCapacity)
     {
         ArgumentNullException.ThrowIfNull(systems);
         ArgumentNullException.ThrowIfNull(ships);
         ArgumentNullException.ThrowIfNull(connectorTopology);
         ArgumentNullException.ThrowIfNull(materializationPolicies);
+        ArgumentNullException.ThrowIfNull(relationships);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(
             factRetentionCapacity);
 
         StarSystem[] systemValues = systems.ToArray();
         InitialShipSetup[] shipValues = ships.ToArray();
         ShipMaterializationPolicy[] policyValues = materializationPolicies.ToArray();
+        var principalIds = new HashSet<PrincipalId>(
+            relationships.Principals.Select(principal => principal.Id));
         var systemIds = new HashSet<SystemId>();
         foreach (StarSystem system in systemValues)
         {
@@ -151,6 +171,13 @@ public sealed class GameSessionSetup
                     $"Ship {ship.Id} references unknown system {ship.Position.SystemId}.",
                     nameof(ships));
             }
+
+            if (!principalIds.Contains(ship.PrincipalId))
+            {
+                throw new ArgumentException(
+                    $"Ship {ship.Id} references unknown principal {ship.PrincipalId}.",
+                    nameof(ships));
+            }
         }
 
         foreach (ConnectorEndpoint endpoint in connectorTopology.Endpoints)
@@ -180,6 +207,13 @@ public sealed class GameSessionSetup
                     $"Materialization policy {policy.FacilityId} references unknown system {policy.Position.SystemId}.",
                     nameof(materializationPolicies));
             }
+
+            if (!principalIds.Contains(policy.PrincipalId))
+            {
+                throw new ArgumentException(
+                    $"Materialization policy {policy.FacilityId} references unknown principal {policy.PrincipalId}.",
+                    nameof(materializationPolicies));
+            }
         }
 
         Systems = new ReadOnlyCollection<StarSystem>(systemValues);
@@ -187,6 +221,7 @@ public sealed class GameSessionSetup
         ConnectorTopology = connectorTopology;
         MaterializationPolicies =
             new ReadOnlyCollection<ShipMaterializationPolicy>(policyValues);
+        Relationships = relationships;
         FactRetentionCapacity = factRetentionCapacity;
     }
 
@@ -197,6 +232,8 @@ public sealed class GameSessionSetup
     public ConnectorTopology ConnectorTopology { get; }
 
     public IReadOnlyList<ShipMaterializationPolicy> MaterializationPolicies { get; }
+
+    public RelationshipSetup Relationships { get; }
 
     public int FactRetentionCapacity { get; }
 }

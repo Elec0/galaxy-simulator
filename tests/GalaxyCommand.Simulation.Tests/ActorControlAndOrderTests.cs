@@ -70,7 +70,7 @@ public sealed class ActorControlAndOrderTests
                 GameSessionTestFixture.Entity,
                 GameSessionTestFixture.Ship,
                 GameSessionTestFixture.CargoInventory,
-                GameSessionTestFixture.Organization,
+                GameSessionTestFixture.Principal,
                 GameSessionTestFixture.Design,
                 GameSessionTestFixture.Position(0, 0),
                 scriptController));

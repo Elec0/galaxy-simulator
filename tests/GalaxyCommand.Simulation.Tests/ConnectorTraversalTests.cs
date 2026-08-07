@@ -213,7 +213,7 @@ public sealed class ConnectorTraversalTests
                     new EntityId(1),
                     Ship,
                     new InventoryId(1),
-                    new OrganizationId(1),
+                    GameSessionTestFixture.Principal,
                     new ShipDesign(
                         new ConstructionDesignId(1),
                         "Connector Test Ship",
@@ -225,6 +225,7 @@ public sealed class ConnectorTraversalTests
                         Player.Id)),
             ],
             topology,
+            GameSessionTestFixture.Relationships,
             factRetentionCapacity: 256);
         return new GameSession(
             setup,

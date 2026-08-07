@@ -29,7 +29,7 @@ public sealed class EntityLifecycleTests
                 GameSessionTestFixture.Entity,
                 GameSessionTestFixture.Ship,
                 GameSessionTestFixture.CargoInventory,
-                GameSessionTestFixture.Organization,
+                GameSessionTestFixture.Principal,
                 GameSessionTestFixture.Design,
                 GameSessionTestFixture.Position(0, 0),
                 GameSessionTestFixture.PlayerController),
@@ -37,7 +37,7 @@ public sealed class EntityLifecycleTests
                 GameSessionTestFixture.Entity,
                 secondShip,
                 new InventoryId(2),
-                GameSessionTestFixture.Organization,
+                GameSessionTestFixture.Principal,
                 GameSessionTestFixture.Design,
                 GameSessionTestFixture.Position(10, 0),
                 GameSessionTestFixture.PlayerController),
@@ -47,6 +47,7 @@ public sealed class EntityLifecycleTests
             new GameSessionSetup(
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
                 setupShips,
+                GameSessionTestFixture.Relationships,
                 factRetentionCapacity: 256));
     }
 
@@ -100,7 +101,7 @@ public sealed class EntityLifecycleTests
         Assert.Equal(new ShipId(2), result.ShipId);
         Assert.Equal(new InventoryId(2), result.CargoInventoryId);
         Assert.Equal(result.EntityId, ship.EntityId);
-        Assert.Equal(GameSessionTestFixture.Organization, ship.OrganizationId);
+        Assert.Equal(GameSessionTestFixture.Principal, ship.PrincipalId);
         Assert.Equal(design.Id, ship.DesignId);
         Assert.Equal(result.CargoInventoryId, ship.CargoInventoryId);
         Assert.Equal(design.CargoCapacity, ship.CargoCapacity);
@@ -134,7 +135,7 @@ public sealed class EntityLifecycleTests
         Assert.Equal(EntityKind.Ship, fact.Kind);
         Assert.Equal(result.ShipId, fact.ShipId);
         Assert.Equal(EntityMaterializationSourceKind.Construction, fact.SourceKind);
-        Assert.Equal(GameSessionTestFixture.Organization, fact.OrganizationId);
+        Assert.Equal(GameSessionTestFixture.Principal, fact.PrincipalId);
         Assert.Equal(design.Id, fact.DesignId);
         Assert.Equal(GameSessionTestFixture.Position(20, 30), fact.InitialPosition);
         GamePresentationSnapshot presentation = session.CapturePresentation(
@@ -229,13 +230,14 @@ public sealed class EntityLifecycleTests
                     GameSessionTestFixture.Entity,
                     GameSessionTestFixture.Ship,
                     GameSessionTestFixture.CargoInventory,
-                    GameSessionTestFixture.Organization,
+                    GameSessionTestFixture.Principal,
                     GameSessionTestFixture.Design,
                     GameSessionTestFixture.Position(0, 0),
                     GameSessionTestFixture.PlayerController),
             ],
             new ConnectorTopology([], []),
             policies,
+            GameSessionTestFixture.Relationships,
             factRetentionCapacity: 256);
         var session = new GameSession(
             setup,
@@ -509,13 +511,14 @@ public sealed class EntityLifecycleTests
                     GameSessionTestFixture.Entity,
                     GameSessionTestFixture.Ship,
                     GameSessionTestFixture.CargoInventory,
-                    GameSessionTestFixture.Organization,
+                    GameSessionTestFixture.Principal,
                     GameSessionTestFixture.Design,
                     GameSessionTestFixture.Position(0, 0),
                     GameSessionTestFixture.PlayerController),
             ],
             new ConnectorTopology([], []),
             [policy],
+            GameSessionTestFixture.Relationships,
             factRetentionCapacity: 256);
         return new GameSession(
             setup,
@@ -530,7 +533,7 @@ public sealed class EntityLifecycleTests
         long y = 0) =>
         new(
             facilityId,
-            GameSessionTestFixture.Organization,
+            GameSessionTestFixture.Principal,
             GameSessionTestFixture.Position(x, y),
             GameSessionTestFixture.PlayerController,
             InitialShipOrderPolicy.NoInitialOrder,
@@ -545,7 +548,7 @@ public sealed class EntityLifecycleTests
                     GameSessionTestFixture.Entity,
                     GameSessionTestFixture.Ship,
                     GameSessionTestFixture.CargoInventory,
-                    GameSessionTestFixture.Organization,
+                    GameSessionTestFixture.Principal,
                     GameSessionTestFixture.Design,
                     GameSessionTestFixture.Position(0, 0),
                     GameSessionTestFixture.PlayerController),
@@ -553,11 +556,12 @@ public sealed class EntityLifecycleTests
                     new EntityId(2),
                     new ShipId(2),
                     new InventoryId(2),
-                    GameSessionTestFixture.Organization,
+                    GameSessionTestFixture.Principal,
                     GameSessionTestFixture.Design,
                     GameSessionTestFixture.Position(100, 0),
                     GameSessionTestFixture.PlayerController),
             ],
+            GameSessionTestFixture.Relationships,
             factRetentionCapacity: 256);
         return new GameSession(
             setup,

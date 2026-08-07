@@ -20,7 +20,7 @@ public sealed class GameSessionSnapshotTests
         GameShipSnapshot ship = Assert.Single(snapshot.Ships);
         Assert.Equal(GameSessionTestFixture.Entity, ship.EntityId);
         Assert.Equal(GameSessionTestFixture.Ship, ship.Id);
-        Assert.Equal(GameSessionTestFixture.Organization, ship.OrganizationId);
+        Assert.Equal(GameSessionTestFixture.Principal, ship.PrincipalId);
         Assert.Equal(GameSessionTestFixture.Design.Id, ship.DesignId);
         Assert.Equal(GameSessionTestFixture.CargoInventory, ship.CargoInventoryId);
         Assert.Equal(GameSessionTestFixture.Design.CargoCapacity, ship.CargoCapacity);
@@ -56,7 +56,7 @@ public sealed class GameSessionSnapshotTests
             ships.Add(new GameShipSnapshot(
                 new EntityId(99),
                 new ShipId(99),
-                new OrganizationId(99),
+                new PrincipalId(99),
                 new ConstructionDesignId(99),
                 new InventoryId(99),
                 new Quantity(99),
@@ -80,7 +80,7 @@ public sealed class GameSessionSnapshotTests
             GameSessionTestFixture.Entity,
             GameSessionTestFixture.Ship,
             GameSessionTestFixture.CargoInventory,
-            GameSessionTestFixture.Organization,
+            GameSessionTestFixture.Principal,
             GameSessionTestFixture.Design,
             new SystemPosition(
                 new SystemId(2),
@@ -93,6 +93,7 @@ public sealed class GameSessionSnapshotTests
             new GameSessionSetup(
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
                 [ship],
+                GameSessionTestFixture.Relationships,
                 factRetentionCapacity: 256));
     }
 
@@ -117,12 +118,13 @@ public sealed class GameSessionSnapshotTests
                         GameSessionTestFixture.Entity,
                         GameSessionTestFixture.Ship,
                         GameSessionTestFixture.CargoInventory,
-                        GameSessionTestFixture.Organization,
+                        GameSessionTestFixture.Principal,
                         GameSessionTestFixture.Design,
                         GameSessionTestFixture.Position(0, 0),
                         GameSessionTestFixture.PlayerController),
                 ],
                 topology,
+                GameSessionTestFixture.Relationships,
                 factRetentionCapacity: 256));
     }
 
@@ -137,11 +139,12 @@ public sealed class GameSessionSnapshotTests
                         GameSessionTestFixture.Entity,
                         GameSessionTestFixture.Ship,
                         GameSessionTestFixture.CargoInventory,
-                        GameSessionTestFixture.Organization,
+                        GameSessionTestFixture.Principal,
                         GameSessionTestFixture.Design,
                         GameSessionTestFixture.Position(0, 0),
                         GameSessionTestFixture.PlayerController),
                 ],
+                GameSessionTestFixture.Relationships,
                 factRetentionCapacity: 0));
     }
 }

@@ -20,16 +20,19 @@ public sealed class ShipMaterializationPolicy
 {
     private readonly ReadOnlyDictionary<ConstructionDesignId, ShipDesign> _designs;
 
+    /// <summary>
+    /// Creates authoritative materialization policy for one facility and owner.
+    /// </summary>
     public ShipMaterializationPolicy(
         FacilityId facilityId,
-        OrganizationId organizationId,
+        PrincipalId principalId,
         SystemPosition position,
         ActorController baseController,
         InitialShipOrderPolicy initialOrderPolicy,
         IEnumerable<ShipDesign> allowedDesigns)
     {
         ArgumentOutOfRangeException.ThrowIfZero(facilityId.Value);
-        ArgumentOutOfRangeException.ThrowIfZero(organizationId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(principalId.Value);
         ArgumentOutOfRangeException.ThrowIfZero(position.SystemId.Value);
         ArgumentNullException.ThrowIfNull(baseController);
         ArgumentNullException.ThrowIfNull(allowedDesigns);
@@ -69,7 +72,7 @@ public sealed class ShipMaterializationPolicy
         }
 
         FacilityId = facilityId;
-        OrganizationId = organizationId;
+        PrincipalId = principalId;
         Position = position;
         BaseController = baseController;
         InitialOrderPolicy = initialOrderPolicy;
@@ -78,7 +81,7 @@ public sealed class ShipMaterializationPolicy
 
     public FacilityId FacilityId { get; }
 
-    public OrganizationId OrganizationId { get; }
+    public PrincipalId PrincipalId { get; }
 
     public SystemPosition Position { get; }
 
@@ -94,7 +97,7 @@ public sealed class ShipMaterializationPolicy
 
 public sealed record GameSessionShip(
     ShipId Id,
-    OrganizationId OrganizationId,
+    PrincipalId PrincipalId,
     ConstructionDesignId DesignId,
     InventoryId CargoInventoryId);
 
@@ -366,7 +369,7 @@ internal sealed class EntityLifecycleOwner
             _inventories.Add(new Inventory(ship.CargoInventoryId, ship.CargoCapacity));
             _ships.ApplyAdd(new GameSessionShip(
                 ship.ShipId,
-                ship.OrganizationId,
+                ship.PrincipalId,
                 ship.DesignId,
                 ship.CargoInventoryId));
             _movement.Add(ship.ShipId, ship.Position);
@@ -394,7 +397,7 @@ internal sealed class EntityLifecycleOwner
             ship.EntityId,
             ship.Id,
             ship.CargoInventoryId,
-            ship.OrganizationId,
+            ship.PrincipalId,
             ship.Design.Id,
             ship.Design.CargoCapacity,
             ship.Position,
@@ -473,7 +476,7 @@ internal sealed class EntityLifecycleOwner
         _inventories.Add(new Inventory(inventoryId, design!.CargoCapacity));
         _ships.ApplyAdd(new GameSessionShip(
             shipId,
-            policy!.OrganizationId,
+            policy!.PrincipalId,
             design.Id,
             inventoryId));
         _movement.Add(shipId, policy.Position);
@@ -678,7 +681,7 @@ internal sealed class EntityLifecycleOwner
         EntityId EntityId,
         ShipId ShipId,
         InventoryId CargoInventoryId,
-        OrganizationId OrganizationId,
+        PrincipalId PrincipalId,
         ConstructionDesignId DesignId,
         Quantity CargoCapacity,
         SystemPosition Position,
