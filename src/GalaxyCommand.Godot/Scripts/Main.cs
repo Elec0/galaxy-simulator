@@ -153,14 +153,16 @@ public partial class Main : Node
 	{
 		_presentation = _session.CapturePresentation(
 			new GamePresentationRequest(
+				InitialPrincipalId,
 				_map.SelectedShipIds,
 				_map.FocusedShipId,
 				_factCursor,
 				MaximumFactCountPerRefresh));
 		_map.Display(_presentation);
 		ConsumeFacts(_presentation.Facts);
+		_factCursor = _presentation.NextFactCursor;
 
-		GameSnapshot snapshot = _presentation.World;
+		GamePresentationWorldSnapshot snapshot = _presentation.World;
 		GameShipSnapshot? selected = _presentation.Selection.FocusedShip;
 		string order = selected?.CurrentOrder is { } current
 			? $"{current.Status} / {current.Reason} / {DescribeDestination(current.Destination)}"
@@ -197,7 +199,6 @@ public partial class Main : Node
 		foreach (GameFactEnvelope fact in facts.Facts)
 		{
 			_recentFacts.Add(fact);
-			_factCursor = fact.Sequence;
 		}
 
 		if (_recentFacts.Count > MaximumRecentFacts)

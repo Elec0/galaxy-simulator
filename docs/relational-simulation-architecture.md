@@ -28,7 +28,10 @@ The third slice adds source-scoped idempotent standing batches, stable
 contribution reduction, rejection-atomic prepared commit, and semantic standing
 facts. The fourth slice adds canonical mutual diplomacy, explicit issued and
 revoked grant state, standing-dependent effectiveness queries, rejection-atomic
-policy batches, and typed diplomacy and grant facts.
+policy batches, and typed diplomacy and grant facts. The fifth slice requires
+an observing `PrincipalId`, removes complete relationship diagnostics from the
+presentation world, and returns a separate scoped relationship projection and
+fact feed.
 
 ## Decision summary
 
@@ -429,11 +432,11 @@ strategic goals must not enter the player view merely because they exist in the
 diagnostic snapshot. `TASK-020` defines confirmed, reported, and stale knowledge
 and will expand the scoped projection.
 
-The current `GamePresentationSnapshot` wraps the complete `GameSnapshot` for a
-local single-player client. Before private relational state is exposed through
-that facade, its request must identify the observing principal and the facade
-must return the scoped relationship view separately. Godot must not filter
-private truth after receiving it.
+`GamePresentationSnapshot` no longer wraps the complete `GameSnapshot`. Its
+request identifies the observing principal, its presentation-safe world omits
+complete relationship diagnostics, and it returns the scoped relationship view
+separately. Relationship facts are filtered at the same boundary. Godot never
+receives private reverse standing to filter locally.
 
 ## Setup, persistence, and restoration
 
@@ -491,7 +494,7 @@ Implementation proceeds in dependency order:
 6. Record the authoritative save inventory for `TASK-014`; do not implement a
    serialization format inside `TASK-012`.
 
-Slices 1 through 4 are implemented. Slice 5 is the next dependency-ordered
+Slices 1 through 5 are implemented. Slice 6 is the next dependency-ordered
 work.
 
 Each slice needs focused tests for setup rejection atomicity, directional

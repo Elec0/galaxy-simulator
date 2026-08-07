@@ -140,6 +140,7 @@ public sealed class EntityLifecycleTests
         Assert.Equal(GameSessionTestFixture.Position(20, 30), fact.InitialPosition);
         GamePresentationSnapshot presentation = session.CapturePresentation(
             new GamePresentationRequest(
+                GameSessionTestFixture.Principal,
                 [result.ShipId],
                 result.ShipId,
                 factCursor: null,
@@ -333,6 +334,7 @@ public sealed class EntityLifecycleTests
         Assert.Equal(factCount, session.ReadFactsAfter(null, 256).Facts.Count);
         GamePresentationSnapshot presentation = session.CapturePresentation(
             new GamePresentationRequest(
+                GameSessionTestFixture.Principal,
                 [GameSessionTestFixture.Ship],
                 GameSessionTestFixture.Ship,
                 factCursor: null,

@@ -9,7 +9,7 @@ public partial class GalaxyMap : Control
 	private readonly SortedSet<ShipId> _selectedShipIds = new(
 		Comparer<ShipId>.Create((first, second) =>
 			first.Value.CompareTo(second.Value)));
-	private GameSnapshot? _snapshot;
+	private GamePresentationWorldSnapshot? _snapshot;
 
 	public event Action? SelectionChanged;
 	public event Action<SystemPosition, OrderPlacement>? DestinationRequested;

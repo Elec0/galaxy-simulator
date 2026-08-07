@@ -7,12 +7,17 @@ namespace GalaxyCommand.Simulation;
 /// </summary>
 public sealed record GamePresentationRequest
 {
+    /// <summary>
+    /// Creates one validated observer-scoped presentation request.
+    /// </summary>
     public GamePresentationRequest(
+        PrincipalId observerPrincipalId,
         IEnumerable<ShipId> selectedShipIds,
         ShipId? focusedShipId,
         GameFactSequence? factCursor,
         int maximumFactCount)
     {
+        ArgumentOutOfRangeException.ThrowIfZero(observerPrincipalId.Value);
         ArgumentNullException.ThrowIfNull(selectedShipIds);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumFactCount);
 
@@ -46,11 +51,14 @@ public sealed record GamePresentationRequest
             }
         }
 
+        ObserverPrincipalId = observerPrincipalId;
         SelectedShipIds = new ReadOnlyCollection<ShipId>(ordered);
         FocusedShipId = focusedShipId;
         FactCursor = factCursor;
         MaximumFactCount = maximumFactCount;
     }
+
+    public PrincipalId ObserverPrincipalId { get; }
 
     public IReadOnlyList<ShipId> SelectedShipIds { get; }
 
@@ -59,6 +67,83 @@ public sealed record GamePresentationRequest
     public GameFactSequence? FactCursor { get; }
 
     public int MaximumFactCount { get; }
+}
+
+/// <summary>
+/// Immutable presentation-safe world state with authoritative relationship
+/// diagnostics intentionally excluded.
+/// </summary>
+public sealed record GamePresentationWorldSnapshot
+{
+    internal GamePresentationWorldSnapshot(GameSnapshot world)
+    {
+        ArgumentNullException.ThrowIfNull(world);
+        Time = world.Time;
+        Systems = world.Systems;
+        ConnectorEndpoints = world.ConnectorEndpoints;
+        TransitConnections = world.TransitConnections;
+        Ships = world.Ships;
+    }
+
+    public SimulationTime Time { get; }
+
+    public IReadOnlyList<GameSystemSnapshot> Systems { get; }
+
+    public IReadOnlyList<ConnectorEndpointSnapshot> ConnectorEndpoints { get; }
+
+    public IReadOnlyList<TransitConnectionSnapshot> TransitConnections { get; }
+
+    public IReadOnlyList<GameShipSnapshot> Ships { get; }
+}
+
+/// <summary>
+/// Public principal identity safe for observer-scoped presentation.
+/// </summary>
+public sealed record RelationshipPrincipalPresentationSnapshot(
+    PrincipalId Id,
+    string Name);
+
+/// <summary>
+/// One other principal's directional treatment of the observer.
+/// </summary>
+public sealed record IncomingStandingPresentationSnapshot(
+    PrincipalId AssessingPrincipalId,
+    StandingValue Value,
+    StandingBand Band);
+
+/// <summary>
+/// Immutable relationship view filtered for one observing principal.
+/// </summary>
+public sealed record RelationshipPresentationSnapshot
+{
+    internal RelationshipPresentationSnapshot(
+        PrincipalId observerPrincipalId,
+        IReadOnlyList<RelationshipPrincipalPresentationSnapshot> principals,
+        IReadOnlyList<DiplomaticConditionSnapshot> diplomaticConditions,
+        IReadOnlyList<IncomingStandingPresentationSnapshot> incomingStandings,
+        IReadOnlyList<RelationshipGrantSnapshot> grantsIssuedToObserver)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(observerPrincipalId.Value);
+        ArgumentNullException.ThrowIfNull(principals);
+        ArgumentNullException.ThrowIfNull(diplomaticConditions);
+        ArgumentNullException.ThrowIfNull(incomingStandings);
+        ArgumentNullException.ThrowIfNull(grantsIssuedToObserver);
+        ObserverPrincipalId = observerPrincipalId;
+        Principals = principals;
+        DiplomaticConditions = diplomaticConditions;
+        IncomingStandings = incomingStandings;
+        GrantsIssuedToObserver = grantsIssuedToObserver;
+    }
+
+    public PrincipalId ObserverPrincipalId { get; }
+
+    public IReadOnlyList<RelationshipPrincipalPresentationSnapshot> Principals { get; }
+
+    public IReadOnlyList<DiplomaticConditionSnapshot> DiplomaticConditions { get; }
+
+    public IReadOnlyList<IncomingStandingPresentationSnapshot> IncomingStandings { get; }
+
+    public IReadOnlyList<RelationshipGrantSnapshot> GrantsIssuedToObserver { get; }
 }
 
 /// <summary>
@@ -91,38 +176,55 @@ public sealed record GamePresentationSelection
 }
 
 /// <summary>
-/// Immutable rendering-independent composition of world state, local selection,
-/// and one incremental semantic-fact read.
+/// Immutable rendering-independent composition of presentation-safe world and
+/// relationship state, local selection, and one incremental semantic-fact read.
 /// </summary>
 public sealed record GamePresentationSnapshot
 {
     internal GamePresentationSnapshot(
-        GameSnapshot world,
+        GamePresentationWorldSnapshot world,
+        RelationshipPresentationSnapshot relationships,
         GamePresentationSelection selection,
         GameFactReadResult facts,
-        IReadOnlyList<GameFactEnvelope> selectedShipFacts)
+        IReadOnlyList<GameFactEnvelope> selectedShipFacts,
+        GameFactSequence? nextFactCursor)
     {
         ArgumentNullException.ThrowIfNull(world);
+        ArgumentNullException.ThrowIfNull(relationships);
         ArgumentNullException.ThrowIfNull(selection);
         ArgumentNullException.ThrowIfNull(facts);
         ArgumentNullException.ThrowIfNull(selectedShipFacts);
         World = world;
+        Relationships = relationships;
         Selection = selection;
         Facts = facts;
         SelectedShipFacts = selectedShipFacts;
+        NextFactCursor = nextFactCursor;
     }
 
-    public GameSnapshot World { get; }
+    public GamePresentationWorldSnapshot World { get; }
+
+    public RelationshipPresentationSnapshot Relationships { get; }
 
     public GamePresentationSelection Selection { get; }
 
     public GameFactReadResult Facts { get; }
 
     public IReadOnlyList<GameFactEnvelope> SelectedShipFacts { get; }
+
+    /// <summary>
+    /// Cursor after all source facts inspected for this observer-scoped read,
+    /// including facts withheld by the relationship privacy filter.
+    /// </summary>
+    public GameFactSequence? NextFactCursor { get; }
 }
 
 internal static class GamePresentationSnapshotFactory
 {
+    /// <summary>
+    /// Composes one presentation-safe world, observer relationship projection,
+    /// selection resolution, and filtered fact read.
+    /// </summary>
     internal static GamePresentationSnapshot Create(
         GameSnapshot world,
         GamePresentationRequest request,
@@ -151,20 +253,93 @@ internal static class GamePresentationSnapshotFactory
             && shipsById.TryGetValue(focused, out GameShipSnapshot? resolvedFocusedShip)
                 ? resolvedFocusedShip
                 : null;
+        IReadOnlyList<GameFactEnvelope> visibleFacts = GameSnapshotCollection.Copy(
+            facts.Facts.Where(fact => IsVisibleToObserver(
+                fact.Fact,
+                world.Relationships,
+                request.ObserverPrincipalId)));
+        var scopedFacts = new GameFactReadResult(
+            visibleFacts,
+            facts.OldestRetainedSequence,
+            facts.NewestCommittedSequence,
+            facts.CursorGap);
         var selectedIds = new HashSet<ShipId>(request.SelectedShipIds);
         IReadOnlyList<GameFactEnvelope> selectedShipFacts =
-            GameSnapshotCollection.Copy(facts.Facts.Where(fact =>
+            GameSnapshotCollection.Copy(visibleFacts.Where(fact =>
                 ReferencesSelectedShip(fact.Fact, selectedIds)));
+        GameFactSequence? nextFactCursor = facts.Facts.Count > 0
+            ? facts.Facts[^1].Sequence
+            : request.FactCursor;
 
         return new GamePresentationSnapshot(
-            world,
+            new GamePresentationWorldSnapshot(world),
+            CreateRelationshipPresentation(
+                world.Relationships,
+                request.ObserverPrincipalId),
             new GamePresentationSelection(
                 request.SelectedShipIds,
                 GameSnapshotCollection.Copy(resolvedShips),
                 GameSnapshotCollection.Copy(unresolvedShipIds),
                 focusedShip),
-            facts,
-            selectedShipFacts);
+            scopedFacts,
+            selectedShipFacts,
+            nextFactCursor);
+    }
+
+    /// <summary>
+    /// Applies the initial relationship information boundary while preserving
+    /// non-relational facts and public diplomacy facts.
+    /// </summary>
+    private static bool IsVisibleToObserver(
+        GameFact fact,
+        RelationshipSnapshot relationships,
+        PrincipalId observerPrincipalId)
+    {
+        ArgumentNullException.ThrowIfNull(fact);
+        return fact switch
+        {
+            StandingChangedFact standing =>
+                standing.SubjectPrincipalId == observerPrincipalId,
+            DiplomaticConditionChangedFact => true,
+            RelationshipGrantIssuedFact grant =>
+                grant.HolderPrincipalId == observerPrincipalId,
+            RelationshipGrantRevokedFact grant => relationships.Grants.Any(value =>
+                value.Id == grant.Id && value.HolderPrincipalId == observerPrincipalId),
+            _ => true,
+        };
+    }
+
+    /// <summary>
+    /// Projects public relationship state and observer-directed private state
+    /// without exposing the observer's reverse assessments.
+    /// </summary>
+    private static RelationshipPresentationSnapshot CreateRelationshipPresentation(
+        RelationshipSnapshot relationships,
+        PrincipalId observerPrincipalId)
+    {
+        if (!relationships.Principals.Any(principal => principal.Id == observerPrincipalId))
+        {
+            throw new ArgumentException(
+                $"Observer principal {observerPrincipalId} is not registered.",
+                nameof(observerPrincipalId));
+        }
+
+        return new RelationshipPresentationSnapshot(
+            observerPrincipalId,
+            GameSnapshotCollection.Copy(relationships.Principals.Select(principal =>
+                new RelationshipPrincipalPresentationSnapshot(
+                    principal.Id,
+                    principal.Name))),
+            GameSnapshotCollection.Copy(relationships.DiplomaticConditions),
+            GameSnapshotCollection.Copy(relationships.Standings
+                .Where(standing => standing.SubjectPrincipalId == observerPrincipalId)
+                .Select(standing => new IncomingStandingPresentationSnapshot(
+                    standing.AssessingPrincipalId,
+                    standing.Value,
+                    standing.Band))),
+            GameSnapshotCollection.Copy(relationships.Grants
+                .Where(grant => grant.HolderPrincipalId == observerPrincipalId
+                    && grant.IsIssued)));
     }
 
     private static bool ReferencesSelectedShip(

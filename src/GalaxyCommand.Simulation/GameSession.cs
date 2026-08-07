@@ -99,6 +99,10 @@ public sealed class GameSession : IGameplayCommandHandler
     public GameSnapshot CaptureSnapshot() =>
         _runtime.CaptureSnapshot();
 
+    /// <summary>
+    /// Captures a presentation-safe world and observer-scoped relationship and
+    /// fact projections after the current authoritative commit boundary.
+    /// </summary>
     public GamePresentationSnapshot CapturePresentation(
         GamePresentationRequest request)
     {

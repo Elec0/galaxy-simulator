@@ -42,6 +42,10 @@ after those owners join the clean `GameSession`.
     diplomacy and grant batches, explicit issued and revoked grants,
     standing-dependent effectiveness queries, immutable diagnostics, and
     ordered diplomacy and grant facts.
+  - Added observer-scoped relationship presentation with public identities and
+    diplomacy, incoming treatment, issued grants to the observer, filtered
+    relationship facts, and an opaque scanned-fact cursor. Complete private
+    relationship diagnostics no longer reach Godot through presentation.
   - Context: [Relational gameplay model](factions.md) · [Relational simulation architecture](relational-simulation-architecture.md)
 
 - [ ] **TASK-013: Define pause, speed, and input timing**

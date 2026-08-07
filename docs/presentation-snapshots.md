@@ -22,10 +22,18 @@ protocol, a multiplayer authority model, an event log, or a save format.
 
 **Implementation status:** Completed by `TASK-010` on 2026-07-31.
 `GamePresentationRequest` canonicalizes client selection and cursor input;
-`GameSession.CapturePresentation` returns the immutable world snapshot,
+`GameSession.CapturePresentation` returns the immutable presentation-safe world,
 selection resolution, cursor-based fact read, and selected-ship fact subset.
 Godot retains local selection, focus, and fact-cursor state while using that
 read result for map rendering and inspector status.
+
+`TASK-012` later required an observing `PrincipalId` on each presentation
+request. The facade now returns a relationship-free presentation world plus a
+separate observer-scoped relationship projection. Public principal identity and
+diplomacy remain visible; only incoming standing and issued grants held by the
+observer cross the private boundary. Relationship facts use the same filter,
+and `NextFactCursor` advances past inspected hidden facts without exposing
+their payloads.
 
 ## Starting point
 
@@ -50,7 +58,7 @@ does not yet expose recent facts.
 | 1 | What remains the canonical world read model? | `GameSnapshot`; do not replace it with a UI-specific aggregate. |
 | 2 | Who owns selection? | The presentation client owns a deterministic set of `ShipId` values and one optional focused member; selection is not simulation state and does not submit a command. |
 | 3 | How is selected-ship detail represented? | Resolve the requested set against one captured `GameSnapshot`, reusing immutable `GameShipSnapshot` values for controller, spatial state, and order detail. |
-| 4 | How are recent facts supplied? | Request a bounded suffix through the existing cursor query, returning its facts and `CursorGap` unchanged. |
+| 4 | How are recent facts supplied? | Request a bounded suffix through the existing cursor query, preserve its order and `CursorGap`, filter private relationship payloads, and return the last inspected sequence as `NextFactCursor`. |
 | 5 | Which facts are relevant to selected ships? | Provide a pure direct-reference projection for fact payloads that explicitly carry one of the selected `ShipId` values; never infer relevance from time, event order, or a command's proximity. |
 | 6 | Does presentation interpolate simulation state? | No. The snapshot supplies authoritative current position or motion segment. Rendering may interpolate locally from that segment and must discard the result each refresh. |
 | 7 | What happens when a selection member disappears? | The refresh reports the unresolved requested ID. The client removes or changes its local selection; it does not invent a destruction reason. |
@@ -60,17 +68,19 @@ does not yet expose recent facts.
 
 ```mermaid
 flowchart LR
-    input["Local presentation state\nselected ShipId set, focus, and fact cursor"]
+    input["Local presentation state\nobserver PrincipalId, selected ships, focus, fact cursor"]
     session["GameSession\nauthoritative read boundary"]
     world["GameSnapshot\nworld, motion, controller, orders"]
     facts["GameFactReadResult\nordered bounded suffix"]
     compose["Presentation facade\nresolve selection set and project direct facts"]
-    frame["GamePresentationSnapshot\nworld, selection, recent facts"]
+    scope["Observer relationship projection\npublic diplomacy, incoming standing, held grants"]
+    frame["GamePresentationSnapshot\nsafe world, scoped relationships, selection, facts"]
     view["Godot map, inspector, notification feed\nlocal rendering and interpolation"]
 
     input --> compose
     session --> world --> compose
     session --> facts --> compose
+    compose --> scope --> frame
     compose --> frame --> view
 ```
 
@@ -86,17 +96,21 @@ details, but the contract has these inputs and outputs:
 
 ```text
 Input
+  observerPrincipalId: registered PrincipalId defining the information boundary
   selectedShipIds: unique ShipId values in ascending ShipId order
   focusedShipId: optional member of selectedShipIds
   factCursor: optional GameFactSequence
   maximumFactCount: positive bounded count
 
 Output
-  world: GameSnapshot
+  world: presentation-safe world without complete relationship diagnostics
+  relationships: public identity and diplomacy, incoming standing, and grants
+                 issued to the observer
   selection: requested IDs, resolved GameShipSnapshot values, unresolved IDs,
              and optional resolved focus
-  facts: GameFactReadResult without altered ordering or gap semantics
+  facts: observer-visible GameFactReadResult preserving source order and gap semantics
   selectedShipFacts: ordered direct-reference subset for the selected set
+  nextFactCursor: last source fact inspected, including withheld private facts
 ```
 
 The facade captures the world after the current command or advancement call has
@@ -105,9 +119,11 @@ current runtime is single-threaded. When evaluation becomes concurrent, this
 operation must occur only after deterministic owner commits have joined, so it
 never observes a partially committed domain or fact batch.
 
-The client retains its own cursor. It advances the cursor only to the last fact
-actually delivered and processed, not to `NewestCommittedSequence`; a request
-limit may leave later retained facts unread. If `CursorGap` is true, the
+The client retains its own cursor. It advances the cursor to `NextFactCursor`
+after processing the response. That cursor may pass relationship facts withheld
+by the observer filter, but never skips an uninspected source fact. It does not
+advance directly to `NewestCommittedSequence`; a request limit may leave later
+retained facts unread. If `CursorGap` is true, the
 client must visibly treat its prior feed as incomplete, may clear its local
 notification history, and may continue from the delivered suffix. It must not
 claim it reconstructed the lost facts.
