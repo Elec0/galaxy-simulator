@@ -219,6 +219,310 @@ public sealed record InitialStandingSetup
 }
 
 /// <summary>
+/// Authoritative source domain for a standing-change delivery identity.
+/// </summary>
+public enum StandingChangeSourceKind
+{
+    Explicit,
+}
+
+/// <summary>
+/// Stable source-scoped identity used to make one standing-change delivery
+/// idempotent without requiring unrelated domain owners to share an allocator.
+/// </summary>
+public readonly record struct StandingChangeBatchId
+{
+    /// <summary>
+    /// Creates a non-zero standing-change identity within one source domain.
+    /// </summary>
+    public StandingChangeBatchId(StandingChangeSourceKind sourceKind, ulong value)
+    {
+        if (!Enum.IsDefined(sourceKind))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(sourceKind),
+                sourceKind,
+                "Unknown standing change source kind.");
+        }
+
+        ArgumentOutOfRangeException.ThrowIfZero(value);
+        SourceKind = sourceKind;
+        Value = value;
+    }
+
+    public StandingChangeSourceKind SourceKind { get; }
+
+    public ulong Value { get; }
+
+    /// <inheritdoc />
+    public override string ToString() =>
+        $"{SourceKind}:{Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+}
+
+/// <summary>
+/// Stable ordering identity for one contribution within a directional pair.
+/// </summary>
+public readonly record struct StandingChangeContributionId
+{
+    /// <summary>
+    /// Creates a non-zero contribution identity.
+    /// </summary>
+    public StandingChangeContributionId(ulong value)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(value);
+        Value = value;
+    }
+
+    public ulong Value { get; }
+
+    /// <inheritdoc />
+    public override string ToString() =>
+        Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
+/// <summary>
+/// Initial reason vocabulary for explicit relationship-domain changes.
+/// Other domains add reasons only with their approved gameplay policy.
+/// </summary>
+public enum StandingChangeReason
+{
+    Explicit,
+}
+
+/// <summary>
+/// One immutable delta and reason with stable within-pair ordering identity.
+/// </summary>
+public sealed record StandingChangeContribution
+{
+    /// <summary>
+    /// Creates one validated standing contribution.
+    /// </summary>
+    public StandingChangeContribution(
+        StandingChangeContributionId id,
+        long delta,
+        StandingChangeReason reason)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(id.Value);
+        if (!Enum.IsDefined(reason))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(reason),
+                reason,
+                "Unknown standing change reason.");
+        }
+
+        Id = id;
+        Delta = delta;
+        Reason = reason;
+    }
+
+    public StandingChangeContributionId Id { get; }
+
+    public long Delta { get; }
+
+    public StandingChangeReason Reason { get; }
+}
+
+/// <summary>
+/// Proposed directional standing effect from one assessing principal toward a
+/// distinct subject principal.
+/// </summary>
+public sealed record StandingChangeProposal
+{
+    /// <summary>
+    /// Creates one validated directional standing proposal.
+    /// </summary>
+    public StandingChangeProposal(
+        PrincipalId assessingPrincipalId,
+        PrincipalId subjectPrincipalId,
+        StandingChangeContribution contribution)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(assessingPrincipalId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(subjectPrincipalId.Value);
+        ArgumentNullException.ThrowIfNull(contribution);
+        if (assessingPrincipalId == subjectPrincipalId)
+        {
+            throw new ArgumentException(
+                "A principal cannot change standing toward itself.");
+        }
+
+        AssessingPrincipalId = assessingPrincipalId;
+        SubjectPrincipalId = subjectPrincipalId;
+        Contribution = contribution;
+    }
+
+    public PrincipalId AssessingPrincipalId { get; }
+
+    public PrincipalId SubjectPrincipalId { get; }
+
+    public StandingChangeContribution Contribution { get; }
+}
+
+/// <summary>
+/// One idempotent standing-change delivery containing independently produced
+/// proposals for deterministic reduction.
+/// </summary>
+public sealed record StandingChangeBatch
+{
+    /// <summary>
+    /// Copies a non-empty proposal batch without retaining caller mutation.
+    /// </summary>
+    public StandingChangeBatch(
+        StandingChangeBatchId id,
+        IEnumerable<StandingChangeProposal> proposals)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(id.Value);
+        ArgumentNullException.ThrowIfNull(proposals);
+        StandingChangeProposal[] values = proposals.ToArray();
+        if (values.Length == 0)
+        {
+            throw new ArgumentException(
+                "A standing-change batch requires at least one proposal.",
+                nameof(proposals));
+        }
+
+        foreach (StandingChangeProposal proposal in values)
+        {
+            ArgumentNullException.ThrowIfNull(proposal);
+        }
+
+        Id = id;
+        Proposals = new ReadOnlyCollection<StandingChangeProposal>(values);
+    }
+
+    public StandingChangeBatchId Id { get; }
+
+    public IReadOnlyList<StandingChangeProposal> Proposals { get; }
+}
+
+/// <summary>
+/// Typed reason that prevents a standing batch from mutating relationship state.
+/// </summary>
+public enum StandingChangeRejectionReason
+{
+    UnknownPrincipal,
+    DuplicateContribution,
+    DeltaOverflow,
+    BatchIdentityConflict,
+    FactSequenceExhausted,
+}
+
+/// <summary>
+/// Prepared and committed result for one directional standing pair.
+/// </summary>
+public sealed record StandingChangeOutcome
+{
+    /// <summary>
+    /// Creates one validated immutable result of directional contribution reduction.
+    /// </summary>
+    public StandingChangeOutcome(
+        PrincipalId assessingPrincipalId,
+        PrincipalId subjectPrincipalId,
+        StandingValue priorValue,
+        StandingBand priorBand,
+        long combinedDelta,
+        StandingValue resultingValue,
+        StandingBand resultingBand,
+        IEnumerable<StandingChangeContribution> contributions)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(assessingPrincipalId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(subjectPrincipalId.Value);
+        if (assessingPrincipalId == subjectPrincipalId)
+        {
+            throw new ArgumentException(
+                "A standing outcome requires distinct principals.");
+        }
+
+        if (!Enum.IsDefined(priorBand))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(priorBand),
+                priorBand,
+                "Unknown prior standing band.");
+        }
+
+        if (!Enum.IsDefined(resultingBand))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(resultingBand),
+                resultingBand,
+                "Unknown resulting standing band.");
+        }
+
+        ArgumentNullException.ThrowIfNull(contributions);
+        StandingChangeContribution[] contributionValues = contributions.ToArray();
+        if (contributionValues.Length == 0)
+        {
+            throw new ArgumentException(
+                "A standing outcome requires at least one contribution.",
+                nameof(contributions));
+        }
+
+        long verifiedDelta = 0;
+        foreach (StandingChangeContribution contribution in contributionValues)
+        {
+            ArgumentNullException.ThrowIfNull(contribution);
+            verifiedDelta = checked(verifiedDelta + contribution.Delta);
+        }
+
+        if (verifiedDelta != combinedDelta)
+        {
+            throw new ArgumentException(
+                "Standing contributions do not equal the combined delta.",
+                nameof(combinedDelta));
+        }
+
+        AssessingPrincipalId = assessingPrincipalId;
+        SubjectPrincipalId = subjectPrincipalId;
+        PriorValue = priorValue;
+        PriorBand = priorBand;
+        CombinedDelta = combinedDelta;
+        ResultingValue = resultingValue;
+        ResultingBand = resultingBand;
+        Contributions = new ReadOnlyCollection<StandingChangeContribution>(
+            contributionValues);
+    }
+
+    public PrincipalId AssessingPrincipalId { get; }
+
+    public PrincipalId SubjectPrincipalId { get; }
+
+    public StandingValue PriorValue { get; }
+
+    public StandingBand PriorBand { get; }
+
+    public long CombinedDelta { get; }
+
+    public StandingValue ResultingValue { get; }
+
+    public StandingBand ResultingBand { get; }
+
+    public IReadOnlyList<StandingChangeContribution> Contributions { get; }
+
+    public bool Changed => PriorValue != ResultingValue;
+}
+
+/// <summary>
+/// Idempotent outcome of validating and committing one standing-change batch.
+/// </summary>
+public abstract record StandingChangeBatchResult
+{
+    private StandingChangeBatchResult()
+    {
+    }
+
+    public sealed record Applied(
+        StandingChangeBatchId BatchId,
+        IReadOnlyList<StandingChangeOutcome> Outcomes)
+        : StandingChangeBatchResult;
+
+    public sealed record Rejected(
+        StandingChangeBatchId BatchId,
+        StandingChangeRejectionReason Reason)
+        : StandingChangeBatchResult;
+}
+
+/// <summary>
 /// Validated immutable relationship input for one clean game session.
 /// </summary>
 public sealed class RelationshipSetup
@@ -366,9 +670,12 @@ public sealed record RelationshipSnapshot(
 internal sealed class RelationshipOwner
 {
     private readonly IReadOnlyList<PrincipalDefinition> _principals;
-    private readonly IReadOnlyDictionary<(PrincipalId Assessing, PrincipalId Subject), StandingValue>
+    private readonly HashSet<PrincipalId> _principalIds;
+    private readonly Dictionary<(PrincipalId Assessing, PrincipalId Subject), StandingValue>
         _standingOverrides;
     private readonly StandingPolicy _standingPolicy;
+    private readonly Dictionary<StandingChangeBatchId, CommittedStandingBatch>
+        _committedStandingBatches = [];
 
     /// <summary>
     /// Copies canonical setup state into the authoritative runtime owner.
@@ -377,6 +684,9 @@ internal sealed class RelationshipOwner
     {
         ArgumentNullException.ThrowIfNull(setup);
         _principals = setup.Principals;
+        _principalIds = setup.Principals
+            .Select(principal => principal.Id)
+            .ToHashSet();
         _standingPolicy = setup.StandingPolicy;
         _standingOverrides = setup.Standings.ToDictionary(
             standing => (
@@ -387,6 +697,136 @@ internal sealed class RelationshipOwner
     }
 
     internal PrincipalId PlayerPrincipalId { get; }
+
+    /// <summary>
+    /// Validates and reduces a complete batch without mutating relationship state.
+    /// </summary>
+    internal StandingChangePreparation PrepareStandingChanges(StandingChangeBatch batch)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        StandingChangeProposal[] ordered = batch.Proposals
+            .OrderBy(proposal => proposal.AssessingPrincipalId.Value)
+            .ThenBy(proposal => proposal.SubjectPrincipalId.Value)
+            .ThenBy(proposal => proposal.Contribution.Id.Value)
+            .ToArray();
+        if (_committedStandingBatches.TryGetValue(batch.Id, out CommittedStandingBatch? prior))
+        {
+            return prior.Proposals.SequenceEqual(ordered)
+                ? new StandingChangePreparation.Resolved(prior.Result)
+                : ResolvedRejection(
+                    batch.Id,
+                    StandingChangeRejectionReason.BatchIdentityConflict);
+        }
+
+        var contributionKeys = new HashSet<(
+            PrincipalId Assessing,
+            PrincipalId Subject,
+            StandingChangeContributionId Contribution)>();
+        foreach (StandingChangeProposal proposal in ordered)
+        {
+            if (!_principalIds.Contains(proposal.AssessingPrincipalId)
+                || !_principalIds.Contains(proposal.SubjectPrincipalId))
+            {
+                return ResolvedRejection(
+                    batch.Id,
+                    StandingChangeRejectionReason.UnknownPrincipal);
+            }
+
+            if (!contributionKeys.Add((
+                    proposal.AssessingPrincipalId,
+                    proposal.SubjectPrincipalId,
+                    proposal.Contribution.Id)))
+            {
+                return ResolvedRejection(
+                    batch.Id,
+                    StandingChangeRejectionReason.DuplicateContribution);
+            }
+        }
+
+        var outcomes = new List<StandingChangeOutcome>();
+        foreach (IGrouping<(PrincipalId AssessingPrincipalId, PrincipalId SubjectPrincipalId),
+                     StandingChangeProposal> group in ordered.GroupBy(proposal => (
+                         proposal.AssessingPrincipalId,
+                         proposal.SubjectPrincipalId)))
+        {
+            StandingChangeContribution[] contributions = group
+                .Select(proposal => proposal.Contribution)
+                .ToArray();
+            long combinedDelta = 0;
+            try
+            {
+                foreach (StandingChangeContribution contribution in contributions)
+                {
+                    combinedDelta = checked(combinedDelta + contribution.Delta);
+                }
+            }
+            catch (OverflowException)
+            {
+                return ResolvedRejection(
+                    batch.Id,
+                    StandingChangeRejectionReason.DeltaOverflow);
+            }
+
+            StandingValue priorValue = GetStanding(
+                group.Key.AssessingPrincipalId,
+                group.Key.SubjectPrincipalId);
+            long unboundedResult;
+            try
+            {
+                unboundedResult = checked(priorValue.Value + combinedDelta);
+            }
+            catch (OverflowException)
+            {
+                return ResolvedRejection(
+                    batch.Id,
+                    StandingChangeRejectionReason.DeltaOverflow);
+            }
+
+            var resultingValue = new StandingValue(Math.Clamp(
+                unboundedResult,
+                _standingPolicy.Minimum.Value,
+                _standingPolicy.Maximum.Value));
+            outcomes.Add(new StandingChangeOutcome(
+                group.Key.AssessingPrincipalId,
+                group.Key.SubjectPrincipalId,
+                priorValue,
+                _standingPolicy.GetBand(priorValue),
+                combinedDelta,
+                resultingValue,
+                _standingPolicy.GetBand(resultingValue),
+                contributions));
+        }
+
+        var result = new StandingChangeBatchResult.Applied(
+            batch.Id,
+            new ReadOnlyCollection<StandingChangeOutcome>(outcomes));
+        return new StandingChangePreparation.Prepared(new PreparedStandingChange(
+            batch.Id,
+            ordered,
+            result,
+            outcomes.Where(outcome => outcome.Changed).ToArray()));
+    }
+
+    /// <summary>
+    /// Applies an already validated standing preparation through operations that
+    /// cannot reject and records its idempotent receipt.
+    /// </summary>
+    internal StandingChangeBatchResult ApplyStandingChanges(
+        PreparedStandingChange prepared)
+    {
+        ArgumentNullException.ThrowIfNull(prepared);
+        foreach (StandingChangeOutcome outcome in prepared.ChangedOutcomes)
+        {
+            _standingOverrides[(
+                outcome.AssessingPrincipalId,
+                outcome.SubjectPrincipalId)] = outcome.ResultingValue;
+        }
+
+        _committedStandingBatches.Add(
+            prepared.BatchId,
+            new CommittedStandingBatch(prepared.Proposals, prepared.Result));
+        return prepared.Result;
+    }
 
     /// <summary>
     /// Resolves the complete directional matrix in stable principal order.
@@ -404,9 +844,7 @@ internal sealed class RelationshipOwner
                     continue;
                 }
 
-                StandingValue value = _standingOverrides.GetValueOrDefault(
-                    (assessing.Id, subject.Id),
-                    _standingPolicy.Initial);
+                StandingValue value = GetStanding(assessing.Id, subject.Id);
                 standings.Add(new StandingSnapshot(
                     assessing.Id,
                     subject.Id,
@@ -425,4 +863,39 @@ internal sealed class RelationshipOwner
                     principal.Name))),
             GameSnapshotCollection.Copy(standings));
     }
+
+    private StandingValue GetStanding(
+        PrincipalId assessingPrincipalId,
+        PrincipalId subjectPrincipalId) =>
+        _standingOverrides.GetValueOrDefault(
+            (assessingPrincipalId, subjectPrincipalId),
+            _standingPolicy.Initial);
+
+    private static StandingChangePreparation.Resolved ResolvedRejection(
+        StandingChangeBatchId batchId,
+        StandingChangeRejectionReason reason) =>
+        new(new StandingChangeBatchResult.Rejected(batchId, reason));
 }
+
+internal abstract record StandingChangePreparation
+{
+    private StandingChangePreparation()
+    {
+    }
+
+    internal sealed record Resolved(StandingChangeBatchResult Result)
+        : StandingChangePreparation;
+
+    internal sealed record Prepared(PreparedStandingChange Value)
+        : StandingChangePreparation;
+}
+
+internal sealed record PreparedStandingChange(
+    StandingChangeBatchId BatchId,
+    IReadOnlyList<StandingChangeProposal> Proposals,
+    StandingChangeBatchResult.Applied Result,
+    IReadOnlyList<StandingChangeOutcome> ChangedOutcomes);
+
+internal sealed record CommittedStandingBatch(
+    IReadOnlyList<StandingChangeProposal> Proposals,
+    StandingChangeBatchResult.Applied Result);

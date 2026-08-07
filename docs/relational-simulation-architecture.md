@@ -24,6 +24,9 @@ The first implementation must answer four questions consistently:
 The first slice now provides principal identity and definitions, standing policy
 and setup validation, an immutable relationship owner, complete diagnostic
 standing snapshots, and clean-session asset ownership through `PrincipalId`.
+The third slice adds source-scoped idempotent standing batches, stable
+contribution reduction, rejection-atomic prepared commit, and semantic standing
+facts.
 
 ## Decision summary
 
@@ -296,6 +299,12 @@ Each effect names all affected principals, its typed semantic reason, and a stab
 domain correlation identity. Human-readable explanation text is presentation
 state, not authoritative input.
 
+Standing changes use a source-scoped batch identity so independent domain
+owners do not share an allocator. Contribution identities are stable within one
+directional pair and batch. Repeated delivery of the same canonical batch
+returns its prior receipt; different content under the same identity rejects
+without mutation.
+
 Gameplay commands do not initially expose a raw "change standing" or "declare
 war" operation to the player. A command addresses a concrete gameplay action.
 The domain that commits its outcome may produce relationship effects according
@@ -449,6 +458,8 @@ silently create principals referenced only by an asset or relationship.
 - Issued and revoked grant state
 - Next grant identifier or other deterministic allocation state
 - Standing policy identity and compatibility information
+- Committed standing batch identities, canonical contributions, and receipts
+  required to preserve idempotent delivery across restoration
 
 Restore validates the whole relational section before publishing the session.
 It restores state directly rather than replaying relational facts. The retained
@@ -478,7 +489,8 @@ Implementation proceeds in dependency order:
 6. Record the authoritative save inventory for `TASK-014`; do not implement a
    serialization format inside `TASK-012`.
 
-Slices 1 and 2 are implemented. Slice 3 is the next dependency-ordered work.
+Slices 1 through 3 are implemented. Slice 4 is the next dependency-ordered
+work.
 
 Each slice needs focused tests for setup rejection atomicity, directional
 asymmetry, stable ordering, immutable snapshots, worker and batch-order

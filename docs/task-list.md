@@ -31,10 +31,13 @@ after those owners join the clean `GameSession`.
   - Accepted architecture defines principal identity, directional standing,
     mutual diplomacy, explicit grants, deterministic effects, scoped reads,
     and save inventory; implementation is in progress.
-  - Implemented the first slice: principal definitions, configurable standing
-    policy, canonical setup validation, immutable relationship ownership,
-    complete directional diagnostic snapshots, and clean-session
+  - Implemented the first two slices: principal definitions, configurable
+    standing policy, canonical setup validation, immutable relationship
+    ownership, complete directional diagnostic snapshots, and clean-session
     `OrganizationId` to `PrincipalId` ownership migration.
+  - Added source-scoped idempotent standing batches, stable per-direction
+    contribution reduction, checked and clamped rejection-atomic commits,
+    mutation receipts, and ordered `StandingChangedFact` publication.
   - Context: [Relational gameplay model](factions.md) · [Relational simulation architecture](relational-simulation-architecture.md)
 
 - [ ] **TASK-013: Define pause, speed, and input timing**

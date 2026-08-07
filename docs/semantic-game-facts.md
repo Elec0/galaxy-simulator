@@ -525,6 +525,11 @@ Do not predefine facts for combat, factions, relationships, dialogue,
 objectives, construction in the clean `GameSession`, entity destruction, or
 long-running scripts. Add those with the subsystem that owns their meaning.
 
+`TASK-012` later added `StandingChangeFactCause` and `StandingChangedFact` with
+the relationship subsystem that owns directional standing. One changed
+direction emits one fact after stable contribution reduction; rejected,
+idempotently repeated, and authoritative no-op batches emit none.
+
 Phase 1 diagnostic event and decision fingerprints remain unchanged. Migrating
 the acceptance fixture to semantic facts is separate from proving the clean
 session fact boundary.

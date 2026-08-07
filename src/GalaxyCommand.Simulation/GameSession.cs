@@ -56,6 +56,14 @@ public sealed class GameSession : IGameplayCommandHandler
     public EntityRemovalResult RemoveEntity(EntityRemovalRequest request) =>
         _runtime.RemoveEntity(request);
 
+    /// <summary>
+    /// Commits one idempotent batch of directional standing effects and returns
+    /// its prior result when the same batch is delivered again.
+    /// </summary>
+    public StandingChangeBatchResult CommitStandingChanges(
+        StandingChangeBatch batch) =>
+        _runtime.CommitStandingChanges(batch);
+
     public RunReport AdvanceTo(SimulationTime target) =>
         _runtime.AdvanceTo(target);
 

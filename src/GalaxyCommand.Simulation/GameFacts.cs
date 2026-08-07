@@ -63,6 +63,23 @@ public sealed record EntityRemovalFactCause : GameFactCause
 }
 
 /// <summary>
+/// Immediate cause for one idempotent standing-change batch.
+/// </summary>
+public sealed record StandingChangeFactCause : GameFactCause
+{
+    /// <summary>
+    /// Creates a cause correlated to one committed standing batch.
+    /// </summary>
+    public StandingChangeFactCause(StandingChangeBatchId batchId)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(batchId.Value);
+        BatchId = batchId;
+    }
+
+    public StandingChangeBatchId BatchId { get; }
+}
+
+/// <summary>
 /// Causal construction identity used when completion was not dispatched from
 /// a scheduled event carrying an <see cref="EventKey"/>.
 /// </summary>
@@ -209,6 +226,54 @@ public sealed record EntityRemovedFact : GameFact
     public EntityRemovalReason Reason { get; }
 
     public EntityCargoDisposition CargoDisposition { get; }
+}
+
+/// <summary>
+/// Semantic record of one directional standing value changing after stable
+/// contribution reduction.
+/// </summary>
+public sealed record StandingChangedFact : GameFact
+{
+    /// <summary>
+    /// Creates a fact from one changed prepared standing outcome.
+    /// </summary>
+    public StandingChangedFact(StandingChangeOutcome outcome)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        ArgumentOutOfRangeException.ThrowIfZero(outcome.AssessingPrincipalId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(outcome.SubjectPrincipalId.Value);
+        if (!outcome.Changed)
+        {
+            throw new ArgumentException(
+                "A standing-change fact requires an authoritative value change.",
+                nameof(outcome));
+        }
+
+        AssessingPrincipalId = outcome.AssessingPrincipalId;
+        SubjectPrincipalId = outcome.SubjectPrincipalId;
+        PriorValue = outcome.PriorValue;
+        PriorBand = outcome.PriorBand;
+        CombinedDelta = outcome.CombinedDelta;
+        ResultingValue = outcome.ResultingValue;
+        ResultingBand = outcome.ResultingBand;
+        Contributions = GameSnapshotCollection.Copy(outcome.Contributions);
+    }
+
+    public PrincipalId AssessingPrincipalId { get; }
+
+    public PrincipalId SubjectPrincipalId { get; }
+
+    public StandingValue PriorValue { get; }
+
+    public StandingBand PriorBand { get; }
+
+    public long CombinedDelta { get; }
+
+    public StandingValue ResultingValue { get; }
+
+    public StandingBand ResultingBand { get; }
+
+    public IReadOnlyList<StandingChangeContribution> Contributions { get; }
 }
 
 public sealed record CommandAcceptedFact : GameFact
@@ -541,6 +606,7 @@ internal enum GameFactCommitCategory
     OrderTransition,
     PhysicalWorkStarted,
     EntityLifecycle,
+    Relationship,
 }
 
 internal readonly record struct GameFactProposalKey(
@@ -585,6 +651,22 @@ internal sealed class GameFactStore
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
         _retained = new GameFactEnvelope[capacity];
+    }
+
+    /// <summary>
+    /// Reports whether one complete prepared fact batch can receive contiguous
+    /// authoritative sequence values without overflow.
+    /// </summary>
+    internal bool CanCommit(int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        if (count == 0)
+        {
+            return true;
+        }
+
+        return _nextSequence is { } next
+            && checked((ulong)count - 1) <= ulong.MaxValue - next;
     }
 
     internal void Commit(

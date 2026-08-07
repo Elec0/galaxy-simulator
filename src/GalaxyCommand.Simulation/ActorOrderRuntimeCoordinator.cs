@@ -288,6 +288,44 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         return result;
     }
 
+    /// <summary>
+    /// Commits prepared relationship state and publishes one fact for each
+    /// changed directional pair in stable principal order.
+    /// </summary>
+    internal StandingChangeBatchResult CommitStandingChanges(
+        StandingChangeBatch batch)
+    {
+        StandingChangePreparation preparation =
+            _relationships.PrepareStandingChanges(batch);
+        if (preparation is StandingChangePreparation.Resolved resolved)
+        {
+            return resolved.Result;
+        }
+
+        PreparedStandingChange prepared =
+            ((StandingChangePreparation.Prepared)preparation).Value;
+        if (!_facts.CanCommit(prepared.ChangedOutcomes.Count))
+        {
+            return new StandingChangeBatchResult.Rejected(
+                batch.Id,
+                StandingChangeRejectionReason.FactSequenceExhausted);
+        }
+
+        StandingChangeBatchResult result =
+            _relationships.ApplyStandingChanges(prepared);
+        _facts.Commit(
+            CurrentTime,
+            new StandingChangeFactCause(batch.Id),
+            prepared.ChangedOutcomes.Select(outcome => new GameFactProposal(
+                new GameFactProposalKey(
+                    GameFactCommitCategory.Relationship,
+                    outcome.AssessingPrincipalId.Value,
+                    outcome.SubjectPrincipalId.Value,
+                    0),
+                new StandingChangedFact(outcome))));
+        return result;
+    }
+
     public void Reconcile(SimulationTime now, EventAgenda<GameEvent> agenda)
     {
     }
