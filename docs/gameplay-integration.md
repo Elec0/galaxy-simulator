@@ -402,10 +402,12 @@ boundaries in [Relational simulation architecture](relational-simulation-archite
 
 ### 3.6 Pause, speed, and input timing
 
-Define when commands submitted while paused take effect, how commands are
-ordered when several arrive at the same simulation time, and whether opening
-dialogue pauses automatically. These are local single-player rules; no
-multiplayer synchronization behavior is needed.
+**Status: resolved by `TASK-013`.**
+
+The accepted local single-player rules define quiescent input boundaries,
+immediate paused command commit, same-time `CommandSequence` ordering,
+configurable speed presets, and the player preference for automatically
+pausing response-required dialogue. See [Time and pacing](time-and-pacing.md).
 
 ### 3.7 Save, load, and replay state
 

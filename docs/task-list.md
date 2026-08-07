@@ -20,12 +20,6 @@ join the clean `GameSession`.
 
 ## Near-term work
 
-- [ ] **TASK-013: Define pause, speed, and input timing**
-  - Define when commands submitted while paused take effect.
-  - Define ordering for multiple commands at one simulation timestamp.
-  - Define whether opening dialogue pauses automatically.
-  - Keep these as local single-player rules.
-
 - [ ] **TASK-014: Define the authoritative save boundary**
   - Inventory all state required for save and load.
   - Include simulation time, pending agenda, creation sequences, random state,
@@ -49,9 +43,11 @@ prerequisites and desired behavior are sufficiently defined.
 
 - [ ] **TASK-016: Design dialogue state and presentation**
   - Define availability, conditions, choices, repeatability, memory,
-    consequences, and simulation pause behavior.
+    consequences, response-required classification, and conversation
+    continuity under the accepted pause behavior.
   - Keep rendering and interaction in Godot while gameplay effects use normal
     commands.
+  - Context: [Time and pacing](time-and-pacing.md)
 
 - [ ] **TASK-017: Design deterministic scripted events**
   - Define time-, location-, threshold-, and fact-based triggers.
@@ -101,6 +97,16 @@ prerequisites and desired behavior are sufficiently defined.
   - Define deterministic migrations or clear incompatibility diagnostics when
     an older save references renamed, replaced, removed, or changed content.
   - Context: [Relational simulation architecture](relational-simulation-architecture.md)
+
+- [ ] **TASK-038: Implement application pause, speed, and input timing**
+  - Replace fixed real-time advancement with the accepted pacing state and
+    completed-timestamp control checkpoints.
+  - Load and validate the mod-configurable speed ladder, preserve local player
+    pacing preferences, and drain buffered input deterministically before
+    further advancement.
+  - Integrate response-required dialogue automatic pause only after `TASK-016`
+    defines the corresponding dialogue state and continuity.
+  - Context: [Time and pacing](time-and-pacing.md)
 
 - [ ] **TASK-025: Define bounded explanation history**
   - Retain enough decisions and facts to explain behavior to the player without
@@ -188,6 +194,19 @@ prerequisites and desired behavior are sufficiently defined.
   - Context: [Relational gameplay model](factions.md)
 
 ## Completed foundations
+
+- [x] **TASK-013: Define pause, speed, and input timing**
+  - Defined quiescent input boundaries, immediate paused command commit,
+    same-time command-sequence ordering, and future-only scheduled completion.
+  - Defined independent pause and running-speed state, a validated
+    mod-configurable ladder with default `1x`, `2x`, `5x`, `10x`, and `30x`
+    presets, and no catch-up debt or outcome changes when performance lags.
+  - Defined the enabled-by-default player preference for automatically pausing
+    response-required dialogue, including manual override and safe restoration
+    of the prior speed.
+  - Implementation remains in `TASK-038`; dialogue classification and
+    continuity remain in `TASK-016`.
+  - Context: [Time and pacing](time-and-pacing.md)
 
 - [x] **TASK-012: Translate relational gameplay into simulation architecture**
   - Added `PrincipalId` identity, configurable directional standing, canonical
