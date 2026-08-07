@@ -530,6 +530,12 @@ the relationship subsystem that owns directional standing. One changed
 direction emits one fact after stable contribution reduction; rejected,
 idempotently repeated, and authoritative no-op batches emit none.
 
+The same owner later added `RelationshipPolicyChangeFactCause`,
+`DiplomaticConditionChangedFact`, `RelationshipGrantIssuedFact`, and
+`RelationshipGrantRevokedFact`. Diplomacy facts use canonical unordered pairs;
+grant facts preserve stable identity and typed reason. Rejected and repeated
+batches, plus no-op diplomacy assignments, emit no facts.
+
 Phase 1 diagnostic event and decision fingerprints remain unchanged. Migrating
 the acceptance fixture to semantic facts is separate from proving the clean
 session fact boundary.

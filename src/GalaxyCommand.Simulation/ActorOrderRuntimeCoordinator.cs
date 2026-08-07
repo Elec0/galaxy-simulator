@@ -326,6 +326,71 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         return result;
     }
 
+    /// <summary>
+    /// Commits one prepared diplomacy and grant batch and publishes changed
+    /// outcomes in deterministic relationship order.
+    /// </summary>
+    internal RelationshipPolicyChangeBatchResult CommitRelationshipPolicyChanges(
+        RelationshipPolicyChangeBatch batch)
+    {
+        RelationshipPolicyChangePreparation preparation =
+            _relationships.PreparePolicyChanges(batch);
+        if (preparation is RelationshipPolicyChangePreparation.Resolved resolved)
+        {
+            return resolved.Result;
+        }
+
+        PreparedRelationshipPolicyChange prepared =
+            ((RelationshipPolicyChangePreparation.Prepared)preparation).Value;
+        int factCount = prepared.Result.DiplomaticOutcomes.Count(value => value.Changed)
+            + prepared.Result.GrantOutcomes.Count;
+        if (!_facts.CanCommit(factCount))
+        {
+            return new RelationshipPolicyChangeBatchResult.Rejected(
+                batch.Id,
+                RelationshipPolicyChangeRejectionReason.FactSequenceExhausted);
+        }
+
+        RelationshipPolicyChangeBatchResult result =
+            _relationships.ApplyPolicyChanges(prepared);
+        IEnumerable<GameFactProposal> diplomaticFacts = prepared.Result
+            .DiplomaticOutcomes
+            .Where(outcome => outcome.Changed)
+            .Select(outcome => new GameFactProposal(
+                new GameFactProposalKey(
+                    GameFactCommitCategory.RelationshipDiplomacy,
+                    outcome.LowerPrincipalId.Value,
+                    outcome.UpperPrincipalId.Value,
+                    0),
+                new DiplomaticConditionChangedFact(outcome)));
+        IEnumerable<GameFactProposal> grantFacts = prepared.Result.GrantOutcomes
+            .Select(outcome => new GameFactProposal(
+                new GameFactProposalKey(
+                    GameFactCommitCategory.RelationshipGrant,
+                    outcome.Id.Value,
+                    0,
+                    0),
+                outcome.ResultingIssued
+                    ? new RelationshipGrantIssuedFact(outcome)
+                    : new RelationshipGrantRevokedFact(outcome)));
+        _facts.Commit(
+            CurrentTime,
+            new RelationshipPolicyChangeFactCause(batch.Id),
+            diplomaticFacts.Concat(grantFacts));
+        return result;
+    }
+
+    internal DiplomaticCondition GetDiplomaticCondition(
+        PrincipalId firstPrincipalId,
+        PrincipalId secondPrincipalId) =>
+        _relationships.GetDiplomaticCondition(firstPrincipalId, secondPrincipalId);
+
+    internal bool HasEffectiveRelationshipGrant(
+        PrincipalId issuerPrincipalId,
+        PrincipalId holderPrincipalId,
+        RelationshipGrantKind kind) =>
+        _relationships.HasEffectiveGrant(issuerPrincipalId, holderPrincipalId, kind);
+
     public void Reconcile(SimulationTime now, EventAgenda<GameEvent> agenda)
     {
     }

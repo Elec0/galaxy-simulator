@@ -64,6 +64,35 @@ public sealed class GameSession : IGameplayCommandHandler
         StandingChangeBatch batch) =>
         _runtime.CommitStandingChanges(batch);
 
+    /// <summary>
+    /// Commits one idempotent batch of mutual diplomacy and explicit grant
+    /// effects and returns its prior result when delivered again.
+    /// </summary>
+    public RelationshipPolicyChangeBatchResult CommitRelationshipPolicyChanges(
+        RelationshipPolicyChangeBatch batch) =>
+        _runtime.CommitRelationshipPolicyChanges(batch);
+
+    /// <summary>
+    /// Returns the current mutual diplomatic condition for two principals.
+    /// </summary>
+    public DiplomaticCondition GetDiplomaticCondition(
+        PrincipalId firstPrincipalId,
+        PrincipalId secondPrincipalId) =>
+        _runtime.GetDiplomaticCondition(firstPrincipalId, secondPrincipalId);
+
+    /// <summary>
+    /// Reports whether an issued grant of the requested kind is currently
+    /// effective for the directional principal pair.
+    /// </summary>
+    public bool HasEffectiveRelationshipGrant(
+        PrincipalId issuerPrincipalId,
+        PrincipalId holderPrincipalId,
+        RelationshipGrantKind kind) =>
+        _runtime.HasEffectiveRelationshipGrant(
+            issuerPrincipalId,
+            holderPrincipalId,
+            kind);
+
     public RunReport AdvanceTo(SimulationTime target) =>
         _runtime.AdvanceTo(target);
 

@@ -423,6 +423,346 @@ public sealed class RelationshipTests
                 StandingChangeReason.Explicit)));
     }
 
+    [Fact]
+    public void RelationshipSetupCanonicalizesDiplomacyAndValidatesInitialGrants()
+    {
+        RelationshipSetup setup = CreateRelationshipSetup(
+            [
+                Definition(PlayerPrincipal, "player", "Player"),
+                Definition(RegionalPrincipal, "regional", "Regional"),
+            ],
+            [new InitialStandingSetup(PlayerPrincipal, RegionalPrincipal, new StandingValue(60))],
+            [new InitialDiplomaticConditionSetup(
+                RegionalPrincipal,
+                PlayerPrincipal,
+                DiplomaticCondition.War)],
+            [new InitialRelationshipGrantSetup(
+                new RelationshipGrantId(4),
+                PlayerPrincipal,
+                RegionalPrincipal,
+                GrantKind(),
+                StandingBand.Favorable)]);
+
+        InitialDiplomaticConditionSetup diplomacy = Assert.Single(setup.DiplomaticConditions);
+        Assert.Equal(PlayerPrincipal, diplomacy.LowerPrincipalId);
+        Assert.Equal(RegionalPrincipal, diplomacy.UpperPrincipalId);
+        Assert.Single(setup.Grants);
+
+        Assert.Throws<ArgumentException>(() => CreateRelationshipSetup(
+            setup.Principals,
+            [],
+            [],
+            [new InitialRelationshipGrantSetup(
+                new RelationshipGrantId(5),
+                PlayerPrincipal,
+                RegionalPrincipal,
+                GrantKind(),
+                StandingBand.Favorable)]));
+        Assert.Throws<ArgumentException>(() => CreateRelationshipSetup(
+            setup.Principals,
+            [],
+            [
+                new InitialDiplomaticConditionSetup(
+                    PlayerPrincipal,
+                    RegionalPrincipal,
+                    DiplomaticCondition.War),
+                new InitialDiplomaticConditionSetup(
+                    RegionalPrincipal,
+                    PlayerPrincipal,
+                    DiplomaticCondition.War),
+            ],
+            []));
+    }
+
+    [Fact]
+    public void PolicyBatchCommitsCanonicalDiplomacyAndGrantFacts()
+    {
+        GameSession session = CreateRelationshipSession(
+            [new InitialStandingSetup(PlayerPrincipal, RegionalPrincipal, new StandingValue(60))]);
+        var grantId = new RelationshipGrantId(3);
+
+        RelationshipPolicyChangeBatchResult.Applied result = Assert.IsType<
+            RelationshipPolicyChangeBatchResult.Applied>(
+                session.CommitRelationshipPolicyChanges(new RelationshipPolicyChangeBatch(
+                    PolicyBatchId(1),
+                    [
+                        new IssueRelationshipGrantProposal(
+                            grantId,
+                            PlayerPrincipal,
+                            RegionalPrincipal,
+                            GrantKind(),
+                            StandingBand.Favorable,
+                            RelationshipPolicyChangeReason.Explicit),
+                        new SetDiplomaticConditionProposal(
+                            RegionalPrincipal,
+                            PlayerPrincipal,
+                            DiplomaticCondition.War,
+                            RelationshipPolicyChangeReason.Explicit),
+                    ])));
+
+        DiplomaticConditionChangeOutcome diplomacy = Assert.Single(result.DiplomaticOutcomes);
+        Assert.True(diplomacy.Changed);
+        Assert.Equal(DiplomaticCondition.Peace, diplomacy.PriorCondition);
+        Assert.Equal(DiplomaticCondition.War, diplomacy.ResultingCondition);
+        RelationshipGrantChangeOutcome grant = Assert.Single(result.GrantOutcomes);
+        Assert.True(grant.ResultingIssued);
+        Assert.Equal(DiplomaticCondition.War, session.GetDiplomaticCondition(
+            PlayerPrincipal,
+            RegionalPrincipal));
+        Assert.True(session.HasEffectiveRelationshipGrant(
+            PlayerPrincipal,
+            RegionalPrincipal,
+            GrantKind()));
+
+        IReadOnlyList<GameFactEnvelope> facts = ReadAllFacts(session);
+        Assert.Collection(
+            facts,
+            envelope => Assert.IsType<DiplomaticConditionChangedFact>(envelope.Fact),
+            envelope => Assert.IsType<RelationshipGrantIssuedFact>(envelope.Fact));
+        Assert.All(
+            facts,
+            envelope => Assert.Equal(
+                PolicyBatchId(1),
+                Assert.IsType<RelationshipPolicyChangeFactCause>(envelope.Cause).BatchId));
+    }
+
+    [Fact]
+    public void PolicyBatchIsInvariantToProposalOrderAndSnapshotsAreImmutable()
+    {
+        InitialStandingSetup[] standings =
+        [
+            new InitialStandingSetup(PlayerPrincipal, RegionalPrincipal, new StandingValue(60)),
+            new InitialStandingSetup(RegionalPrincipal, PlayerPrincipal, new StandingValue(60)),
+        ];
+        GameSession first = CreateRelationshipSession(standings);
+        GameSession permuted = CreateRelationshipSession(standings);
+        RelationshipPolicyChangeProposal diplomacy = new SetDiplomaticConditionProposal(
+            RegionalPrincipal,
+            PlayerPrincipal,
+            DiplomaticCondition.War,
+            RelationshipPolicyChangeReason.Explicit);
+        RelationshipPolicyChangeProposal firstGrant = new IssueRelationshipGrantProposal(
+            new RelationshipGrantId(2),
+            RegionalPrincipal,
+            PlayerPrincipal,
+            GrantKind(),
+            StandingBand.Favorable,
+            RelationshipPolicyChangeReason.Explicit);
+        RelationshipPolicyChangeProposal secondGrant = new IssueRelationshipGrantProposal(
+            new RelationshipGrantId(1),
+            PlayerPrincipal,
+            RegionalPrincipal,
+            GrantKind(),
+            StandingBand.Favorable,
+            RelationshipPolicyChangeReason.Explicit);
+
+        first.CommitRelationshipPolicyChanges(new RelationshipPolicyChangeBatch(
+            PolicyBatchId(7),
+            [firstGrant, diplomacy, secondGrant]));
+        permuted.CommitRelationshipPolicyChanges(new RelationshipPolicyChangeBatch(
+            PolicyBatchId(7),
+            [secondGrant, firstGrant, diplomacy]));
+
+        RelationshipSnapshot snapshot = first.CaptureSnapshot().Relationships;
+        RelationshipSnapshot permutedSnapshot = permuted.CaptureSnapshot().Relationships;
+        Assert.Equal(snapshot.DiplomaticConditions, permutedSnapshot.DiplomaticConditions);
+        Assert.Equal(snapshot.Grants, permutedSnapshot.Grants);
+        Assert.Equal(
+            [1UL, 2UL],
+            snapshot.Grants.Select(grant => grant.Id.Value));
+        Assert.Equal(
+            [typeof(DiplomaticConditionChangedFact), typeof(RelationshipGrantIssuedFact),
+                typeof(RelationshipGrantIssuedFact)],
+            ReadAllFacts(first).Select(envelope => envelope.Fact.GetType()));
+        var diplomacyValues = Assert.IsAssignableFrom<IList<DiplomaticConditionSnapshot>>(
+            snapshot.DiplomaticConditions);
+        var grantValues = Assert.IsAssignableFrom<IList<RelationshipGrantSnapshot>>(
+            snapshot.Grants);
+        Assert.Throws<NotSupportedException>(() => diplomacyValues.Clear());
+        Assert.Throws<NotSupportedException>(() => grantValues.Clear());
+    }
+
+    [Fact]
+    public void GrantEffectivenessTracksStandingWithoutRewritingIssuedState()
+    {
+        GameSession session = CreateRelationshipSession(
+            [new InitialStandingSetup(PlayerPrincipal, RegionalPrincipal, new StandingValue(60))],
+            grants:
+            [
+                new InitialRelationshipGrantSetup(
+                    new RelationshipGrantId(1),
+                    PlayerPrincipal,
+                    RegionalPrincipal,
+                    GrantKind(),
+                    StandingBand.Favorable),
+            ]);
+
+        session.CommitStandingChanges(new StandingChangeBatch(
+            BatchId(20),
+            [Proposal(PlayerPrincipal, RegionalPrincipal, 1, -20)]));
+
+        RelationshipGrantSnapshot suspended = Assert.Single(
+            session.CaptureSnapshot().Relationships.Grants);
+        Assert.True(suspended.IsIssued);
+        Assert.False(suspended.IsEffective);
+        Assert.False(session.HasEffectiveRelationshipGrant(
+            PlayerPrincipal,
+            RegionalPrincipal,
+            GrantKind()));
+
+        session.CommitStandingChanges(new StandingChangeBatch(
+            BatchId(21),
+            [Proposal(PlayerPrincipal, RegionalPrincipal, 1, 10)]));
+
+        RelationshipGrantSnapshot restored = Assert.Single(
+            session.CaptureSnapshot().Relationships.Grants);
+        Assert.True(restored.IsIssued);
+        Assert.True(restored.IsEffective);
+    }
+
+    [Fact]
+    public void PolicyBatchRejectsInvalidMixedChangesAtomically()
+    {
+        GameSession session = CreateRelationshipSession(
+            [new InitialStandingSetup(PlayerPrincipal, RegionalPrincipal, new StandingValue(60))]);
+
+        var rejected = Assert.IsType<RelationshipPolicyChangeBatchResult.Rejected>(
+            session.CommitRelationshipPolicyChanges(new RelationshipPolicyChangeBatch(
+                PolicyBatchId(2),
+                [
+                    new SetDiplomaticConditionProposal(
+                        PlayerPrincipal,
+                        RegionalPrincipal,
+                        DiplomaticCondition.War,
+                        RelationshipPolicyChangeReason.Explicit),
+                    new IssueRelationshipGrantProposal(
+                        new RelationshipGrantId(1),
+                        new PrincipalId(99),
+                        PlayerPrincipal,
+                        GrantKind(),
+                        StandingBand.Neutral,
+                        RelationshipPolicyChangeReason.Explicit),
+                ])));
+
+        Assert.Equal(RelationshipPolicyChangeRejectionReason.UnknownPrincipal, rejected.Reason);
+        RelationshipSnapshot snapshot = session.CaptureSnapshot().Relationships;
+        Assert.Equal(
+            DiplomaticCondition.Peace,
+            Assert.Single(snapshot.DiplomaticConditions).Condition);
+        Assert.Empty(snapshot.Grants);
+        Assert.Empty(ReadAllFacts(session));
+    }
+
+    [Fact]
+    public void PolicyBatchRejectsUnmetThresholdAndDuplicateAssignments()
+    {
+        GameSession session = CreateRelationshipSession();
+        var unmet = Assert.IsType<RelationshipPolicyChangeBatchResult.Rejected>(
+            session.CommitRelationshipPolicyChanges(new RelationshipPolicyChangeBatch(
+                PolicyBatchId(3),
+                [
+                    new IssueRelationshipGrantProposal(
+                        new RelationshipGrantId(1),
+                        PlayerPrincipal,
+                        RegionalPrincipal,
+                        GrantKind(),
+                        StandingBand.Favorable,
+                        RelationshipPolicyChangeReason.Explicit),
+                ])));
+        var duplicate = Assert.IsType<RelationshipPolicyChangeBatchResult.Rejected>(
+            session.CommitRelationshipPolicyChanges(new RelationshipPolicyChangeBatch(
+                PolicyBatchId(4),
+                [
+                    new SetDiplomaticConditionProposal(
+                        PlayerPrincipal,
+                        RegionalPrincipal,
+                        DiplomaticCondition.War,
+                        RelationshipPolicyChangeReason.Explicit),
+                    new SetDiplomaticConditionProposal(
+                        RegionalPrincipal,
+                        PlayerPrincipal,
+                        DiplomaticCondition.Peace,
+                        RelationshipPolicyChangeReason.Explicit),
+                ])));
+
+        Assert.Equal(
+            RelationshipPolicyChangeRejectionReason.StandingRequirementNotMet,
+            unmet.Reason);
+        Assert.Equal(
+            RelationshipPolicyChangeRejectionReason.DuplicateDiplomaticAssignment,
+            duplicate.Reason);
+        Assert.Empty(ReadAllFacts(session));
+    }
+
+    [Fact]
+    public void RepeatedPolicyBatchReturnsReceiptAndNoOpDiplomacyEmitsNoFact()
+    {
+        GameSession session = CreateRelationshipSession();
+        var batch = new RelationshipPolicyChangeBatch(
+            PolicyBatchId(5),
+            [
+                new SetDiplomaticConditionProposal(
+                    PlayerPrincipal,
+                    RegionalPrincipal,
+                    DiplomaticCondition.Peace,
+                    RelationshipPolicyChangeReason.Explicit),
+            ]);
+
+        RelationshipPolicyChangeBatchResult.Applied first = Assert.IsType<
+            RelationshipPolicyChangeBatchResult.Applied>(
+                session.CommitRelationshipPolicyChanges(batch));
+        RelationshipPolicyChangeBatchResult.Applied repeated = Assert.IsType<
+            RelationshipPolicyChangeBatchResult.Applied>(
+                session.CommitRelationshipPolicyChanges(batch));
+        var conflict = Assert.IsType<RelationshipPolicyChangeBatchResult.Rejected>(
+            session.CommitRelationshipPolicyChanges(new RelationshipPolicyChangeBatch(
+                batch.Id,
+                [
+                    new SetDiplomaticConditionProposal(
+                        PlayerPrincipal,
+                        RegionalPrincipal,
+                        DiplomaticCondition.War,
+                        RelationshipPolicyChangeReason.Explicit),
+                ])));
+
+        Assert.Same(first, repeated);
+        Assert.False(Assert.Single(first.DiplomaticOutcomes).Changed);
+        Assert.Equal(
+            RelationshipPolicyChangeRejectionReason.BatchIdentityConflict,
+            conflict.Reason);
+        Assert.Empty(ReadAllFacts(session));
+    }
+
+    [Fact]
+    public void RevokedGrantRemainsDistinctFromStandingSuspension()
+    {
+        GameSession session = CreateRelationshipSession(
+            [new InitialStandingSetup(PlayerPrincipal, RegionalPrincipal, new StandingValue(60))],
+            grants:
+            [
+                new InitialRelationshipGrantSetup(
+                    new RelationshipGrantId(1),
+                    PlayerPrincipal,
+                    RegionalPrincipal,
+                    GrantKind(),
+                    StandingBand.Favorable),
+            ]);
+
+        session.CommitRelationshipPolicyChanges(new RelationshipPolicyChangeBatch(
+            PolicyBatchId(6),
+            [
+                new RevokeRelationshipGrantProposal(
+                    new RelationshipGrantId(1),
+                    RelationshipPolicyChangeReason.Explicit),
+            ]));
+
+        RelationshipGrantSnapshot grant = Assert.Single(
+            session.CaptureSnapshot().Relationships.Grants);
+        Assert.False(grant.IsIssued);
+        Assert.False(grant.IsEffective);
+        Assert.IsType<RelationshipGrantRevokedFact>(Assert.Single(ReadAllFacts(session)).Fact);
+    }
+
     private static PrincipalDefinition Definition(
         PrincipalId id,
         string contentId,
@@ -445,15 +785,24 @@ public sealed class RelationshipTests
     private static StandingChangeBatchId BatchId(ulong value) =>
         new(StandingChangeSourceKind.Explicit, value);
 
+    private static RelationshipPolicyChangeBatchId PolicyBatchId(ulong value) =>
+        new(RelationshipPolicyChangeSourceKind.Explicit, value);
+
+    private static RelationshipGrantKind GrantKind() => new("test-access");
+
     private static GameSession CreateRelationshipSession(
-        IEnumerable<InitialStandingSetup>? standings = null)
+        IEnumerable<InitialStandingSetup>? standings = null,
+        IEnumerable<InitialDiplomaticConditionSetup>? diplomaticConditions = null,
+        IEnumerable<InitialRelationshipGrantSetup>? grants = null)
     {
         RelationshipSetup relationships = CreateRelationshipSetup(
             [
                 Definition(PlayerPrincipal, "player", "Player"),
                 Definition(RegionalPrincipal, "regional", "Regional"),
             ],
-            standings ?? []);
+            standings ?? [],
+            diplomaticConditions ?? [],
+            grants ?? []);
         return new GameSession(
             new GameSessionSetup(
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
@@ -482,8 +831,16 @@ public sealed class RelationshipTests
 
     private static RelationshipSetup CreateRelationshipSetup(
         IEnumerable<PrincipalDefinition> principals,
-        IEnumerable<InitialStandingSetup> standings) =>
-        new(principals, PlayerPrincipal, Policy(), standings);
+        IEnumerable<InitialStandingSetup> standings,
+        IEnumerable<InitialDiplomaticConditionSetup>? diplomaticConditions = null,
+        IEnumerable<InitialRelationshipGrantSetup>? grants = null) =>
+        new(
+            principals,
+            PlayerPrincipal,
+            Policy(),
+            standings,
+            diplomaticConditions ?? [],
+            grants ?? []);
 
     private static StandingPolicy Policy() =>
         new(

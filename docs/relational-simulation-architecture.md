@@ -26,7 +26,9 @@ and setup validation, an immutable relationship owner, complete diagnostic
 standing snapshots, and clean-session asset ownership through `PrincipalId`.
 The third slice adds source-scoped idempotent standing batches, stable
 contribution reduction, rejection-atomic prepared commit, and semantic standing
-facts.
+facts. The fourth slice adds canonical mutual diplomacy, explicit issued and
+revoked grant state, standing-dependent effectiveness queries, rejection-atomic
+policy batches, and typed diplomacy and grant facts.
 
 ## Decision summary
 
@@ -489,7 +491,7 @@ Implementation proceeds in dependency order:
 6. Record the authoritative save inventory for `TASK-014`; do not implement a
    serialization format inside `TASK-012`.
 
-Slices 1 through 3 are implemented. Slice 4 is the next dependency-ordered
+Slices 1 through 4 are implemented. Slice 5 is the next dependency-ordered
 work.
 
 Each slice needs focused tests for setup rejection atomicity, directional

@@ -38,6 +38,10 @@ after those owners join the clean `GameSession`.
   - Added source-scoped idempotent standing batches, stable per-direction
     contribution reduction, checked and clamped rejection-atomic commits,
     mutation receipts, and ordered `StandingChangedFact` publication.
+  - Added canonical mutual `Peace` and `War` state, source-scoped idempotent
+    diplomacy and grant batches, explicit issued and revoked grants,
+    standing-dependent effectiveness queries, immutable diagnostics, and
+    ordered diplomacy and grant facts.
   - Context: [Relational gameplay model](factions.md) · [Relational simulation architecture](relational-simulation-architecture.md)
 
 - [ ] **TASK-013: Define pause, speed, and input timing**

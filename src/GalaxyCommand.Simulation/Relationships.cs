@@ -219,6 +219,168 @@ public sealed record InitialStandingSetup
 }
 
 /// <summary>
+/// Explicit mutual diplomatic condition for one unordered principal pair.
+/// </summary>
+public enum DiplomaticCondition
+{
+    Peace,
+    War,
+}
+
+/// <summary>
+/// Authored non-default diplomatic condition for one principal pair.
+/// </summary>
+public sealed record InitialDiplomaticConditionSetup
+{
+    /// <summary>
+    /// Creates one validated non-peace diplomatic setup entry.
+    /// </summary>
+    public InitialDiplomaticConditionSetup(
+        PrincipalId firstPrincipalId,
+        PrincipalId secondPrincipalId,
+        DiplomaticCondition condition)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(firstPrincipalId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(secondPrincipalId.Value);
+        if (firstPrincipalId == secondPrincipalId)
+        {
+            throw new ArgumentException("Self-diplomacy is invalid.");
+        }
+
+        if (!Enum.IsDefined(condition) || condition == DiplomaticCondition.Peace)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(condition),
+                condition,
+                "Initial diplomacy stores only a defined non-peace condition.");
+        }
+
+        (LowerPrincipalId, UpperPrincipalId) = CanonicalPair(
+            firstPrincipalId,
+            secondPrincipalId);
+        Condition = condition;
+    }
+
+    public PrincipalId LowerPrincipalId { get; }
+
+    public PrincipalId UpperPrincipalId { get; }
+
+    public DiplomaticCondition Condition { get; }
+
+    /// <summary>
+    /// Orders a distinct pair by stable principal identity.
+    /// </summary>
+    private static (PrincipalId Lower, PrincipalId Upper) CanonicalPair(
+        PrincipalId first,
+        PrincipalId second) =>
+        first.Value < second.Value ? (first, second) : (second, first);
+}
+
+/// <summary>
+/// Stable identity for one explicit relationship grant.
+/// </summary>
+public readonly record struct RelationshipGrantId
+{
+    /// <summary>
+    /// Creates a non-zero grant identity.
+    /// </summary>
+    public RelationshipGrantId(ulong value)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(value);
+        Value = value;
+    }
+
+    public ulong Value { get; }
+}
+
+/// <summary>
+/// Stable content-defined kind of relationship permission.
+/// </summary>
+public readonly record struct RelationshipGrantKind
+{
+    /// <summary>
+    /// Creates an opaque case-sensitive grant kind.
+    /// </summary>
+    public RelationshipGrantKind(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        Value = value;
+    }
+
+    public string Value { get; }
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+}
+
+/// <summary>
+/// Authored issued grant with a standing-dependent use requirement.
+/// </summary>
+public sealed record InitialRelationshipGrantSetup
+{
+    /// <summary>
+    /// Creates one validated initial issued grant.
+    /// </summary>
+    public InitialRelationshipGrantSetup(
+        RelationshipGrantId id,
+        PrincipalId issuerPrincipalId,
+        PrincipalId holderPrincipalId,
+        RelationshipGrantKind kind,
+        StandingBand minimumStandingBand)
+    {
+        ValidateGrantValues(
+            id,
+            issuerPrincipalId,
+            holderPrincipalId,
+            kind,
+            minimumStandingBand);
+        Id = id;
+        IssuerPrincipalId = issuerPrincipalId;
+        HolderPrincipalId = holderPrincipalId;
+        Kind = kind;
+        MinimumStandingBand = minimumStandingBand;
+    }
+
+    public RelationshipGrantId Id { get; }
+
+    public PrincipalId IssuerPrincipalId { get; }
+
+    public PrincipalId HolderPrincipalId { get; }
+
+    public RelationshipGrantKind Kind { get; }
+
+    public StandingBand MinimumStandingBand { get; }
+
+    /// <summary>
+    /// Validates the shared structural fields used by setup and issue proposals.
+    /// </summary>
+    internal static void ValidateGrantValues(
+        RelationshipGrantId id,
+        PrincipalId issuerPrincipalId,
+        PrincipalId holderPrincipalId,
+        RelationshipGrantKind kind,
+        StandingBand minimumStandingBand)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(id.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(issuerPrincipalId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(holderPrincipalId.Value);
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind.Value);
+        if (issuerPrincipalId == holderPrincipalId)
+        {
+            throw new ArgumentException("A relationship grant requires distinct principals.");
+        }
+
+        if (!Enum.IsDefined(minimumStandingBand))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(minimumStandingBand),
+                minimumStandingBand,
+                "Unknown minimum standing band.");
+        }
+    }
+}
+
+/// <summary>
 /// Authoritative source domain for a standing-change delivery identity.
 /// </summary>
 public enum StandingChangeSourceKind
@@ -523,6 +685,369 @@ public abstract record StandingChangeBatchResult
 }
 
 /// <summary>
+/// Authoritative source domain for diplomacy and grant delivery identities.
+/// </summary>
+public enum RelationshipPolicyChangeSourceKind
+{
+    Explicit,
+}
+
+/// <summary>
+/// Stable source-scoped identity for one diplomacy and grant change batch.
+/// </summary>
+public readonly record struct RelationshipPolicyChangeBatchId
+{
+    /// <summary>
+    /// Creates a non-zero change identity within one source domain.
+    /// </summary>
+    public RelationshipPolicyChangeBatchId(
+        RelationshipPolicyChangeSourceKind sourceKind,
+        ulong value)
+    {
+        if (!Enum.IsDefined(sourceKind))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(sourceKind),
+                sourceKind,
+                "Unknown relationship policy change source kind.");
+        }
+
+        ArgumentOutOfRangeException.ThrowIfZero(value);
+        SourceKind = sourceKind;
+        Value = value;
+    }
+
+    public RelationshipPolicyChangeSourceKind SourceKind { get; }
+
+    public ulong Value { get; }
+}
+
+/// <summary>
+/// Initial reason vocabulary for explicit diplomacy and grant changes.
+/// </summary>
+public enum RelationshipPolicyChangeReason
+{
+    Explicit,
+}
+
+/// <summary>
+/// Closed proposal vocabulary for diplomacy and explicit grant changes.
+/// </summary>
+public abstract record RelationshipPolicyChangeProposal
+{
+    private protected RelationshipPolicyChangeProposal(
+        RelationshipPolicyChangeReason reason)
+    {
+        if (!Enum.IsDefined(reason))
+        {
+            throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unknown reason.");
+        }
+
+        Reason = reason;
+    }
+
+    public RelationshipPolicyChangeReason Reason { get; }
+}
+
+/// <summary>
+/// Explicit assignment of one mutual diplomatic condition.
+/// </summary>
+public sealed record SetDiplomaticConditionProposal : RelationshipPolicyChangeProposal
+{
+    /// <summary>
+    /// Creates one validated mutual diplomatic assignment.
+    /// </summary>
+    public SetDiplomaticConditionProposal(
+        PrincipalId firstPrincipalId,
+        PrincipalId secondPrincipalId,
+        DiplomaticCondition condition,
+        RelationshipPolicyChangeReason reason)
+        : base(reason)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(firstPrincipalId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(secondPrincipalId.Value);
+        if (firstPrincipalId == secondPrincipalId)
+        {
+            throw new ArgumentException("Self-diplomacy is invalid.");
+        }
+
+        if (!Enum.IsDefined(condition))
+        {
+            throw new ArgumentOutOfRangeException(nameof(condition), condition, "Unknown condition.");
+        }
+
+        (LowerPrincipalId, UpperPrincipalId) = firstPrincipalId.Value < secondPrincipalId.Value
+            ? (firstPrincipalId, secondPrincipalId)
+            : (secondPrincipalId, firstPrincipalId);
+        Condition = condition;
+    }
+
+    public PrincipalId LowerPrincipalId { get; }
+
+    public PrincipalId UpperPrincipalId { get; }
+
+    public DiplomaticCondition Condition { get; }
+}
+
+/// <summary>
+/// Explicit issuance of one stable relationship grant.
+/// </summary>
+public sealed record IssueRelationshipGrantProposal : RelationshipPolicyChangeProposal
+{
+    /// <summary>
+    /// Creates one validated grant issuance proposal.
+    /// </summary>
+    public IssueRelationshipGrantProposal(
+        RelationshipGrantId id,
+        PrincipalId issuerPrincipalId,
+        PrincipalId holderPrincipalId,
+        RelationshipGrantKind kind,
+        StandingBand minimumStandingBand,
+        RelationshipPolicyChangeReason reason)
+        : base(reason)
+    {
+        InitialRelationshipGrantSetup.ValidateGrantValues(
+            id,
+            issuerPrincipalId,
+            holderPrincipalId,
+            kind,
+            minimumStandingBand);
+        Id = id;
+        IssuerPrincipalId = issuerPrincipalId;
+        HolderPrincipalId = holderPrincipalId;
+        Kind = kind;
+        MinimumStandingBand = minimumStandingBand;
+    }
+
+    public RelationshipGrantId Id { get; }
+
+    public PrincipalId IssuerPrincipalId { get; }
+
+    public PrincipalId HolderPrincipalId { get; }
+
+    public RelationshipGrantKind Kind { get; }
+
+    public StandingBand MinimumStandingBand { get; }
+}
+
+/// <summary>
+/// Explicit revocation of one previously issued relationship grant.
+/// </summary>
+public sealed record RevokeRelationshipGrantProposal : RelationshipPolicyChangeProposal
+{
+    /// <summary>
+    /// Creates one validated grant revocation proposal.
+    /// </summary>
+    public RevokeRelationshipGrantProposal(
+        RelationshipGrantId id,
+        RelationshipPolicyChangeReason reason)
+        : base(reason)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(id.Value);
+        Id = id;
+    }
+
+    public RelationshipGrantId Id { get; }
+}
+
+/// <summary>
+/// One immutable idempotent delivery of diplomacy and grant effects.
+/// </summary>
+public sealed record RelationshipPolicyChangeBatch
+{
+    /// <summary>
+    /// Copies a non-empty proposal batch without retaining caller mutation.
+    /// </summary>
+    public RelationshipPolicyChangeBatch(
+        RelationshipPolicyChangeBatchId id,
+        IEnumerable<RelationshipPolicyChangeProposal> proposals)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(id.Value);
+        ArgumentNullException.ThrowIfNull(proposals);
+        RelationshipPolicyChangeProposal[] values = proposals.ToArray();
+        if (values.Length == 0)
+        {
+            throw new ArgumentException("A relationship policy batch requires proposals.", nameof(proposals));
+        }
+
+        foreach (RelationshipPolicyChangeProposal proposal in values)
+        {
+            ArgumentNullException.ThrowIfNull(proposal);
+        }
+
+        Id = id;
+        Proposals = new ReadOnlyCollection<RelationshipPolicyChangeProposal>(values);
+    }
+
+    public RelationshipPolicyChangeBatchId Id { get; }
+
+    public IReadOnlyList<RelationshipPolicyChangeProposal> Proposals { get; }
+}
+
+/// <summary>
+/// Typed reason that prevents a diplomacy and grant batch from committing.
+/// </summary>
+public enum RelationshipPolicyChangeRejectionReason
+{
+    UnknownPrincipal,
+    DuplicateDiplomaticAssignment,
+    DuplicateGrantAssignment,
+    GrantIdentityAlreadyExists,
+    UnknownGrant,
+    GrantAlreadyRevoked,
+    StandingRequirementNotMet,
+    BatchIdentityConflict,
+    FactSequenceExhausted,
+}
+
+/// <summary>
+/// Prepared result for one mutual diplomatic assignment.
+/// </summary>
+public sealed record DiplomaticConditionChangeOutcome
+{
+    /// <summary>
+    /// Creates one validated canonical diplomatic outcome.
+    /// </summary>
+    public DiplomaticConditionChangeOutcome(
+        PrincipalId lowerPrincipalId,
+        PrincipalId upperPrincipalId,
+        DiplomaticCondition priorCondition,
+        DiplomaticCondition resultingCondition,
+        RelationshipPolicyChangeReason reason)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(lowerPrincipalId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(upperPrincipalId.Value);
+        if (lowerPrincipalId.Value >= upperPrincipalId.Value)
+        {
+            throw new ArgumentException("A diplomatic outcome requires a canonical pair.");
+        }
+
+        if (!Enum.IsDefined(priorCondition))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(priorCondition),
+                priorCondition,
+                "Unknown prior diplomatic condition.");
+        }
+
+        if (!Enum.IsDefined(resultingCondition))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(resultingCondition),
+                resultingCondition,
+                "Unknown resulting diplomatic condition.");
+        }
+
+        if (!Enum.IsDefined(reason))
+        {
+            throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unknown reason.");
+        }
+
+        LowerPrincipalId = lowerPrincipalId;
+        UpperPrincipalId = upperPrincipalId;
+        PriorCondition = priorCondition;
+        ResultingCondition = resultingCondition;
+        Reason = reason;
+    }
+
+    public PrincipalId LowerPrincipalId { get; }
+
+    public PrincipalId UpperPrincipalId { get; }
+
+    public DiplomaticCondition PriorCondition { get; }
+
+    public DiplomaticCondition ResultingCondition { get; }
+
+    public RelationshipPolicyChangeReason Reason { get; }
+
+    public bool Changed => PriorCondition != ResultingCondition;
+}
+
+/// <summary>
+/// Prepared result for one relationship grant state transition.
+/// </summary>
+public sealed record RelationshipGrantChangeOutcome
+{
+    /// <summary>
+    /// Creates one validated grant issuance or revocation outcome.
+    /// </summary>
+    public RelationshipGrantChangeOutcome(
+        RelationshipGrantId id,
+        PrincipalId issuerPrincipalId,
+        PrincipalId holderPrincipalId,
+        RelationshipGrantKind kind,
+        StandingBand minimumStandingBand,
+        bool priorIssued,
+        bool resultingIssued,
+        RelationshipPolicyChangeReason reason)
+    {
+        InitialRelationshipGrantSetup.ValidateGrantValues(
+            id,
+            issuerPrincipalId,
+            holderPrincipalId,
+            kind,
+            minimumStandingBand);
+        if (priorIssued == resultingIssued)
+        {
+            throw new ArgumentException("A grant outcome requires a state transition.");
+        }
+
+        if (!Enum.IsDefined(reason))
+        {
+            throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unknown reason.");
+        }
+
+        Id = id;
+        IssuerPrincipalId = issuerPrincipalId;
+        HolderPrincipalId = holderPrincipalId;
+        Kind = kind;
+        MinimumStandingBand = minimumStandingBand;
+        PriorIssued = priorIssued;
+        ResultingIssued = resultingIssued;
+        Reason = reason;
+    }
+
+    public RelationshipGrantId Id { get; }
+
+    public PrincipalId IssuerPrincipalId { get; }
+
+    public PrincipalId HolderPrincipalId { get; }
+
+    public RelationshipGrantKind Kind { get; }
+
+    public StandingBand MinimumStandingBand { get; }
+
+    public bool PriorIssued { get; }
+
+    public bool ResultingIssued { get; }
+
+    public RelationshipPolicyChangeReason Reason { get; }
+
+    public bool Changed => PriorIssued != ResultingIssued;
+}
+
+/// <summary>
+/// Idempotent outcome of one diplomacy and grant change batch.
+/// </summary>
+public abstract record RelationshipPolicyChangeBatchResult
+{
+    private RelationshipPolicyChangeBatchResult()
+    {
+    }
+
+    public sealed record Applied(
+        RelationshipPolicyChangeBatchId BatchId,
+        IReadOnlyList<DiplomaticConditionChangeOutcome> DiplomaticOutcomes,
+        IReadOnlyList<RelationshipGrantChangeOutcome> GrantOutcomes)
+        : RelationshipPolicyChangeBatchResult;
+
+    public sealed record Rejected(
+        RelationshipPolicyChangeBatchId BatchId,
+        RelationshipPolicyChangeRejectionReason Reason)
+        : RelationshipPolicyChangeBatchResult;
+}
+
+/// <summary>
 /// Validated immutable relationship input for one clean game session.
 /// </summary>
 public sealed class RelationshipSetup
@@ -535,11 +1060,28 @@ public sealed class RelationshipSetup
         PrincipalId playerPrincipalId,
         StandingPolicy standingPolicy,
         IEnumerable<InitialStandingSetup> standings)
+        : this(principals, playerPrincipalId, standingPolicy, standings, [], [])
+    {
+    }
+
+    /// <summary>
+    /// Validates and canonicalizes complete principal, standing, diplomacy, and
+    /// initial issued-grant state.
+    /// </summary>
+    public RelationshipSetup(
+        IEnumerable<PrincipalDefinition> principals,
+        PrincipalId playerPrincipalId,
+        StandingPolicy standingPolicy,
+        IEnumerable<InitialStandingSetup> standings,
+        IEnumerable<InitialDiplomaticConditionSetup> diplomaticConditions,
+        IEnumerable<InitialRelationshipGrantSetup> grants)
     {
         ArgumentNullException.ThrowIfNull(principals);
         ArgumentOutOfRangeException.ThrowIfZero(playerPrincipalId.Value);
         ArgumentNullException.ThrowIfNull(standingPolicy);
         ArgumentNullException.ThrowIfNull(standings);
+        ArgumentNullException.ThrowIfNull(diplomaticConditions);
+        ArgumentNullException.ThrowIfNull(grants);
 
         PrincipalDefinition[] principalValues = principals.ToArray();
         foreach (PrincipalDefinition principal in principalValues)
@@ -623,10 +1165,88 @@ public sealed class RelationshipSetup
             }
         }
 
+        InitialDiplomaticConditionSetup[] diplomaticValues = diplomaticConditions.ToArray();
+        foreach (InitialDiplomaticConditionSetup diplomatic in diplomaticValues)
+        {
+            ArgumentNullException.ThrowIfNull(diplomatic);
+        }
+
+        Array.Sort(
+            diplomaticValues,
+            (left, right) =>
+            {
+                int lower = left.LowerPrincipalId.Value.CompareTo(
+                    right.LowerPrincipalId.Value);
+                return lower != 0
+                    ? lower
+                    : left.UpperPrincipalId.Value.CompareTo(right.UpperPrincipalId.Value);
+            });
+        var diplomaticKeys = new HashSet<(PrincipalId Lower, PrincipalId Upper)>();
+        foreach (InitialDiplomaticConditionSetup diplomatic in diplomaticValues)
+        {
+            if (!principalIds.Contains(diplomatic.LowerPrincipalId)
+                || !principalIds.Contains(diplomatic.UpperPrincipalId))
+            {
+                throw new ArgumentException(
+                    "Initial diplomacy references an unknown principal.",
+                    nameof(diplomaticConditions));
+            }
+
+            if (!diplomaticKeys.Add((
+                    diplomatic.LowerPrincipalId,
+                    diplomatic.UpperPrincipalId)))
+            {
+                throw new ArgumentException(
+                    "Duplicate initial diplomatic pair.",
+                    nameof(diplomaticConditions));
+            }
+        }
+
+        InitialRelationshipGrantSetup[] grantValues = grants.ToArray();
+        foreach (InitialRelationshipGrantSetup grant in grantValues)
+        {
+            ArgumentNullException.ThrowIfNull(grant);
+        }
+
+        Array.Sort(grantValues, (left, right) => left.Id.Value.CompareTo(right.Id.Value));
+        var grantIds = new HashSet<RelationshipGrantId>();
+        foreach (InitialRelationshipGrantSetup grant in grantValues)
+        {
+            if (!principalIds.Contains(grant.IssuerPrincipalId)
+                || !principalIds.Contains(grant.HolderPrincipalId))
+            {
+                throw new ArgumentException(
+                    "Initial relationship grant references an unknown principal.",
+                    nameof(grants));
+            }
+
+            if (!grantIds.Add(grant.Id))
+            {
+                throw new ArgumentException(
+                    $"Duplicate initial relationship grant {grant.Id.Value}.",
+                    nameof(grants));
+            }
+
+            StandingValue issuerStanding = standingValues
+                .Where(value => value.AssessingPrincipalId == grant.IssuerPrincipalId
+                    && value.SubjectPrincipalId == grant.HolderPrincipalId)
+                .Select(value => value.Value)
+                .SingleOrDefault(standingPolicy.Initial);
+            if (standingPolicy.GetBand(issuerStanding) < grant.MinimumStandingBand)
+            {
+                throw new ArgumentException(
+                    "Initial relationship grant standing requirement is not met.",
+                    nameof(grants));
+            }
+        }
+
         Principals = new ReadOnlyCollection<PrincipalDefinition>(principalValues);
         PlayerPrincipalId = playerPrincipalId;
         StandingPolicy = standingPolicy;
         Standings = new ReadOnlyCollection<InitialStandingSetup>(standingValues);
+        DiplomaticConditions = new ReadOnlyCollection<InitialDiplomaticConditionSetup>(
+            diplomaticValues);
+        Grants = new ReadOnlyCollection<InitialRelationshipGrantSetup>(grantValues);
     }
 
     public IReadOnlyList<PrincipalDefinition> Principals { get; }
@@ -636,6 +1256,10 @@ public sealed class RelationshipSetup
     public StandingPolicy StandingPolicy { get; }
 
     public IReadOnlyList<InitialStandingSetup> Standings { get; }
+
+    public IReadOnlyList<InitialDiplomaticConditionSetup> DiplomaticConditions { get; }
+
+    public IReadOnlyList<InitialRelationshipGrantSetup> Grants { get; }
 }
 
 /// <summary>
@@ -656,13 +1280,35 @@ public sealed record StandingSnapshot(
     StandingBand Band);
 
 /// <summary>
+/// Immutable mutual diplomatic condition for one canonical principal pair.
+/// </summary>
+public sealed record DiplomaticConditionSnapshot(
+    PrincipalId LowerPrincipalId,
+    PrincipalId UpperPrincipalId,
+    DiplomaticCondition Condition);
+
+/// <summary>
+/// Immutable explicit grant state and its standing-dependent effectiveness.
+/// </summary>
+public sealed record RelationshipGrantSnapshot(
+    RelationshipGrantId Id,
+    PrincipalId IssuerPrincipalId,
+    PrincipalId HolderPrincipalId,
+    RelationshipGrantKind Kind,
+    StandingBand MinimumStandingBand,
+    bool IsIssued,
+    bool IsEffective);
+
+/// <summary>
 /// Complete authoritative relationship diagnostics at one commit boundary.
 /// </summary>
 public sealed record RelationshipSnapshot(
     PrincipalId PlayerPrincipalId,
     StandingPolicyId StandingPolicyId,
     IReadOnlyList<PrincipalSnapshot> Principals,
-    IReadOnlyList<StandingSnapshot> Standings);
+    IReadOnlyList<StandingSnapshot> Standings,
+    IReadOnlyList<DiplomaticConditionSnapshot> DiplomaticConditions,
+    IReadOnlyList<RelationshipGrantSnapshot> Grants);
 
 /// <summary>
 /// Deterministic owner of principal identity and directional standing state.
@@ -674,8 +1320,13 @@ internal sealed class RelationshipOwner
     private readonly Dictionary<(PrincipalId Assessing, PrincipalId Subject), StandingValue>
         _standingOverrides;
     private readonly StandingPolicy _standingPolicy;
+    private readonly Dictionary<(PrincipalId Lower, PrincipalId Upper), DiplomaticCondition>
+        _diplomaticConditions;
+    private readonly Dictionary<RelationshipGrantId, RelationshipGrantState> _grants;
     private readonly Dictionary<StandingChangeBatchId, CommittedStandingBatch>
         _committedStandingBatches = [];
+    private readonly Dictionary<RelationshipPolicyChangeBatchId, CommittedRelationshipPolicyBatch>
+        _committedPolicyBatches = [];
 
     /// <summary>
     /// Copies canonical setup state into the authoritative runtime owner.
@@ -693,6 +1344,18 @@ internal sealed class RelationshipOwner
                 standing.AssessingPrincipalId,
                 standing.SubjectPrincipalId),
             standing => standing.Value);
+        _diplomaticConditions = setup.DiplomaticConditions.ToDictionary(
+            value => (value.LowerPrincipalId, value.UpperPrincipalId),
+            value => value.Condition);
+        _grants = setup.Grants.ToDictionary(
+            grant => grant.Id,
+            grant => new RelationshipGrantState(
+                grant.Id,
+                grant.IssuerPrincipalId,
+                grant.HolderPrincipalId,
+                grant.Kind,
+                grant.MinimumStandingBand,
+                IsIssued: true));
         PlayerPrincipalId = setup.PlayerPrincipalId;
     }
 
@@ -829,12 +1492,238 @@ internal sealed class RelationshipOwner
     }
 
     /// <summary>
+    /// Validates and prepares diplomacy and grant changes without mutation.
+    /// </summary>
+    internal RelationshipPolicyChangePreparation PreparePolicyChanges(
+        RelationshipPolicyChangeBatch batch)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        RelationshipPolicyChangeProposal[] ordered = batch.Proposals
+            .OrderBy(ProposalPrimaryIdentity)
+            .ThenBy(ProposalSecondaryIdentity)
+            .ThenBy(ProposalKindOrder)
+            .ThenBy(ProposalGrantIdentity)
+            .ToArray();
+        if (_committedPolicyBatches.TryGetValue(
+                batch.Id,
+                out CommittedRelationshipPolicyBatch? prior))
+        {
+            return prior.Proposals.SequenceEqual(ordered)
+                ? new RelationshipPolicyChangePreparation.Resolved(prior.Result)
+                : PolicyRejection(
+                    batch.Id,
+                    RelationshipPolicyChangeRejectionReason.BatchIdentityConflict);
+        }
+
+        var diplomaticKeys = new HashSet<(PrincipalId Lower, PrincipalId Upper)>();
+        var grantIds = new HashSet<RelationshipGrantId>();
+        var diplomaticOutcomes = new List<DiplomaticConditionChangeOutcome>();
+        var grantOutcomes = new List<RelationshipGrantChangeOutcome>();
+        foreach (RelationshipPolicyChangeProposal proposal in ordered)
+        {
+            switch (proposal)
+            {
+                case SetDiplomaticConditionProposal diplomatic:
+                    if (!PrincipalsExist(
+                            diplomatic.LowerPrincipalId,
+                            diplomatic.UpperPrincipalId))
+                    {
+                        return PolicyRejection(
+                            batch.Id,
+                            RelationshipPolicyChangeRejectionReason.UnknownPrincipal);
+                    }
+
+                    if (!diplomaticKeys.Add((
+                            diplomatic.LowerPrincipalId,
+                            diplomatic.UpperPrincipalId)))
+                    {
+                        return PolicyRejection(
+                            batch.Id,
+                            RelationshipPolicyChangeRejectionReason
+                                .DuplicateDiplomaticAssignment);
+                    }
+
+                    diplomaticOutcomes.Add(new DiplomaticConditionChangeOutcome(
+                        diplomatic.LowerPrincipalId,
+                        diplomatic.UpperPrincipalId,
+                        GetDiplomaticCondition(
+                            diplomatic.LowerPrincipalId,
+                            diplomatic.UpperPrincipalId),
+                        diplomatic.Condition,
+                        diplomatic.Reason));
+                    break;
+
+                case IssueRelationshipGrantProposal issue:
+                    if (!PrincipalsExist(issue.IssuerPrincipalId, issue.HolderPrincipalId))
+                    {
+                        return PolicyRejection(
+                            batch.Id,
+                            RelationshipPolicyChangeRejectionReason.UnknownPrincipal);
+                    }
+
+                    if (!grantIds.Add(issue.Id))
+                    {
+                        return PolicyRejection(
+                            batch.Id,
+                            RelationshipPolicyChangeRejectionReason.DuplicateGrantAssignment);
+                    }
+
+                    if (_grants.ContainsKey(issue.Id))
+                    {
+                        return PolicyRejection(
+                            batch.Id,
+                            RelationshipPolicyChangeRejectionReason.GrantIdentityAlreadyExists);
+                    }
+
+                    if (GetStandingBand(issue.IssuerPrincipalId, issue.HolderPrincipalId)
+                        < issue.MinimumStandingBand)
+                    {
+                        return PolicyRejection(
+                            batch.Id,
+                            RelationshipPolicyChangeRejectionReason
+                                .StandingRequirementNotMet);
+                    }
+
+                    grantOutcomes.Add(new RelationshipGrantChangeOutcome(
+                        issue.Id,
+                        issue.IssuerPrincipalId,
+                        issue.HolderPrincipalId,
+                        issue.Kind,
+                        issue.MinimumStandingBand,
+                        priorIssued: false,
+                        resultingIssued: true,
+                        issue.Reason));
+                    break;
+
+                case RevokeRelationshipGrantProposal revoke:
+                    if (!grantIds.Add(revoke.Id))
+                    {
+                        return PolicyRejection(
+                            batch.Id,
+                            RelationshipPolicyChangeRejectionReason.DuplicateGrantAssignment);
+                    }
+
+                    if (!_grants.TryGetValue(revoke.Id, out RelationshipGrantState? grant))
+                    {
+                        return PolicyRejection(
+                            batch.Id,
+                            RelationshipPolicyChangeRejectionReason.UnknownGrant);
+                    }
+
+                    if (!grant.IsIssued)
+                    {
+                        return PolicyRejection(
+                            batch.Id,
+                            RelationshipPolicyChangeRejectionReason.GrantAlreadyRevoked);
+                    }
+
+                    grantOutcomes.Add(new RelationshipGrantChangeOutcome(
+                        grant.Id,
+                        grant.IssuerPrincipalId,
+                        grant.HolderPrincipalId,
+                        grant.Kind,
+                        grant.MinimumStandingBand,
+                        priorIssued: true,
+                        resultingIssued: false,
+                        revoke.Reason));
+                    break;
+
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported relationship policy proposal {proposal.GetType().Name}.");
+            }
+        }
+
+        var result = new RelationshipPolicyChangeBatchResult.Applied(
+            batch.Id,
+            GameSnapshotCollection.Copy(diplomaticOutcomes),
+            GameSnapshotCollection.Copy(grantOutcomes));
+        return new RelationshipPolicyChangePreparation.Prepared(
+            new PreparedRelationshipPolicyChange(batch.Id, ordered, result));
+    }
+
+    /// <summary>
+    /// Applies an already validated diplomacy and grant preparation and records
+    /// its idempotent receipt.
+    /// </summary>
+    internal RelationshipPolicyChangeBatchResult ApplyPolicyChanges(
+        PreparedRelationshipPolicyChange prepared)
+    {
+        ArgumentNullException.ThrowIfNull(prepared);
+        foreach (DiplomaticConditionChangeOutcome outcome in
+                 prepared.Result.DiplomaticOutcomes.Where(value => value.Changed))
+        {
+            var key = (outcome.LowerPrincipalId, outcome.UpperPrincipalId);
+            if (outcome.ResultingCondition == DiplomaticCondition.Peace)
+            {
+                _diplomaticConditions.Remove(key);
+            }
+            else
+            {
+                _diplomaticConditions[key] = outcome.ResultingCondition;
+            }
+        }
+
+        foreach (RelationshipGrantChangeOutcome outcome in prepared.Result.GrantOutcomes)
+        {
+            _grants[outcome.Id] = new RelationshipGrantState(
+                outcome.Id,
+                outcome.IssuerPrincipalId,
+                outcome.HolderPrincipalId,
+                outcome.Kind,
+                outcome.MinimumStandingBand,
+                outcome.ResultingIssued);
+        }
+
+        _committedPolicyBatches.Add(
+            prepared.BatchId,
+            new CommittedRelationshipPolicyBatch(prepared.Proposals, prepared.Result));
+        return prepared.Result;
+    }
+
+    /// <summary>
+    /// Returns the mutual condition for a registered, distinct principal pair.
+    /// </summary>
+    internal DiplomaticCondition GetDiplomaticCondition(
+        PrincipalId firstPrincipalId,
+        PrincipalId secondPrincipalId)
+    {
+        ValidateKnownDistinctPrincipals(firstPrincipalId, secondPrincipalId);
+        (PrincipalId lower, PrincipalId upper) = firstPrincipalId.Value < secondPrincipalId.Value
+            ? (firstPrincipalId, secondPrincipalId)
+            : (secondPrincipalId, firstPrincipalId);
+        return _diplomaticConditions.GetValueOrDefault(
+            (lower, upper),
+            DiplomaticCondition.Peace);
+    }
+
+    /// <summary>
+    /// Reports whether any matching issued grant currently satisfies its
+    /// issuer-to-holder standing requirement.
+    /// </summary>
+    internal bool HasEffectiveGrant(
+        PrincipalId issuerPrincipalId,
+        PrincipalId holderPrincipalId,
+        RelationshipGrantKind kind)
+    {
+        ValidateKnownDistinctPrincipals(issuerPrincipalId, holderPrincipalId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind.Value);
+        return _grants.Values.Any(grant =>
+            grant.IssuerPrincipalId == issuerPrincipalId
+            && grant.HolderPrincipalId == holderPrincipalId
+            && grant.Kind == kind
+            && IsEffective(grant));
+    }
+
+    /// <summary>
     /// Resolves the complete directional matrix in stable principal order.
     /// </summary>
     internal RelationshipSnapshot CaptureSnapshot()
     {
         var standings = new List<StandingSnapshot>(
             checked(_principals.Count * Math.Max(0, _principals.Count - 1)));
+        var diplomaticConditions = new List<DiplomaticConditionSnapshot>(
+            checked(_principals.Count * Math.Max(0, _principals.Count - 1) / 2));
         foreach (PrincipalDefinition assessing in _principals)
         {
             foreach (PrincipalDefinition subject in _principals)
@@ -850,6 +1739,13 @@ internal sealed class RelationshipOwner
                     subject.Id,
                     value,
                     _standingPolicy.GetBand(value)));
+                if (assessing.Id.Value < subject.Id.Value)
+                {
+                    diplomaticConditions.Add(new DiplomaticConditionSnapshot(
+                        assessing.Id,
+                        subject.Id,
+                        GetDiplomaticCondition(assessing.Id, subject.Id)));
+                }
             }
         }
 
@@ -861,7 +1757,18 @@ internal sealed class RelationshipOwner
                     principal.Id,
                     principal.ContentId,
                     principal.Name))),
-            GameSnapshotCollection.Copy(standings));
+            GameSnapshotCollection.Copy(standings),
+            GameSnapshotCollection.Copy(diplomaticConditions),
+            GameSnapshotCollection.Copy(_grants.Values
+                .OrderBy(grant => grant.Id.Value)
+                .Select(grant => new RelationshipGrantSnapshot(
+                    grant.Id,
+                    grant.IssuerPrincipalId,
+                    grant.HolderPrincipalId,
+                    grant.Kind,
+                    grant.MinimumStandingBand,
+                    grant.IsIssued,
+                    IsEffective(grant)))));
     }
 
     private StandingValue GetStanding(
@@ -871,10 +1778,99 @@ internal sealed class RelationshipOwner
             (assessingPrincipalId, subjectPrincipalId),
             _standingPolicy.Initial);
 
+    private StandingBand GetStandingBand(
+        PrincipalId assessingPrincipalId,
+        PrincipalId subjectPrincipalId) =>
+        _standingPolicy.GetBand(GetStanding(assessingPrincipalId, subjectPrincipalId));
+
+    /// <summary>
+    /// Combines persistent issuance with the current directional standing band.
+    /// </summary>
+    private bool IsEffective(RelationshipGrantState grant) =>
+        grant.IsIssued
+        && GetStandingBand(grant.IssuerPrincipalId, grant.HolderPrincipalId)
+            >= grant.MinimumStandingBand;
+
+    /// <summary>
+    /// Reports whether both relationship endpoints are registered.
+    /// </summary>
+    private bool PrincipalsExist(PrincipalId first, PrincipalId second) =>
+        _principalIds.Contains(first) && _principalIds.Contains(second);
+
+    /// <summary>
+    /// Enforces the shared endpoint contract for public relationship queries.
+    /// </summary>
+    private void ValidateKnownDistinctPrincipals(PrincipalId first, PrincipalId second)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(first.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(second.Value);
+        if (first == second)
+        {
+            throw new ArgumentException("A relationship query requires distinct principals.");
+        }
+
+        if (!PrincipalsExist(first, second))
+        {
+            throw new ArgumentException("Relationship query references an unknown principal.");
+        }
+    }
+
+    /// <summary>
+    /// Resolves the first stable proposal ordering identity.
+    /// </summary>
+    private static ulong ProposalPrimaryIdentity(RelationshipPolicyChangeProposal proposal) =>
+        proposal switch
+        {
+            SetDiplomaticConditionProposal value => value.LowerPrincipalId.Value,
+            IssueRelationshipGrantProposal value => value.IssuerPrincipalId.Value,
+            RevokeRelationshipGrantProposal => ulong.MaxValue,
+            _ => throw new InvalidOperationException("Unsupported relationship policy proposal."),
+        };
+
+    /// <summary>
+    /// Resolves the second stable proposal ordering identity.
+    /// </summary>
+    private static ulong ProposalSecondaryIdentity(RelationshipPolicyChangeProposal proposal) =>
+        proposal switch
+        {
+            SetDiplomaticConditionProposal value => value.UpperPrincipalId.Value,
+            IssueRelationshipGrantProposal value => value.HolderPrincipalId.Value,
+            RevokeRelationshipGrantProposal => ulong.MaxValue,
+            _ => throw new InvalidOperationException("Unsupported relationship policy proposal."),
+        };
+
+    /// <summary>
+    /// Orders closed proposal variants independently of runtime type metadata.
+    /// </summary>
+    private static int ProposalKindOrder(RelationshipPolicyChangeProposal proposal) =>
+        proposal switch
+        {
+            SetDiplomaticConditionProposal => 0,
+            IssueRelationshipGrantProposal => 1,
+            RevokeRelationshipGrantProposal => 2,
+            _ => throw new InvalidOperationException("Unsupported relationship policy proposal."),
+        };
+
+    /// <summary>
+    /// Resolves the stable grant tie-breaker for proposal ordering.
+    /// </summary>
+    private static ulong ProposalGrantIdentity(RelationshipPolicyChangeProposal proposal) =>
+        proposal switch
+        {
+            IssueRelationshipGrantProposal value => value.Id.Value,
+            RevokeRelationshipGrantProposal value => value.Id.Value,
+            _ => 0,
+        };
+
     private static StandingChangePreparation.Resolved ResolvedRejection(
         StandingChangeBatchId batchId,
         StandingChangeRejectionReason reason) =>
         new(new StandingChangeBatchResult.Rejected(batchId, reason));
+
+    private static RelationshipPolicyChangePreparation.Resolved PolicyRejection(
+        RelationshipPolicyChangeBatchId batchId,
+        RelationshipPolicyChangeRejectionReason reason) =>
+        new(new RelationshipPolicyChangeBatchResult.Rejected(batchId, reason));
 }
 
 internal abstract record StandingChangePreparation
@@ -899,3 +1895,33 @@ internal sealed record PreparedStandingChange(
 internal sealed record CommittedStandingBatch(
     IReadOnlyList<StandingChangeProposal> Proposals,
     StandingChangeBatchResult.Applied Result);
+
+internal abstract record RelationshipPolicyChangePreparation
+{
+    private RelationshipPolicyChangePreparation()
+    {
+    }
+
+    internal sealed record Resolved(RelationshipPolicyChangeBatchResult Result)
+        : RelationshipPolicyChangePreparation;
+
+    internal sealed record Prepared(PreparedRelationshipPolicyChange Value)
+        : RelationshipPolicyChangePreparation;
+}
+
+internal sealed record PreparedRelationshipPolicyChange(
+    RelationshipPolicyChangeBatchId BatchId,
+    IReadOnlyList<RelationshipPolicyChangeProposal> Proposals,
+    RelationshipPolicyChangeBatchResult.Applied Result);
+
+internal sealed record CommittedRelationshipPolicyBatch(
+    IReadOnlyList<RelationshipPolicyChangeProposal> Proposals,
+    RelationshipPolicyChangeBatchResult.Applied Result);
+
+internal sealed record RelationshipGrantState(
+    RelationshipGrantId Id,
+    PrincipalId IssuerPrincipalId,
+    PrincipalId HolderPrincipalId,
+    RelationshipGrantKind Kind,
+    StandingBand MinimumStandingBand,
+    bool IsIssued);
