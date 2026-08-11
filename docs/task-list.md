@@ -13,23 +13,27 @@ rather than deleting them.
 
 ## Current focus
 
-`TASK-012` completed the first shared relational simulation foundation from the
-gameplay model accepted in `TASK-035`. Economic and transport owner integration
-is tracked separately in `TASK-034` and should begin only after those owners
-join the clean `GameSession`.
+`TASK-014` has defined the authoritative save boundary. `TASK-039` is the
+current prerequisite for checkpoint capture and restore: entity removal must
+cancel its exact pending movement events. `TASK-034` remains required before
+supported save or load because construction, economy, and transport must join
+the clean `GameSession` aggregate.
 
 ## Near-term work
 
-- [ ] **TASK-014: Define the authoritative save boundary**
-  - Inventory all state required for save and load.
-  - Include simulation time, pending agenda, creation sequences, random state,
-    system topology, spatial and motion state, controllers, orders, generations,
-    objectives, and script or dialogue progress.
-  - Incorporate the complete relationship state, source-scoped committed batch
-    receipts, direct atomic restoration requirement, and non-authoritative
-    exclusions recorded by `TASK-012`.
-  - Defer the final serialization format until the state boundary is tested.
-  - Context: [Relational simulation architecture § Authoritative relationship save inventory](relational-simulation-architecture.md#authoritative-relationship-save-inventory)
+- [ ] **TASK-039: Cancel removed-entity movement events from the agenda**
+  - Retain the scheduled `EventKey` on active local motion and connector
+    transit, then prepare, revalidate, and cancel the exact events during
+    entity removal in ascending key order.
+  - Add narrow non-allocating agenda lookup and cancellation operations that
+    verify the key, generation, and movement identity without consuming a
+    creation sequence. An unexpected post-prepare mismatch poisons the session
+    and its health gate prevents further simulation or saving.
+  - Preserve ordinary stale-generation behavior for live actors, but leave no
+    removed-entity movement event in the pending agenda. Add focused
+    cancellation, fault-injection, and continuation tests before implementing
+    checkpoint capture and restore.
+  - Context: [Authoritative save boundary](authoritative-save-boundary.md#agenda-cancellation-for-entity-removal) · [Entity lifecycle and explicit spawning](entity-lifecycle.md)
 
 ## Future parking lot
 
@@ -173,6 +177,9 @@ prerequisites and desired behavior are sufficiently defined.
 - [ ] **TASK-034: Integrate clean-session economy and transport with entity lifecycle**
   - Begin only after reusable economic and transport owners join the clean
     `GameSession`; do not pull acceptance-only Phase 1 ownership into production.
+  - Make construction, economy, and transport state part of the session's
+    atomic aggregate so `TASK-014` can support save and load without an
+    externally supplied authoritative workflow owner.
   - Add owner-provided prepare and release operations for jobs, reservations,
     capacity commitments, and scheduled work that reference a removed ship or
     cargo inventory.
@@ -194,6 +201,20 @@ prerequisites and desired behavior are sufficiently defined.
   - Context: [Relational gameplay model](factions.md)
 
 ## Completed foundations
+
+- [x] **TASK-014: Define the authoritative save boundary**
+  - Defined complete authoritative checkpoint inventory, completed-commit
+    capture timing, source-health admission, private direct restoration, and
+    non-authoritative exclusions.
+  - Defined aggregate admission: supported saves and loads remain blocked until
+    `TASK-034` brings construction, economy, and transport into the clean
+    `GameSession` aggregate. `TASK-039` must cancel removed-entity movement
+    events before checkpoint capture and restore implementation.
+  - Save encoding and versioning remain in `TASK-022`; versioned content
+    catalogs and saved content-reference migration remain in `TASK-037`.
+    Future domain owners must supply their own authoritative sections before
+    they participate in a supported saved session.
+  - Context: [Authoritative save boundary](authoritative-save-boundary.md) · [Relational simulation architecture § Authoritative relationship save inventory](relational-simulation-architecture.md#authoritative-relationship-save-inventory)
 
 - [x] **TASK-013: Define pause, speed, and input timing**
   - Defined quiescent input boundaries, immediate paused command commit,

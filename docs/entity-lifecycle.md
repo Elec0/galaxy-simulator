@@ -29,9 +29,9 @@ stable facility-order batching, complete component publication, committed
 identity receipts, and rejection atomicity. `PhaseOneShipMaterializer` remains
 acceptance-only. Clean-session removal now invalidates active, queued, and
 suspended entity-target orders, cancels affected local motion, removes every
-live ship owner with entity publication removed last, rejects reserved cargo,
-records `EntityRemovedFact`, and leaves scheduled activity as deterministic
-missing-reference work. Construction commits now record one idempotent
+live ship owner with entity publication removed last and rejects reserved cargo.
+It records `EntityRemovedFact`; `TASK-039` will require exact movement-event
+cancellation before removal. Construction commits now record one idempotent
 `EntityMaterializedFact` in stable batch order, preserving the originating
 scheduled-event key when present. Integration with future clean-session
 economic and transport owners is tracked separately in `TASK-034`.
@@ -111,11 +111,13 @@ last. The single-thread reference runtime does not interleave commands, events,
 reconciliation, or snapshots with this apply interval.
 
 An unexpected exception during apply poisons the session and it cannot continue
-or be saved as a valid session. Expected duplicate, missing-reference, capacity,
-and stale-request outcomes must be found during prepare and returned as typed
-results, not thrown after partial mutation. Focused fault-injection tests must
-prove that every expected rejection leaves all owners and ID sequences
-unchanged.
+or be saved as a valid session. The aggregate health gate is permanently
+unhealthy after that failure and rejects advancement, commands, and checkpoint
+capture; poison state is never checkpoint data because no checkpoint may exist.
+Expected duplicate, missing-reference, capacity, and stale-request outcomes
+must be found during prepare and returned as typed results, not thrown after
+partial mutation. Focused fault-injection tests must prove that every expected
+rejection leaves all owners and ID sequences unchanged.
 
 ## Identity and lifetime
 
@@ -245,8 +247,11 @@ The deterministic removal sequence is:
    destination is the removed entity, using `TargetRemoved`. Cancel an affected
    actor's current physical plan and allow its order owner to promote ordinary
    queued work using the existing order rules.
-5. Invalidate local-motion and connector-transit generations. Later events
-   observing the absent actor are deterministic missing-reference no-ops.
+5. Retain and cancel the active local-motion or connector-transit completion
+   by its exact `EventKey`, generation, and movement identity before removing
+   the actor. Ordinary replacement stale events for live actors retain their
+   deterministic no-op behavior; removed actors leave no pending movement
+   completion. `TASK-039` implements this change.
 6. Remove the departing actor's orders and temporary control without promoting
    queued work or restoring suspended work.
 7. Apply cargo disposition. Initial `DiscardCargo` removes unreserved cargo
@@ -270,7 +275,10 @@ inventory commitments. Removal nevertheless rejects a cargo inventory that has
 material or capacity reservations. When those owners join the clean session,
 their prepare and release operations must be inserted before cargo removal;
 `TASK-034` owns that integration without reopening the completed clean-session
-lifecycle foundation.
+lifecycle foundation. The same integration is a prerequisite for supported
+save and load: the current public materialization operation also receives an
+external `ConstructionProcess`, so `GameSession` is not yet a complete
+checkpoint aggregate.
 
 ## Facts, snapshots, and commands
 
