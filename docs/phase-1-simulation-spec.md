@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Phase 1 proves that a deterministic, headless physical economy can acquire resources, transport them through a production chain, construct a ship, expose the causes of shortages, and recover after a disruption.
+Phase 1 proves that a deterministic, headless physical economy can acquire resources, transport them through a production chain, construct a ship, and expose the causes of shortages.
 
 This specification intentionally excludes systems that are not required to test that loop.
 
@@ -211,12 +211,6 @@ inventory fingerprints include configured capacity, so different constructed
 designs cannot collapse to the same state solely because their current cargo
 and locations happen to match.
 
-## Disruption test
-
-The approved fixture disables Mine-to-Refinery travel at 50 simulated seconds and restores it at 250 seconds. A ship already traversing the route completes that leg, while later logistics decisions cannot use the disabled direction. The run exposes the resulting unmet-input shortage before restoration and constructs the ship later than the uninterrupted baseline.
-
-Restoring the route should allow outstanding logistics and production to recover without spawning replacement materials or resetting the scenario.
-
 ## Acceptance criteria
 
 Phase 1 is complete when:
@@ -224,8 +218,6 @@ Phase 1 is complete when:
 - The scenario runs for a configured duration without invariant violations.
 - Materials pass through every production stage.
 - At least one ship is constructed solely from acquired and transported inputs.
-- A disabled route causes an explainable shortage and construction delay.
-- Restoring the route permits recovery and eventual construction.
 - Identical runs produce identical final-state and event-log digests.
 - The runner emits the required metrics and decision records.
 

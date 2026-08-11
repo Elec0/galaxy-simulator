@@ -22,9 +22,9 @@ public sealed class PhaseOneScenarioTests
         Assert.Equal(2, report.StartingShipCount);
         Assert.Equal(3, report.EndingShipCount);
         Assert.Equal<ulong>(675_400, report.EndTime.Milliseconds);
-        Assert.Equal<ulong>(46, report.EventsProcessed);
-        Assert.Equal<ulong>(0x4a648f666a817742, report.EventLogDigest);
-        Assert.Equal<ulong>(0x00755abadb989375, report.FinalStateDigest);
+        Assert.Equal<ulong>(45, report.EventsProcessed);
+        Assert.Equal<ulong>(0x175eac5bd99a0695, report.EventLogDigest);
+        Assert.Equal<ulong>(0x424bec2061b0e8f9, report.FinalStateDigest);
         Assert.True(report.Metrics.TransportJobsCreated >= report.Metrics.TransportJobsCompleted);
         Assert.True(report.Metrics.TransportJobsCompleted > 0);
         Assert.Equal<ulong>(0, report.Metrics.TransportJobsFailed);
@@ -38,32 +38,6 @@ public sealed class PhaseOneScenarioTests
             record.Kind is ScenarioEventKind.ConstructionComplete);
         Assert.Contains(scenario.DecisionRecords, record =>
             record.Reason == DecisionReason.HighestRankedReachableTransport);
-    }
-
-    [Fact]
-    public void ApprovedDisruptionDelaysThenRecoversShipConstruction()
-    {
-        var baseline = new PhaseOneScenario();
-        PhaseOneReport baselineReport = baseline.RunUntilFirstShip(new SimulationTime(1_000_000));
-        var disrupted = new PhaseOneScenario();
-        disrupted.ScheduleApprovedRouteDisruption();
-
-        PhaseOneReport shortageReport = disrupted.RunUntilFirstShip(new SimulationTime(200_000));
-
-        Assert.Null(shortageReport.ConstructedShipId);
-        Assert.NotEmpty(shortageReport.CurrentShortages);
-        PhaseOneReport disruptedReport = disrupted.RunUntilFirstShip(new SimulationTime(1_000_000));
-        Assert.NotNull(disruptedReport.ConstructedShipId);
-        Assert.True(disruptedReport.EndTime > baselineReport.EndTime);
-        Assert.NotEqual(baselineReport.EventLogDigest, disruptedReport.EventLogDigest);
-        var routeChanges = disrupted.EventRecords
-            .Where(record => record.Kind is ScenarioEventKind.RouteEnabled)
-            .Select(record =>
-            {
-                var route = (ScenarioEventKind.RouteEnabled)record.Kind;
-                return (record.Timestamp.Milliseconds, route.Enabled);
-            });
-        Assert.Equal([(50_000UL, false), (250_000UL, true)], routeChanges);
     }
 
     [Fact]

@@ -158,43 +158,6 @@ public sealed class TransportTests
     }
 
     [Fact]
-    public void DisabledRouteDoesNotInterruptAnActiveLeg()
-    {
-        TransportFixture fixture = CreateFixture();
-        TransportJobId jobId = PublishAndAssign(fixture);
-        var capacityReservationIds = new IdSequence<CapacityReservationId>();
-        var agenda = new EventAgenda<TransportEvent>();
-        TransportTiming timing = CreateTiming();
-        fixture.Board.StartOrRetry(
-            jobId,
-            fixture.Freighter,
-            fixture.Inventories,
-            capacityReservationIds,
-            fixture.Graph,
-            agenda,
-            timing,
-            SimulationTime.Zero);
-        ScheduledEvent<TransportEvent> arrival = Assert.IsType<ScheduledEvent<TransportEvent>>(
-            agenda.PopNextThrough(new SimulationTime(10)));
-        RouteId routeId = Assert.IsType<TransportEvent.Arrive>(arrival.Payload).RouteId;
-        fixture.Graph.SetRouteEnabled(routeId, false);
-
-        ScheduledEventDisposition disposition = fixture.Board.HandleEvent(
-            arrival.Payload,
-            fixture.Freighter,
-            fixture.Inventories,
-            capacityReservationIds,
-            fixture.Graph,
-            agenda,
-            timing,
-            arrival.Key.Timestamp);
-
-        Assert.Equal(ScheduledEventDisposition.Applied, disposition);
-        Assert.Equal(fixture.SourceLocation, fixture.Freighter.LocationId);
-        Assert.Equal(TransportJobStatus.Loading, fixture.Board.GetJob(jobId)?.Status);
-    }
-
-    [Fact]
     public void UnloadingWaitsForThenReservesDestinationCapacity()
     {
         TransportFixture fixture = CreateFixture();

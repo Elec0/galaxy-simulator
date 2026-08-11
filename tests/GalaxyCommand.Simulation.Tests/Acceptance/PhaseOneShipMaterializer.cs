@@ -1,7 +1,7 @@
 namespace GalaxyCommand.Simulation;
 
 /// <summary>
-/// Acceptance-only bridge until TASK-011 supplies production entity lifecycle.
+/// Test-only bridge that materializes the Phase 1 acceptance fixture product.
 /// </summary>
 internal static class PhaseOneShipMaterializer
 {

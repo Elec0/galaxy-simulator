@@ -3,12 +3,12 @@ namespace GalaxyCommand.Simulation;
 internal sealed record PhaseOneFixtureState(
     SimulationWorld World,
     Shipyard Shipyard,
-    RouteId MineToRefineryRoute,
+    ILogisticsNavigation LogisticsNavigation,
     MaterialId[] KnownMaterials);
 
 /// <summary>
-/// Builds the concrete Phase 1 proof-of-concept world without coupling the
-/// simulation engine to that scenario.
+/// Builds the concrete Phase 1 acceptance world without coupling the
+/// production simulation engine to that scenario.
 /// </summary>
 internal static class PhaseOneFixture
 {
@@ -21,11 +21,16 @@ internal static class PhaseOneFixture
         LocationId refineryLocation = setup.AddLocation("Refinery");
         LocationId shipyardLocation = setup.AddLocation("Shipyard");
 
-        (RouteId mineToRefineryRoute, _) = setup.AddBidirectionalRoutes(
+        setup.AddBidirectionalRoutes(
             mineLocation,
             refineryLocation,
             config.RouteDuration);
         setup.AddBidirectionalRoutes(
+            refineryLocation,
+            shipyardLocation,
+            config.RouteDuration);
+        ILogisticsNavigation logisticsNavigation = CreateLogisticsNavigation(
+            mineLocation,
             refineryLocation,
             shipyardLocation,
             config.RouteDuration);
@@ -96,7 +101,68 @@ internal static class PhaseOneFixture
         return new PhaseOneFixtureState(
             setup.Complete(),
             shipyard,
-            mineToRefineryRoute,
+            logisticsNavigation,
             [ore, alloy, components]);
+    }
+
+    private static HierarchicalLogisticsNavigation CreateLogisticsNavigation(
+        LocationId mineLocation,
+        LocationId refineryLocation,
+        LocationId shipyardLocation,
+        SimulationDuration connectorDuration)
+    {
+        SystemPosition mine = Position(1);
+        SystemPosition refinery = Position(2);
+        SystemPosition shipyard = Position(3);
+        var topology = new ConnectorTopology(
+            [
+                new ConnectorEndpoint(new ConnectorEndpointId(1), mine),
+                new ConnectorEndpoint(new ConnectorEndpointId(2), refinery),
+                new ConnectorEndpoint(new ConnectorEndpointId(3), refinery),
+                new ConnectorEndpoint(new ConnectorEndpointId(4), shipyard),
+            ],
+            [
+                new TransitConnection(
+                    new TransitConnectionId(1),
+                    new ConnectorEndpointId(1),
+                    new ConnectorEndpointId(2),
+                    connectorDuration),
+                new TransitConnection(
+                    new TransitConnectionId(2),
+                    new ConnectorEndpointId(2),
+                    new ConnectorEndpointId(1),
+                    connectorDuration),
+                new TransitConnection(
+                    new TransitConnectionId(3),
+                    new ConnectorEndpointId(3),
+                    new ConnectorEndpointId(4),
+                    connectorDuration),
+                new TransitConnection(
+                    new TransitConnectionId(4),
+                    new ConnectorEndpointId(4),
+                    new ConnectorEndpointId(3),
+                    connectorDuration),
+            ]);
+        return new HierarchicalLogisticsNavigation(
+            new Dictionary<LocationId, SystemPosition>
+            {
+                [mineLocation] = mine,
+                [refineryLocation] = refinery,
+                [shipyardLocation] = shipyard,
+            },
+            new HierarchicalNavigationPlanner(
+                topology,
+                new ZeroLocalTravelTimeEstimator()));
+    }
+
+    private static SystemPosition Position(ulong systemId) =>
+        new(new SystemId(systemId), new SpatialPosition());
+
+    private sealed class ZeroLocalTravelTimeEstimator : ILocalTravelTimeEstimator
+    {
+        public SimulationDuration Estimate(
+            ShipId actorId,
+            SystemPosition origin,
+            SystemPosition destination) => SimulationDuration.Zero;
     }
 }

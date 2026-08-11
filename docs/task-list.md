@@ -13,10 +13,11 @@ rather than deleting them.
 
 ## Current focus
 
-`TASK-014` has defined the authoritative save boundary, and `TASK-039` now
-ensures removed entities leave no pending movement completion behind.
-`TASK-034` remains required before supported save or load because construction,
-economy, and transport must join the clean `GameSession` aggregate.
+`TASK-031` is complete. `TASK-034` is now the required clean-session economy
+and transport integration work before supported save or load, because
+construction, economy, and transport must join the `GameSession` aggregate.
+`TASK-014` has defined the authoritative save boundary, and `TASK-039` ensures
+removed entities leave no pending movement completion behind.
 
 ## Near-term work
 
@@ -136,21 +137,12 @@ prerequisites and desired behavior are sufficiently defined.
     allowed to change either before adding mutable connector state.
   - Define replan, wait, wake, failure, command, fact, and snapshot behavior for
     changes before traversal begins and while transit is active.
+  - Restore whole-simulation disruption coverage after this contract is
+    implemented. It must use authoritative connector state, not a Phase 1
+    test-only route-toggle shim.
   - Begin only when a concrete gameplay system can own availability or access;
     faction relationships in `TASK-012` and scripted behavior in `TASK-017`
     may supply those requirements.
-  - Context: [Navigation and spatial architecture](navigation-architecture.md)
-
-- [ ] **TASK-031: Migrate Phase 1 logistics to hierarchical navigation**
-  - Define and approve an explicit mapping from legacy `LocationId` nodes to
-    systems, spatial entities, inventories, facilities, and connector
-    endpoints; do not infer it from the old route graph.
-  - Adapt logistics to request reachability and travel estimates without
-    selecting graph legs itself.
-  - Begin after `TASK-009` establishes orchestration ownership and `TASK-011`
-    establishes the required spatial-entity identities.
-  - Preserve the existing Phase 1 acceptance fingerprints until an explicitly
-    approved fixture migration changes them.
   - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 - [ ] **TASK-032: Define semantic economy facts**
@@ -201,6 +193,23 @@ prerequisites and desired behavior are sufficiently defined.
   - Context: [Relational gameplay model](factions.md)
 
 ## Completed foundations
+
+- [x] **TASK-031: Migrate Phase 1 logistics to hierarchical navigation**
+  - Approved and implemented the explicit Mine, Refinery, and Shipyard mapping
+    to systems, anchored facility and inventory entities, initial ships, and
+    directional connector endpoints. See [Navigation and spatial
+    architecture](navigation-architecture.md#approved-phase-1-acceptance-mapping).
+  - Added opaque `ILogisticsNavigation` reachability and duration estimates.
+    Assignment and transport no longer inspect, retain, or schedule `RouteId`
+    graph legs; the Phase 1 test fixture now uses hierarchical navigation.
+  - The approved fixture migration removes route disruption coverage until
+    `TASK-030` supplies authoritative connector availability. The acceptance
+    baseline is 45 processed events, event digest `175eac5bd99a0695`, and
+    final-state digest `424bec2061b0e8f9`.
+  - Phase 1 remains a test-only whole-simulation acceptance fixture. Its former
+    CLI entrypoint and `baseline.phase-one` benchmark are retired. `TASK-034`
+    owns clean-session economic and transport composition.
+  - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 - [x] **TASK-039: Cancel removed-entity movement events from the agenda**
   - Active local motion and connector transit retain their scheduled completion
@@ -282,7 +291,7 @@ prerequisites and desired behavior are sufficiently defined.
     active, queued, and suspended target invalidation, reserved-cargo rejection,
     stale scheduled-event handling, presentation resolution, and removal facts.
   - Future clean-session economic and transport owner cleanup is tracked in
-    `TASK-034`; legacy spatial migration remains in `TASK-031`.
+    `TASK-034`; legacy spatial migration was completed by `TASK-031`.
   - Context: [Entity lifecycle and explicit spawning](entity-lifecycle.md)
 
 - [x] **TASK-010: Generalize presentation snapshots**
@@ -310,7 +319,8 @@ prerequisites and desired behavior are sufficiently defined.
   - Actor command results, movement, facts, all five canonical benchmark
     digests, and the Phase 1 event/final-state digest remain unchanged.
   - Entity lifecycle completed in `TASK-011`; legacy-location navigation
-    migration and semantic economy facts remain in `TASK-031` and `TASK-032`.
+    migration completed in `TASK-031`, and semantic economy facts remain in
+    `TASK-032`.
   - Context: [Runtime orchestration and domain ownership](runtime-orchestration.md)
 
 - [x] **TASK-001: Define deterministic same-time processing**
@@ -333,8 +343,8 @@ prerequisites and desired behavior are sufficiently defined.
   - `GameSession` accepts and records gameplay commands, advances without a
     fixture milestone stop, captures immutable presentation state, and is the
     boundary used by Godot.
-  - `PhaseOneScenario` remains isolated under `Acceptance/` as a bounded
-    regression harness.
+  - `PhaseOneScenario` remains isolated under the test project's `Acceptance/`
+    directory as a bounded regression harness.
   - Ordered semantic facts were completed by `TASK-008`.
   - Context: [Gameplay integration §1.2, §1.7, and §2.3](gameplay-integration.md#12-there-is-no-general-gameplay-command-boundary)
 
@@ -438,7 +448,7 @@ prerequisites and desired behavior are sufficiently defined.
   - Cancellation and replacement are generation-safe; connector transit is
     non-interruptible, and replacement orders wait and wake on emergence.
   - Runtime connector availability and access remain in `TASK-030`; `TASK-011`
-    completed entity destinations, and Phase 1 migration remains in `TASK-031`.
+    completed entity destinations, and Phase 1 migration completed in `TASK-031`.
   - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 - [x] **DONE-001: Establish the project vision and modular design documents**

@@ -35,7 +35,6 @@ These documents are an early design draft. Names, quantities, formulas, and tech
 The active migration target is a .NET 10 solution containing:
 
 - `GalaxyCommand.Simulation`: the rendering-independent simulation library
-- `GalaxyCommand.Cli`: the headless runner used for development and benchmarks
 - `GalaxyCommand.Simulation.Tests`: deterministic simulation tests
 
 Run the C# verification commands from this directory:
@@ -44,7 +43,6 @@ Run the C# verification commands from this directory:
 dotnet restore GalaxyCommand.slnx
 dotnet build GalaxyCommand.slnx --no-restore
 dotnet test GalaxyCommand.slnx --no-build --no-restore
-dotnet run --project src/GalaxyCommand.Cli/GalaxyCommand.Cli.csproj --no-build --no-restore
 ```
 
 The SDK version is pinned in `global.json`. Shared compiler settings enable
@@ -53,15 +51,8 @@ nullable-reference checking and treat warnings as errors.
 ## Deterministic benchmarks
 
 The dedicated benchmark runner writes human-readable progress to stderr and a
-machine-readable JSON report to stdout. Its default smoke suite runs only the
-small Phase 1 correctness baseline:
-
-```sh
-dotnet run --project benchmarks/GalaxyCommand.Benchmarks/GalaxyCommand.Benchmarks.csproj -- --suite smoke
-```
-
-Heavy reference scenarios never run as part of `dotnet test` and require the
-explicit full-suite option:
+machine-readable JSON report to stdout. Phase 1 is now a test-only acceptance
+fixture, so every remaining benchmark requires the explicit full-suite option:
 
 ```sh
 dotnet run --project benchmarks/GalaxyCommand.Benchmarks/GalaxyCommand.Benchmarks.csproj -- --suite full
@@ -120,10 +111,8 @@ client can also be built and run with:
   --path src/GalaxyCommand.Godot
 ```
 
-The C# CLI runs the integrated Phase 1 scenario through mining, transport,
+The test-only Phase 1 acceptance scenario runs through mining, transport,
 refining, component manufacturing, and construction of a persistent freighter.
-Its report includes material and logistics totals, facility-state timing,
-current shortages, structured record counts, and deterministic event-log and
-final-state fingerprints. The test suite also disables Mine-to-Refinery travel
-at 50 simulated seconds and restores it at 250 seconds to verify shortage
-visibility and recovery.
+It checks material and logistics totals, facility-state timing, current
+shortages, structured records, and deterministic event and final-state
+fingerprints.

@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using GalaxyCommand.Simulation;
-using GalaxyCommand.Simulation.Acceptance;
 
 namespace GalaxyCommand.Benchmarks;
 
@@ -20,7 +19,6 @@ internal static class BenchmarkScenarioFactory
     internal static IBenchmarkScenario Create(string basePreset) =>
         basePreset switch
         {
-            BenchmarkPresets.PhaseOneBaseline => new PhaseOneBenchmarkScenario(),
             BenchmarkPresets.SpatialManyQuiet => new SpatialBenchmarkScenario(),
             BenchmarkPresets.SpatialOneCrowded => new SpatialBenchmarkScenario(),
             BenchmarkPresets.NavigationConnectorVolume =>
@@ -29,29 +27,6 @@ internal static class BenchmarkScenarioFactory
             _ => throw new BenchmarkUsageException(
                 $"Unsupported benchmark base preset '{basePreset}'."),
         };
-}
-
-internal sealed class PhaseOneBenchmarkScenario : IBenchmarkScenario
-{
-    public ScenarioCorrectnessResult Run(ResolvedBenchmarkScenario configuration)
-    {
-        var scenario = new PhaseOneScenario(new PhaseOneConfig
-        {
-            RandomSeed = configuration.GetUInt64(BenchmarkParameterNames.Seed),
-        });
-        PhaseOneReport report = scenario.RunUntilFirstShip(
-            new SimulationTime(configuration.GetUInt64(
-                BenchmarkParameterNames.SimulatedDurationMilliseconds)));
-        return new ScenarioCorrectnessResult(
-            $"{report.EventLogDigest:x16}:{report.FinalStateDigest:x16}",
-            report.EndTime.Milliseconds - report.StartTime.Milliseconds,
-            ScenarioSetup.Counts(
-                ("commands", 0),
-                ("decisions", scenario.DecisionRecords.Count),
-                ("events", checked((long)report.EventsProcessed)),
-                ("facts", 0),
-                ("ships", report.EndingShipCount)));
-    }
 }
 
 internal sealed class SpatialBenchmarkScenario : IBenchmarkScenario

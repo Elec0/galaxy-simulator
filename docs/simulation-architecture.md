@@ -45,26 +45,27 @@ movement, actor control, and active, queued, or suspended ship orders. It
 exposes immutable `GameSnapshot` and diagnostic records without exposing
 mutable state.
 
-`PhaseOneFixture` builds the proof-of-concept economic world.
-`Acceptance/PhaseOneScenario` is a separate bounded regression harness that
-directly composes `EconomicRuntimeSystem`. It retains the approved disruptions,
-first-constructed-ship stopping condition, temporary materialization adapter,
-and exact event and state fingerprints used by headless acceptance tests and
-the CLI. It is intentionally not used by `GameSession` or Godot.
+The test-only `PhaseOneFixture` builds the proof-of-concept economic world.
+`tests/GalaxyCommand.Simulation.Tests/Acceptance/PhaseOneScenario` is a
+separate bounded regression harness that
+directly composes `EconomicRuntimeSystem`. It retains the first-constructed-ship
+stopping condition, temporary materialization adapter, and exact event and
+state fingerprints used by headless acceptance tests. It is
+intentionally not used by `GameSession`, Godot, the CLI, or benchmarks.
 
 ```mermaid
 flowchart LR
     godot["Godot input and presentation"] --> session["GameSession"]
     session --> game["ActorOrderRuntimeCoordinator<br/>orders, topology, and spatial movement"]
-    cli["CLI and acceptance tests"] --> scenario["PhaseOneScenario"]
+    acceptance["Acceptance tests"] --> scenario["PhaseOneScenario"]
     scenario --> economic["EconomicRuntimeSystem<br/>reusable economic dispatch"]
     game --> engine["SimulationEngine"]
     economic --> coordinator["EconomicRuntimeCoordinator<br/>deterministic waves"]
     scenario --> engine
 ```
 
-Additional bounded fixtures belong under `Acceptance/`; they do not define the
-lifecycle or API of a normal game session.
+Additional bounded fixtures belong under the test project's `Acceptance/`
+directory; they do not define the lifecycle or API of a normal game session.
 
 `TASK-009` replaced the combined acceptance runtime with reusable production
 domain owners beneath fixed coordinators. The Phase 1 scenario keeps only its

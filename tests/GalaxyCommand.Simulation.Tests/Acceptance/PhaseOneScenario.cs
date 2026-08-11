@@ -32,7 +32,6 @@ namespace GalaxyCommand.Simulation
         public sealed record ConstructionComplete(
             FacilityId FacilityId,
             ConstructionOrderId OrderId) : ScenarioEventKind;
-        public sealed record RouteEnabled(RouteId RouteId, bool Enabled) : ScenarioEventKind;
     }
 
     public sealed record ScenarioEventRecord(
@@ -137,7 +136,6 @@ namespace GalaxyCommand.Simulation
     internal abstract record PhaseOneEvent
     {
         public sealed record Economic(EconomicEvent Event) : PhaseOneEvent;
-        public sealed record RouteEnabled(RouteId RouteId, bool Enabled) : PhaseOneEvent;
     }
 }
 
@@ -145,8 +143,8 @@ namespace GalaxyCommand.Simulation.Acceptance
 {
 
     /// <summary>
-    /// Bounded acceptance-only engine composition, fixture adapters, metrics, and
-    /// reports for the integrated Phase 1 proof.
+    /// Test-only engine composition, fixture adapters, metrics, and reports for
+    /// the integrated Phase 1 acceptance proof.
     /// </summary>
     public sealed class PhaseOneScenario : ISimulationRuntime<PhaseOneEvent>
     {
@@ -170,7 +168,6 @@ namespace GalaxyCommand.Simulation.Acceptance
         private readonly IdSequence<ShipId> _shipIds;
         private readonly IdSequence<InventoryId> _inventoryIds;
         private readonly EconomicRuntimeSystem _economicSystem;
-        private readonly RouteId _mineToRefineryRoute;
         private readonly MaterialId[] _knownMaterials;
         private readonly SortedDictionary<LocationId, string> _locationNames;
         private readonly List<ScenarioEventRecord> _eventRecords = [];
@@ -221,13 +218,12 @@ namespace GalaxyCommand.Simulation.Acceptance
                     constructionLocations,
                     _inventories,
                     _transportBoard,
-                    _ships,
-                    _navigation,
+                _ships,
+                    fixture.LogisticsNavigation,
                     _productionIds,
                     _transportIds,
                     _reservationIds,
                     _capacityReservationIds));
-            _mineToRefineryRoute = fixture.MineToRefineryRoute;
             _knownMaterials = fixture.KnownMaterials;
             _engine = new SimulationEngine<PhaseOneEvent>(this, _agenda);
         }
@@ -248,12 +244,9 @@ namespace GalaxyCommand.Simulation.Acceptance
                 TransportJob? job = freighter.ActiveJobId is { } jobId
                     ? _transportBoard.GetJob(jobId)
                     : null;
-                RouteId? currentRoute = job?.CurrentRouteId;
-                SimulationTime? arrivesAt = currentRoute is not null
+                SimulationTime? arrivesAt = job?.Status is TransportJobStatus.TravelingToSource
+                    or TransportJobStatus.TravelingToDestination
                     ? job?.TransitionAt
-                    : null;
-                SimulationTime? departedAt = currentRoute is { } routeId && arrivesAt is { } arrival
-                    ? TravelDeparture(routeId, arrival)
                     : null;
 
                 ships.Add(new ShipSnapshot(
@@ -262,8 +255,6 @@ namespace GalaxyCommand.Simulation.Acceptance
                     freighter.LocationId,
                     freighter.ActiveJobId,
                     job?.Status,
-                    currentRoute,
-                    departedAt,
                     arrivesAt));
             }
 
@@ -294,22 +285,6 @@ namespace GalaxyCommand.Simulation.Acceptance
                         route.IsEnabled))),
                 SnapshotCollection.Copy(ships),
                 SnapshotCollection.Copy(constructions));
-        }
-
-        public void ScheduleApprovedRouteDisruption()
-        {
-            foreach ((ulong timestamp, bool enabled) in new[]
-            {
-            (50_000UL, false),
-            (250_000UL, true),
-        })
-            {
-                _engine.Schedule(
-                    new SimulationTime(timestamp),
-                    EventPhase.StateUpdate,
-                    new EventGeneration(0),
-                    new PhaseOneEvent.RouteEnabled(_mineToRefineryRoute, enabled));
-            }
         }
 
         public PhaseOneReport RunUntilFirstShip(SimulationTime target)
@@ -362,13 +337,6 @@ namespace GalaxyCommand.Simulation.Acceptance
                 ToEventKind(simulationEvent.Payload)));
         }
 
-        private SimulationTime TravelDeparture(RouteId routeId, SimulationTime arrivesAt)
-        {
-            DirectedRoute route = _navigation.GetRoute(routeId)
-                ?? throw new InvalidOperationException($"Missing route {routeId}.");
-            return new SimulationTime(checked(arrivesAt.Milliseconds - route.BaseDuration.Milliseconds));
-        }
-
         private ScheduledEventDisposition HandleEvent(
             ScheduledEvent<PhaseOneEvent> scheduled,
             SimulationTime now)
@@ -382,10 +350,6 @@ namespace GalaxyCommand.Simulation.Acceptance
                         scheduled.Key,
                         scheduled.Generation,
                         now);
-
-                case PhaseOneEvent.RouteEnabled route:
-                    _navigation.SetRouteEnabled(route.RouteId, route.Enabled);
-                    return ScheduledEventDisposition.Applied;
 
                 default:
                     throw new ArgumentOutOfRangeException(nameof(scheduled));
@@ -752,11 +716,6 @@ namespace GalaxyCommand.Simulation.Acceptance
             hash.WriteUInt64(_agenda.CurrentTime.Milliseconds);
             hash.WriteUInt64(_config.RandomSeed);
             hash.WriteUInt64(_constructedShipId?.Value ?? 0);
-            DirectedRoute route = _navigation.GetRoute(_mineToRefineryRoute)
-                ?? throw new InvalidOperationException("Approved fixture route is missing.");
-            hash.WriteUInt64(route.Id.Value);
-            hash.WriteBoolean(route.IsEnabled);
-
             var inventoryIds = new SortedSet<InventoryId>(EntityIdComparer<InventoryId>.Instance);
             foreach (ProductionLine line in _productionLines.Values)
             {
@@ -827,11 +786,6 @@ namespace GalaxyCommand.Simulation.Acceptance
                     hash.WriteUInt64(construction.FacilityId.Value);
                     hash.WriteUInt64(construction.OrderId.Value);
                     break;
-                case ScenarioEventKind.RouteEnabled route:
-                    hash.WriteByte(3);
-                    hash.WriteUInt64(route.RouteId.Value);
-                    hash.WriteBoolean(route.Enabled);
-                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(record));
             }
@@ -845,7 +799,6 @@ namespace GalaxyCommand.Simulation.Acceptance
                     hash.WriteByte(0);
                     hash.WriteUInt64(arrive.JobId.Value);
                     hash.WriteUInt64(arrive.Generation.Value);
-                    hash.WriteUInt64(arrive.RouteId.Value);
                     hash.WriteByte((byte)arrive.Target);
                     break;
                 case TransportEvent.FinishLoading loading:
@@ -870,8 +823,6 @@ namespace GalaxyCommand.Simulation.Acceptance
             {
                 case TransportJobStatus.TravelingToSource:
                 case TransportJobStatus.TravelingToDestination:
-                    hash.WriteUInt64(job.CurrentRouteId?.Value
-                        ?? throw new InvalidOperationException("Traveling job has no route."));
                     hash.WriteUInt64(job.TransitionAt?.Milliseconds
                         ?? throw new InvalidOperationException("Traveling job has no arrival time."));
                     break;
@@ -887,8 +838,6 @@ namespace GalaxyCommand.Simulation.Acceptance
             scenarioEvent switch
             {
                 PhaseOneEvent.Economic economic => ToEventKind(economic.Event),
-                PhaseOneEvent.RouteEnabled route =>
-                    new ScenarioEventKind.RouteEnabled(route.RouteId, route.Enabled),
                 _ => throw new ArgumentOutOfRangeException(nameof(scenarioEvent)),
             };
 

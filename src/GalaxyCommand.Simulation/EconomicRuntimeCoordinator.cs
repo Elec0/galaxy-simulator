@@ -49,7 +49,7 @@ public sealed class EconomicRuntimeCoordinator
     private readonly IReadOnlyDictionary<FacilityId, ConstructionProcess> _constructionProcesses;
     private readonly InventoryRegistry _inventories;
     private readonly LogisticsSystem _logistics = new();
-    private readonly INavigation _navigation;
+    private readonly ILogisticsNavigation _navigation;
     private readonly IReadOnlyDictionary<FacilityId, LocationId> _productionLocations;
     private readonly ProductionIdSequences _productionIds;
     private readonly IReadOnlyDictionary<FacilityId, ProductionLine> _productionLines;
@@ -70,7 +70,7 @@ public sealed class EconomicRuntimeCoordinator
         InventoryRegistry inventories,
         TransportBoard transportBoard,
         ShipRegistry ships,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         ProductionIdSequences productionIds,
         TransportIdSequences transportIds,
         IdSequence<ReservationId> reservationIds,

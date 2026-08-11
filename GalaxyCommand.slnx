@@ -1,6 +1,5 @@
 <Solution>
   <Project Path="src/GalaxyCommand.Simulation/GalaxyCommand.Simulation.csproj" />
-  <Project Path="src/GalaxyCommand.Cli/GalaxyCommand.Cli.csproj" />
   <Project Path="src/GalaxyCommand.Godot/GalaxyCommand.Godot.csproj" />
   <Project Path="tests/GalaxyCommand.Simulation.Tests/GalaxyCommand.Simulation.Tests.csproj" />
   <Project Path="benchmarks/GalaxyCommand.Benchmarks/GalaxyCommand.Benchmarks.csproj" />

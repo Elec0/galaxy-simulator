@@ -11,7 +11,7 @@ accepted the initial scale envelope and informational simulation-speed goals on
 Implementation now includes a dedicated headless runner, explicit smoke and
 full-suite gating, versioned JSON scenario files, validated numeric overrides,
 machine-readable results, fast configuration coverage in the normal unit-test
-suite, and the five initial single-thread scenario shapes. The canonical
+suite, and the four remaining initial single-thread scenario shapes. The canonical
 Release full suite passed all committed digests across repeated iterations on
 2026-07-28, completing `TASK-024`.
 
@@ -131,7 +131,6 @@ future behavior.
 
 | ID | Shape | Primary pressure | Initial availability |
 | --- | --- | --- | --- |
-| `baseline.phase-one` | Existing mining-to-construction acceptance scenario | End-to-end deterministic economic regression | Available now |
 | `spatial.many-quiet` | Many systems with modest independent ship populations | Broad iteration, scheduled movement, snapshots | Available with a benchmark fixture |
 | `spatial.one-crowded` | Most active ships moving and receiving orders in one system | Dense owner workload and order churn | Available with a benchmark fixture |
 | `spatial.several-crowded` | Several systems with concentrated activity | Cross-owner batching without assuming one thread per system | Available with a benchmark fixture |
@@ -140,9 +139,10 @@ future behavior.
 | `economy.logistics-volume` | Many facilities, inventories, offers, demands, and freighters | Matching, reservation, and retry work | Requires a scalable Phase 1 fixture and benefits from `TASK-009` boundaries |
 | `mixed.reference` | Accepted reference combination of spatial, economic, faction, and script work | Player-facing whole-galaxy throughput | Added incrementally as those systems become authoritative |
 
-`baseline.phase-one` remains a correctness foundation, not a scale benchmark:
-its three locations, four facilities, and initial two freighters are too small
-to justify performance architecture.
+The former `baseline.phase-one` fixture is now a test-only whole-simulation
+acceptance proof. Its three locations, four facilities, and initial two
+freighters were too small to justify performance architecture, so it is no
+longer part of the benchmark runner.
 
 ## Benchmark execution contract
 
@@ -324,9 +324,10 @@ The delivery sequence is:
 1. Add the headless benchmark runner and versioned scenario-definition
    contract, with fast correctness coverage in normal tests and explicit
    opt-in for heavy scenarios.
-2. Capture `baseline.phase-one`, `spatial.many-quiet`,
-   `spatial.one-crowded`, `navigation.connector-volume`, and
-   `facts.retention-and-read` single-thread baselines.
+2. Capture `spatial.many-quiet`, `spatial.one-crowded`,
+   `navigation.connector-volume`, and `facts.retention-and-read` single-thread
+   baselines. Keep the small Phase 1 economy scenario in the normal
+   whole-simulation acceptance suite instead.
 3. Record the first measurements and identify nonlinear behavior without
    changing architecture to hide it.
 4. Begin `TASK-009` using the accepted shapes and measurements.

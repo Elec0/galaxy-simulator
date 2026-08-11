@@ -47,11 +47,10 @@ each completion and the `TASK-006` order coordinator tracks active, queued,
 suspended, and terminal state. Replacement materializes local motion before
 starting the new leg.
 
-The Phase 1 transport graph remains isolated in its acceptance runtime and has
-not migrated to these contracts. Runtime connector availability and access
-remain in `TASK-030`; entity destinations begin with the lifecycle and
-spatial-entity identity work in `TASK-011`; and the deliberate Phase 1
-compatibility migration remains in `TASK-031`. Docking and attachment remain
+The Phase 1 acceptance fixture now maps its logistics locations to these
+contracts and requests opaque hierarchical reachability and duration estimates.
+Its legacy graph remains only for compatibility presentation. Runtime connector
+availability and access remain in `TASK-030`. Docking and attachment remain
 later spatial-state work described below.
 
 ## Design at a glance
@@ -323,8 +322,8 @@ Plans may be refreshed:
 Disabling a connector or invalidating a local path does not silently teleport
 or rewind a ship already executing a valid leg. The movement mechanism defines
 whether an active leg is allowed to finish, interrupted into a valid spatial
-state, or failed. The initial compatibility behavior may allow an active leg to
-finish and replan at its boundary, matching the Phase 1 route-disruption rule.
+state, or failed. `TASK-030` must define and cover that behavior when runtime
+connector availability becomes authoritative.
 
 Connector traversal is physically non-interruptible in the initial runtime.
 Cancelling the owning order during transit cancels its intent immediately, but
@@ -438,12 +437,81 @@ scale target exists:
    a multi-system move composed from local and connector legs.
    **Implemented by `TASK-028` after the `TASK-006` order foundation.**
 6. Adapt Phase 1 logistics to request reachability and estimates without
-   selecting graph legs itself. Preserve its existing deterministic acceptance
-   fingerprints until an explicitly approved fixture migration.
-   **Tracked by `TASK-031` after `TASK-009` and `TASK-011`.**
+   selecting graph legs itself. The approved fixture migration now uses opaque
+   hierarchical estimates and revised acceptance fingerprints.
+   **Completed by `TASK-031` after `TASK-009` and `TASK-011`.**
 7. Replace Phase 1-specific location and route presentation with general
    system, spatial-entity, plan, and motion snapshots.
 
 The compatibility layer should be removed only after the economic scenario and
 interactive movement both use the new contracts with focused regression
 coverage.
+
+## Approved Phase 1 acceptance mapping
+
+**Decision status:** Accepted by the project owner on 2026-08-10.
+
+`TASK-031` migrates the bounded Phase 1 acceptance fixture without treating a
+legacy `LocationId` as a future gameplay identity. The fixture maps each legacy
+location to one system and maps each facility and inventory to an explicit
+anchored spatial entity. This preserves the existing economic topology while
+making the distinctions that the location graph previously collapsed visible to
+the migration.
+
+| Legacy location | System | Anchored entities and inventories | Initial ships |
+| --- | --- | --- | --- |
+| Mine | Mine system | Mine facility entity and mine inventory | One freighter at the mine facility anchor |
+| Refinery | Refinery system | Refinery facility entity and refinery inventory | One freighter at the refinery facility anchor |
+| Shipyard | Shipyard system | Component-factory entity and inventory; separate shipyard entity and inventory | Constructed freighters appear at the shipyard facility anchor |
+
+Every facility anchor in this fixture uses the same system-local coordinate.
+The component factory and shipyard are distinct entities despite being
+co-located. The initial local travel-time policy therefore assigns zero duration
+between anchors in the same system. This is a compatibility choice, not a
+claim that future facilities share a physical position or that local movement
+is generally instantaneous.
+
+Each ship cargo inventory remains attached to its owning ship entity. The
+fixture's legacy `OrganizationId` continues to identify ownership within the
+acceptance composition. It does not create a parallel `GameSession` entity or
+principal model, which remains `TASK-034` work.
+
+The two legacy bidirectional links become directional connector transit pairs:
+
+```mermaid
+flowchart LR
+    mineFacility["Mine facility and inventory"]
+    mineGate["Mine-Refinery connector endpoint"]
+    refineryGate["Refinery-side Mine connector endpoint"]
+    refineryFacility["Refinery facility and inventory"]
+    refineryShipyardGate["Refinery-side Shipyard connector endpoint"]
+    shipyardGate["Shipyard-side Refinery connector endpoint"]
+    componentFactory["Component factory and inventory"]
+    shipyardFacility["Shipyard facility and inventory"]
+
+    subgraph mine["Mine system"]
+        mineFacility
+        mineGate
+    end
+    subgraph refinery["Refinery system"]
+        refineryGate
+        refineryFacility
+        refineryShipyardGate
+    end
+    subgraph shipyard["Shipyard system"]
+        shipyardGate
+        componentFactory
+        shipyardFacility
+    end
+
+    mineGate <-- "60 seconds each direction" --> refineryGate
+    refineryShipyardGate <-- "60 seconds each direction" --> shipyardGate
+```
+
+Each endpoint has its own stable identity. The Mine-Refinery pair and the
+Refinery-Shipyard pair each define one connection in each direction. Logistics
+may request reachability and estimated travel duration between mapped anchors,
+but it must not inspect connector identities, select legs, or retain a
+`RouteId`. The test-only fixture has no mutable connector availability. When
+`TASK-030` adds authoritative availability, it owns the renewed disruption
+coverage and its replan and wake behavior.

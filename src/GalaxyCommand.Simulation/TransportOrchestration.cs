@@ -54,7 +54,6 @@ public abstract record TransportAdvanceEffect(
         TransportJobStatus ExpectedStatus,
         LocationId ExpectedLocationId,
         TravelTarget Target,
-        RouteId RouteId,
         SimulationTime ArrivesAt)
         : TransportAdvanceEffect(
             ShipId,
@@ -244,7 +243,7 @@ public sealed class TransportSystem
 
     public static TransportAdvanceEvaluation Evaluate(
         TransportAdvanceBatch batch,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         TransportTiming timing,
         SimulationTime now)
     {
@@ -275,7 +274,7 @@ public sealed class TransportSystem
         Freighter freighter,
         InventoryRegistry inventories,
         TravelTarget target,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         TransportTiming timing,
         SimulationTime now)
     {
@@ -354,7 +353,7 @@ public sealed class TransportSystem
         ShipRegistry ships,
         InventoryRegistry inventories,
         IdSequence<CapacityReservationId> capacityReservationIds,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         TransportTiming timing,
         SimulationTime now)
     {
@@ -409,17 +408,19 @@ public sealed class TransportSystem
     private static TransportAdvanceEffect EvaluateTransport(
         TransportAdvanceRead transport,
         TravelTarget target,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         TransportTiming timing,
         SimulationTime now)
     {
         LocationId destination = target == TravelTarget.Source
             ? transport.SourceLocationId
             : transport.DestinationLocationId;
-        RoutePlan? plan = navigation.FindRoute(
+        LogisticsTravelEstimate? estimate = navigation.Estimate(
+            transport.ShipId,
             transport.CurrentLocationId,
-            destination);
-        if (plan is null)
+            destination,
+            now);
+        if (estimate is null)
         {
             return new TransportAdvanceEffect.WaitForRoute(
                 transport.ShipId,
@@ -430,11 +431,8 @@ public sealed class TransportSystem
                 target);
         }
 
-        if (plan.RouteIds.Count > 0)
+        if (estimate.Duration > SimulationDuration.Zero)
         {
-            RouteId routeId = plan.RouteIds[0];
-            DirectedRoute route = navigation.GetRoute(routeId)
-                ?? throw new KeyNotFoundException($"Unknown route {routeId}.");
             return new TransportAdvanceEffect.Travel(
                 transport.ShipId,
                 transport.JobId,
@@ -442,8 +440,7 @@ public sealed class TransportSystem
                 transport.Status,
                 transport.CurrentLocationId,
                 target,
-                routeId,
-                now.Add(route.BaseDuration));
+                now.Add(estimate.Duration));
         }
 
         if (target == TravelTarget.Source)

@@ -43,9 +43,8 @@ current timestamp cycle completes.
 
 **Status: resolved by `TASK-002` and `TASK-003`.**
 
-The bounded Phase 1 acceptance harness can advance the simulation, capture a
-snapshot, and schedule one fixture-specific route disruption. It is not the
-application-facing boundary.
+The bounded Phase 1 acceptance harness can advance the simulation and capture
+a snapshot. It is not the application-facing boundary.
 
 Without a common command boundary, future systems would either add specialized
 methods to the facade or mutate the world directly. Those paths would develop
@@ -80,8 +79,7 @@ reference.
 
 The generic simulation engine is scenario-independent, but the Phase 1 runtime
 still owns the combined event vocabulary, event dispatch, reconciliation order,
-metrics, shortages, decisions, snapshots, fixture-specific disruption, and
-stopping condition.
+metrics, shortages, decisions, snapshots, and stopping condition.
 
 Adding dialogue, faction planning, combat, objectives, or scripted events
 directly to this class would recreate a scenario-specific monolith above the
@@ -301,9 +299,9 @@ should not receive unrestricted mutation callbacks.
 
 `GameSession` has no fixture milestone stop and continues advancing after the
 first constructed ship. Keep bounded stopping conditions in headless acceptance
-scenarios, benchmarks, and tests; `Acceptance/PhaseOneScenario` is the current
-example. A normal game session should continue until the player quits or an
-explicit terminal game state is reached.
+tests; `tests/GalaxyCommand.Simulation.Tests/Acceptance/PhaseOneScenario` is
+the current example. A normal game session should continue until the player
+quits or an explicit terminal game state is reached.
 
 Construction milestones, quest completion, victory, and defeat should be
 represented as objective or game-state facts rather than implicit engine
@@ -329,8 +327,9 @@ identifiers.
 Normal movement should remain deterministic and scheduled by storing an
 authoritative motion segment rather than polling every ship at rendering
 frequency. Local movement and connector traversal compose as different travel
-legs. The Phase 1 graph remains a compatibility backend until its logistics and
-acceptance coverage can migrate deliberately through `TASK-031`.
+legs. The Phase 1 graph remains only as compatibility presentation for its
+test-only fixture; `TASK-031` migrated logistics and acceptance coverage to
+hierarchical estimates.
 
 The complete contract and migration sequence are in
 [Navigation and spatial architecture](navigation-architecture.md).

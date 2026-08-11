@@ -111,7 +111,7 @@ not yet a reusable orchestration model.
   path.
 - Adopt ECS or another new entity-storage model.
 - Migrate Phase 1 logistics from `LocationId` routes to hierarchical navigation;
-  that remains `TASK-031`.
+  completed later by `TASK-031`.
 - Define production entity spawning or destruction before `TASK-011`.
 - Turn internal event, proposal, or benchmark records into semantic facts.
 - Define faction, script, objective, combat, or save-state systems.
@@ -212,7 +212,7 @@ system interface or one thread per box.
 | 7 | Can systems schedule directly? | No evaluation path schedules into the agenda; it returns event proposals for deterministic agenda commit |
 | 8 | How are facts emitted? | Existing semantic facts remain commit outputs; economic fact vocabulary is defined separately rather than inferred from internal effects |
 | 9 | How is construction materialization handled? | Construction emits a typed product-completion effect; the entity lifecycle owner eventually materializes ships |
-| 10 | What remains acceptance-only? | Phase 1 fixture data, legacy navigation mapping, disruption controls, stop rule, reports, diagnostic fingerprints, and temporary product materialization |
+| 10 | What remains acceptance-only? | Phase 1 fixture data, its hierarchical logistics mapping, stop rule, reports, diagnostic fingerprints, and temporary product materialization |
 | 11 | When is concurrency added? | After the single-thread coordinator, effect paths, deterministic tests, and measurements are established |
 | 12 | How is success measured? | Unchanged authoritative digests and counts, explicit ownership tests, deterministic permutation tests, and per-domain informational measurements |
 
@@ -232,9 +232,9 @@ No production type may depend on:
 - `PhaseOneReport`
 - Phase 1 disruption controls or milestone stopping rules
 
-The Phase 1 acceptance harness composes the same reusable economic systems with
-fixture-specific setup and adapters. Its public facade may continue to expose
-the approved snapshot, report, disruption, and run-until-first-ship behavior.
+The test-only Phase 1 acceptance harness composes the same reusable economic
+systems with fixture-specific setup and adapters. It may expose snapshot,
+report, disruption, and run-until-first-ship behavior only to its test suite.
 It must not reimplement production, construction, logistics, scheduling, or
 conflict rules.
 

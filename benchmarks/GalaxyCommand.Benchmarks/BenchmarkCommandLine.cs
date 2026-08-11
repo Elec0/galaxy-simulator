@@ -137,7 +137,9 @@ public static class BenchmarkCommandLine
                 ? request.PresetIds
                 : request.Suite == BenchmarkSuite.Full
                     ? BenchmarkPresets.All.Select(preset => preset.Id).ToArray()
-                    : [BenchmarkPresets.PhaseOneBaseline];
+                    : throw new BenchmarkUsageException(
+                        "No smoke benchmark remains after retiring the Phase 1 acceptance fixture. "
+                        + "Supply '--suite full' or select a preset with '--suite full --preset ID'.");
             scenarios = presetIds
                 .Select(id => BenchmarkScenarioResolver.ResolvePreset(id, request.Overrides))
                 .ToArray();
@@ -166,7 +168,7 @@ public static class BenchmarkCommandLine
           dotnet run --project benchmarks/GalaxyCommand.Benchmarks -- [options]
 
         Options:
-          --suite smoke|full       Select smoke (default) or explicitly enable heavy scenarios.
+          --suite smoke|full       Smoke has no benchmark fixture; full explicitly enables benchmarks.
           --preset ID              Run one preset; may be repeated.
           --scenario-file PATH     Run one versioned JSON scenario file.
           --set NAME=INTEGER       Override one numeric parameter; may be repeated.

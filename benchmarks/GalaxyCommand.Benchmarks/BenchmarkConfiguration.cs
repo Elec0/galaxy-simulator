@@ -65,7 +65,6 @@ public sealed record BenchmarkPreset
 
 public static class BenchmarkPresets
 {
-    public const string PhaseOneBaseline = "baseline.phase-one";
     public const string SpatialManyQuiet = "spatial.many-quiet";
     public const string SpatialOneCrowded = "spatial.one-crowded";
     public const string NavigationConnectorVolume = "navigation.connector-volume";
@@ -89,15 +88,6 @@ public static class BenchmarkPresets
     {
         BenchmarkPreset[] values =
         [
-            new(
-                PhaseOneBaseline,
-                false,
-                Parameters(
-                    (BenchmarkParameterNames.WarmupIterations, 1),
-                    (BenchmarkParameterNames.MeasuredIterations, 3),
-                    (BenchmarkParameterNames.Seed, 1),
-                    (BenchmarkParameterNames.SimulatedDurationMilliseconds, 1_000_000)),
-                "4a648f666a817742:910988d1e450c118"),
             new(
                 SpatialManyQuiet,
                 true,
@@ -403,8 +393,6 @@ public static class BenchmarkScenarioValidator
 
         switch (scenario.BasePreset)
         {
-            case BenchmarkPresets.PhaseOneBaseline:
-                break;
             case BenchmarkPresets.SpatialManyQuiet:
             case BenchmarkPresets.SpatialOneCrowded:
             case BenchmarkPresets.NavigationConnectorVolume:

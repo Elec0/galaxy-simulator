@@ -106,7 +106,10 @@ public sealed class LogisticsOrchestrationTests
                 freighters,
                 fixture.Inventories);
             LogisticsAssignmentEvaluation evaluation =
-                LogisticsSystem.EvaluateAssignments(batch, fixture.Navigation);
+                LogisticsSystem.EvaluateAssignments(
+                    batch,
+                    fixture.Navigation,
+                    SimulationTime.Zero);
 
             Assert.Equal(8, evaluation.Candidates.Count);
             Assert.All(freighters, freighter =>

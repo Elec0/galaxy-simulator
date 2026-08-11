@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 namespace GalaxyCommand.Simulation;
 
 /// <summary>
-/// Immutable, rendering-independent state for presentation clients.
+/// Immutable acceptance-observation state for the Phase 1 test fixture.
 /// </summary>
 public sealed record PhaseOneSnapshot(
     SimulationTime Time,
@@ -29,8 +29,6 @@ public sealed record ShipSnapshot(
     LocationId Location,
     TransportJobId? ActiveTransportJob,
     TransportJobStatus? TransportStatus,
-    RouteId? CurrentRoute,
-    SimulationTime? DepartedAt,
     SimulationTime? ArrivesAt);
 
 public sealed record ConstructionSnapshot(

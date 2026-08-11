@@ -397,7 +397,8 @@ public sealed class LogisticsSystem
 
     public static LogisticsAssignmentEvaluation EvaluateAssignments(
         LogisticsAssignmentBatch batch,
-        INavigation navigation)
+        ILogisticsNavigation navigation,
+        SimulationTime now)
     {
         ArgumentNullException.ThrowIfNull(batch);
         ArgumentNullException.ThrowIfNull(navigation);
@@ -435,10 +436,16 @@ public sealed class LogisticsSystem
                         continue;
                     }
 
-                    RoutePlan? toSource =
-                        navigation.FindRoute(freighter.LocationId, supply.LocationId);
-                    RoutePlan? toDestination =
-                        navigation.FindRoute(supply.LocationId, demand.LocationId);
+                    LogisticsTravelEstimate? toSource = navigation.Estimate(
+                        freighter.ShipId,
+                        freighter.LocationId,
+                        supply.LocationId,
+                        now);
+                    LogisticsTravelEstimate? toDestination = navigation.Estimate(
+                        freighter.ShipId,
+                        supply.LocationId,
+                        demand.LocationId,
+                        now);
                     if (toSource is null || toDestination is null)
                     {
                         continue;
@@ -450,7 +457,7 @@ public sealed class LogisticsSystem
                         demand.DemandId,
                         demand.Priority,
                         demand.CreatedAt,
-                        toSource.TotalDuration.Add(toDestination.TotalDuration),
+                        toSource.Duration.Add(toDestination.Duration),
                         quantity));
                 }
             }
@@ -524,7 +531,7 @@ public sealed class LogisticsSystem
         IdSequence<ReservationId> reservationIds,
         ShipRegistry ships,
         InventoryRegistry inventories,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         SimulationTime now)
     {
         var measurements = new List<RuntimeMeasurement>();
@@ -548,7 +555,7 @@ public sealed class LogisticsSystem
 
         stopwatch.Restart();
         LogisticsAssignmentEvaluation evaluation =
-            EvaluateAssignments(batch, navigation);
+            EvaluateAssignments(batch, navigation, now);
         stopwatch.Stop();
         measurements.Add(new RuntimeMeasurement(
             AssignmentDomainName,

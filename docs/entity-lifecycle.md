@@ -42,7 +42,8 @@ economic and transport owners is tracked separately in `TASK-034`.
   after physical completion and waits for idempotent acknowledgement; it does
   not create a ship or its components.
 - `PhaseOneShipMaterializer` creates a legacy ship at `LocationId`. It remains
-  under `Acceptance/` until `TASK-031` has an approved spatial migration.
+  under the test project's `Acceptance/` directory after `TASK-031` migrated
+  logistics; `TASK-034` owns clean-session entity materialization.
 - `GameSessionSetup` creates initial ships before runtime. It is setup input,
   not a runtime spawn command.
 - The actor runtime can clean up movement, orders, and control together, but
@@ -333,4 +334,4 @@ transfer, ownership transfer, faction behavior, generic components, ECS,
 docking, connector availability, scripts, developer cheats, group orders, save
 serialization, replay, or Phase 1 legacy-location migration. Those decisions
 remain with `TASK-012`, `TASK-014`, `TASK-017`, `TASK-019`, `TASK-027`,
-`TASK-030`, `TASK-031`, `TASK-032`, and `TASK-033` as applicable.
+`TASK-030`, `TASK-032`, and `TASK-033` as applicable.

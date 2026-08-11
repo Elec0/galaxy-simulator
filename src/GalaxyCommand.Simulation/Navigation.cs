@@ -49,7 +49,7 @@ public sealed record RoutePlan(
 /// <summary>
 /// Deterministic directed multigraph used by the Phase 1 navigation backend.
 /// </summary>
-public sealed class RouteGraph : INavigation
+public sealed class RouteGraph : INavigation, ILogisticsNavigation
 {
     private readonly HashSet<LocationId> _locations = [];
     private readonly Dictionary<RouteId, DirectedRoute> _routes = [];
@@ -163,6 +163,17 @@ public sealed class RouteGraph : INavigation
         }
 
         return null;
+    }
+
+    /// <inheritdoc />
+    public LogisticsTravelEstimate? Estimate(
+        ShipId actorId,
+        LocationId origin,
+        LocationId destination,
+        SimulationTime plannedAt)
+    {
+        RoutePlan? plan = FindRoute(origin, destination);
+        return plan is null ? null : new LogisticsTravelEstimate(plan.TotalDuration);
     }
 
     private void RequireLocation(LocationId location)

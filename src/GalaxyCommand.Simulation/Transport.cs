@@ -139,7 +139,6 @@ public abstract record TransportEvent(TransportJobId JobId, EventGeneration Gene
     public sealed record Arrive(
         TransportJobId JobId,
         EventGeneration Generation,
-        RouteId RouteId,
         TravelTarget Target) : TransportEvent(JobId, Generation);
 
     public sealed record FinishLoading(
@@ -196,7 +195,6 @@ public sealed class TransportJob
     public SimulationTime AssignedAt { get; }
     public EventGeneration Generation { get; internal set; } = new(0);
     public TransportJobStatus Status { get; internal set; } = TransportJobStatus.Assigned;
-    public RouteId? CurrentRouteId { get; internal set; }
     public SimulationTime? TransitionAt { get; internal set; }
 }
 
@@ -321,7 +319,7 @@ public sealed class TransportBoard
         IdSequence<ReservationId> reservationIds,
         Freighter freighter,
         InventoryRegistry inventories,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         SimulationTime now)
     {
         if (freighter.ActiveJobId is { } activeJobId)
@@ -424,18 +422,13 @@ public sealed class TransportBoard
                     travel.Target == TravelTarget.Source
                         ? TransportJobStatus.TravelingToSource
                         : TransportJobStatus.TravelingToDestination,
-                    travel.RouteId,
                     travel.ArrivesAt);
                 eventProposal = new TransportEventProposal(
                     effect.ShipId,
                     job.Id,
                     travel.ArrivesAt,
                     job.Generation,
-                    new TransportEvent.Arrive(
-                        job.Id,
-                        job.Generation,
-                        travel.RouteId,
-                        travel.Target));
+                    new TransportEvent.Arrive(job.Id, job.Generation, travel.Target));
                 break;
 
             case TransportAdvanceEffect.BeginLoading loading:
@@ -501,7 +494,7 @@ public sealed class TransportBoard
         Freighter freighter,
         InventoryRegistry inventories,
         IdSequence<CapacityReservationId> capacityReservationIds,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         EventAgenda<TransportEvent> agenda,
         TransportTiming timing,
         SimulationTime now) =>
@@ -521,7 +514,7 @@ public sealed class TransportBoard
         Freighter freighter,
         InventoryRegistry inventories,
         IdSequence<CapacityReservationId> capacityReservationIds,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         EventAgenda<TEvent> agenda,
         Func<TransportEvent, TEvent> wrapEvent,
         TransportTiming timing,
@@ -547,7 +540,7 @@ public sealed class TransportBoard
         Freighter? freighter,
         InventoryRegistry inventories,
         IdSequence<CapacityReservationId> capacityReservationIds,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         EventAgenda<TransportEvent> agenda,
         TransportTiming timing,
         SimulationTime now) =>
@@ -567,7 +560,7 @@ public sealed class TransportBoard
         Freighter? freighter,
         InventoryRegistry inventories,
         IdSequence<CapacityReservationId> capacityReservationIds,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         EventAgenda<TEvent> agenda,
         Func<TransportEvent, TEvent> wrapEvent,
         TransportTiming timing,
@@ -603,7 +596,7 @@ public sealed class TransportBoard
         TransportEvent transportEvent,
         Freighter? freighter,
         InventoryRegistry inventories,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         SimulationTime now)
     {
         if (GetJob(transportEvent.JobId) is not { } job)
@@ -645,7 +638,7 @@ public sealed class TransportBoard
         switch (transportEvent)
         {
             case TransportEvent.Arrive arrive:
-                if (!TravelStateMatches(job, arrive.RouteId, arrive.Target, now))
+                if (!TravelStateMatches(job, arrive.Target, now))
                 {
                     return new TransportEventCoreCommit(
                         ScheduledEventDisposition.IgnoredStateMismatch,
@@ -654,9 +647,9 @@ public sealed class TransportBoard
                         null);
                 }
 
-                DirectedRoute route = navigation.GetRoute(arrive.RouteId)
-                    ?? throw new KeyNotFoundException($"Unknown route {arrive.RouteId}.");
-                freighter.LocationId = route.Destination;
+                freighter.LocationId = arrive.Target == TravelTarget.Source
+                    ? job.SourceLocationId
+                    : job.DestinationLocationId;
                 return new TransportEventCoreCommit(
                     ScheduledEventDisposition.Applied,
                     job.ShipId,
@@ -811,7 +804,7 @@ public sealed class TransportBoard
     private TransportAssignmentCandidate? BestCandidate(
         Freighter freighter,
         InventoryRegistry inventories,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         Quantity cargoCapacity)
     {
         TransportAssignmentCandidate? best = null;
@@ -831,8 +824,16 @@ public sealed class TransportBoard
                     continue;
                 }
 
-                RoutePlan? toSource = navigation.FindRoute(freighter.LocationId, supply.LocationId);
-                RoutePlan? toDestination = navigation.FindRoute(supply.LocationId, demand.LocationId);
+                LogisticsTravelEstimate? toSource = navigation.Estimate(
+                    freighter.ShipId,
+                    freighter.LocationId,
+                    supply.LocationId,
+                    SimulationTime.Zero);
+                LogisticsTravelEstimate? toDestination = navigation.Estimate(
+                    freighter.ShipId,
+                    supply.LocationId,
+                    demand.LocationId,
+                    SimulationTime.Zero);
                 if (toSource is null || toDestination is null)
                 {
                     continue;
@@ -844,7 +845,7 @@ public sealed class TransportBoard
                     demand.Id,
                     demand.Priority,
                     demand.CreatedAt,
-                    toSource.TotalDuration.Add(toDestination.TotalDuration),
+                    toSource.Duration.Add(toDestination.Duration),
                     quantity);
                 if (best is null
                     || TransportAssignmentCandidateComparer.Instance.Compare(
@@ -905,7 +906,7 @@ public sealed class TransportBoard
         Freighter freighter,
         InventoryRegistry inventories,
         IdSequence<CapacityReservationId> capacityReservationIds,
-        INavigation navigation,
+        ILogisticsNavigation navigation,
         EventAgenda<TEvent> agenda,
         Func<TransportEvent, TEvent> wrapEvent,
         TransportTiming timing,
@@ -915,8 +916,12 @@ public sealed class TransportBoard
         LocationId destination = target == TravelTarget.Source
             ? job.SourceLocationId
             : job.DestinationLocationId;
-        RoutePlan? plan = navigation.FindRoute(freighter.LocationId, destination);
-        if (plan is null)
+        LogisticsTravelEstimate? estimate = navigation.Estimate(
+            freighter.ShipId,
+            freighter.LocationId,
+            destination,
+            now);
+        if (estimate is null)
         {
             SetJobState(job, target == TravelTarget.Source
                 ? TransportJobStatus.WaitingForRouteToSource
@@ -924,7 +929,7 @@ public sealed class TransportBoard
             return false;
         }
 
-        if (plan.RouteIds.Count == 0)
+        if (estimate.Duration == SimulationDuration.Zero)
         {
             return target == TravelTarget.Source
                 ? BeginLoading(job, agenda, wrapEvent, timing, now)
@@ -932,21 +937,17 @@ public sealed class TransportBoard
                     agenda, wrapEvent, timing, now);
         }
 
-        RouteId routeId = plan.RouteIds[0];
-        DirectedRoute route = navigation.GetRoute(routeId)
-            ?? throw new KeyNotFoundException($"Unknown route {routeId}.");
-        SimulationTime arrivesAt = now.Add(route.BaseDuration);
+        SimulationTime arrivesAt = now.Add(estimate.Duration);
         agenda.Schedule(
             arrivesAt,
             EventPhase.PhysicalCompletion,
             job.Generation,
-            wrapEvent(new TransportEvent.Arrive(job.Id, job.Generation, routeId, target)));
+            wrapEvent(new TransportEvent.Arrive(job.Id, job.Generation, target)));
         SetJobState(
             job,
             target == TravelTarget.Source
                 ? TransportJobStatus.TravelingToSource
                 : TransportJobStatus.TravelingToDestination,
-            routeId,
             arrivesAt);
         return true;
     }
@@ -1048,11 +1049,9 @@ public sealed class TransportBoard
 
     private static bool TravelStateMatches(
         TransportJob job,
-        RouteId routeId,
         TravelTarget target,
         SimulationTime now) =>
-        job.CurrentRouteId == routeId
-        && job.TransitionAt == now
+        job.TransitionAt == now
         && job.Status == (target == TravelTarget.Source
             ? TransportJobStatus.TravelingToSource
             : TransportJobStatus.TravelingToDestination);
@@ -1060,11 +1059,9 @@ public sealed class TransportBoard
     private static void SetJobState(
         TransportJob job,
         TransportJobStatus status,
-        RouteId? routeId = null,
         SimulationTime? transitionAt = null)
     {
         job.Status = status;
-        job.CurrentRouteId = routeId;
         job.TransitionAt = transitionAt;
     }
 
