@@ -97,6 +97,12 @@ public sealed record LocalMotionSegment
 
     public SimulationTime ArrivesAt { get; }
 
+    /// <summary>
+    /// Exact agenda entry that completes this active motion, once its proposal
+    /// has been committed by the agenda owner.
+    /// </summary>
+    public EventKey? CompletionEventKey { get; internal set; }
+
     public SystemPosition PositionAt(SimulationTime time)
     {
         if (time <= DepartedAt)
@@ -191,6 +197,12 @@ public sealed record ConnectorTransitSegment
     public SimulationTime DepartedAt { get; }
 
     public SimulationTime ArrivesAt { get; }
+
+    /// <summary>
+    /// Exact agenda entry that completes this active transit, once its proposal
+    /// has been committed by the agenda owner.
+    /// </summary>
+    public EventKey? CompletionEventKey { get; internal set; }
 }
 
 public abstract record SpatialMovementEvent
@@ -245,7 +257,8 @@ public sealed record LocalMotionSnapshot(
     SystemPosition Origin,
     SystemPosition Destination,
     SimulationTime DepartedAt,
-    SimulationTime ArrivesAt);
+    SimulationTime ArrivesAt,
+    EventKey? CompletionEventKey);
 
 public sealed record ConnectorTransitSnapshot(
     ConnectorTransitId Id,
@@ -254,7 +267,8 @@ public sealed record ConnectorTransitSnapshot(
     SystemPosition Source,
     SystemPosition Destination,
     SimulationTime DepartedAt,
-    SimulationTime ArrivesAt);
+    SimulationTime ArrivesAt,
+    EventKey? CompletionEventKey);
 
 /// <summary>
 /// Result of committing one local-motion transition. Future work is returned
@@ -476,8 +490,54 @@ public sealed class SpatialMovement
     }
 
     /// <summary>
-    /// Authoritative cleanup commit for an actor being removed. Any pending
-    /// arrival becomes a deterministic missing-reference no-op.
+    /// Records the key allocated for the active movement completion after the
+    /// agenda owner commits its proposal.
+    /// </summary>
+    internal void BindCompletionEvent(ShipId shipId, EventKey eventKey)
+    {
+        ActorState actor = GetRequiredActor(shipId);
+        switch (actor.State)
+        {
+            case ShipSpatialState.Moving moving:
+                BindCompletionEvent(moving.Motion, eventKey);
+                return;
+            case ShipSpatialState.ConnectorTransit transit:
+                BindCompletionEvent(transit.Transit, eventKey);
+                return;
+            default:
+                throw new InvalidOperationException(
+                    $"Ship {shipId} has no active movement to bind to {eventKey}.");
+        }
+    }
+
+    /// <summary>
+    /// Returns the exact scheduled completion associated with an active actor,
+    /// or null when the actor is stationary.
+    /// </summary>
+    internal PendingMovementCompletion? GetPendingCompletion(ShipId shipId)
+    {
+        ActorState actor = GetRequiredActor(shipId);
+        return actor.State switch
+        {
+            ShipSpatialState.Moving moving => new PendingMovementCompletion.Arrival(
+                shipId,
+                moving.Motion.Id,
+                moving.Motion.Generation,
+                GetRequiredCompletionEventKey(moving.Motion)),
+            ShipSpatialState.ConnectorTransit transit => new PendingMovementCompletion.Emergence(
+                shipId,
+                transit.Transit.Id,
+                transit.Transit.Generation,
+                GetRequiredCompletionEventKey(transit.Transit)),
+            ShipSpatialState.AtPosition => null,
+            _ => throw new InvalidOperationException(
+                $"Unsupported spatial state {actor.State.GetType().Name}."),
+        };
+    }
+
+    /// <summary>
+    /// Authoritative cleanup commit for an actor whose exact pending movement
+    /// completion has already been cancelled by the lifecycle coordinator.
     /// </summary>
     public bool CommitRemove(ShipId shipId, SimulationTime now)
     {
@@ -561,7 +621,8 @@ public sealed class SpatialMovement
                                 motion.Origin,
                                 motion.Destination,
                                 motion.DepartedAt,
-                                motion.ArrivesAt))));
+                                motion.ArrivesAt,
+                                motion.CompletionEventKey))));
                     break;
                 case ShipSpatialState.ConnectorTransit traversing:
                     ConnectorTransitSegment transit = traversing.Transit;
@@ -575,7 +636,8 @@ public sealed class SpatialMovement
                                 transit.Source,
                                 transit.Destination,
                                 transit.DepartedAt,
-                                transit.ArrivesAt))));
+                                transit.ArrivesAt,
+                                transit.CompletionEventKey))));
                     break;
                 default:
                     throw new InvalidOperationException(
@@ -616,6 +678,64 @@ public sealed class SpatialMovement
         return position;
     }
 
+    /// <summary>
+    /// Binds the already-allocated arrival key only when it names the exact
+    /// physical-completion time for this motion.
+    /// </summary>
+    private static void BindCompletionEvent(
+        LocalMotionSegment motion,
+        EventKey eventKey)
+    {
+        if (motion.CompletionEventKey is not null
+            || eventKey.Timestamp != motion.ArrivesAt
+            || eventKey.Phase != EventPhase.PhysicalCompletion)
+        {
+            throw new InvalidOperationException(
+                $"Arrival event {eventKey} does not match motion {motion.Id}.");
+        }
+
+        motion.CompletionEventKey = eventKey;
+    }
+
+    /// <summary>
+    /// Binds the already-allocated emergence key only when it names the exact
+    /// physical-completion time for this transit.
+    /// </summary>
+    private static void BindCompletionEvent(
+        ConnectorTransitSegment transit,
+        EventKey eventKey)
+    {
+        if (transit.CompletionEventKey is not null
+            || eventKey.Timestamp != transit.ArrivesAt
+            || eventKey.Phase != EventPhase.PhysicalCompletion)
+        {
+            throw new InvalidOperationException(
+                $"Emergence event {eventKey} does not match transit {transit.Id}.");
+        }
+
+        transit.CompletionEventKey = eventKey;
+    }
+
+    /// <summary>
+    /// Retrieves the key required to prove that a moving actor can be removed
+    /// without leaving its arrival event behind.
+    /// </summary>
+    private static EventKey GetRequiredCompletionEventKey(
+        LocalMotionSegment motion) =>
+        motion.CompletionEventKey
+        ?? throw new InvalidOperationException(
+            $"Active motion {motion.Id} has no scheduled completion event.");
+
+    /// <summary>
+    /// Retrieves the key required to prove that a transiting actor can be
+    /// removed without leaving its emergence event behind.
+    /// </summary>
+    private static EventKey GetRequiredCompletionEventKey(
+        ConnectorTransitSegment transit) =>
+        transit.CompletionEventKey
+        ?? throw new InvalidOperationException(
+            $"Active connector transit {transit.Id} has no scheduled completion event.");
+
     private static SystemPosition CurrentPosition(
         ActorState actor,
         SimulationTime now) =>
@@ -640,4 +760,24 @@ public sealed class SpatialMovement
 
         public ShipSpatialState State { get; set; }
     }
+}
+
+internal abstract record PendingMovementCompletion(
+    ShipId ShipId,
+    EventGeneration Generation,
+    EventKey EventKey)
+{
+    internal sealed record Arrival(
+        ShipId ShipId,
+        MotionId MotionId,
+        EventGeneration Generation,
+        EventKey EventKey)
+        : PendingMovementCompletion(ShipId, Generation, EventKey);
+
+    internal sealed record Emergence(
+        ShipId ShipId,
+        ConnectorTransitId TransitId,
+        EventGeneration Generation,
+        EventKey EventKey)
+        : PendingMovementCompletion(ShipId, Generation, EventKey);
 }

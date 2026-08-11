@@ -118,7 +118,7 @@ section whose owning task has not yet defined its internal model.
 | World topology | Every star system, connector endpoint, directional connection, and any later enabled, access, or dynamic topology state. Immutable authored definitions may be resolved by stable content reference only when exact compatibility is validated. | Current topology; future topology policy belongs to its owning domain. |
 | Entities and inventories | Live entity-to-typed-ID mappings; every live ship's principal, design reference, cargo inventory identity, capacity, and stored amounts; inventory material and capacity reservations with their owners; lifecycle materialization and removal receipts. | Lifecycle is current, but a supported section waits for `TASK-034` to join construction, economy, and transport state. |
 | Entity and resource allocators | The next value or exhausted state for every runtime allocator, including entity, ship, inventory, motion, connector transit, order, agenda creation, command, fact, and every future owner-specific identifier. High-water marks alone are insufficient when IDs have been allocated without a live object. | Current owners and every future owner. |
-| Spatial and motion | Each live ship's discriminated spatial state, actor generation, active motion or connector-transit identity, endpoints, departure and arrival times, and the corresponding pending completion `EventKey`. | Current movement and agenda; scheduled keys become required in `TASK-039`. |
+| Spatial and motion | Each live ship's discriminated spatial state, actor generation, active motion or connector-transit identity, endpoints, departure and arrival times, and the corresponding pending completion `EventKey`. | Current movement and agenda. |
 | Control and orders | Per-ship base controller, temporary override and reason, controller revision, active/queued/suspended orders in their exact order, terminal state retained by the order owner, plan, next-leg index, motion/transit linkage, order status and reason, and order IDs/generations used by pending work. | Current actor-control and order owners. |
 | Relationships | The complete relationship inventory and direct restoration contract specified in [Relational simulation architecture](relational-simulation-architecture.md#authoritative-relationship-save-inventory): principal/content identity, player principal, exact standing policy and values, diplomacy, grants, and committed source-scoped standing and policy batch receipts. | Current relationship owner. |
 | Command admission | The next command sequence or exhausted state, last admitted command time, and any admitted-but-not-applied ordered command queue. Retained command records are history, not command authority. | Current processor sequence and admission time; queue reserved for `TASK-038`. |
@@ -177,11 +177,11 @@ behind the same policy label.
 
 ## Agenda cancellation for entity removal
 
-The current removal path invalidates a departing actor's generation and leaves
-its scheduled movement completion in the agenda. That is a valid runtime
-no-op, but it makes a checkpoint unable to distinguish an intentional orphan
-from a corrupt event that names an invented removed ship. `TASK-039` replaces
-that behavior before checkpoint capture and restore are implemented.
+Removal cancels a departing actor's exact scheduled movement completion rather
+than leaving it as a generation-invalidated agenda no-op. That prevents a
+checkpoint from confusing an intentional orphan with a corrupt event that
+names an invented removed ship. `TASK-039` established this behavior before
+checkpoint capture and restore are implemented.
 
 Active local-motion and connector-transit state must retain the exact scheduled
 `EventKey` created for their completion. During removal, the coordinator uses

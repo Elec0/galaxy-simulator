@@ -71,6 +71,16 @@ public sealed record ScheduledEvent<TEvent>(
     TEvent Payload);
 
 /// <summary>
+/// Result of checking whether one exact pending agenda entry may be cancelled.
+/// </summary>
+public enum AgendaCancellationCheck
+{
+    Matches,
+    Missing,
+    Mismatch,
+}
+
+/// <summary>
 /// Ordered agenda of future domain events.
 /// </summary>
 public sealed class EventAgenda<TEvent>
@@ -116,6 +126,45 @@ public sealed class EventAgenda<TEvent>
         var key = new EventKey(timestamp, phase, creationSequence);
         _pending.Add(key, new PendingEvent(generation, payload));
         return key;
+    }
+
+    /// <summary>
+    /// Checks one pending entry without changing agenda state or allocating a
+    /// creation sequence. The payload comparison is exact for the agenda's
+    /// event type.
+    /// </summary>
+    public AgendaCancellationCheck CheckCancellation(
+        EventKey key,
+        EventGeneration expectedGeneration,
+        TEvent expectedPayload)
+    {
+        if (!_pending.TryGetValue(key, out PendingEvent? pending))
+        {
+            return AgendaCancellationCheck.Missing;
+        }
+
+        return pending.Generation == expectedGeneration
+            && EqualityComparer<TEvent>.Default.Equals(pending.Payload, expectedPayload)
+            ? AgendaCancellationCheck.Matches
+            : AgendaCancellationCheck.Mismatch;
+    }
+
+    /// <summary>
+    /// Revalidates and removes one exact pending entry without allocating a
+    /// creation sequence. A false result leaves the agenda unchanged.
+    /// </summary>
+    public bool TryCancelExact(
+        EventKey key,
+        EventGeneration expectedGeneration,
+        TEvent expectedPayload)
+    {
+        if (CheckCancellation(key, expectedGeneration, expectedPayload)
+            != AgendaCancellationCheck.Matches)
+        {
+            return false;
+        }
+
+        return _pending.Remove(key);
     }
 
     /// <summary>

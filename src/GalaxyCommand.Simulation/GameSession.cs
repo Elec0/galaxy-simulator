@@ -25,6 +25,12 @@ public sealed class GameSession : IGameplayCommandHandler
 
     public IReadOnlyList<GameplayCommandRecord> CommandRecords => _commands.Records;
 
+    /// <summary>
+    /// Reports whether the session remains safe for authoritative mutation and
+    /// checkpoint capture.
+    /// </summary>
+    public bool IsHealthy => _runtime.IsHealthy;
+
     public ShipId? ResolveShip(EntityId entityId) =>
         _runtime.ResolveShip(entityId);
 
@@ -37,8 +43,11 @@ public sealed class GameSession : IGameplayCommandHandler
     /// </summary>
     public ConstructionEntityMaterializationResult MaterializeConstruction(
         ConstructionProcess source,
-        ConstructionMaterializationEffect effect) =>
-        _runtime.MaterializeConstruction(source, effect);
+        ConstructionMaterializationEffect effect)
+    {
+        EnsureHealthy();
+        return _runtime.MaterializeConstruction(source, effect);
+    }
 
     /// <summary>
     /// Materializes all pending construction effects in stable facility and
@@ -46,31 +55,43 @@ public sealed class GameSession : IGameplayCommandHandler
     /// </summary>
     public IReadOnlyList<ConstructionEntityMaterializationResult>
         MaterializePendingConstruction(
-            IEnumerable<ConstructionProcess> sources) =>
-        _runtime.MaterializePendingConstruction(sources);
+            IEnumerable<ConstructionProcess> sources)
+    {
+        EnsureHealthy();
+        return _runtime.MaterializePendingConstruction(sources);
+    }
 
     /// <summary>
     /// Removes one live entity through deterministic cross-owner cleanup and
     /// returns the prior receipt when the same removal is repeated.
     /// </summary>
-    public EntityRemovalResult RemoveEntity(EntityRemovalRequest request) =>
-        _runtime.RemoveEntity(request);
+    public EntityRemovalResult RemoveEntity(EntityRemovalRequest request)
+    {
+        EnsureHealthy();
+        return _runtime.RemoveEntity(request);
+    }
 
     /// <summary>
     /// Commits one idempotent batch of directional standing effects and returns
     /// its prior result when the same batch is delivered again.
     /// </summary>
     public StandingChangeBatchResult CommitStandingChanges(
-        StandingChangeBatch batch) =>
-        _runtime.CommitStandingChanges(batch);
+        StandingChangeBatch batch)
+    {
+        EnsureHealthy();
+        return _runtime.CommitStandingChanges(batch);
+    }
 
     /// <summary>
     /// Commits one idempotent batch of mutual diplomacy and explicit grant
     /// effects and returns its prior result when delivered again.
     /// </summary>
     public RelationshipPolicyChangeBatchResult CommitRelationshipPolicyChanges(
-        RelationshipPolicyChangeBatch batch) =>
-        _runtime.CommitRelationshipPolicyChanges(batch);
+        RelationshipPolicyChangeBatch batch)
+    {
+        EnsureHealthy();
+        return _runtime.CommitRelationshipPolicyChanges(batch);
+    }
 
     /// <summary>
     /// Returns the current mutual diplomatic condition for two principals.
@@ -93,11 +114,17 @@ public sealed class GameSession : IGameplayCommandHandler
             holderPrincipalId,
             kind);
 
-    public RunReport AdvanceTo(SimulationTime target) =>
-        _runtime.AdvanceTo(target);
+    public RunReport AdvanceTo(SimulationTime target)
+    {
+        EnsureHealthy();
+        return _runtime.AdvanceTo(target);
+    }
 
-    public GameSnapshot CaptureSnapshot() =>
-        _runtime.CaptureSnapshot();
+    public GameSnapshot CaptureSnapshot()
+    {
+        EnsureHealthy();
+        return _runtime.CaptureSnapshot();
+    }
 
     /// <summary>
     /// Captures a presentation-safe world and observer-scoped relationship and
@@ -116,8 +143,11 @@ public sealed class GameSession : IGameplayCommandHandler
 
     public GameplayCommandRecord SubmitCommand(
         CommandSource source,
-        GameplayCommand command) =>
-        _commands.Submit(CurrentTime, source, command);
+        GameplayCommand command)
+    {
+        EnsureHealthy();
+        return _commands.Submit(CurrentTime, source, command);
+    }
 
     public GameFactReadResult ReadFactsAfter(
         GameFactSequence? sequence,
@@ -125,6 +155,14 @@ public sealed class GameSession : IGameplayCommandHandler
         _facts.ReadAfter(sequence, maximumCount);
 
     GameplayCommandHandlingResult IGameplayCommandHandler.Handle(
-        GameplayCommandEnvelope envelope) =>
-        _runtime.Handle(envelope);
+        GameplayCommandEnvelope envelope)
+    {
+        EnsureHealthy();
+        return _runtime.Handle(envelope);
+    }
+
+    /// <summary>
+    /// Prevents authoritative operations after a failed prepared commit.
+    /// </summary>
+    private void EnsureHealthy() => _runtime.ThrowIfUnhealthy();
 }

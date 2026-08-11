@@ -30,8 +30,8 @@ identity receipts, and rejection atomicity. `PhaseOneShipMaterializer` remains
 acceptance-only. Clean-session removal now invalidates active, queued, and
 suspended entity-target orders, cancels affected local motion, removes every
 live ship owner with entity publication removed last and rejects reserved cargo.
-It records `EntityRemovedFact`; `TASK-039` will require exact movement-event
-cancellation before removal. Construction commits now record one idempotent
+It records `EntityRemovedFact`; `TASK-039` cancels exact movement-completion
+events before removal. Construction commits now record one idempotent
 `EntityMaterializedFact` in stable batch order, preserving the originating
 scheduled-event key when present. Integration with future clean-session
 economic and transport owners is tracked separately in `TASK-034`.

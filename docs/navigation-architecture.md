@@ -303,8 +303,8 @@ Beginning a leg validates that its start state and required topology still
 match. Completion validates the leg identity, generation, actor state, and
 expected completion time before applying movement. Cancellation and replacement
 invalidate pending completion through the generation contract. Destruction
-cancels its exact pending movement completion before actor removal, as tracked
-by `TASK-039`. Cancelling or replacing local motion first derives and
+cancels its exact pending movement completion before actor removal, as
+implemented by `TASK-039`. Cancelling or replacing local motion first derives and
 materializes the ship's authoritative position at the command timestamp, so it
 does not snap back to the segment's origin or forward to its destination.
 

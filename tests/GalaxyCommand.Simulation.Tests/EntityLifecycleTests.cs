@@ -306,7 +306,7 @@ public sealed class EntityLifecycleTests
     }
 
     [Fact]
-    public void RemovalUnpublishesCompleteEntityAndMakesScheduledArrivalStale()
+    public void RemovalUnpublishesCompleteEntityAndCancelsScheduledArrival()
     {
         GameSession session = GameSessionTestFixture.Create();
         GameplayCommandRecord move = session.SubmitCommand(
@@ -316,6 +316,8 @@ public sealed class EntityLifecycleTests
                 GameSessionTestFixture.Destination(100, 0),
                 OrderPlacement.ReplaceAll));
         Assert.Equal(CommandResultStatus.Accepted, move.Result.Status);
+        GameShipSnapshot moving = Assert.Single(session.CaptureSnapshot().Ships);
+        Assert.NotNull(moving.Motion?.CompletionEventKey);
         var request = new EntityRemovalRequest(
             GameSessionTestFixture.Entity,
             EntityRemovalReason.Despawned,
@@ -350,9 +352,7 @@ public sealed class EntityLifecycleTests
 
         session.AdvanceTo(new SimulationTime(100));
 
-        Assert.Equal(
-            ScheduledEventDisposition.IgnoredMissingReference,
-            Assert.Single(session.EventRecords).Disposition);
+        Assert.Empty(session.EventRecords);
         Assert.IsType<EntityRemovedFact>(
             session.ReadFactsAfter(null, 256).Facts[^1].Fact);
         GameplayCommandRecord rejected = session.SubmitCommand(

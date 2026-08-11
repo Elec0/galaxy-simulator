@@ -188,6 +188,8 @@ public enum EntityRemovalRejectionReason
     MissingEntity,
     CargoHasCommitments,
     OwnerConflict,
+    PendingMovementEventMissing,
+    PendingMovementEventMismatch,
 }
 
 public abstract record EntityRemovalResult

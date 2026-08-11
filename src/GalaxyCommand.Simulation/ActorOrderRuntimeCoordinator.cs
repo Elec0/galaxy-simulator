@@ -26,6 +26,11 @@ internal abstract record GameEvent
     internal sealed record SpatialMovement(SpatialMovementEvent Event) : GameEvent;
 }
 
+internal sealed record PreparedMovementCancellation(
+    EventKey EventKey,
+    EventGeneration Generation,
+    GameEvent Event);
+
 /// <summary>
 /// Fixed persistent coordinator for actor commands, orders, movement, spatial
 /// events, and their semantic facts.
@@ -45,6 +50,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     private readonly RelationshipOwner _relationships;
     private readonly GameFactStore _facts;
     private readonly List<GameEventRecord> _eventRecords = [];
+    private bool _isPoisoned;
 
     internal ActorOrderRuntimeCoordinator(
         GameSessionSetup setup,
@@ -155,7 +161,22 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             ]);
     }
 
-    public bool ShouldStop => false;
+    public bool ShouldStop => _isPoisoned;
+
+    internal bool IsHealthy => !_isPoisoned;
+
+    /// <summary>
+    /// Rejects an operation after a post-prepare invariant failure has made
+    /// this session unsafe to advance, command, capture, or save.
+    /// </summary>
+    internal void ThrowIfUnhealthy()
+    {
+        if (_isPoisoned)
+        {
+            throw new InvalidOperationException(
+                "The game session is unhealthy after an invariant failure.");
+        }
+    }
 
     internal RunReport AdvanceTo(SimulationTime target) =>
         _engine.RunUntil(target);
@@ -225,6 +246,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     /// </summary>
     internal EntityRemovalResult RemoveEntity(EntityRemovalRequest request)
     {
+        ThrowIfUnhealthy();
         EntityRemovalPreparation preparation = _lifecycle.PrepareRemoval(request);
         if (preparation is EntityRemovalPreparation.Resolved resolved)
         {
@@ -233,6 +255,28 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
 
         PreparedEntityRemoval removal =
             ((EntityRemovalPreparation.Prepared)preparation).Value;
+        EntityRemovalResult.Rejected? cancellationRejection =
+            PrepareMovementCancellations(removal, out PreparedMovementCancellation[] cancellations);
+        if (cancellationRejection is not null)
+        {
+            return cancellationRejection;
+        }
+
+        foreach (PreparedMovementCancellation cancellation in cancellations)
+        {
+            if (_agenda.TryCancelExact(
+                cancellation.EventKey,
+                cancellation.Generation,
+                cancellation.Event))
+            {
+                continue;
+            }
+
+            _isPoisoned = true;
+            throw new InvalidOperationException(
+                $"Prepared cancellation for {cancellation.EventKey} no longer matches the agenda.");
+        }
+
         var transitions = new List<ShipOrderTransition>();
         var factProposals = new List<GameFactProposal>();
         TargetedShipOrder[] applyOrder = removal.InboundOrders
@@ -928,11 +972,14 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                             continue;
                         }
 
-                        AgendaCommitOwner.Commit(
+                        AgendaCommitResult agendaCommit = AgendaCommitOwner.Commit(
                             _agenda,
                             [commit.EventProposal
                                 ?? throw new InvalidOperationException(
                                     $"Local motion {motion.Id} produced no arrival proposal.")]);
+                        _movement.BindCompletionEvent(
+                            shipId,
+                            AssertSingleEventKey(agendaCommit));
                         _orders.BindMotion(shipId, active.Id, motion.Id);
                         factProposals.Add(PhysicalWorkStartedProposal(
                             shipId,
@@ -953,9 +1000,12 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                                 movement =>
                                     (GameEvent)new GameEvent.SpatialMovement(movement));
                         ConnectorTransitSegment transit = commit.Transit;
-                        AgendaCommitOwner.Commit(
+                        AgendaCommitResult agendaCommit = AgendaCommitOwner.Commit(
                             _agenda,
                             [commit.EventProposal]);
+                        _movement.BindCompletionEvent(
+                            shipId,
+                            AssertSingleEventKey(agendaCommit));
                         _orders.BindTransit(shipId, active.Id, transit.Id);
                         factProposals.Add(PhysicalWorkStartedProposal(
                             shipId,
@@ -1008,6 +1058,75 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                 CurrentTime,
                 reason,
                 active.Id)));
+    }
+
+    /// <summary>
+    /// Prepares exact cancellation records for the removed actor's active
+    /// movement and verifies their identity against the agenda without
+    /// changing either owner.
+    /// </summary>
+    private EntityRemovalResult.Rejected? PrepareMovementCancellations(
+        PreparedEntityRemoval removal,
+        out PreparedMovementCancellation[] cancellations)
+    {
+        PendingMovementCompletion? completion =
+            _movement.GetPendingCompletion(removal.ShipId);
+        if (completion is null)
+        {
+            cancellations = [];
+            return null;
+        }
+
+        GameEvent expectedEvent = completion switch
+        {
+            PendingMovementCompletion.Arrival arrival =>
+                new GameEvent.SpatialMovement(new SpatialMovementEvent.Arrive(
+                    arrival.ShipId,
+                    arrival.MotionId,
+                    arrival.Generation)),
+            PendingMovementCompletion.Emergence emergence =>
+                new GameEvent.SpatialMovement(new SpatialMovementEvent.Emerge(
+                    emergence.ShipId,
+                    emergence.TransitId,
+                    emergence.Generation)),
+            _ => throw new InvalidOperationException(
+                $"Unsupported pending movement completion {completion.GetType().Name}."),
+        };
+        AgendaCancellationCheck check = _agenda.CheckCancellation(
+            completion.EventKey,
+            completion.Generation,
+            expectedEvent);
+        if (check != AgendaCancellationCheck.Matches)
+        {
+            cancellations = [];
+            EntityRemovalRejectionReason reason = check == AgendaCancellationCheck.Missing
+                ? EntityRemovalRejectionReason.PendingMovementEventMissing
+                : EntityRemovalRejectionReason.PendingMovementEventMismatch;
+            return new EntityRemovalResult.Rejected(removal.Request, reason);
+        }
+
+        cancellations =
+        [
+            new PreparedMovementCancellation(
+                completion.EventKey,
+                completion.Generation,
+                expectedEvent),
+        ];
+        Array.Sort(cancellations, static (left, right) =>
+            left.EventKey.CompareTo(right.EventKey));
+        return null;
+    }
+
+    /// <summary>
+    /// Extracts the one key created for a single movement completion proposal.
+    /// </summary>
+    private static EventKey AssertSingleEventKey(AgendaCommitResult commit)
+    {
+        ArgumentNullException.ThrowIfNull(commit);
+        return commit.EventKeys.Count == 1
+            ? commit.EventKeys[0]
+            : throw new InvalidOperationException(
+                "A movement completion proposal must create exactly one agenda event.");
     }
 
     private static void AddOrderTransitionProposals(
@@ -1068,7 +1187,8 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             motion.Origin,
             motion.Destination,
             motion.DepartedAt,
-            motion.ArrivesAt);
+            motion.ArrivesAt,
+            motion.CompletionEventKey);
 
     private static ConnectorTransitSnapshot Snapshot(
         ConnectorTransitSegment transit) =>
@@ -1079,7 +1199,8 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             transit.Source,
             transit.Destination,
             transit.DepartedAt,
-            transit.ArrivesAt);
+            transit.ArrivesAt,
+            transit.CompletionEventKey);
 
     private NavigationPlanResult Plan(
         ShipId shipId,

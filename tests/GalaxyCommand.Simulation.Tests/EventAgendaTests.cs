@@ -127,6 +127,42 @@ public sealed class EventAgendaTests
     }
 
     [Fact]
+    public void ExactCancellationChecksIdentityAndDoesNotAllocateASequence()
+    {
+        var agenda = new EventAgenda<string>();
+        var generation = new EventGeneration(4);
+        EventKey key = agenda.Schedule(
+            new SimulationTime(10),
+            EventPhase.PhysicalCompletion,
+            generation,
+            "arrival");
+
+        Assert.Equal(
+            AgendaCancellationCheck.Mismatch,
+            agenda.CheckCancellation(key, generation, "emergence"));
+        Assert.False(agenda.TryCancelExact(key, generation, "emergence"));
+        Assert.Equal(
+            AgendaCancellationCheck.Missing,
+            agenda.CheckCancellation(
+                new EventKey(new SimulationTime(10), EventPhase.PhysicalCompletion, 99),
+                generation,
+                "arrival"));
+        Assert.Equal(
+            AgendaCancellationCheck.Matches,
+            agenda.CheckCancellation(key, generation, "arrival"));
+        Assert.True(agenda.TryCancelExact(key, generation, "arrival"));
+
+        EventKey next = agenda.Schedule(
+            new SimulationTime(20),
+            EventPhase.PhysicalCompletion,
+            generation,
+            "next");
+
+        Assert.Equal(1UL, next.CreationSequence);
+        Assert.Equal(1, agenda.Count);
+    }
+
+    [Fact]
     public void AgendaOwnerAllocatesSequencesByStableProposalOrder()
     {
         var agenda = new EventAgenda<string>();

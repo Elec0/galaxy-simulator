@@ -13,27 +13,12 @@ rather than deleting them.
 
 ## Current focus
 
-`TASK-014` has defined the authoritative save boundary. `TASK-039` is the
-current prerequisite for checkpoint capture and restore: entity removal must
-cancel its exact pending movement events. `TASK-034` remains required before
-supported save or load because construction, economy, and transport must join
-the clean `GameSession` aggregate.
+`TASK-014` has defined the authoritative save boundary, and `TASK-039` now
+ensures removed entities leave no pending movement completion behind.
+`TASK-034` remains required before supported save or load because construction,
+economy, and transport must join the clean `GameSession` aggregate.
 
 ## Near-term work
-
-- [ ] **TASK-039: Cancel removed-entity movement events from the agenda**
-  - Retain the scheduled `EventKey` on active local motion and connector
-    transit, then prepare, revalidate, and cancel the exact events during
-    entity removal in ascending key order.
-  - Add narrow non-allocating agenda lookup and cancellation operations that
-    verify the key, generation, and movement identity without consuming a
-    creation sequence. An unexpected post-prepare mismatch poisons the session
-    and its health gate prevents further simulation or saving.
-  - Preserve ordinary stale-generation behavior for live actors, but leave no
-    removed-entity movement event in the pending agenda. Add focused
-    cancellation, fault-injection, and continuation tests before implementing
-    checkpoint capture and restore.
-  - Context: [Authoritative save boundary](authoritative-save-boundary.md#agenda-cancellation-for-entity-removal) · [Entity lifecycle and explicit spawning](entity-lifecycle.md)
 
 ## Future parking lot
 
@@ -101,6 +86,21 @@ prerequisites and desired behavior are sufficiently defined.
   - Define deterministic migrations or clear incompatibility diagnostics when
     an older save references renamed, replaced, removed, or changed content.
   - Context: [Relational simulation architecture](relational-simulation-architecture.md)
+
+- [ ] **TASK-040: Define player-safe recovery from corrupted sessions and content failures**
+  - Decide the player-facing flow for a poisoned live session, failed
+    checkpoint validation, and unavailable, incompatible, or corrupt built-in
+    and mod-provided content.
+  - Preserve the authoritative rule that invalid state never resumes, silently
+    repairs, or publishes a partial session. Determine the safe recovery
+    choices, diagnostic capture, actionable explanation, and how the player
+    returns to a verified session without exposing internal exception detail.
+  - Define the provenance and compatibility information needed to identify a
+    failing content source and the boundary between disabling content for a
+    future load and preserving an already-running authoritative session.
+  - Add focused failure-injection and continuity tests once the recovery
+    contract is accepted. Depends on `TASK-022`, `TASK-023`, and `TASK-037`.
+  - Context: [Authoritative save boundary](authoritative-save-boundary.md) · [Version content catalogs](task-list.md#task-037-version-content-catalogs-and-migrate-saved-content-references)
 
 - [ ] **TASK-038: Implement application pause, speed, and input timing**
   - Replace fixed real-time advancement with the accepted pacing state and
@@ -202,14 +202,26 @@ prerequisites and desired behavior are sufficiently defined.
 
 ## Completed foundations
 
+- [x] **TASK-039: Cancel removed-entity movement events from the agenda**
+  - Active local motion and connector transit retain their scheduled completion
+    `EventKey`. Removal prepares, revalidates, and cancels that exact event
+    before cross-owner cleanup, with no creation-sequence allocation.
+  - Missing or mismatched movement entries reject during preparation; a
+    post-prepare mismatch poisons the session and blocks authoritative work or
+    checkpoint capture. Ordinary stale events for live actors remain valid
+    deterministic no-ops.
+  - Added focused agenda identity and sequence tests plus local-motion and
+    connector-transit removal continuation coverage.
+  - Context: [Authoritative save boundary](authoritative-save-boundary.md#agenda-cancellation-for-entity-removal) · [Entity lifecycle and explicit spawning](entity-lifecycle.md)
+
 - [x] **TASK-014: Define the authoritative save boundary**
   - Defined complete authoritative checkpoint inventory, completed-commit
     capture timing, source-health admission, private direct restoration, and
     non-authoritative exclusions.
   - Defined aggregate admission: supported saves and loads remain blocked until
     `TASK-034` brings construction, economy, and transport into the clean
-    `GameSession` aggregate. `TASK-039` must cancel removed-entity movement
-    events before checkpoint capture and restore implementation.
+    `GameSession` aggregate. `TASK-039` cancels removed-entity movement events
+    before checkpoint capture and restore implementation.
   - Save encoding and versioning remain in `TASK-022`; versioned content
     catalogs and saved content-reference migration remain in `TASK-037`.
     Future domain owners must supply their own authoritative sections before

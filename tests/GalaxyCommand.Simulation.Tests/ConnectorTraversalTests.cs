@@ -132,6 +132,28 @@ public sealed class ConnectorTraversalTests
     }
 
     [Fact]
+    public void RemovingDuringTransitCancelsScheduledEmergence()
+    {
+        GameSession session = CreateSession();
+        Submit(session, MoveTo(Destination(0), OrderPlacement.ReplaceAll));
+        session.AdvanceTo(new SimulationTime(10));
+
+        GameShipSnapshot transit = Assert.Single(session.CaptureSnapshot().Ships);
+        Assert.NotNull(transit.Transit?.CompletionEventKey);
+        int eventsBeforeRemoval = session.EventRecords.Count;
+
+        EntityRemovalResult result = session.RemoveEntity(new EntityRemovalRequest(
+            GameSessionTestFixture.Entity,
+            EntityRemovalReason.Destroyed,
+            EntityCargoDisposition.DiscardCargo));
+
+        Assert.IsType<EntityRemovalResult.Removed>(result);
+        Assert.Empty(session.CaptureSnapshot().Ships);
+        session.AdvanceTo(new SimulationTime(60));
+        Assert.Equal(eventsBeforeRemoval, session.EventRecords.Count);
+    }
+
+    [Fact]
     public void ReplacementDuringTransitWaitsAndWakesOnEmergence()
     {
         GameSession session = CreateSession();
