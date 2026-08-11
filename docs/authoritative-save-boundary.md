@@ -13,12 +13,12 @@ It deliberately does not select an encoding, persistence medium, schema
 versioning mechanism, or content migration policy. Those decisions remain with
 `TASK-022` and `TASK-037`.
 
-Supported saves begin only after `TASK-034` has brought construction, economy,
-and transport owners into the `GameSession` aggregate. The current public
-`MaterializeConstruction` operation mutates both `GameSession` and a caller-
-supplied `ConstructionProcess`, so the session alone is not yet a complete
-checkpoint root. There is no supported-save exception for a session that appears
-to have no external workflow state.
+`TASK-034` brought construction, economy, and transport owners into the
+`GameSession` aggregate and retired the public operations that accepted a
+caller-supplied `ConstructionProcess`. The session is now the complete
+authoritative aggregate required for checkpoint work. This establishes
+aggregate admission; it does not implement save encoding or storage, which
+remain `TASK-022` work.
 
 **Decision status:** Proposed for project-owner review.
 
@@ -79,27 +79,18 @@ it is not repaired by replaying part of the checkpoint.
 
 ## Aggregate admission boundary
 
-`GameSession` owns lifecycle state, but its current construction materialization
-operation acknowledges the supplied `ConstructionProcess` while committing the
-corresponding lifecycle result. Capturing only the session could therefore
-preserve one half of a cross-owner operation while omitting the construction
-owner's order, pending-materialization, acknowledgement, and receipt state.
-That is not an authoritative checkpoint.
-
-The selected boundary is that no save or load is supported until `TASK-034`
-places clean-session construction, economy, and transport owners inside one
-`GameSession` aggregate. That work must make their workflow state, pending
-effects, reservations, commitments, scheduled work, allocators, and receipts
-available to the same private checkpoint coordinator as lifecycle, movement,
-relationships, agenda, commands, and facts. The coordinator captures the whole
+The selected boundary requires clean-session construction, economy, and
+transport owners inside one `GameSession` aggregate. `TASK-034` established
+that ownership: their workflow state, pending effects, reservations,
+commitments, scheduled work, allocators, and receipts now sit behind the same
+private aggregate boundary as lifecycle, movement, relationships, agenda,
+commands, and facts. The future checkpoint coordinator captures the whole
 aggregate at one completed commit boundary and restores the whole aggregate
 before publication.
 
-Until then, `GameSession.CaptureSnapshot` remains a presentation read model;
-neither it nor any new API may be represented as an authoritative save capture.
-A caller cannot make the boundary safe by promising that an externally supplied
-owner is idle, empty, or currently has no pending materialization. The owner is
-outside the aggregate, so its state is unavailable for atomic capture.
+`GameSession.CaptureSnapshot` remains a presentation read model; neither it nor
+any new API may be represented as an authoritative save capture. `TASK-022`
+must define a separate checkpoint representation over the complete aggregate.
 
 ## Required owner sections
 
@@ -109,14 +100,14 @@ section whose owning task has not yet defined its internal model.
 
 | Section | Required authoritative information | Status and owner |
 | --- | --- | --- |
-| Aggregate admission | Evidence that all authoritative workflow owners are inside the checkpoint aggregate. No caller-supplied construction, economy, or transport owner may remain outside it. | Blocks supported saves until `TASK-034`. |
+| Aggregate admission | Evidence that all authoritative workflow owners are inside the checkpoint aggregate. No caller-supplied construction, economy, or transport owner may remain outside it. | Established by `TASK-034`; future owners must meet the same rule. |
 | Capture health | A healthy aggregate and healthy participating owners at the completed capture boundary. A poisoned or partially failed source is rejected before any owner state is captured. | Capture precondition only; never saved. |
-| Checkpoint identity | Save identity, the compatible game/content identity, and the authoritative simulation time. The format/schema representation is deferred. | Format in `TASK-022`, content compatibility in `TASK-037`; supported capture waits for `TASK-034`. |
+| Checkpoint identity | Save identity, the compatible game/content identity, and the authoritative simulation time. The format/schema representation is deferred. | Format in `TASK-022`; content compatibility in `TASK-037`. |
 | Engine checkpoint | The completed checkpoint state needed to continue rather than repeat initialization: current time, initialized/accrual progress, and the fact that no event phase is open. | Current engine. |
 | Pending agenda | Every pending event's complete `EventKey` (time, phase, creation sequence), generation, and discriminated payload, plus the next agenda creation sequence including exhaustion. Entity removal must first cancel its movement events; ordinary stale-generation events for live actors remain valid deterministic no-ops. | Current engine and each event-owning domain. |
 | Deterministic runtime policies | A policy manifest naming every injected strategy that can affect a later authoritative decision. Each entry requires a stable kind, algorithm/behavior version, exact parameters, and its compatible content references or a rejection if the implementation is unavailable. It includes materialization policies and allowed ship designs, navigation planning and travel-time policy, fact-retention capacity, and every future injected decision strategy. | Current setup and `GameSession` composition; concrete encoding in `TASK-022`. |
 | World topology | Every star system, connector endpoint, directional connection, and any later enabled, access, or dynamic topology state. Immutable authored definitions may be resolved by stable content reference only when exact compatibility is validated. | Current topology; future topology policy belongs to its owning domain. |
-| Entities and inventories | Live entity-to-typed-ID mappings; every live ship's principal, design reference, cargo inventory identity, capacity, and stored amounts; inventory material and capacity reservations with their owners; lifecycle materialization and removal receipts. | Lifecycle is current, but a supported section waits for `TASK-034` to join construction, economy, and transport state. |
+| Entities and inventories | Live entity-to-typed-ID mappings; every live ship's principal, design reference, cargo inventory identity, capacity, and stored amounts; inventory material and capacity reservations with their owners; lifecycle materialization and removal receipts. | Current aggregate ownership established by `TASK-034`; encoding remains `TASK-022`. |
 | Entity and resource allocators | The next value or exhausted state for every runtime allocator, including entity, ship, inventory, motion, connector transit, order, agenda creation, command, fact, and every future owner-specific identifier. High-water marks alone are insufficient when IDs have been allocated without a live object. | Current owners and every future owner. |
 | Spatial and motion | Each live ship's discriminated spatial state, actor generation, active motion or connector-transit identity, endpoints, departure and arrival times, and the corresponding pending completion `EventKey`. | Current movement and agenda. |
 | Control and orders | Per-ship base controller, temporary override and reason, controller revision, active/queued/suspended orders in their exact order, terminal state retained by the order owner, plan, next-leg index, motion/transit linkage, order status and reason, and order IDs/generations used by pending work. | Current actor-control and order owners. |
@@ -128,7 +119,7 @@ section whose owning task has not yet defined its internal model.
 | Script execution | Every persistent script instance, definition reference, program/version checkpoint, trigger subscriptions, one-shot or repeatable memory, locals that affect future behavior, pending wake/cancellation state, and script-owned idempotency receipts. Scheduled wakes also appear in the agenda. | Reserved for `TASK-017`. |
 | Dialogue continuity | Every active or suspended conversation, participant and definition references, current node, availability/consumption/repeatability memory, selected consequences, response-required state, and any deterministic timeout or wake state. | Reserved for `TASK-016`. |
 | Knowledge and player state | Any future authoritative knowledge, staleness, discovery, or player preference state whose absence changes commands or simulation behavior. Purely local presentation settings are excluded. | Knowledge in `TASK-020`; pacing/input preferences in `TASK-038`. |
-| Future domain owners | Complete workflow state, pending effects, reservations, commitments, scheduling links, allocator state, and committed receipts for every owner later added to `GameSession`. | Required aggregate-admission rule for `TASK-034` and later work. |
+| Future domain owners | Complete workflow state, pending effects, reservations, commitments, scheduling links, allocator state, and committed receipts for every owner later added to `GameSession`. | Required aggregate-admission rule for all later work. |
 
 The former Phase 1 acceptance composition has its own fixture state and does
 not define the production save boundary. If it later becomes a supported saved
@@ -267,9 +258,9 @@ The following are not save authority and cannot rebuild the world:
 
 ## Restore procedure
 
-1. Admit save or load only after `TASK-034` establishes the complete
-   `GameSession` aggregate, then decode into an inert checkpoint representation
-   selected by `TASK-022`.
+1. Decode into an inert checkpoint representation selected by `TASK-022`, with
+   the complete `GameSession` aggregate established by `TASK-034` as the
+   authoritative source and restoration target.
 2. Resolve content references and the deterministic runtime-policy manifest
    through the version and provenance boundaries selected by `TASK-037`.
 3. Validate each owner section independently, then validate all cross-owner
@@ -289,8 +280,8 @@ change sequences, receipts, history, or outcomes.
 `TASK-014` is complete only when an in-memory checkpoint contract proves this
 boundary without choosing a file format. The focused tests must cover:
 
-- Supported checkpoint capture is unavailable before `TASK-034`; an apparently
-  idle caller-supplied `ConstructionProcess` does not create an exception.
+- The public session boundary exposes no operation that accepts a caller-owned
+  construction, economy, or transport workflow.
 - A completed aggregate captures and restores construction, economy, transport,
   lifecycle, and all other owner state together at one commit boundary.
 - Fault injection after a partial apply poisons the source aggregate; capture
@@ -331,7 +322,7 @@ that the boundary is complete.
 `TASK-022` owns encoded save schema, versioning, migration, corruption
 handling, and storage mechanics. `TASK-037` owns versioned content catalogs,
 source provenance, and saved content-reference migration. `TASK-016` through
-`TASK-021`, `TASK-025`, `TASK-034`, and `TASK-038` must each supply the precise
-state for their reserved section before their runtime owner can participate in
-a supported save. `TASK-034` is the first aggregate-admission prerequisite for
-any supported save or load.
+`TASK-021`, `TASK-025`, and `TASK-038` must each supply the precise state for
+their reserved section before their runtime owner can participate in a
+supported save. `TASK-034` completed the first aggregate-admission prerequisite
+for supported save and load work.

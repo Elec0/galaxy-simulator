@@ -13,13 +13,22 @@ rather than deleting them.
 
 ## Current focus
 
-`TASK-031` is complete. `TASK-034` is now the required clean-session economy
-and transport integration work before supported save or load, because
-construction, economy, and transport must join the `GameSession` aggregate.
-`TASK-014` has defined the authoritative save boundary, and `TASK-039` ensures
-removed entities leave no pending movement completion behind.
+`TASK-034` is complete. Construction, economy, and transport now belong to the
+clean `GameSession` aggregate, and removed entities leave neither economic
+commitments nor pending movement completion behind. `TASK-022` is the next
+save-boundary task: select the encoded save format, versioning, and migration
+strategy for the authoritative inventory defined by `TASK-014`.
 
 ## Near-term work
+
+- [ ] **TASK-022: Select save format, versioning, and migration strategy**
+  - Define the encoded save schema, format versioning, validation, corruption
+    handling, storage mechanics, and deterministic schema migration.
+  - Build on the authoritative boundary from `TASK-014` and the complete
+    aggregate admission established by `TASK-034`.
+  - Keep content catalog identity, provenance, and saved content-reference
+    migration in `TASK-037`.
+  - Context: [Authoritative save boundary](authoritative-save-boundary.md)
 
 ## Future parking lot
 
@@ -65,11 +74,6 @@ prerequisites and desired behavior are sufficiently defined.
 - [ ] **TASK-021: Define random-number stream ownership**
   - Decide how systems and scripts receive deterministic randomness.
   - Preserve reproducibility when unrelated systems add random draws.
-
-- [ ] **TASK-022: Select save format, versioning, and migration strategy**
-  - Begin only after the authoritative save boundary is understood.
-  - Own save schema and serialization migration; `TASK-037` separately owns
-    versioned content catalogs and migration of saved content references.
 
 - [ ] **TASK-023: Decide the gameplay content format**
   - Determine which content is code-defined, data-defined, or externally
@@ -166,28 +170,6 @@ prerequisites and desired behavior are sufficiently defined.
     selection contract in `TASK-010`.
   - Context: [Presentation snapshots](presentation-snapshots.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
-- [ ] **TASK-034: Integrate clean-session economy and transport with entity lifecycle**
-  - In progress: generic immutable new-game economy configuration now names
-    facilities, inventories, production, ship construction, logistics anchors,
-    and initial freighters without importing the Phase 1 fixture. The session
-    now constructs private owner state and dispatches its production,
-    construction, and transport work through the shared agenda. Removal now
-    prepares and releases every affected transport commitment before cargo
-    disposal, leaving invalidated scheduled transport work as deterministic
-    no-ops. Next, retire external construction workflow ownership from the
-    public session boundary.
-  - Begin only after reusable economic and transport owners join the clean
-    `GameSession`; do not pull acceptance-only Phase 1 ownership into production.
-  - Make construction, economy, and transport state part of the session's
-    atomic aggregate so `TASK-014` can support save and load without an
-    externally supplied authoritative workflow owner.
-  - Add owner-provided prepare and release operations for jobs, reservations,
-    capacity commitments, and scheduled work that reference a removed ship or
-    cargo inventory.
-  - Preserve lifecycle rejection atomicity, deterministic owner ordering,
-    missing-reference event behavior, and lifecycle fact ordering.
-  - Context: [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Runtime orchestration](runtime-orchestration.md)
-
 - [ ] **TASK-036: Define piracy and its relationship consequences**
   - Define which acts count as piracy and distinguish piracy from ordinary
     trade, territorial violations, salvage, privateering, and declared war.
@@ -203,6 +185,19 @@ prerequisites and desired behavior are sufficiently defined.
 
 ## Completed foundations
 
+- [x] **TASK-034: Integrate clean-session economy and transport with entity lifecycle**
+  - Added a generic immutable new-game economy seed and private session-owned
+    production, construction, logistics, transport, inventory, and freighter
+    state without importing the Phase 1 acceptance fixture.
+  - Routed economic work through the shared deterministic agenda, materialized
+    completed construction through lifecycle with its scheduled event as the
+    semantic cause, and preserved stable facility allocation order.
+  - Removal prepares and releases affected transport commitments before cargo
+    disposal. The public session no longer accepts caller-owned construction
+    processes or pending materialization workflows, completing aggregate
+    admission for the save boundary defined by `TASK-014`.
+  - Context: [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Runtime orchestration](runtime-orchestration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
+
 - [x] **TASK-031: Migrate Phase 1 logistics to hierarchical navigation**
   - Approved and implemented the explicit Mine, Refinery, and Shipyard mapping
     to systems, anchored facility and inventory entities, initial ships, and
@@ -217,7 +212,7 @@ prerequisites and desired behavior are sufficiently defined.
     final-state digest `424bec2061b0e8f9`.
   - Phase 1 remains a test-only whole-simulation acceptance fixture. Its former
     CLI entrypoint and `baseline.phase-one` benchmark are retired. `TASK-034`
-    owns clean-session economic and transport composition.
+    completed clean-session economic and transport composition.
   - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 - [x] **TASK-039: Cancel removed-entity movement events from the agenda**
@@ -236,10 +231,10 @@ prerequisites and desired behavior are sufficiently defined.
   - Defined complete authoritative checkpoint inventory, completed-commit
     capture timing, source-health admission, private direct restoration, and
     non-authoritative exclusions.
-  - Defined aggregate admission: supported saves and loads remain blocked until
-    `TASK-034` brings construction, economy, and transport into the clean
-    `GameSession` aggregate. `TASK-039` cancels removed-entity movement events
-    before checkpoint capture and restore implementation.
+  - Defined aggregate admission. `TASK-034` subsequently brought construction,
+    economy, and transport into the clean `GameSession` aggregate, and
+    `TASK-039` cancels removed-entity movement events before checkpoint capture
+    and restore implementation.
   - Save encoding and versioning remain in `TASK-022`; versioned content
     catalogs and saved content-reference migration remain in `TASK-037`.
     Future domain owners must supply their own authoritative sections before
@@ -299,7 +294,7 @@ prerequisites and desired behavior are sufficiently defined.
   - Added deterministic removal across current clean-session owners, including
     active, queued, and suspended target invalidation, reserved-cargo rejection,
     stale scheduled-event handling, presentation resolution, and removal facts.
-  - Future clean-session economic and transport owner cleanup is tracked in
+  - Clean-session economic and transport owner cleanup was completed by
     `TASK-034`; legacy spatial migration was completed by `TASK-031`.
   - Context: [Entity lifecycle and explicit spawning](entity-lifecycle.md)
 

@@ -98,34 +98,6 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     internal EntityId? ResolveEntity(ShipId shipId) =>
         _lifecycle.Entities.GetEntityId(shipId);
 
-    internal ConstructionEntityMaterializationResult MaterializeConstruction(
-        ConstructionProcess source,
-        ConstructionMaterializationEffect effect)
-    {
-        ConstructionMaterializationCommit commit =
-            _lifecycle.MaterializeConstruction(source, effect, CurrentTime);
-        CommitMaterializationFact(commit);
-        return commit.Result;
-    }
-
-    /// <summary>
-    /// Commits pending construction in lifecycle-defined stable order and
-    /// records facts in that same order for newly applied results.
-    /// </summary>
-    internal IReadOnlyList<ConstructionEntityMaterializationResult>
-        MaterializePendingConstruction(
-            IEnumerable<ConstructionProcess> sources)
-    {
-        IReadOnlyList<ConstructionMaterializationCommit> commits =
-            _lifecycle.MaterializePendingConstruction(sources, CurrentTime);
-        foreach (ConstructionMaterializationCommit commit in commits)
-        {
-            CommitMaterializationFact(commit);
-        }
-
-        return commits.Select(commit => commit.Result).ToArray();
-    }
-
     /// <summary>
     /// Emits one lifecycle fact for a newly applied materialization and emits
     /// nothing for deferred or idempotently repeated results.
@@ -142,15 +114,12 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         SystemPosition position = _movement.PositionAt(materialized.ShipId, CurrentTime)
             ?? throw new InvalidOperationException(
                 $"Materialized ship {materialized.ShipId} has no initial position.");
-        GameFactCause cause = materialized.Effect.CompletionEventKey is { } eventKey
-            ? new ScheduledEventFactCause(eventKey)
-            : new ConstructionMaterializationFactCause(
-                materialized.Effect.FacilityId,
-                materialized.Effect.OrderId,
-                materialized.Effect.Generation);
+        EventKey eventKey = materialized.Effect.CompletionEventKey
+            ?? throw new InvalidOperationException(
+                "Session-owned construction materialization has no scheduled completion event.");
         _facts.Commit(
             CurrentTime,
-            cause,
+            new ScheduledEventFactCause(eventKey),
             [
                 new GameFactProposal(
                     new GameFactProposalKey(

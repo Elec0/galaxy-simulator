@@ -62,7 +62,118 @@ public sealed class GameSessionEconomySetupTests
         Assert.Equal(ScheduledEventDisposition.Applied, completion.Disposition);
         var economic = Assert.IsType<GameEventKind.Economic>(completion.Kind);
         Assert.IsType<EconomicEvent.ConstructionComplete>(economic.Event);
+        GameShipSnapshot materialized = Assert.Single(
+            session.CaptureSnapshot().Ships,
+            ship => ship.Id == new ShipId(2));
+        Assert.Equal(new EntityId(2), materialized.EntityId);
+        Assert.Equal(new InventoryId(3), materialized.CargoInventoryId);
+        Assert.Equal(GameSessionTestFixture.Principal, materialized.PrincipalId);
+        Assert.Equal(GameSessionTestFixture.Design.Id, materialized.DesignId);
+        Assert.Equal(GameSessionTestFixture.Design.CargoCapacity, materialized.CargoCapacity);
+        Assert.Equal(GameSessionTestFixture.Position(0, 0), materialized.Position);
+        Assert.Equal(GameSessionTestFixture.PlayerController, materialized.Control.BaseController);
+        Assert.Null(materialized.Control.TemporaryOverride);
+        Assert.Null(materialized.CurrentOrder);
+        Assert.Empty(materialized.QueuedOrders);
+        Assert.Empty(materialized.SuspendedOrders);
+        Assert.Equal(materialized.Id, session.ResolveShip(materialized.EntityId));
+        Assert.Equal(materialized.EntityId, session.ResolveEntity(materialized.Id));
+
+        GameFactEnvelope envelope = Assert.Single(session.ReadFactsAfter(null, 16).Facts);
+        Assert.Equal(
+            new EventKey(
+                completion.Timestamp,
+                completion.Phase,
+                completion.CreationSequence),
+            Assert.IsType<ScheduledEventFactCause>(envelope.Cause).Key);
+        var fact = Assert.IsType<EntityMaterializedFact>(envelope.Fact);
+        Assert.Equal(materialized.EntityId, fact.EntityId);
+        Assert.Equal(materialized.Id, fact.ShipId);
+        Assert.Equal(EntityMaterializationSourceKind.Construction, fact.SourceKind);
+        Assert.Equal(materialized.PrincipalId, fact.PrincipalId);
+        Assert.Equal(materialized.DesignId, fact.DesignId);
+        Assert.Equal(materialized.Position, fact.InitialPosition);
+
+        session.AdvanceTo(new SimulationTime(2_000));
+
         Assert.Equal(2, session.CaptureSnapshot().Ships.Count);
+        Assert.Single(session.EventRecords);
+        Assert.Single(session.ReadFactsAfter(null, 16).Facts);
+    }
+
+    [Fact]
+    public void SessionOwnedConstructionUsesStableFacilityOrder()
+    {
+        var lowerFacility = new FacilityId(1);
+        var higherFacility = new FacilityId(2);
+        var lowerInventory = new InventoryId(2);
+        var higherInventory = new InventoryId(3);
+        GameSessionEconomySetup economy = new(
+            [
+                new InitialInventorySetup(lowerInventory, new Quantity(20), []),
+                new InitialInventorySetup(higherInventory, new Quantity(20), []),
+            ],
+            [
+                new EconomyFacilitySetup(
+                    higherFacility,
+                    higherInventory,
+                    new LocationId(2),
+                    GameSessionTestFixture.Position(20, 0)),
+                new EconomyFacilitySetup(
+                    lowerFacility,
+                    lowerInventory,
+                    new LocationId(1),
+                    GameSessionTestFixture.Position(10, 0)),
+            ],
+            [],
+            [
+                new ConstructionFacilitySetup(higherFacility, new Throughput(1)),
+                new ConstructionFacilitySetup(lowerFacility, new Throughput(1)),
+            ],
+            [GameSessionTestFixture.Design],
+            [
+                new InitialConstructionOrderSetup(
+                    higherFacility,
+                    GameSessionTestFixture.Design.Id),
+                new InitialConstructionOrderSetup(
+                    lowerFacility,
+                    GameSessionTestFixture.Design.Id),
+            ],
+            [],
+            new UnreachableLogisticsNavigation(),
+            new TransportTiming(
+                SimulationDuration.Zero,
+                new TransferRate(1),
+                new TransferRate(1)));
+        var setup = new GameSessionSetup(
+            [new StarSystem(GameSessionTestFixture.System, "Test System")],
+            [CreateInitialShip()],
+            new ConnectorTopology([], []),
+            [
+                CreateMaterializationPolicy(lowerFacility, 10),
+                CreateMaterializationPolicy(higherFacility, 20),
+            ],
+            economy,
+            GameSessionTestFixture.Relationships,
+            factRetentionCapacity: 16);
+        var session = new GameSession(
+            setup,
+            new DirectLocalNavigationPlanner(new GameSessionTestFixture.FixedTravelTimeEstimator()));
+
+        session.AdvanceTo(new SimulationTime(1_000));
+
+        EntityMaterializedFact[] facts = session.ReadFactsAfter(null, 16).Facts
+            .Select(envelope => Assert.IsType<EntityMaterializedFact>(envelope.Fact))
+            .ToArray();
+        Assert.Equal(
+            [new EntityId(2), new EntityId(3)],
+            facts.Select(fact => fact.EntityId));
+        Assert.Equal(
+            [GameSessionTestFixture.Position(10, 0), GameSessionTestFixture.Position(20, 0)],
+            facts.Select(fact => fact.InitialPosition));
+        Assert.Equal(
+            [new ShipId(2), new ShipId(3)],
+            facts.Select(fact => fact.ShipId));
     }
 
     [Fact]
@@ -120,10 +231,15 @@ public sealed class GameSessionEconomySetupTests
         GameSessionTestFixture.Position(0, 0),
         GameSessionTestFixture.PlayerController);
 
-    private static ShipMaterializationPolicy CreateMaterializationPolicy() => new(
-        new FacilityId(1),
+    private static ShipMaterializationPolicy CreateMaterializationPolicy() =>
+        CreateMaterializationPolicy(new FacilityId(1), 0);
+
+    private static ShipMaterializationPolicy CreateMaterializationPolicy(
+        FacilityId facilityId,
+        long x) => new(
+        facilityId,
         GameSessionTestFixture.Principal,
-        GameSessionTestFixture.Position(0, 0),
+        GameSessionTestFixture.Position(x, 0),
         GameSessionTestFixture.PlayerController,
         InitialShipOrderPolicy.NoInitialOrder,
         [GameSessionTestFixture.Design]);

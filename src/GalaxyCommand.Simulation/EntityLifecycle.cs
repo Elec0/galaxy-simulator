@@ -101,7 +101,7 @@ public sealed record GameSessionShip(
     ConstructionDesignId DesignId,
     InventoryId CargoInventoryId);
 
-public enum ConstructionMaterializationDeferredReason
+internal enum ConstructionMaterializationDeferredReason
 {
     SourceFacilityMismatch,
     MissingPendingMaterialization,
@@ -114,7 +114,7 @@ public enum ConstructionMaterializationDeferredReason
     OwnerConflict,
 }
 
-public abstract record ConstructionEntityMaterializationResult
+internal abstract record ConstructionEntityMaterializationResult
 {
     private ConstructionEntityMaterializationResult()
     {
@@ -524,51 +524,6 @@ internal sealed class EntityLifecycleOwner
             inventoryId);
         _receipts.Add(key, result);
         return new ConstructionMaterializationCommit(result, WasApplied: true);
-    }
-
-    /// <summary>
-    /// Normalizes construction sources into stable facility and order order,
-    /// then commits each pending materialization through the single-item path.
-    /// </summary>
-    internal IReadOnlyList<ConstructionMaterializationCommit>
-        MaterializePendingConstruction(
-            IEnumerable<ConstructionProcess> sources,
-            SimulationTime now)
-    {
-        ArgumentNullException.ThrowIfNull(sources);
-        var orderedSources = new SortedDictionary<FacilityId, ConstructionProcess>(
-            EntityIdComparer<FacilityId>.Instance);
-        foreach (ConstructionProcess source in sources)
-        {
-            ArgumentNullException.ThrowIfNull(source);
-            if (orderedSources.TryGetValue(
-                    source.FacilityId,
-                    out ConstructionProcess? existing))
-            {
-                if (!ReferenceEquals(existing, source))
-                {
-                    throw new ArgumentException(
-                        $"Multiple construction processes claim facility {source.FacilityId}.",
-                        nameof(sources));
-                }
-
-                continue;
-            }
-
-            orderedSources.Add(source.FacilityId, source);
-        }
-
-        var results = new List<ConstructionMaterializationCommit>();
-        foreach (ConstructionProcess source in orderedSources.Values)
-        {
-            foreach (ConstructionMaterializationEffect effect in
-                     source.PendingMaterializations)
-            {
-                results.Add(MaterializeConstruction(source, effect, now));
-            }
-        }
-
-        return results.AsReadOnly();
     }
 
     internal EntityRemovalPreparation PrepareRemoval(

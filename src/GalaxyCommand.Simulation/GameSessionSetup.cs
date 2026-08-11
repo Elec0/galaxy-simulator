@@ -262,8 +262,8 @@ public sealed class GameSessionSetup
     public IReadOnlyList<ShipMaterializationPolicy> MaterializationPolicies { get; }
 
     /// <summary>
-    /// Gets the optional generic new-game economic seed. A later TASK-034
-    /// slice constructs and runs its private owners from this input.
+    /// Gets the optional generic new-game economic seed used to construct the
+    /// session's private economy, construction, and transport owners.
     /// </summary>
     public GameSessionEconomySetup? Economy { get; }
 

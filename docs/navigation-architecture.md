@@ -474,7 +474,7 @@ is generally instantaneous.
 Each ship cargo inventory remains attached to its owning ship entity. The
 fixture's legacy `OrganizationId` continues to identify ownership within the
 acceptance composition. It does not create a parallel `GameSession` entity or
-principal model, which remains `TASK-034` work.
+principal model; `TASK-034` completed that production integration separately.
 
 The two legacy bidirectional links become directional connector transit pairs:
 

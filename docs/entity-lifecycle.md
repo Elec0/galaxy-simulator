@@ -32,9 +32,9 @@ suspended entity-target orders, cancels affected local motion, removes every
 live ship owner with entity publication removed last and rejects reserved cargo.
 It records `EntityRemovedFact`; `TASK-039` cancels exact movement-completion
 events before removal. Construction commits now record one idempotent
-`EntityMaterializedFact` in stable batch order, preserving the originating
-scheduled-event key when present. Integration with future clean-session
-economic and transport owners is tracked separately in `TASK-034`.
+`EntityMaterializedFact` in stable owner order and preserve the originating
+scheduled-event key. `TASK-034` completed clean-session economic and transport
+ownership and removal integration.
 
 ## Starting point
 
@@ -43,7 +43,8 @@ economic and transport owners is tracked separately in `TASK-034`.
   not create a ship or its components.
 - `PhaseOneShipMaterializer` creates a legacy ship at `LocationId`. It remains
   under the test project's `Acceptance/` directory after `TASK-031` migrated
-  logistics; `TASK-034` owns clean-session entity materialization.
+  logistics; clean-session entity materialization is session-owned after
+  `TASK-034`.
 - `GameSessionSetup` creates initial ships before runtime. It is setup input,
   not a runtime spawn command.
 - The actor runtime can clean up movement, orders, and control together, but
@@ -270,16 +271,14 @@ The lifecycle owner sends typed proposals to each owner and applies owner groups
 in this order, with stable IDs inside a group. It never relies on locks or
 concurrent completion order.
 
-The current clean `GameSession` does not host the legacy economic and transport
-runtime, so clean-session ships cannot yet acquire transport jobs or external
-inventory commitments. Removal nevertheless rejects a cargo inventory that has
-material or capacity reservations. When those owners join the clean session,
-their prepare and release operations must be inserted before cargo removal;
-`TASK-034` owns that integration without reopening the completed clean-session
-lifecycle foundation. The same integration is a prerequisite for supported
-save and load: the current public materialization operation also receives an
-external `ConstructionProcess`, so `GameSession` is not yet a complete
-checkpoint aggregate.
+The clean `GameSession` hosts production economic and transport owners without
+importing the legacy acceptance runtime. `TASK-034` joined those owners to the
+clean session.
+Removal now prepares and releases affected transport jobs, reservations, and
+capacity commitments before cargo removal. Construction completion resolves
+only through the private session-owned construction process and shared agenda;
+the public session boundary accepts no external workflow owner. `GameSession`
+is therefore the complete aggregate required for later checkpoint encoding.
 
 ## Facts, snapshots, and commands
 

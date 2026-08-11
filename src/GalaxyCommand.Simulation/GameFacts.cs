@@ -97,31 +97,6 @@ public sealed record RelationshipPolicyChangeFactCause : GameFactCause
 }
 
 /// <summary>
-/// Causal construction identity used when completion was not dispatched from
-/// a scheduled event carrying an <see cref="EventKey"/>.
-/// </summary>
-public sealed record ConstructionMaterializationFactCause : GameFactCause
-{
-    public ConstructionMaterializationFactCause(
-        FacilityId facilityId,
-        ConstructionOrderId orderId,
-        EventGeneration generation)
-    {
-        ArgumentOutOfRangeException.ThrowIfZero(facilityId.Value);
-        ArgumentOutOfRangeException.ThrowIfZero(orderId.Value);
-        FacilityId = facilityId;
-        OrderId = orderId;
-        Generation = generation;
-    }
-
-    public FacilityId FacilityId { get; }
-
-    public ConstructionOrderId OrderId { get; }
-
-    public EventGeneration Generation { get; }
-}
-
-/// <summary>
 /// Typed gameplay meaning committed by the authoritative simulation.
 /// </summary>
 public abstract record GameFact
