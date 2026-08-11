@@ -311,7 +311,8 @@ public sealed class TransportBoard
             .Where(job => job.DestinationInventoryId == inventoryId
                 && job.MaterialId == materialId
                 && job.Status is not TransportJobStatus.Completed
-                and not TransportJobStatus.FailedBeforeLoading)
+                and not TransportJobStatus.FailedBeforeLoading
+                and not TransportJobStatus.Cancelled)
             .Select(job => job.Quantity));
 
     public TransportJobId? AssignBest(
@@ -799,6 +800,34 @@ public sealed class TransportBoard
         SetJobState(job, TransportJobStatus.Cancelled);
         freighter.ActiveJobId = null;
         return true;
+    }
+
+    internal bool CanCancelForEntityRemoval(
+        TransportJob job,
+        Freighter? freighter,
+        InventoryRegistry inventories)
+    {
+        ArgumentNullException.ThrowIfNull(job);
+        ArgumentNullException.ThrowIfNull(inventories);
+        if (job.Status is TransportJobStatus.Completed
+            or TransportJobStatus.FailedBeforeLoading
+            or TransportJobStatus.Cancelled)
+        {
+            return true;
+        }
+
+        if (freighter is null || freighter.ActiveJobId != job.Id
+            || inventories.Get(job.SourceInventoryId) is null
+            || !_demands.ContainsKey(job.DemandRequestId))
+        {
+            return false;
+        }
+
+        bool cargoLoaded = job.Status is TransportJobStatus.WaitingForRouteToDestination
+            or TransportJobStatus.TravelingToDestination
+            or TransportJobStatus.WaitingForDestinationCapacity
+            or TransportJobStatus.Unloading;
+        return cargoLoaded || _supplies.ContainsKey(job.SupplyOfferId);
     }
 
     private TransportAssignmentCandidate? BestCandidate(

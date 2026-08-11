@@ -167,6 +167,15 @@ prerequisites and desired behavior are sufficiently defined.
   - Context: [Presentation snapshots](presentation-snapshots.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
 - [ ] **TASK-034: Integrate clean-session economy and transport with entity lifecycle**
+  - In progress: generic immutable new-game economy configuration now names
+    facilities, inventories, production, ship construction, logistics anchors,
+    and initial freighters without importing the Phase 1 fixture. The session
+    now constructs private owner state and dispatches its production,
+    construction, and transport work through the shared agenda. Removal now
+    prepares and releases every affected transport commitment before cargo
+    disposal, leaving invalidated scheduled transport work as deterministic
+    no-ops. Next, retire external construction workflow ownership from the
+    public session boundary.
   - Begin only after reusable economic and transport owners join the clean
     `GameSession`; do not pull acceptance-only Phase 1 ownership into production.
   - Make construction, economy, and transport state part of the session's

@@ -7,6 +7,8 @@ public abstract record GameEventKind
     }
 
     public sealed record SpatialMovement(SpatialMovementEvent Event) : GameEventKind;
+
+    public sealed record Economic(EconomicEvent Event) : GameEventKind;
 }
 
 public sealed record GameEventRecord(
@@ -24,6 +26,8 @@ internal abstract record GameEvent
     }
 
     internal sealed record SpatialMovement(SpatialMovementEvent Event) : GameEvent;
+
+    internal sealed record Economic(EconomicEvent Event) : GameEvent;
 }
 
 internal sealed record PreparedMovementCancellation(
@@ -47,6 +51,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     private readonly ConnectorTopology _topology;
     private readonly ISpatialNavigationPlanner _navigation;
     private readonly EntityLifecycleOwner _lifecycle;
+    private readonly SessionEconomyOwner? _economy;
     private readonly RelationshipOwner _relationships;
     private readonly GameFactStore _facts;
     private readonly List<GameEventRecord> _eventRecords = [];
@@ -76,6 +81,9 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         }
 
         _lifecycle.RegisterSetup(setup.Ships);
+        _economy = setup.Economy is null
+            ? null
+            : new SessionEconomyOwner(setup.Economy, _lifecycle);
 
         _engine = new SimulationEngine<GameEvent>(this, _agenda);
     }
@@ -247,7 +255,9 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     internal EntityRemovalResult RemoveEntity(EntityRemovalRequest request)
     {
         ThrowIfUnhealthy();
-        EntityRemovalPreparation preparation = _lifecycle.PrepareRemoval(request);
+        EntityRemovalPreparation preparation = _lifecycle.PrepareRemoval(
+            request,
+            permitOwnerReleasedCommitments: _economy is not null);
         if (preparation is EntityRemovalPreparation.Resolved resolved)
         {
             return resolved.Value;
@@ -255,6 +265,18 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
 
         PreparedEntityRemoval removal =
             ((EntityRemovalPreparation.Prepared)preparation).Value;
+        PreparedEconomyEntityRemoval? economyRemoval = null;
+        if (_economy is not null
+            && !_economy.TryPrepareEntityRemoval(
+                removal.ShipId,
+                removal.CargoInventoryId,
+                out economyRemoval))
+        {
+            return new EntityRemovalResult.Rejected(
+                request,
+                EntityRemovalRejectionReason.OwnerConflict);
+        }
+
         EntityRemovalResult.Rejected? cancellationRejection =
             PrepareMovementCancellations(removal, out PreparedMovementCancellation[] cancellations);
         if (cancellationRejection is not null)
@@ -275,6 +297,19 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             _isPoisoned = true;
             throw new InvalidOperationException(
                 $"Prepared cancellation for {cancellation.EventKey} no longer matches the agenda.");
+        }
+
+        if (_economy is not null && economyRemoval is not null)
+        {
+            try
+            {
+                _economy.ApplyEntityRemoval(economyRemoval);
+            }
+            catch
+            {
+                _isPoisoned = true;
+                throw;
+            }
         }
 
         var transitions = new List<ShipOrderTransition>();
@@ -437,6 +472,58 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
 
     public void Reconcile(SimulationTime now, EventAgenda<GameEvent> agenda)
     {
+        if (_economy is null)
+        {
+            return;
+        }
+
+        EconomicReconciliationResult reconciliation = _economy.Runtime.Reconcile(
+            now,
+            _economy.TransportTiming);
+        var proposals = new List<AgendaEventProposal<GameEvent>>();
+        foreach (ProductionCompletionProposal completion in
+                 reconciliation.Production.Commit.CompletionProposals)
+        {
+            proposals.Add(new AgendaEventProposal<GameEvent>(
+                new AgendaProposalOrder(
+                    RuntimeEvaluationWave.ProductionReadiness,
+                    completion.FacilityId.Value,
+                    completion.JobId.Value,
+                    EffectKind: 0,
+                    LocalOrdinal: 0),
+                completion.Timestamp,
+                EventPhase.PhysicalCompletion,
+                completion.Generation,
+                new GameEvent.Economic(new EconomicEvent.ProductionComplete(
+                    completion.FacilityId,
+                    completion.JobId))));
+        }
+
+        foreach (ConstructionCompletionProposal completion in
+                 reconciliation.Construction.Commit.CompletionProposals)
+        {
+            proposals.Add(new AgendaEventProposal<GameEvent>(
+                new AgendaProposalOrder(
+                    RuntimeEvaluationWave.ConstructionReadiness,
+                    completion.FacilityId.Value,
+                    completion.OrderId.Value,
+                    EffectKind: 0,
+                    LocalOrdinal: 0),
+                completion.Timestamp,
+                EventPhase.PhysicalCompletion,
+                completion.Generation,
+                new GameEvent.Economic(new EconomicEvent.ConstructionComplete(
+                    completion.FacilityId,
+                    completion.OrderId))));
+        }
+
+        AddTransportEventProposals(
+            reconciliation.TransportAdvance.Commit.EventProposals,
+            proposals);
+        if (proposals.Count > 0)
+        {
+            _ = AgendaCommitOwner.Commit(agenda, proposals);
+        }
     }
 
     public void AccrueTo(SimulationTime now)
@@ -448,6 +535,11 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         SimulationTime now,
         EventAgenda<GameEvent> agenda)
     {
+        if (simulationEvent.Payload is GameEvent.Economic economic)
+        {
+            return HandleEconomicEvent(simulationEvent, economic.Event, now, agenda);
+        }
+
         if (simulationEvent.Payload is not GameEvent.SpatialMovement spatial)
         {
             throw new InvalidOperationException(
@@ -561,6 +653,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         {
             GameEvent.SpatialMovement spatial =>
                 new GameEventKind.SpatialMovement(spatial.Event),
+            GameEvent.Economic economic => new GameEventKind.Economic(economic.Event),
             _ => throw new InvalidOperationException(
                 $"Unsupported game event {simulationEvent.Payload.GetType().Name}."),
         };
@@ -572,6 +665,91 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             disposition,
             kind));
     }
+
+    /// <summary>
+    /// Commits one private economic completion, acknowledges completed ship
+    /// construction through lifecycle, and schedules any transport continuation.
+    /// </summary>
+    private ScheduledEventDisposition HandleEconomicEvent(
+        ScheduledEvent<GameEvent> simulationEvent,
+        EconomicEvent economicEvent,
+        SimulationTime now,
+        EventAgenda<GameEvent> agenda)
+    {
+        if (_economy is null)
+        {
+            return ScheduledEventDisposition.IgnoredMissingReference;
+        }
+
+        EconomicEventCommitResult result = _economy.Runtime.CommitEvent(
+            economicEvent,
+            simulationEvent.Key,
+            simulationEvent.Generation,
+            _economy.TransportTiming,
+            now);
+        if (result is EconomicEventCommitResult.Construction
+            {
+                Result.Materialization: { } materialization,
+            })
+        {
+            ConstructionProcess source = _economy.GetRequiredConstructionProcess(
+                materialization.FacilityId);
+            ConstructionMaterializationCommit commit = _lifecycle.MaterializeConstruction(
+                source,
+                materialization,
+                now);
+            CommitMaterializationFact(commit);
+        }
+
+        if (result is EconomicEventCommitResult.Transport transport)
+        {
+            var proposals = new List<AgendaEventProposal<GameEvent>>();
+            AddTransportEventProposals(transport.Result.Continuation.EventProposals, proposals);
+            if (proposals.Count > 0)
+            {
+                _ = AgendaCommitOwner.Commit(agenda, proposals);
+            }
+        }
+
+        return result.Disposition;
+    }
+
+    /// <summary>
+    /// Converts committed transport continuation proposals into the session's
+    /// deterministic agenda order without exposing its agenda to the owner.
+    /// </summary>
+    private static void AddTransportEventProposals(
+        IEnumerable<TransportEventProposal> transportEvents,
+        List<AgendaEventProposal<GameEvent>> destination)
+    {
+        foreach (TransportEventProposal transportEvent in transportEvents)
+        {
+            destination.Add(new AgendaEventProposal<GameEvent>(
+                new AgendaProposalOrder(
+                    RuntimeEvaluationWave.LogisticsAssignment,
+                    transportEvent.ShipId.Value,
+                    transportEvent.JobId.Value,
+                    EffectKind: TransportEventKindOrder(transportEvent.Event),
+                    LocalOrdinal: 0),
+                transportEvent.Timestamp,
+                EventPhase.PhysicalCompletion,
+                transportEvent.Generation,
+                new GameEvent.Economic(new EconomicEvent.Transport(
+                    transportEvent.Event))));
+        }
+    }
+
+    /// <summary>
+    /// Provides a fixed local ordering for distinct same-job transport events.
+    /// </summary>
+    private static int TransportEventKindOrder(TransportEvent transportEvent) =>
+        transportEvent switch
+        {
+            TransportEvent.Arrive => 0,
+            TransportEvent.FinishLoading => 1,
+            TransportEvent.FinishUnloading => 2,
+            _ => throw new ArgumentOutOfRangeException(nameof(transportEvent)),
+        };
 
     private GameplayCommandHandlingResult HandleMove(
         CommandSource source,

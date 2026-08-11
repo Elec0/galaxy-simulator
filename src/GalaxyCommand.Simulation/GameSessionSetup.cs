@@ -78,6 +78,7 @@ public sealed class GameSessionSetup
                 Array.Empty<ConnectorEndpoint>(),
                 Array.Empty<TransitConnection>()),
             Array.Empty<ShipMaterializationPolicy>(),
+            null,
             relationships,
             factRetentionCapacity)
     {
@@ -97,6 +98,7 @@ public sealed class GameSessionSetup
             ships,
             connectorTopology,
             Array.Empty<ShipMaterializationPolicy>(),
+            null,
             relationships,
             factRetentionCapacity)
     {
@@ -110,6 +112,29 @@ public sealed class GameSessionSetup
         IEnumerable<InitialShipSetup> ships,
         ConnectorTopology connectorTopology,
         IEnumerable<ShipMaterializationPolicy> materializationPolicies,
+        RelationshipSetup relationships,
+        int factRetentionCapacity)
+        : this(
+            systems,
+            ships,
+            connectorTopology,
+            materializationPolicies,
+            null,
+            relationships,
+            factRetentionCapacity)
+    {
+    }
+
+    /// <summary>
+    /// Validates and canonicalizes complete initial state, including optional
+    /// session-owned economic configuration.
+    /// </summary>
+    public GameSessionSetup(
+        IEnumerable<StarSystem> systems,
+        IEnumerable<InitialShipSetup> ships,
+        ConnectorTopology connectorTopology,
+        IEnumerable<ShipMaterializationPolicy> materializationPolicies,
+        GameSessionEconomySetup? economy,
         RelationshipSetup relationships,
         int factRetentionCapacity)
     {
@@ -216,11 +241,14 @@ public sealed class GameSessionSetup
             }
         }
 
+        ValidateEconomy(economy, systemIds, shipIds, cargoInventoryIds, policyValues);
+
         Systems = new ReadOnlyCollection<StarSystem>(systemValues);
         Ships = new ReadOnlyCollection<InitialShipSetup>(shipValues);
         ConnectorTopology = connectorTopology;
         MaterializationPolicies =
             new ReadOnlyCollection<ShipMaterializationPolicy>(policyValues);
+        Economy = economy;
         Relationships = relationships;
         FactRetentionCapacity = factRetentionCapacity;
     }
@@ -233,7 +261,61 @@ public sealed class GameSessionSetup
 
     public IReadOnlyList<ShipMaterializationPolicy> MaterializationPolicies { get; }
 
+    /// <summary>
+    /// Gets the optional generic new-game economic seed. A later TASK-034
+    /// slice constructs and runs its private owners from this input.
+    /// </summary>
+    public GameSessionEconomySetup? Economy { get; }
+
     public RelationshipSetup Relationships { get; }
 
     public int FactRetentionCapacity { get; }
+
+    private static void ValidateEconomy(
+        GameSessionEconomySetup? economy,
+        HashSet<SystemId> systemIds,
+        HashSet<ShipId> shipIds,
+        HashSet<InventoryId> cargoInventoryIds,
+        IEnumerable<ShipMaterializationPolicy> policies)
+    {
+        if (economy is null)
+        {
+            return;
+        }
+
+        var facilityIds = new HashSet<FacilityId>();
+        foreach (EconomyFacilitySetup facility in economy.Facilities)
+        {
+            if (!systemIds.Contains(facility.Position.SystemId)
+                || cargoInventoryIds.Contains(facility.InventoryId)
+                || !facilityIds.Add(facility.FacilityId))
+            {
+                throw new ArgumentException(
+                    $"Economy facility {facility.FacilityId} has an unknown system, conflicts with ship cargo, or is duplicated.",
+                    nameof(economy));
+            }
+        }
+
+        foreach (InitialFreighterSetup freighter in economy.Freighters)
+        {
+            if (!shipIds.Contains(freighter.ShipId))
+            {
+                throw new ArgumentException(
+                    $"Economy freighter {freighter.ShipId} is not a session ship.",
+                    nameof(economy));
+            }
+        }
+
+        var policiesByFacility = policies.ToDictionary(policy => policy.FacilityId);
+        foreach (InitialConstructionOrderSetup order in economy.ConstructionOrders)
+        {
+            if (!policiesByFacility.TryGetValue(order.FacilityId, out ShipMaterializationPolicy? policy)
+                || policy.GetDesign(order.DesignId) is null)
+            {
+                throw new ArgumentException(
+                    $"Construction order {order.DesignId} has no matching materialization policy at facility {order.FacilityId}.",
+                    nameof(economy));
+            }
+        }
+    }
 }

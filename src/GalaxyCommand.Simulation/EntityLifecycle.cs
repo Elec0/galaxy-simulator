@@ -340,6 +340,8 @@ internal sealed class EntityLifecycleOwner
 
     internal EntityRegistry Entities => _entities;
 
+    internal InventoryRegistry Inventories => _inventories;
+
     internal GameSessionShip GetRequiredShip(ShipId shipId) =>
         _ships.Get(shipId)
         ?? throw new InvalidOperationException($"Ship {shipId} has no live ship record.");
@@ -350,6 +352,23 @@ internal sealed class EntityLifecycleOwner
         return _inventories.Get(ship.CargoInventoryId)
             ?? throw new InvalidOperationException(
                 $"Ship {shipId} has no cargo inventory {ship.CargoInventoryId}.");
+    }
+
+    /// <summary>
+    /// Registers an economy-owned setup inventory and advances the shared
+    /// inventory allocator so later materialization cannot reuse its identity.
+    /// </summary>
+    internal void RegisterEconomyInventory(Inventory inventory)
+    {
+        ArgumentNullException.ThrowIfNull(inventory);
+        if (_inventories.Contains(inventory.Id))
+        {
+            throw new InvalidOperationException(
+                $"Inventory {inventory.Id} is already registered.");
+        }
+
+        _inventoryIds.AdvancePast(inventory.Id);
+        _inventories.Add(inventory);
     }
 
     internal void RegisterSetup(IReadOnlyList<InitialShipSetup> ships)
@@ -552,7 +571,9 @@ internal sealed class EntityLifecycleOwner
         return results.AsReadOnly();
     }
 
-    internal EntityRemovalPreparation PrepareRemoval(EntityRemovalRequest request)
+    internal EntityRemovalPreparation PrepareRemoval(
+        EntityRemovalRequest request,
+        bool permitOwnerReleasedCommitments)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (_removalReceipts.TryGetValue(request.EntityId, out EntityRemovalResult.Removed? receipt))
@@ -591,7 +612,7 @@ internal sealed class EntityLifecycleOwner
                     EntityRemovalRejectionReason.OwnerConflict));
         }
 
-        if (cargo.HasCommitments)
+        if (cargo.HasCommitments && !permitOwnerReleasedCommitments)
         {
             return new EntityRemovalPreparation.Resolved(
                 new EntityRemovalResult.Rejected(
@@ -612,6 +633,15 @@ internal sealed class EntityLifecycleOwner
         SimulationTime now)
     {
         ArgumentNullException.ThrowIfNull(removal);
+        Inventory cargo = _inventories.Get(removal.CargoInventoryId)
+            ?? throw new InvalidOperationException(
+                $"Prepared entity removal {removal.Request.EntityId} lost cargo inventory {removal.CargoInventoryId}.");
+        if (cargo.HasCommitments)
+        {
+            throw new InvalidOperationException(
+                $"Prepared entity removal {removal.Request.EntityId} still has cargo commitments.");
+        }
+
         if (!_movement.CommitRemove(removal.ShipId, now)
             || !_orders.Remove(removal.ShipId)
             || !_control.Remove(removal.ShipId)

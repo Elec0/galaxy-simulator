@@ -42,18 +42,38 @@ public sealed class ShipRegistry
 
     public void AddFreighter(Ship ship)
     {
-        if (_ships.ContainsKey(ship.Id))
+        ArgumentNullException.ThrowIfNull(ship);
+        AddFreighter(ship.Id, ship.LocationId, ship.CargoInventoryId);
+        _ships.Add(ship.Id, ship);
+    }
+
+    /// <summary>
+    /// Registers logistics capability for a session-owned ship without
+    /// importing the acceptance-only organization ship record.
+    /// </summary>
+    public void AddFreighter(
+        ShipId shipId,
+        LocationId locationId,
+        InventoryId cargoInventoryId)
+    {
+        if (_freighters.ContainsKey(shipId))
         {
-            throw new InvalidOperationException($"Duplicate ship {ship.Id}.");
+            throw new InvalidOperationException($"Duplicate freighter {shipId}.");
         }
 
         _freighters.Add(
-            ship.Id,
-            new Freighter(ship.Id, ship.LocationId, ship.CargoInventoryId));
-        _ships.Add(ship.Id, ship);
+            shipId,
+            new Freighter(shipId, locationId, cargoInventoryId));
     }
 
     public Ship? GetShip(ShipId shipId) => _ships.GetValueOrDefault(shipId);
 
     public Freighter? GetFreighter(ShipId shipId) => _freighters.GetValueOrDefault(shipId);
+
+    internal bool RemoveFreighter(ShipId shipId)
+    {
+        bool removed = _freighters.Remove(shipId);
+        _ships.Remove(shipId);
+        return removed;
+    }
 }
