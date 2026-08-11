@@ -213,6 +213,127 @@ public sealed class SimulationEngineTests
         Assert.Equal(new SimulationTime(100), simulation.CurrentTime);
     }
 
+    [Fact]
+    public void CompletedTimestampCapturesInitializedEngineAndPendingAgenda()
+    {
+        var runtime = new CounterRuntime();
+        var simulation = new SimulationEngine<CounterEvent>(runtime);
+        simulation.Schedule(
+            new SimulationTime(100),
+            EventPhase.PhysicalCompletion,
+            new EventGeneration(3),
+            new CounterEvent(5));
+        simulation.Schedule(
+            new SimulationTime(200),
+            EventPhase.StateUpdate,
+            new EventGeneration(4),
+            new CounterEvent(7));
+
+        simulation.RunUntil(new SimulationTime(100));
+        CheckpointResult<SimulationEngineCheckpoint<CounterEvent>> capture =
+            simulation.CaptureCheckpoint();
+
+        Assert.True(capture.IsSuccess);
+        Assert.True(capture.Value!.IsInitialized);
+        Assert.Equal(new SimulationTime(100), capture.Value.AccruedThrough);
+        Assert.Equal(new SimulationTime(100), capture.Value.Agenda.CurrentTime);
+        ScheduledEvent<CounterEvent> pending = Assert.Single(
+            capture.Value.Agenda.PendingEvents);
+        Assert.Equal(new SimulationTime(200), pending.Key.Timestamp);
+        Assert.Equal(new EventGeneration(4), pending.Generation);
+        Assert.Equal(new CounterEvent(7), pending.Payload);
+    }
+
+    [Fact]
+    public void RestoredEngineContinuesWithoutInitializationAccrualOrReplay()
+    {
+        var uninterruptedRuntime = new CounterRuntime();
+        var uninterrupted = new SimulationEngine<CounterEvent>(
+            uninterruptedRuntime);
+        uninterrupted.Schedule(
+            new SimulationTime(100),
+            EventPhase.PhysicalCompletion,
+            new EventGeneration(0),
+            new CounterEvent(5));
+        uninterrupted.RunUntil(new SimulationTime(50));
+        SimulationEngineCheckpoint<CounterEvent> checkpoint =
+            uninterrupted.CaptureCheckpoint().Value!;
+        uninterruptedRuntime.ClearObservations();
+
+        var restoredRuntime = new CounterRuntime();
+        CheckpointResult<SimulationEngine<CounterEvent>> restoration =
+            SimulationEngine<CounterEvent>.RestoreCheckpoint(
+                restoredRuntime,
+                checkpoint);
+
+        Assert.True(restoration.IsSuccess);
+        Assert.Empty(restoredRuntime.AccruedTimes);
+        Assert.Empty(restoredRuntime.ValuesSeenDuringReconciliation);
+        Assert.Empty(restoredRuntime.ProcessedPhases);
+
+        RunReport uninterruptedReport = uninterrupted.RunUntil(
+            new SimulationTime(150));
+        RunReport restoredReport = restoration.Value!.RunUntil(
+            new SimulationTime(150));
+
+        Assert.Equal(uninterruptedReport, restoredReport);
+        Assert.Equal(uninterruptedRuntime.Value, restoredRuntime.Value);
+        Assert.Equal(
+            uninterruptedRuntime.AccruedTimes,
+            restoredRuntime.AccruedTimes);
+        Assert.Equal(
+            uninterruptedRuntime.ValuesSeenDuringReconciliation,
+            restoredRuntime.ValuesSeenDuringReconciliation);
+        Assert.Equal(
+            uninterruptedRuntime.ProcessedPhases,
+            restoredRuntime.ProcessedPhases);
+    }
+
+    [Fact]
+    public void RestoreRejectsAccrualThatDoesNotReachCheckpointTime()
+    {
+        var checkpoint = new SimulationEngineCheckpoint<CounterEvent>(
+            isInitialized: true,
+            accruedThrough: SimulationTime.Zero,
+            new EventAgendaCheckpoint<CounterEvent>(
+                new SimulationTime(10),
+                nextCreationSequence: 0,
+                Array.Empty<ScheduledEvent<CounterEvent>>()));
+
+        CheckpointResult<SimulationEngine<CounterEvent>> restoration =
+            SimulationEngine<CounterEvent>.RestoreCheckpoint(
+                new CounterRuntime(),
+                checkpoint);
+
+        Assert.False(restoration.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.engine.accruedThrough",
+            restoration.Failure!.Path);
+    }
+
+    [Fact]
+    public void RestoreRejectsUninitializedEngineAfterTimeZero()
+    {
+        var timestamp = new SimulationTime(10);
+        var checkpoint = new SimulationEngineCheckpoint<CounterEvent>(
+            isInitialized: false,
+            accruedThrough: timestamp,
+            new EventAgendaCheckpoint<CounterEvent>(
+                timestamp,
+                nextCreationSequence: 0,
+                Array.Empty<ScheduledEvent<CounterEvent>>()));
+
+        CheckpointResult<SimulationEngine<CounterEvent>> restoration =
+            SimulationEngine<CounterEvent>.RestoreCheckpoint(
+                new CounterRuntime(),
+                checkpoint);
+
+        Assert.False(restoration.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.engine.isInitialized",
+            restoration.Failure!.Path);
+    }
+
     private sealed record CounterEvent(
         int Delta,
         ScheduledEventDisposition Disposition = ScheduledEventDisposition.Applied);
@@ -236,6 +357,14 @@ public sealed class SimulationEngineTests
         public int? StopAtValue { get; init; }
 
         public bool ShouldStop => StopAtValue is { } threshold && Value >= threshold;
+
+        internal void ClearObservations()
+        {
+            ProcessedPhases.Clear();
+            Dispositions.Clear();
+            ValuesSeenDuringReconciliation.Clear();
+            AccruedTimes.Clear();
+        }
 
         public void Reconcile(SimulationTime now, EventAgenda<CounterEvent> agenda)
         {

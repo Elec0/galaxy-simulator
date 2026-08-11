@@ -31,7 +31,13 @@ strategy for the authoritative inventory defined by `TASK-014`.
   - Implemented the first format-mechanics slice: bounded stream reads, strict
     UTF-8 and JSON validation, duplicate and resource-limit rejection, stable
     indented writes, typed failures, and a contiguous deterministic migration
-    registry. Focused format tests and the full 227-test suite pass.
+    registry.
+  - Added the first owner checkpoint contracts for engine progress and the
+    shared agenda. Capture now requires a closed timestamp boundary and retains
+    initialization, accrual, pending event keys and payloads, the exact next
+    creation sequence, and exhaustion. Direct restore validates these values
+    without reconciliation, accrual, scheduling, dispatch, or allocation.
+    Focused checkpoint tests and the full 237-test suite pass.
   - Build on the authoritative boundary from `TASK-014` and the complete
     aggregate admission established by `TASK-034`.
   - Keep content catalog identity, provenance, and saved content-reference

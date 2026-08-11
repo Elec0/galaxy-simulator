@@ -95,6 +95,109 @@ public sealed class EventAgenda<TEvent>
     public int Count => _pending.Count;
 
     /// <summary>
+    /// Captures exact pending work and allocator state only when no timestamp
+    /// phase is open.
+    /// </summary>
+    internal CheckpointResult<EventAgendaCheckpoint<TEvent>> CaptureCheckpoint()
+    {
+        if (CurrentPhase is not null)
+        {
+            return CheckpointResult<EventAgendaCheckpoint<TEvent>>.Rejected(
+                new CheckpointValidationFailure(
+                    "$.checkpoint.agenda.currentPhase",
+                    "An agenda checkpoint cannot be captured while a timestamp phase is open."));
+        }
+
+        return CheckpointResult<EventAgendaCheckpoint<TEvent>>.Success(
+            new EventAgendaCheckpoint<TEvent>(
+                CurrentTime,
+                _nextCreationSequence,
+                _pending.Select(entry => new ScheduledEvent<TEvent>(
+                    entry.Key,
+                    entry.Value.Generation,
+                    entry.Value.Payload))));
+    }
+
+    /// <summary>
+    /// Validates and restores pending work and allocator state directly without
+    /// scheduling events or allocating creation sequences.
+    /// </summary>
+    internal static CheckpointResult<EventAgenda<TEvent>> RestoreCheckpoint(
+        EventAgendaCheckpoint<TEvent> checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        EventKey? previousKey = null;
+        var creationSequences = new HashSet<ulong>();
+        for (int index = 0; index < checkpoint.PendingEvents.Count; index++)
+        {
+            ScheduledEvent<TEvent>? scheduled = checkpoint.PendingEvents[index];
+            if (scheduled is null)
+            {
+                return Rejected(
+                    index,
+                    "event",
+                    "A pending agenda entry is missing.");
+            }
+
+            if (!Enum.IsDefined(scheduled.Key.Phase))
+            {
+                return Rejected(
+                    index,
+                    "key.phase",
+                    "A pending agenda entry has an unknown phase.");
+            }
+
+            if (scheduled.Key.Timestamp < checkpoint.CurrentTime)
+            {
+                return Rejected(
+                    index,
+                    "key.timestamp",
+                    "A pending agenda entry precedes the checkpoint time.");
+            }
+
+            if (scheduled.Key.CreationSequence >= checkpoint.NextCreationSequence)
+            {
+                return Rejected(
+                    index,
+                    "key.creationSequence",
+                    "A pending agenda entry is not below the restored allocator position.");
+            }
+
+            if (!creationSequences.Add(scheduled.Key.CreationSequence))
+            {
+                return Rejected(
+                    index,
+                    "key.creationSequence",
+                    "Pending agenda entries reuse one creation sequence.");
+            }
+
+            if (previousKey is { } previous && scheduled.Key <= previous)
+            {
+                return Rejected(
+                    index,
+                    "key",
+                    "Pending agenda entries are not in strict event-key order.");
+            }
+
+            previousKey = scheduled.Key;
+        }
+
+        var restored = new EventAgenda<TEvent>
+        {
+            CurrentTime = checkpoint.CurrentTime,
+            _nextCreationSequence = checkpoint.NextCreationSequence,
+        };
+        foreach (ScheduledEvent<TEvent> scheduled in checkpoint.PendingEvents)
+        {
+            restored._pending.Add(
+                scheduled.Key,
+                new PendingEvent(scheduled.Generation, scheduled.Payload));
+        }
+
+        return CheckpointResult<EventAgenda<TEvent>>.Success(restored);
+    }
+
+    /// <summary>
     /// Earliest pending event without changing agenda state.
     /// </summary>
     public EventKey? NextEventKey => _pending.Count > 0
@@ -205,6 +308,21 @@ public sealed class EventAgenda<TEvent>
     }
 
     /// <summary>
+    /// Closes the fully drained timestamp after its decision phase so capture
+    /// observes a completed authoritative boundary.
+    /// </summary>
+    internal void CompleteTimestamp()
+    {
+        if (CurrentPhase != EventPhase.Decision)
+        {
+            throw new InvalidOperationException(
+                "A timestamp can complete only after its decision phase opens.");
+        }
+
+        CurrentPhase = null;
+    }
+
+    /// <summary>
     /// Removes the next event only when it belongs to the open timestamp and phase.
     /// </summary>
     public ScheduledEvent<TEvent>? PopNextInCurrentPhase()
@@ -257,6 +375,15 @@ public sealed class EventAgenda<TEvent>
             first.Value.Generation,
             first.Value.Payload);
     }
+
+    private static CheckpointResult<EventAgenda<TEvent>> Rejected(
+        int index,
+        string field,
+        string message) =>
+        CheckpointResult<EventAgenda<TEvent>>.Rejected(
+            new CheckpointValidationFailure(
+                $"$.checkpoint.agenda.pendingEvents[{index}].{field}",
+                message));
 
     private sealed record PendingEvent(EventGeneration Generation, TEvent Payload);
 }

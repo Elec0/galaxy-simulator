@@ -248,4 +248,162 @@ public sealed class EventAgendaTests
                 ]));
         Assert.Equal(0, agenda.Count);
     }
+
+    [Fact]
+    public void CheckpointRestoresPendingEventsAndExactAllocatorPosition()
+    {
+        var agenda = new EventAgenda<string>();
+        var generation = new EventGeneration(4);
+        EventKey removed = agenda.Schedule(
+            new SimulationTime(10),
+            EventPhase.PhysicalCompletion,
+            generation,
+            "removed");
+        EventKey retained = agenda.Schedule(
+            new SimulationTime(20),
+            EventPhase.StateUpdate,
+            generation,
+            "retained");
+        Assert.True(agenda.TryCancelExact(removed, generation, "removed"));
+
+        CheckpointResult<EventAgendaCheckpoint<string>> capture =
+            agenda.CaptureCheckpoint();
+        CheckpointResult<EventAgenda<string>> restoration =
+            EventAgenda<string>.RestoreCheckpoint(capture.Value!);
+
+        Assert.True(capture.IsSuccess);
+        ScheduledEvent<string> pending = Assert.Single(
+            capture.Value!.PendingEvents);
+        Assert.Equal(retained, pending.Key);
+        Assert.Equal(generation, pending.Generation);
+        Assert.Equal("retained", pending.Payload);
+        Assert.Equal(2UL, capture.Value.NextCreationSequence);
+        Assert.True(restoration.IsSuccess);
+
+        EventKey next = restoration.Value!.Schedule(
+            new SimulationTime(30),
+            EventPhase.Decision,
+            generation,
+            "next");
+        Assert.Equal(2UL, next.CreationSequence);
+        Assert.Equal(retained, restoration.Value.NextEventKey);
+    }
+
+    [Fact]
+    public void CheckpointCaptureRejectsOpenTimestampPhase()
+    {
+        var agenda = new EventAgenda<string>();
+        agenda.EnterPhase(EventPhase.StateUpdate);
+
+        CheckpointResult<EventAgendaCheckpoint<string>> capture =
+            agenda.CaptureCheckpoint();
+
+        Assert.False(capture.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.agenda.currentPhase",
+            capture.Failure!.Path);
+    }
+
+    [Fact]
+    public void RestorePreservesExhaustedCreationSequence()
+    {
+        var checkpoint = new EventAgendaCheckpoint<string>(
+            SimulationTime.Zero,
+            ulong.MaxValue,
+            Array.Empty<ScheduledEvent<string>>());
+
+        CheckpointResult<EventAgenda<string>> restoration =
+            EventAgenda<string>.RestoreCheckpoint(checkpoint);
+
+        Assert.True(restoration.IsSuccess);
+        Assert.Throws<OverflowException>(() =>
+            restoration.Value!.Schedule(
+                SimulationTime.Zero,
+                EventPhase.Decision,
+                new EventGeneration(0),
+                "cannot allocate"));
+        Assert.Equal(0, restoration.Value!.Count);
+    }
+
+    [Fact]
+    public void RestoreRejectsPendingEventAtOrBeyondAllocatorPosition()
+    {
+        var checkpoint = new EventAgendaCheckpoint<string>(
+            SimulationTime.Zero,
+            nextCreationSequence: 2,
+            [
+                new ScheduledEvent<string>(
+                    new EventKey(
+                        new SimulationTime(10),
+                        EventPhase.Decision,
+                        CreationSequence: 2),
+                    new EventGeneration(0),
+                    "invalid"),
+            ]);
+
+        CheckpointResult<EventAgenda<string>> restoration =
+            EventAgenda<string>.RestoreCheckpoint(checkpoint);
+
+        Assert.False(restoration.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.agenda.pendingEvents[0].key.creationSequence",
+            restoration.Failure!.Path);
+    }
+
+    [Fact]
+    public void RestoreRejectsPendingEventBeforeCheckpointTime()
+    {
+        var checkpoint = new EventAgendaCheckpoint<string>(
+            new SimulationTime(10),
+            nextCreationSequence: 1,
+            [
+                new ScheduledEvent<string>(
+                    new EventKey(
+                        new SimulationTime(9),
+                        EventPhase.Decision,
+                        CreationSequence: 0),
+                    new EventGeneration(0),
+                    "invalid"),
+            ]);
+
+        CheckpointResult<EventAgenda<string>> restoration =
+            EventAgenda<string>.RestoreCheckpoint(checkpoint);
+
+        Assert.False(restoration.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.agenda.pendingEvents[0].key.timestamp",
+            restoration.Failure!.Path);
+    }
+
+    [Fact]
+    public void RestoreRejectsPendingEventsOutsideStrictKeyOrder()
+    {
+        var checkpoint = new EventAgendaCheckpoint<string>(
+            SimulationTime.Zero,
+            nextCreationSequence: 2,
+            [
+                new ScheduledEvent<string>(
+                    new EventKey(
+                        new SimulationTime(20),
+                        EventPhase.Decision,
+                        CreationSequence: 0),
+                    new EventGeneration(0),
+                    "later"),
+                new ScheduledEvent<string>(
+                    new EventKey(
+                        new SimulationTime(10),
+                        EventPhase.Decision,
+                        CreationSequence: 1),
+                    new EventGeneration(0),
+                    "earlier"),
+            ]);
+
+        CheckpointResult<EventAgenda<string>> restoration =
+            EventAgenda<string>.RestoreCheckpoint(checkpoint);
+
+        Assert.False(restoration.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.agenda.pendingEvents[1].key",
+            restoration.Failure!.Path);
+    }
 }

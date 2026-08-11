@@ -47,6 +47,78 @@ public sealed class SimulationEngine<TEvent>
 
     public int PendingEventCount => _agenda.Count;
 
+    /// <summary>
+    /// Captures exact engine progress and agenda state at a completed timestamp
+    /// boundary.
+    /// </summary>
+    internal CheckpointResult<SimulationEngineCheckpoint<TEvent>> CaptureCheckpoint()
+    {
+        CheckpointResult<EventAgendaCheckpoint<TEvent>> agenda =
+            _agenda.CaptureCheckpoint();
+        if (!agenda.IsSuccess)
+        {
+            return CheckpointResult<SimulationEngineCheckpoint<TEvent>>.Rejected(
+                agenda.Failure!);
+        }
+
+        if (_accruedThrough != CurrentTime)
+        {
+            return CheckpointResult<SimulationEngineCheckpoint<TEvent>>.Rejected(
+                new CheckpointValidationFailure(
+                    "$.checkpoint.engine.accruedThrough",
+                    "Engine accrual has not reached the completed checkpoint time."));
+        }
+
+        return CheckpointResult<SimulationEngineCheckpoint<TEvent>>.Success(
+            new SimulationEngineCheckpoint<TEvent>(
+                _initialized,
+                _accruedThrough,
+                agenda.Value!));
+    }
+
+    /// <summary>
+    /// Validates and restores engine progress and its agenda directly without
+    /// initialization, accrual, event dispatch, or sequence allocation.
+    /// </summary>
+    internal static CheckpointResult<SimulationEngine<TEvent>> RestoreCheckpoint(
+        ISimulationRuntime<TEvent> runtime,
+        SimulationEngineCheckpoint<TEvent> checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(runtime);
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        if (checkpoint.AccruedThrough != checkpoint.Agenda.CurrentTime)
+        {
+            return CheckpointResult<SimulationEngine<TEvent>>.Rejected(
+                new CheckpointValidationFailure(
+                    "$.checkpoint.engine.accruedThrough",
+                    "Restored engine accrual must equal the completed checkpoint time."));
+        }
+
+        if (!checkpoint.IsInitialized &&
+            checkpoint.Agenda.CurrentTime != SimulationTime.Zero)
+        {
+            return CheckpointResult<SimulationEngine<TEvent>>.Rejected(
+                new CheckpointValidationFailure(
+                    "$.checkpoint.engine.isInitialized",
+                    "An uninitialized engine cannot have advanced beyond time zero."));
+        }
+
+        CheckpointResult<EventAgenda<TEvent>> agenda =
+            EventAgenda<TEvent>.RestoreCheckpoint(checkpoint.Agenda);
+        if (!agenda.IsSuccess)
+        {
+            return CheckpointResult<SimulationEngine<TEvent>>.Rejected(
+                agenda.Failure!);
+        }
+
+        var restored = new SimulationEngine<TEvent>(runtime, agenda.Value)
+        {
+            _accruedThrough = checkpoint.AccruedThrough,
+            _initialized = checkpoint.IsInitialized,
+        };
+        return CheckpointResult<SimulationEngine<TEvent>>.Success(restored);
+    }
+
     public EventKey Schedule(
         SimulationTime timestamp,
         EventPhase phase,
@@ -117,6 +189,8 @@ public sealed class SimulationEngine<TEvent>
                 eventsProcessed = checked(eventsProcessed + 1);
             }
         }
+
+        _agenda.CompleteTimestamp();
 
         return eventsProcessed;
     }
