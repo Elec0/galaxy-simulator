@@ -24,11 +24,19 @@ strategy for the authoritative inventory defined by `TASK-014`.
 - [ ] **TASK-022: Select save format, versioning, and migration strategy**
   - Define the encoded save schema, format versioning, validation, corruption
     handling, storage mechanics, and deterministic schema migration.
+  - The accepted design uses externally editable UTF-8 JSON, a versioned strict
+    schema, contiguous one-way migrations, typed rejection, and atomic file
+    replacement. Hand-authored scenarios use the production schema and loader
+    without bypassing authoritative validation.
+  - Implemented the first format-mechanics slice: bounded stream reads, strict
+    UTF-8 and JSON validation, duplicate and resource-limit rejection, stable
+    indented writes, typed failures, and a contiguous deterministic migration
+    registry. Focused format tests and the full 227-test suite pass.
   - Build on the authoritative boundary from `TASK-014` and the complete
     aggregate admission established by `TASK-034`.
   - Keep content catalog identity, provenance, and saved content-reference
     migration in `TASK-037`.
-  - Context: [Authoritative save boundary](authoritative-save-boundary.md)
+  - Context: [Save format, versioning, and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
 
 ## Future parking lot
 

@@ -16,6 +16,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Presentation snapshots](docs/presentation-snapshots.md)
 - [Entity lifecycle and explicit spawning](docs/entity-lifecycle.md)
 - [Authoritative save boundary](docs/authoritative-save-boundary.md)
+- [Save format, versioning, and migration](docs/save-format-and-migration.md)
 - [Concurrency and performance architecture](docs/concurrency-and-performance.md)
 - [Scale targets and benchmark architecture](docs/scale-and-benchmark-targets.md)
 - [Economy and production](docs/economy.md)
