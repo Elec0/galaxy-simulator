@@ -43,12 +43,10 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
 {
     private readonly EventAgenda<GameEvent> _agenda = new();
     private readonly SimulationEngine<GameEvent> _engine;
-    private readonly SortedDictionary<SystemId, StarSystem> _systems =
-        new(EntityIdComparer<SystemId>.Instance);
     private readonly SpatialMovement _movement = new();
     private readonly ActorControlRegistry _control = new();
     private readonly ShipOrderCoordinator _orders = new();
-    private readonly ConnectorTopology _topology;
+    private readonly WorldTopology _worldTopology;
     private readonly ISpatialNavigationPlanner _navigation;
     private readonly EntityLifecycleOwner _lifecycle;
     private readonly SessionEconomyOwner? _economy;
@@ -65,7 +63,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         ArgumentNullException.ThrowIfNull(setup);
         ArgumentNullException.ThrowIfNull(navigation);
         ArgumentNullException.ThrowIfNull(facts);
-        _topology = setup.ConnectorTopology;
+        _worldTopology = new WorldTopology(setup.Systems, setup.ConnectorTopology);
         _navigation = navigation;
         _facts = facts;
         _relationships = new RelationshipOwner(setup.Relationships);
@@ -74,11 +72,6 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             _control,
             _orders,
             setup.MaterializationPolicies);
-
-        foreach (StarSystem system in setup.Systems)
-        {
-            _systems.Add(system.Id, system);
-        }
 
         _lifecycle.RegisterSetup(setup.Ships);
         _economy = setup.Economy is null
@@ -164,13 +157,13 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             _movement.CaptureSnapshot(CurrentTime);
         return new GameSnapshot(
             CurrentTime,
-            GameSnapshotCollection.Copy(_systems.Values.Select(system =>
+            GameSnapshotCollection.Copy(_worldTopology.Systems.Select(system =>
                 new GameSystemSnapshot(system.Id, system.Name))),
-            GameSnapshotCollection.Copy(_topology.Endpoints.Select(endpoint =>
+            GameSnapshotCollection.Copy(_worldTopology.Connectors.Endpoints.Select(endpoint =>
                 new ConnectorEndpointSnapshot(
                     endpoint.Id,
                     endpoint.Position))),
-            GameSnapshotCollection.Copy(_topology.Connections.Select(connection =>
+            GameSnapshotCollection.Copy(_worldTopology.Connectors.Connections.Select(connection =>
                 new TransitConnectionSnapshot(
                     connection.Id,
                     connection.SourceEndpointId,
@@ -1434,11 +1427,11 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         SystemPosition expectedOrigin,
         TravelLeg.Connector leg)
     {
-        TransitConnection connection = _topology.GetConnection(
+        TransitConnection connection = _worldTopology.Connectors.GetConnection(
             leg.ConnectionId);
-        ConnectorEndpoint source = _topology.GetEndpoint(
+        ConnectorEndpoint source = _worldTopology.Connectors.GetEndpoint(
             connection.SourceEndpointId);
-        ConnectorEndpoint destination = _topology.GetEndpoint(
+        ConnectorEndpoint destination = _worldTopology.Connectors.GetEndpoint(
             connection.DestinationEndpointId);
         if (leg.Origin != expectedOrigin
             || leg.Origin != source.Position

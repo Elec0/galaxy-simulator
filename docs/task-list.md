@@ -79,6 +79,14 @@ strategy for the authoritative inventory defined by `TASK-014`.
     rejects incomplete matrices, invalid derived outcomes, noncanonical
     proposals, and contradictory grant provenance. The full 292-test suite
     passes.
+  - Added an immutable world-topology owner and checkpoints for named systems,
+    connector endpoints with exact local coordinates, and directional transit
+    connections with exact durations. Restore accepts non-semantic collection
+    reordering, canonicalizes later capture, preserves hierarchical planning
+    behavior, and rejects duplicate identities, unknown systems or endpoints,
+    same-system connections, and zero transit duration. The runtime coordinator
+    now uses this owner for snapshots and connector-leg validation. The full
+    300-test suite passes.
   - Build on the authoritative boundary from `TASK-014` and the complete
     aggregate admission established by `TASK-034`.
   - Keep content catalog identity, provenance, and saved content-reference
