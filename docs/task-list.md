@@ -13,110 +13,19 @@ rather than deleting them.
 
 ## Current focus
 
-`TASK-034` is complete. Construction, economy, and transport now belong to the
-clean `GameSession` aggregate, and removed entities leave neither economic
-commitments nor pending movement completion behind. `TASK-022` is the next
-save-boundary task: select the encoded save format, versioning, and migration
-strategy for the authoritative inventory defined by `TASK-014`.
+`TASK-022` is complete. The authoritative aggregate now has an externally
+editable JSON format contract, complete internal checkpoint and direct-restore
+boundaries, and atomic file storage mechanics. `TASK-023` is the next dependency:
+select the gameplay content format needed before `TASK-037` can make general
+saved sessions content-compatible.
 
 ## Near-term work
 
-- [ ] **TASK-022: Select save format, versioning, and migration strategy**
-  - Define the encoded save schema, format versioning, validation, corruption
-    handling, storage mechanics, and deterministic schema migration.
-  - The accepted design uses externally editable UTF-8 JSON, a versioned strict
-    schema, contiguous one-way migrations, typed rejection, and atomic file
-    replacement. Hand-authored scenarios use the production schema and loader
-    without bypassing authoritative validation.
-  - Implemented the first format-mechanics slice: bounded stream reads, strict
-    UTF-8 and JSON validation, duplicate and resource-limit rejection, stable
-    indented writes, typed failures, and a contiguous deterministic migration
-    registry.
-  - Added the first owner checkpoint contracts for engine progress and the
-    shared agenda. Capture now requires a closed timestamp boundary and retains
-    initialization, accrual, pending event keys and payloads, the exact next
-    creation sequence, and exhaustion. Direct restore validates these values
-    without reconciliation, accrual, scheduling, dispatch, or allocation.
-  - Added exact generic identifier allocator checkpoints and shared inventory
-    checkpoints. Inventory restore rebuilds derived totals from stored material
-    and explicit reservations, accepts non-semantic collection reordering, and
-    validates identity, capacity, ownership, and commitment consistency before
-    direct construction. No allocation, transfer, reserve, or consumption API
-    is replayed.
-  - Added spatial movement checkpoints for stable ship-local position, active
-    local motion and connector transit, actor generations, exact completion
-    event keys, and motion/transit allocators. Direct restore neither starts nor
-    schedules movement; focused continuation and corruption tests prove the
-    original pending event completes restored motion exactly once.
-  - Added semantic fact continuity checkpoints for the exact next sequence or
-    exhaustion, configured retention capacity, and retained ordered suffix.
-    Direct restore neither recommits facts nor allocates replacement sequences;
-    focused continuation, exhaustion, eviction, and corruption tests pass.
-  - Added command admission checkpoints for the exact next sequence or
-    exhaustion and the last admitted timestamp. Direct restore preserves the
-    monotonic time floor without replaying commands or restoring diagnostic
-    command records.
-  - Added actor-control checkpoints for each ship's base controller, temporary
-    scripted override and reason, and exact control revision. Restore accepts
-    non-semantic actor reordering, canonicalizes later capture, and directly
-    reconstructs control without beginning or ending overrides.
-  - Added ship-order checkpoints for the exact order allocator and each ship's
-    base and override work sets, preserving active, FIFO queued, suspended, and
-    last-terminal orders with plans, next-leg positions, and motion/transit
-    links. Direct restore emits no lifecycle transitions and rejects invalid
-    roles, identities, plans, links, and unpromoted queues.
-  - Added entity-lifecycle checkpoints for live bidirectional identity, ship
-    ownership and design references, the complete inventory registry, exact
-    entity/ship/inventory allocators, and durable materialization and removal
-    receipts. Direct restore preserves repeated-delivery results without setup,
-    materialization, or removal replay and rejects orphaned receipts, live
-    removed state, and allocator inconsistency.
-  - Added relationship checkpoints for principal and content identity, the
-    player principal, exact standing policy and complete directional values,
-    complete diplomacy, issued and revoked grants, and both durable batch
-    receipt families. Direct restore emits no facts or relationship deliveries,
-    isolates decoded collections, canonicalizes unordered owner state, and
-    rejects incomplete matrices, invalid derived outcomes, noncanonical
-    proposals, and contradictory grant provenance. The full 292-test suite
-    passes.
-  - Added an immutable world-topology owner and checkpoints for named systems,
-    connector endpoints with exact local coordinates, and directional transit
-    connections with exact durations. Restore accepts non-semantic collection
-    reordering, canonicalizes later capture, preserves hierarchical planning
-    behavior, and rejects duplicate identities, unknown systems or endpoints,
-    same-system connections, and zero transit duration. The runtime coordinator
-    now uses this owner for snapshots and connector-leg validation. The full
-    300-test suite passes.
-  - Added the deterministic runtime-policy manifest for stable navigation and
-    travel-time kinds with explicit behavior versions, exact travel parameters,
-    fact-retention capacity, and complete materialization policy and ship-design
-    definitions. Resolution binds hierarchical navigation to the restored
-    topology and rejects unavailable kinds or versions, unregistered injected
-    implementations, topology mismatch, invalid owner references, and duplicate
-    facility or design identities. Godot now uses the registered Chebyshev map
-    travel policy with its existing timing parameter. The full 308-test suite
-    passes.
-  - Added production workflow checkpoints for the exact job allocator, facility
-    and inventory binding, throughput, complete recipe definitions, active and
-    FIFO queued work, retained terminal jobs, repetition, status, generation,
-    completion time, and job-local reservation links. Direct restore neither
-    enqueues nor prepares work and rejects allocator inconsistency, invalid job
-    partitioning, malformed scheduling state, and any disagreement with shared
-    inventory reservation authority. The full 318-test suite passes.
-  - Added construction workflow checkpoints for the exact order allocator,
-    facility and inventory binding, throughput, design references, active and
-    FIFO queued work, retained terminal orders, status, generation, completion
-    time, and order-local reservation links. Pending materialization effects and
-    acknowledged identities survive direct restore without replaying enqueue,
-    input preparation, completion, or acknowledgement transitions. Validation
-    rejects unknown designs, invalid workflow partitions, malformed completion
-    and materialization state, and disagreement with shared inventory
-    reservation authority. The full 329-test suite passes.
-  - Build on the authoritative boundary from `TASK-014` and the complete
-    aggregate admission established by `TASK-034`.
-  - Keep content catalog identity, provenance, and saved content-reference
-    migration in `TASK-037`.
-  - Context: [Save format, versioning, and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
+- [ ] **TASK-023: Decide the gameplay content format**
+  - Determine which content is code-defined, data-defined, or externally
+    scriptable.
+  - Revisit modding goals and security constraints at that time.
+  - Feed the selected content identity and provenance model into `TASK-037`.
 
 ## Future parking lot
 
@@ -235,12 +144,6 @@ prerequisites and desired behavior are sufficiently defined.
   - Decide how systems and scripts receive deterministic randomness.
   - Preserve reproducibility when unrelated systems add random draws.
 
-- [ ] **TASK-023: Decide the gameplay content format**
-  - Determine which content is code-defined, data-defined, or externally
-    scriptable.
-  - Revisit modding goals and security constraints at that time.
-  - Feed the selected content identity and provenance model into `TASK-037`.
-
 - [ ] **TASK-041: Define generalized inventory, cargo, and ship equipment**
   - Evolve the current material-only inventory model so ships and other owners
     can hold the approved categories of physical items, without treating every
@@ -357,6 +260,22 @@ prerequisites and desired behavior are sufficiently defined.
 
 ## Completed foundations
 
+- [x] **TASK-022: Select save format, versioning, and migration strategy**
+  - Selected externally editable strict UTF-8 JSON, stable current-schema
+    writing, bounded decoding, typed rejection, and deterministic contiguous
+    one-way migration mechanics.
+  - Implemented complete internal authoritative checkpoints and direct isolated
+    restoration for every currently admitted `GameSession` owner, including
+    cross-owner validation and continuation equivalence.
+  - Added atomic same-directory file publication with durable file and directory
+    synchronization, one explicit backup, portable validated slot identifiers,
+    symbolic-link rejection, and cleanup that preserves the prior committed
+    primary across pre-publication failures. The full 368-test suite passes.
+  - General saved sessions remain unavailable until `TASK-023` supplies the
+    content format and `TASK-037` adds catalog compatibility and saved-reference
+    migration.
+  - Context: [Save format, versioning, and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
+
 - [x] **TASK-034: Integrate clean-session economy and transport with entity lifecycle**
   - Added a generic immutable new-game economy seed and private session-owned
     production, construction, logistics, transport, inventory, and freighter
@@ -407,7 +326,7 @@ prerequisites and desired behavior are sufficiently defined.
     economy, and transport into the clean `GameSession` aggregate, and
     `TASK-039` cancels removed-entity movement events before checkpoint capture
     and restore implementation.
-  - Save encoding and versioning remain in `TASK-022`; versioned content
+  - Save encoding and versioning were completed by `TASK-022`; versioned content
     catalogs and saved content-reference migration remain in `TASK-037`.
     Future domain owners must supply their own authoritative sections before
     they participate in a supported saved session.
@@ -437,7 +356,7 @@ prerequisites and desired behavior are sufficiently defined.
     treatment, and grants issued to the observer without leaking private reverse
     standing through snapshots or facts.
   - Recorded the exact authoritative relationship save inventory and direct
-    atomic restoration contract for `TASK-014`. Save encoding remains
+    atomic restoration contract for `TASK-014`. Save encoding was completed by
     `TASK-022`, content-reference migration remains `TASK-037`, and gameplay
     policy remains with its owning domains, including piracy in `TASK-036`.
   - Context: [Relational gameplay model](factions.md) · [Relational simulation architecture](relational-simulation-architecture.md)

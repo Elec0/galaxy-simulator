@@ -19,6 +19,26 @@ public sealed class GameSession : IGameplayCommandHandler
         _commands = new GameplayCommandProcessor(this, _facts);
     }
 
+    private GameSession(
+        GameFactStore facts,
+        ActorOrderRuntimeCoordinator runtime,
+        CommandAdmissionCheckpoint commandAdmission)
+    {
+        _facts = facts;
+        _runtime = runtime;
+        CheckpointResult<GameplayCommandProcessor> commands =
+            GameplayCommandProcessor.RestoreCheckpoint(
+                commandAdmission,
+                this,
+                facts);
+        if (!commands.IsSuccess)
+        {
+            throw new InvalidOperationException(commands.Failure!.Message);
+        }
+
+        _commands = commands.Value!;
+    }
+
     public SimulationTime CurrentTime => _runtime.CurrentTime;
 
     public IReadOnlyList<GameEventRecord> EventRecords => _runtime.EventRecords;
@@ -129,6 +149,96 @@ public sealed class GameSession : IGameplayCommandHandler
         GameFactSequence? sequence,
         int maximumCount) =>
         _facts.ReadAfter(sequence, maximumCount);
+
+    /// <summary>
+    /// Captures one complete authoritative checkpoint at the current completed
+    /// timestamp, or returns a typed failure without mutating the session.
+    /// </summary>
+    internal CheckpointResult<GameSessionCheckpoint> CaptureCheckpoint()
+    {
+        GameFactStoreCheckpoint facts = _facts.CaptureCheckpoint();
+        CheckpointResult<GameSessionRuntimeCheckpoint> runtime =
+            _runtime.CaptureCheckpoint(facts.Capacity);
+        if (!runtime.IsSuccess)
+        {
+            return CheckpointResult<GameSessionCheckpoint>.Rejected(runtime.Failure!);
+        }
+
+        GameSessionRuntimeCheckpoint value = runtime.Value!;
+        var checkpoint = new GameSessionCheckpoint(
+            value.Engine,
+            value.RuntimePolicies,
+            value.WorldTopology,
+            value.Movement,
+            value.Control,
+            value.Orders,
+            value.Lifecycle,
+            value.Relationships,
+            value.Economy,
+            facts,
+            _commands.CaptureCheckpoint());
+        return CheckpointResult<GameSessionCheckpoint>.Success(checkpoint);
+    }
+
+    /// <summary>
+    /// Validates and assembles every owner in isolation, publishing a session
+    /// only after all owner and cross-owner invariants succeed.
+    /// </summary>
+    internal static CheckpointResult<GameSession> RestoreCheckpoint(
+        GameSessionCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        CheckpointResult<GameFactStore> facts =
+            GameFactStore.RestoreCheckpoint(checkpoint.Facts);
+        if (!facts.IsSuccess)
+        {
+            return CheckpointResult<GameSession>.Rejected(facts.Failure!);
+        }
+
+        if (checkpoint.Facts.Capacity
+            != checkpoint.RuntimePolicies.FactRetentionCapacity)
+        {
+            return CheckpointResult<GameSession>.Rejected(
+                new CheckpointValidationFailure(
+                    "$.checkpoint.facts.capacity",
+                    "Fact capacity disagrees with the runtime policy manifest."));
+        }
+
+        var runtimeCheckpoint = new GameSessionRuntimeCheckpoint(
+            checkpoint.Engine,
+            checkpoint.RuntimePolicies,
+            checkpoint.WorldTopology,
+            checkpoint.Movement,
+            checkpoint.Control,
+            checkpoint.Orders,
+            checkpoint.Lifecycle,
+            checkpoint.Relationships,
+            checkpoint.Economy);
+        CheckpointResult<ActorOrderRuntimeCoordinator> runtime =
+            ActorOrderRuntimeCoordinator.RestoreCheckpoint(
+                runtimeCheckpoint,
+                facts.Value!);
+        if (!runtime.IsSuccess)
+        {
+            return CheckpointResult<GameSession>.Rejected(runtime.Failure!);
+        }
+
+        try
+        {
+            return CheckpointResult<GameSession>.Success(
+                new GameSession(
+                    facts.Value!,
+                    runtime.Value!,
+                    checkpoint.CommandAdmission));
+        }
+        catch (InvalidOperationException error)
+        {
+            return CheckpointResult<GameSession>.Rejected(
+                new CheckpointValidationFailure(
+                    "$.checkpoint.commandAdmission",
+                    error.Message));
+        }
+    }
 
     GameplayCommandHandlingResult IGameplayCommandHandler.Handle(
         GameplayCommandEnvelope envelope)

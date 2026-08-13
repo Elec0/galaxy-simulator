@@ -70,6 +70,33 @@ public sealed class ShipRegistry
 
     public Freighter? GetFreighter(ShipId shipId) => _freighters.GetValueOrDefault(shipId);
 
+    /// <summary>
+    /// Captures only logistics capability; authoritative ship identity and cargo
+    /// ownership are validated against the entity-lifecycle owner during load.
+    /// </summary>
+    internal IReadOnlyList<TransportFreighterCheckpoint> CaptureFreighterCheckpoints() =>
+        _freighters.Values.Select(freighter => new TransportFreighterCheckpoint(
+            freighter.ShipId,
+            freighter.LocationId,
+            freighter.CargoInventoryId,
+            freighter.ActiveJobId)).ToArray();
+
+    /// <summary>
+    /// Directly restores validated freighter capability without registering
+    /// acceptance-only ship records or assigning transport work.
+    /// </summary>
+    internal static ShipRegistry RestoreFreightersDirect(
+        IEnumerable<Freighter> freighters)
+    {
+        var ships = new ShipRegistry();
+        foreach (Freighter freighter in freighters)
+        {
+            ships._freighters.Add(freighter.ShipId, freighter);
+        }
+
+        return ships;
+    }
+
     internal bool RemoveFreighter(ShipId shipId)
     {
         bool removed = _freighters.Remove(shipId);

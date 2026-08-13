@@ -72,6 +72,10 @@ public sealed class HierarchicalLogisticsNavigation : ILogisticsNavigation
         _planner = planner;
     }
 
+    internal IReadOnlyDictionary<LocationId, SystemPosition> Anchors => _anchors;
+
+    internal ISpatialNavigationPlanner Planner => _planner;
+
     /// <inheritdoc />
     public LogisticsTravelEstimate? Estimate(
         ShipId actorId,

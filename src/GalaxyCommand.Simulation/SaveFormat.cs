@@ -12,6 +12,8 @@ internal static class SaveFormat
 
 internal enum SaveFormatFailureKind
 {
+    InvalidSlot,
+    FileMissing,
     StorageAccess,
     DocumentTooLarge,
     InvalidUtf8,

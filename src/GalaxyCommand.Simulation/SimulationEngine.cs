@@ -47,6 +47,8 @@ public sealed class SimulationEngine<TEvent>
 
     public int PendingEventCount => _agenda.Count;
 
+    internal EventAgenda<TEvent> Agenda => _agenda;
+
     /// <summary>
     /// Captures exact engine progress and agenda state at a completed timestamp
     /// boundary.

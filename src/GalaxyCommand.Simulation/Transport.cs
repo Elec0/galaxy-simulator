@@ -235,13 +235,66 @@ internal sealed class TransportAssignmentCandidateComparer :
 
 public sealed class TransportIdSequences
 {
-    private readonly IdSequence<SupplyOfferId> _offers = new();
-    private readonly IdSequence<DemandRequestId> _demands = new();
-    private readonly IdSequence<TransportJobId> _jobs = new();
+    private readonly IdSequence<SupplyOfferId> _offers;
+    private readonly IdSequence<DemandRequestId> _demands;
+    private readonly IdSequence<TransportJobId> _jobs;
+
+    public TransportIdSequences()
+        : this(
+            new IdSequence<SupplyOfferId>(),
+            new IdSequence<DemandRequestId>(),
+            new IdSequence<TransportJobId>())
+    {
+    }
+
+    private TransportIdSequences(
+        IdSequence<SupplyOfferId> offers,
+        IdSequence<DemandRequestId> demands,
+        IdSequence<TransportJobId> jobs)
+    {
+        _offers = offers;
+        _demands = demands;
+        _jobs = jobs;
+    }
 
     internal SupplyOfferId AllocateOffer() => _offers.Allocate();
     internal DemandRequestId AllocateDemand() => _demands.Allocate();
     internal TransportJobId AllocateJob() => _jobs.Allocate();
+
+    internal TransportIdSequencesCheckpoint CaptureCheckpoint() =>
+        new(
+            _offers.CaptureCheckpoint(),
+            _demands.CaptureCheckpoint(),
+            _jobs.CaptureCheckpoint());
+
+    /// <summary>
+    /// Restores all three independent market allocators without issuing IDs.
+    /// </summary>
+    internal static CheckpointResult<TransportIdSequences> RestoreCheckpoint(
+        TransportIdSequencesCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        CheckpointResult<IdSequence<SupplyOfferId>> offers =
+            IdSequence<SupplyOfferId>.RestoreCheckpoint(checkpoint.OfferIds);
+        CheckpointResult<IdSequence<DemandRequestId>> demands =
+            IdSequence<DemandRequestId>.RestoreCheckpoint(checkpoint.DemandIds);
+        CheckpointResult<IdSequence<TransportJobId>> jobs =
+            IdSequence<TransportJobId>.RestoreCheckpoint(checkpoint.JobIds);
+        if (!offers.IsSuccess)
+        {
+            return CheckpointResult<TransportIdSequences>.Rejected(offers.Failure!);
+        }
+
+        if (!demands.IsSuccess)
+        {
+            return CheckpointResult<TransportIdSequences>.Rejected(demands.Failure!);
+        }
+
+        return jobs.IsSuccess
+            ? CheckpointResult<TransportIdSequences>.Success(
+                new TransportIdSequences(offers.Value!, demands.Value!, jobs.Value!))
+            : CheckpointResult<TransportIdSequences>.Rejected(jobs.Failure!);
+    }
 }
 
 /// <summary>
@@ -292,6 +345,71 @@ public sealed class TransportBoard
     public IEnumerable<TransportJob> Jobs => _jobs.Values;
     internal IEnumerable<SupplyOffer> Supplies => _supplies.Values;
     internal IEnumerable<DemandRequest> Demands => _demands.Values;
+
+    /// <summary>
+    /// Captures retained market entries and every transport job in stable ID order.
+    /// </summary>
+    internal TransportBoardCheckpoint CaptureCheckpoint() =>
+        new(
+            _supplies.Values.Select(supply => new TransportSupplyCheckpoint(
+                supply.Id,
+                supply.InventoryId,
+                supply.LocationId,
+                supply.MaterialId,
+                supply.Remaining)).ToArray(),
+            _demands.Values.Select(demand => new TransportDemandCheckpoint(
+                demand.Id,
+                demand.InventoryId,
+                demand.LocationId,
+                demand.MaterialId,
+                demand.Remaining,
+                demand.Priority,
+                demand.CreatedAt)).ToArray(),
+            _jobs.Values.Select(job => new TransportJobCheckpoint(
+                job.Id,
+                job.ShipId,
+                job.SupplyOfferId,
+                job.DemandRequestId,
+                job.SourceInventoryId,
+                job.SourceLocationId,
+                job.DestinationInventoryId,
+                job.DestinationLocationId,
+                job.MaterialId,
+                job.Quantity,
+                job.SourceReservationId,
+                job.DestinationCapacityReservationId,
+                job.AssignedAt,
+                job.Generation,
+                job.Status,
+                job.TransitionAt)).ToArray());
+
+    /// <summary>
+    /// Directly installs a validated market and job registry without publishing,
+    /// assigning, reserving inventory, or advancing transport work.
+    /// </summary>
+    internal static TransportBoard RestoreDirect(
+        IEnumerable<SupplyOffer> supplies,
+        IEnumerable<DemandRequest> demands,
+        IEnumerable<TransportJob> jobs)
+    {
+        var board = new TransportBoard();
+        foreach (SupplyOffer supply in supplies)
+        {
+            board._supplies.Add(supply.Id, supply);
+        }
+
+        foreach (DemandRequest demand in demands)
+        {
+            board._demands.Add(demand.Id, demand);
+        }
+
+        foreach (TransportJob job in jobs)
+        {
+            board._jobs.Add(job.Id, job);
+        }
+
+        return board;
+    }
 
     public Quantity OfferedQuantity(InventoryId inventoryId, MaterialId materialId) =>
         SumQuantities(_supplies.Values

@@ -370,6 +370,9 @@ internal sealed class EntityLifecycleOwner
 
     internal InventoryRegistry Inventories => _inventories;
 
+    internal IReadOnlyList<ShipMaterializationPolicy> MaterializationPolicies =>
+        _policies.Values.ToArray();
+
     /// <summary>
     /// Captures live identity, inventory ownership, exact allocators, and both
     /// durable lifecycle receipt sets in stable key order.
