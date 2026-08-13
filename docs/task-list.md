@@ -59,8 +59,13 @@ strategy for the authoritative inventory defined by `TASK-014`.
   - Added actor-control checkpoints for each ship's base controller, temporary
     scripted override and reason, and exact control revision. Restore accepts
     non-semantic actor reordering, canonicalizes later capture, and directly
-    reconstructs control without beginning or ending overrides. The full
-    266-test suite passes.
+    reconstructs control without beginning or ending overrides.
+  - Added ship-order checkpoints for the exact order allocator and each ship's
+    base and override work sets, preserving active, FIFO queued, suspended, and
+    last-terminal orders with plans, next-leg positions, and motion/transit
+    links. Direct restore emits no lifecycle transitions and rejects invalid
+    roles, identities, plans, links, and unpromoted queues. The full 273-test
+    suite passes.
   - Build on the authoritative boundary from `TASK-014` and the complete
     aggregate admission established by `TASK-034`.
   - Keep content catalog identity, provenance, and saved content-reference

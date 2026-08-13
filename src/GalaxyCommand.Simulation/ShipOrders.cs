@@ -67,7 +67,114 @@ internal sealed class ShipOrderCoordinator
 {
     private readonly SortedDictionary<ShipId, ActorOrders> _actors =
         new(EntityIdComparer<ShipId>.Instance);
-    private readonly IdSequence<ShipOrderId> _ids = new();
+    private readonly IdSequence<ShipOrderId> _ids;
+
+    internal ShipOrderCoordinator()
+        : this(new IdSequence<ShipOrderId>())
+    {
+    }
+
+    private ShipOrderCoordinator(IdSequence<ShipOrderId> ids)
+    {
+        _ids = ids;
+    }
+
+    /// <summary>
+    /// Captures every base and override work set in stable ship order together
+    /// with the exact order identifier allocator state.
+    /// </summary>
+    internal ShipOrderCoordinatorCheckpoint CaptureCheckpoint() =>
+        new(
+            _ids.CaptureCheckpoint(),
+            _actors.Select(pair => new ShipActorOrdersCheckpoint(
+                pair.Key,
+                CaptureWorkSet(pair.Value.Base),
+                pair.Value.Override is { } overrideWork
+                    ? CaptureWorkSet(overrideWork)
+                    : null)));
+
+    /// <summary>
+    /// Validates and directly restores order ownership without creating,
+    /// transitioning, promoting, or cancelling any saved order.
+    /// </summary>
+    internal static CheckpointResult<ShipOrderCoordinator> RestoreCheckpoint(
+        ShipOrderCoordinatorCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        CheckpointResult<IdSequence<ShipOrderId>> idResult =
+            IdSequence<ShipOrderId>.RestoreCheckpoint(checkpoint.OrderIds);
+        if (!idResult.IsSuccess)
+        {
+            return Rejected(
+                "$.checkpoint.orders.orderIds.nextValue",
+                idResult.Failure!.Message);
+        }
+
+        var restored = new ShipOrderCoordinator(idResult.Value!);
+        var retainedOrderIds = new HashSet<ShipOrderId>();
+        const string path = "$.checkpoint.orders.actors";
+        for (int index = 0; index < checkpoint.Actors.Count; index++)
+        {
+            ShipActorOrdersCheckpoint? actor = checkpoint.Actors[index];
+            if (actor is null)
+            {
+                return Rejected(
+                    $"{path}[{index}]",
+                    "A ship order actor checkpoint is missing.");
+            }
+
+            if (actor.ShipId.Value == 0)
+            {
+                return Rejected(
+                    $"{path}[{index}].shipId",
+                    "An order actor ship identifier must be nonzero.");
+            }
+
+            if (restored._actors.ContainsKey(actor.ShipId))
+            {
+                return Rejected(
+                    $"{path}[{index}].shipId",
+                    $"Duplicate order actor {actor.ShipId}.");
+            }
+
+            bool hasOverride = actor.Override is not null;
+            CheckpointResult<WorkSet> baseResult = RestoreWorkSet(
+                actor.Base,
+                $"{path}[{index}].base",
+                hasOverride ? WorkSetRole.SuspendedBase : WorkSetRole.Current,
+                checkpoint.OrderIds,
+                retainedOrderIds);
+            if (!baseResult.IsSuccess)
+            {
+                return CheckpointResult<ShipOrderCoordinator>.Rejected(
+                    baseResult.Failure!);
+            }
+
+            WorkSet? overrideWork = null;
+            if (actor.Override is { } overrideCheckpoint)
+            {
+                CheckpointResult<WorkSet> overrideResult = RestoreWorkSet(
+                    overrideCheckpoint,
+                    $"{path}[{index}].override",
+                    WorkSetRole.Current,
+                    checkpoint.OrderIds,
+                    retainedOrderIds);
+                if (!overrideResult.IsSuccess)
+                {
+                    return CheckpointResult<ShipOrderCoordinator>.Rejected(
+                        overrideResult.Failure!);
+                }
+
+                overrideWork = overrideResult.Value;
+            }
+
+            restored._actors.Add(
+                actor.ShipId,
+                new ActorOrders(baseResult.Value!, overrideWork));
+        }
+
+        return CheckpointResult<ShipOrderCoordinator>.Success(restored);
+    }
 
     internal void Add(ShipId shipId)
     {
@@ -544,6 +651,442 @@ internal sealed class ShipOrderCoordinator
         return CopySnapshots(suspended);
     }
 
+    /// <summary>
+    /// Preserves active, FIFO, and last-terminal roles without flattening their
+    /// distinct lifecycle meaning into one order collection.
+    /// </summary>
+    private static ShipOrderWorkSetCheckpoint CaptureWorkSet(WorkSet work) =>
+        new(
+            work.Active is { } active ? CaptureOrder(active) : null,
+            work.Queue.Select(CaptureOrder),
+            work.LastTerminal is { } terminal ? CaptureOrder(terminal) : null);
+
+    private static ShipOrderCheckpoint CaptureOrder(ShipOrder order) =>
+        new(
+            order.Id,
+            order.Source,
+            order.Destination,
+            order.Status,
+            order.Reason,
+            order.Plan,
+            order.NextLegIndex,
+            order.MotionId,
+            order.TransitId);
+
+    /// <summary>
+    /// Restores one work set while preserving FIFO queue order and enforcing
+    /// the active-state rules for its base or override role.
+    /// </summary>
+    private static CheckpointResult<WorkSet> RestoreWorkSet(
+        ShipOrderWorkSetCheckpoint? checkpoint,
+        string path,
+        WorkSetRole role,
+        IdSequenceCheckpoint orderIds,
+        HashSet<ShipOrderId> retainedOrderIds)
+    {
+        if (checkpoint is null)
+        {
+            return WorkSetRejected(path, "A ship order work set is missing.");
+        }
+
+        var restored = new WorkSet();
+        if (checkpoint.Active is { } activeCheckpoint)
+        {
+            CheckpointResult<ShipOrder> activeResult = RestoreOrder(
+                activeCheckpoint,
+                $"{path}.active",
+                orderIds,
+                retainedOrderIds);
+            if (!activeResult.IsSuccess)
+            {
+                return CheckpointResult<WorkSet>.Rejected(activeResult.Failure!);
+            }
+
+            ShipOrder active = activeResult.Value!;
+            bool validActiveStatus = role == WorkSetRole.SuspendedBase
+                ? active.Status == ShipOrderStatus.Suspended
+                : active.Status is ShipOrderStatus.Active or ShipOrderStatus.Waiting;
+            if (!validActiveStatus)
+            {
+                return WorkSetRejected(
+                    $"{path}.active.status",
+                    "The active order status does not match its work-set role.");
+            }
+
+            restored.Active = active;
+        }
+
+        // Every mutation path promotes the FIFO head before returning to a
+        // completed boundary, so a queue without an active order is corrupt.
+        if (restored.Active is null && checkpoint.Queue.Count != 0)
+        {
+            return WorkSetRejected(
+                $"{path}.queue",
+                "A queued order requires an active order ahead of it.");
+        }
+
+        for (int index = 0; index < checkpoint.Queue.Count; index++)
+        {
+            ShipOrderCheckpoint? queuedCheckpoint = checkpoint.Queue[index];
+            if (queuedCheckpoint is null)
+            {
+                return WorkSetRejected(
+                    $"{path}.queue[{index}]",
+                    "A queued order checkpoint is missing.");
+            }
+
+            CheckpointResult<ShipOrder> queuedResult = RestoreOrder(
+                queuedCheckpoint,
+                $"{path}.queue[{index}]",
+                orderIds,
+                retainedOrderIds);
+            if (!queuedResult.IsSuccess)
+            {
+                return CheckpointResult<WorkSet>.Rejected(queuedResult.Failure!);
+            }
+
+            ShipOrder queued = queuedResult.Value!;
+            if (queued.Status != ShipOrderStatus.Queued)
+            {
+                return WorkSetRejected(
+                    $"{path}.queue[{index}].status",
+                    "A queued order must have queued status.");
+            }
+
+            restored.Queue.Add(queued);
+        }
+
+        if (checkpoint.LastTerminal is { } terminalCheckpoint)
+        {
+            CheckpointResult<ShipOrder> terminalResult = RestoreOrder(
+                terminalCheckpoint,
+                $"{path}.lastTerminal",
+                orderIds,
+                retainedOrderIds);
+            if (!terminalResult.IsSuccess)
+            {
+                return CheckpointResult<WorkSet>.Rejected(terminalResult.Failure!);
+            }
+
+            ShipOrder terminal = terminalResult.Value!;
+            if (terminal.Status is not ShipOrderStatus.Completed
+                and not ShipOrderStatus.Cancelled
+                and not ShipOrderStatus.Failed)
+            {
+                return WorkSetRejected(
+                    $"{path}.lastTerminal.status",
+                    "A last terminal order must have a terminal status.");
+            }
+
+            restored.LastTerminal = terminal;
+        }
+
+        return CheckpointResult<WorkSet>.Success(restored);
+    }
+
+    /// <summary>
+    /// Restores one retained order after validating identity, lifecycle state,
+    /// plan position, and the active physical-work linkage.
+    /// </summary>
+    private static CheckpointResult<ShipOrder> RestoreOrder(
+        ShipOrderCheckpoint checkpoint,
+        string path,
+        IdSequenceCheckpoint orderIds,
+        HashSet<ShipOrderId> retainedOrderIds)
+    {
+        if (checkpoint.Id.Value == 0
+            || !WasAllocated(checkpoint.Id, orderIds))
+        {
+            return OrderRejected(
+                $"{path}.id",
+                "The order identifier was not allocated by the saved sequence.");
+        }
+
+        if (!retainedOrderIds.Add(checkpoint.Id))
+        {
+            return OrderRejected(
+                $"{path}.id",
+                $"Duplicate retained order {checkpoint.Id}.");
+        }
+
+        if (!IsValidSource(checkpoint.Source))
+        {
+            return OrderRejected(
+                $"{path}.source",
+                "An order source is missing or invalid.");
+        }
+
+        if (!IsValidDestination(checkpoint.Destination))
+        {
+            return OrderRejected(
+                $"{path}.destination",
+                "An order destination is missing or invalid.");
+        }
+
+        if (checkpoint.Status is not { } status || !Enum.IsDefined(status))
+        {
+            return OrderRejected(
+                $"{path}.status",
+                "An order status is missing or invalid.");
+        }
+
+        if (checkpoint.Reason is not { } reason
+            || !Enum.IsDefined(reason)
+            || !IsValidReason(status, reason))
+        {
+            return OrderRejected(
+                $"{path}.reason",
+                "The order reason does not match its lifecycle status.");
+        }
+
+        CheckpointValidationFailure? stateFailure = ValidateExecutionState(
+            checkpoint,
+            status,
+            path);
+        if (stateFailure is not null)
+        {
+            return CheckpointResult<ShipOrder>.Rejected(stateFailure);
+        }
+
+        // Assign saved state directly so restoration emits no transitions and
+        // does not advance the next-leg position or allocate physical work.
+        var restored = new ShipOrder(
+            checkpoint.Id,
+            checkpoint.Source!,
+            checkpoint.Destination!)
+        {
+            Status = status,
+            Reason = reason,
+            Plan = checkpoint.Plan,
+            NextLegIndex = checkpoint.NextLegIndex,
+            MotionId = checkpoint.MotionId,
+            TransitId = checkpoint.TransitId,
+        };
+        return CheckpointResult<ShipOrder>.Success(restored);
+    }
+
+    /// <summary>
+    /// Verifies that only an active order retains an executable plan and that
+    /// its physical-work identity matches the current leg category.
+    /// </summary>
+    private static CheckpointValidationFailure? ValidateExecutionState(
+        ShipOrderCheckpoint checkpoint,
+        ShipOrderStatus status,
+        string path)
+    {
+        if (checkpoint.NextLegIndex < 0)
+        {
+            return new CheckpointValidationFailure(
+                $"{path}.nextLegIndex",
+                "The next leg index cannot be negative.");
+        }
+
+        if (checkpoint.MotionId is { Value: 0 })
+        {
+            return new CheckpointValidationFailure(
+                $"{path}.motionId",
+                "A linked motion identifier must be nonzero.");
+        }
+
+        if (checkpoint.TransitId is { Value: 0 })
+        {
+            return new CheckpointValidationFailure(
+                $"{path}.transitId",
+                "A linked connector transit identifier must be nonzero.");
+        }
+
+        if (status != ShipOrderStatus.Active)
+        {
+            return checkpoint.Plan is null
+                && checkpoint.NextLegIndex == 0
+                && checkpoint.MotionId is null
+                && checkpoint.TransitId is null
+                    ? null
+                    : new CheckpointValidationFailure(
+                        path,
+                        "A non-active order cannot retain a plan, leg position, motion, or transit link.");
+        }
+
+        if (checkpoint.Plan is not { } plan || plan.Legs.Count == 0)
+        {
+            return new CheckpointValidationFailure(
+                $"{path}.plan",
+                "An active order requires a non-empty travel plan.");
+        }
+
+        if (checkpoint.NextLegIndex >= plan.Legs.Count)
+        {
+            return new CheckpointValidationFailure(
+                $"{path}.nextLegIndex",
+                "An active order must point to an unfinished plan leg.");
+        }
+
+        CheckpointValidationFailure? planFailure = ValidatePlan(plan, path);
+        if (planFailure is not null)
+        {
+            return planFailure;
+        }
+
+        return plan.Legs[checkpoint.NextLegIndex] switch
+        {
+            TravelLeg.Local when checkpoint.TransitId is not null =>
+                new CheckpointValidationFailure(
+                    $"{path}.transitId",
+                    "A local leg cannot retain a connector transit link."),
+            TravelLeg.Local when checkpoint.MotionId is null =>
+                new CheckpointValidationFailure(
+                    $"{path}.motionId",
+                    "The current local leg requires a motion link."),
+            TravelLeg.Connector when checkpoint.MotionId is not null =>
+                new CheckpointValidationFailure(
+                    $"{path}.motionId",
+                    "A connector leg cannot retain a local motion link."),
+            TravelLeg.Connector when checkpoint.TransitId is null =>
+                new CheckpointValidationFailure(
+                    $"{path}.transitId",
+                    "The current connector leg requires a transit link."),
+            TravelLeg.Local or TravelLeg.Connector => null,
+            _ => new CheckpointValidationFailure(
+                $"{path}.plan.legs[{checkpoint.NextLegIndex}]",
+                "The current travel leg kind is unsupported."),
+        };
+    }
+
+    /// <summary>
+    /// Ensures saved plan legs form one contiguous path ending at the plan's
+    /// stable destination when that destination has a concrete position.
+    /// </summary>
+    private static CheckpointValidationFailure? ValidatePlan(
+        TravelPlan plan,
+        string path)
+    {
+        SystemPosition? priorDestination = null;
+        for (int index = 0; index < plan.Legs.Count; index++)
+        {
+            TravelLeg? leg = plan.Legs[index];
+            SystemPosition origin;
+            SystemPosition destination;
+            switch (leg)
+            {
+                case TravelLeg.Local local:
+                    origin = local.Origin;
+                    destination = local.Destination;
+                    break;
+                case TravelLeg.Connector connector:
+                    origin = connector.Origin;
+                    destination = connector.Destination;
+                    break;
+                default:
+                    return new CheckpointValidationFailure(
+                        $"{path}.plan.legs[{index}]",
+                        "A travel plan leg is missing or unsupported.");
+            }
+
+            if (priorDestination is { } prior && prior != origin)
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}.plan.legs[{index}]",
+                    "Travel plan legs must form a contiguous path.");
+            }
+
+            priorDestination = destination;
+        }
+
+        bool reachesDestination = plan.Destination switch
+        {
+            NavigationDestination.Position position =>
+                priorDestination == position.Value,
+            NavigationDestination.System system =>
+                priorDestination?.SystemId == system.SystemId,
+            NavigationDestination.Entity => true,
+            _ => false,
+        };
+        return reachesDestination
+            ? null
+            : new CheckpointValidationFailure(
+                $"{path}.plan.destination",
+                "The travel plan does not end at its saved destination.");
+    }
+
+    /// <summary>
+    /// Matches each order status to the reasons reachable through the current
+    /// lifecycle transition methods.
+    /// </summary>
+    private static bool IsValidReason(
+        ShipOrderStatus status,
+        ShipOrderReason reason) =>
+        status switch
+        {
+            ShipOrderStatus.Queued =>
+                reason == ShipOrderReason.QueuedBehindActiveOrder,
+            ShipOrderStatus.Active =>
+                reason is ShipOrderReason.MovingToDestination
+                    or ShipOrderReason.ResumingAfterScriptedOverride,
+            ShipOrderStatus.Waiting =>
+                reason == ShipOrderReason.WaitingForConnectorTransitCompletion,
+            ShipOrderStatus.Suspended =>
+                reason == ShipOrderReason.SuspendedByScriptedOverride,
+            ShipOrderStatus.Completed =>
+                reason == ShipOrderReason.DestinationReached,
+            ShipOrderStatus.Cancelled =>
+                reason is ShipOrderReason.CancelledByCommand
+                    or ShipOrderReason.ReplacedByCommand
+                    or ShipOrderReason.ScriptedOverrideEnded,
+            ShipOrderStatus.Failed =>
+                reason is ShipOrderReason.DestinationBecameUnreachable
+                    or ShipOrderReason.TargetRemoved,
+            _ => false,
+        };
+
+    /// <summary>
+    /// Validates the stable local attribution retained by a saved order.
+    /// </summary>
+    private static bool IsValidSource(CommandSource? source) =>
+        source is not null
+        && Enum.IsDefined(source.Kind)
+        && !string.IsNullOrWhiteSpace(source.Id.Value);
+
+    /// <summary>
+    /// Validates every currently supported destination discriminator and its
+    /// required nonzero identity.
+    /// </summary>
+    private static bool IsValidDestination(NavigationDestination? destination) =>
+        destination switch
+        {
+            NavigationDestination.Position position =>
+                position.Value.SystemId.Value != 0,
+            NavigationDestination.System system => system.SystemId.Value != 0,
+            NavigationDestination.Entity entity => entity.EntityId.Value != 0,
+            _ => false,
+        };
+
+    /// <summary>
+    /// Accepts retained identities below the next allocator position, or any
+    /// nonzero identity when the allocator is exhausted.
+    /// </summary>
+    private static bool WasAllocated(
+        ShipOrderId id,
+        IdSequenceCheckpoint sequence) =>
+        sequence.NextValue is not { } next || id.Value < next;
+
+    private static CheckpointResult<ShipOrderCoordinator> Rejected(
+        string path,
+        string message) =>
+        CheckpointResult<ShipOrderCoordinator>.Rejected(
+            new CheckpointValidationFailure(path, message));
+
+    private static CheckpointResult<WorkSet> WorkSetRejected(
+        string path,
+        string message) =>
+        CheckpointResult<WorkSet>.Rejected(
+            new CheckpointValidationFailure(path, message));
+
+    private static CheckpointResult<ShipOrder> OrderRejected(
+        string path,
+        string message) =>
+        CheckpointResult<ShipOrder>.Rejected(
+            new CheckpointValidationFailure(path, message));
+
     private static void Activate(
         ShipId shipId,
         WorkSet work,
@@ -788,7 +1331,18 @@ internal sealed class ShipOrderCoordinator
 
     private sealed class ActorOrders
     {
-        internal WorkSet Base { get; } = new();
+        internal ActorOrders()
+            : this(new WorkSet(), @override: null)
+        {
+        }
+
+        internal ActorOrders(WorkSet @base, WorkSet? @override)
+        {
+            Base = @base;
+            Override = @override;
+        }
+
+        internal WorkSet Base { get; }
 
         internal WorkSet? Override { get; set; }
     }
@@ -800,6 +1354,12 @@ internal sealed class ShipOrderCoordinator
         internal List<ShipOrder> Queue { get; } = [];
 
         internal ShipOrder? LastTerminal { get; set; }
+    }
+
+    private enum WorkSetRole
+    {
+        Current,
+        SuspendedBase,
     }
 }
 
