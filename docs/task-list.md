@@ -103,6 +103,15 @@ strategy for the authoritative inventory defined by `TASK-014`.
     enqueues nor prepares work and rejects allocator inconsistency, invalid job
     partitioning, malformed scheduling state, and any disagreement with shared
     inventory reservation authority. The full 318-test suite passes.
+  - Added construction workflow checkpoints for the exact order allocator,
+    facility and inventory binding, throughput, design references, active and
+    FIFO queued work, retained terminal orders, status, generation, completion
+    time, and order-local reservation links. Pending materialization effects and
+    acknowledged identities survive direct restore without replaying enqueue,
+    input preparation, completion, or acknowledgement transitions. Validation
+    rejects unknown designs, invalid workflow partitions, malformed completion
+    and materialization state, and disagreement with shared inventory
+    reservation authority. The full 329-test suite passes.
   - Build on the authoritative boundary from `TASK-014` and the complete
     aggregate admission established by `TASK-034`.
   - Keep content catalog identity, provenance, and saved content-reference

@@ -177,14 +177,39 @@ public sealed class ConstructionOrder
     internal IReadOnlyList<ReservationId> AllReservationIds() =>
         _reservationIds.Values.SelectMany(ids => ids).ToArray();
 
+    internal IEnumerable<ConstructionReservationLinkCheckpoint> ReservationLinks =>
+        _reservationIds.SelectMany(pair => pair.Value.Select(reservationId =>
+            new ConstructionReservationLinkCheckpoint(pair.Key, reservationId)));
+
     internal void ClearReservations() => _reservationIds.Clear();
 }
 
 public sealed class ConstructionIdSequences
 {
-    private readonly IdSequence<ConstructionOrderId> _orders = new();
+    private readonly IdSequence<ConstructionOrderId> _orders;
+
+    public ConstructionIdSequences()
+        : this(new IdSequence<ConstructionOrderId>())
+    {
+    }
+
+    private ConstructionIdSequences(IdSequence<ConstructionOrderId> orders) =>
+        _orders = orders;
 
     internal ConstructionOrderId AllocateOrder() => _orders.Allocate();
+
+    internal IdSequenceCheckpoint CaptureCheckpoint() => _orders.CaptureCheckpoint();
+
+    internal static CheckpointResult<ConstructionIdSequences> RestoreCheckpoint(
+        IdSequenceCheckpoint checkpoint)
+    {
+        CheckpointResult<IdSequence<ConstructionOrderId>> restored =
+            IdSequence<ConstructionOrderId>.RestoreCheckpoint(checkpoint);
+        return restored.IsSuccess
+            ? CheckpointResult<ConstructionIdSequences>.Success(
+                new ConstructionIdSequences(restored.Value!))
+            : CheckpointResult<ConstructionIdSequences>.Rejected(restored.Failure!);
+    }
 }
 
 /// <summary>
@@ -218,6 +243,8 @@ public sealed class ConstructionProcess
 
     public InventoryId InventoryId { get; }
 
+    internal Throughput Throughput => _throughput;
+
     public ConstructionOrder? ActiveOrder { get; private set; }
 
     public int QueuedOrderCount => _queued.Count;
@@ -238,6 +265,80 @@ public sealed class ConstructionProcess
 
     public ConstructionOrder? GetOrder(ConstructionOrderId orderId) =>
         _orders.GetValueOrDefault(orderId);
+
+    /// <summary>
+    /// Captures queue order separately from the canonically ordered registry so
+    /// collection ordering that carries meaning is never inferred during load.
+    /// </summary>
+    internal ConstructionProcessCheckpoint CaptureCheckpoint() =>
+        new(
+            FacilityId,
+            InventoryId,
+            _throughput,
+            ActiveOrder?.Id,
+            _queued.Select(order => order.Id).ToArray(),
+            _orders.Values.Select(order => new ConstructionOrderCheckpoint(
+                order.Id,
+                order.DesignId,
+                order.Status,
+                order.CompletesAt,
+                order.Generation,
+                order.ReservationLinks
+                    .OrderBy(link => link.MaterialId.Value)
+                    .ThenBy(link => link.ReservationId.Value)
+                    .ToArray()))
+                .ToArray(),
+            _pendingMaterializations.Values.ToArray(),
+            _acknowledgedMaterializations.Values.Select(receipt =>
+                new ConstructionMaterializationReceiptCheckpoint(
+                    receipt.Effect,
+                    receipt.Identity is ConstructionMaterializationIdentity.Ship ship
+                        ? new ConstructionShipIdentityCheckpoint(
+                            ship.EntityId,
+                            ship.ShipId,
+                            ship.CargoInventoryId)
+                        : null))
+                .ToArray());
+
+    /// <summary>
+    /// Directly assembles validated construction state without enqueueing,
+    /// reserving inputs, completing work, or acknowledging materialization.
+    /// </summary>
+    internal static ConstructionProcess RestoreDirect(
+        FacilityId facilityId,
+        InventoryId inventoryId,
+        Throughput throughput,
+        IReadOnlyDictionary<ConstructionOrderId, ConstructionOrder> orders,
+        ConstructionOrderId? activeOrderId,
+        IEnumerable<ConstructionOrderId> queuedOrderIds,
+        IEnumerable<ConstructionMaterializationEffect> pendingMaterializations,
+        IEnumerable<ConstructionMaterializationReceipt> receipts)
+    {
+        var process = new ConstructionProcess(facilityId, inventoryId, throughput);
+        foreach ((ConstructionOrderId orderId, ConstructionOrder order) in orders)
+        {
+            process._orders.Add(orderId, order);
+        }
+
+        process.ActiveOrder = activeOrderId is { } active ? orders[active] : null;
+        foreach (ConstructionOrderId queuedOrderId in queuedOrderIds)
+        {
+            process._queued.Enqueue(orders[queuedOrderId]);
+        }
+
+        foreach (ConstructionMaterializationEffect pending in pendingMaterializations)
+        {
+            process._pendingMaterializations.Add(pending.OrderId, pending);
+        }
+
+        foreach (ConstructionMaterializationReceipt receipt in receipts)
+        {
+            process._acknowledgedMaterializations.Add(receipt.Effect.OrderId, receipt);
+            process._completed.Add(receipt.Effect.OrderId, orders[receipt.Effect.OrderId]);
+        }
+
+        return process;
+    }
 
     public ConstructionOrderId Enqueue(
         ConstructionIdSequences ids,
