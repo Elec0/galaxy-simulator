@@ -218,6 +218,8 @@ internal sealed class GameSessionShipRegistry
     internal GameSessionShip? Get(ShipId shipId) =>
         _ships.GetValueOrDefault(shipId);
 
+    internal IEnumerable<GameSessionShip> Ships => _ships.Values;
+
     internal void ApplyAdd(GameSessionShip ship) =>
         _ships.Add(ship.Id, ship);
 
@@ -338,9 +340,190 @@ internal sealed class EntityLifecycleOwner
         }
     }
 
+    private EntityLifecycleOwner(
+        SpatialMovement movement,
+        ActorControlRegistry control,
+        ShipOrderCoordinator orders,
+        IEnumerable<ShipMaterializationPolicy> policies,
+        EntityRegistry entities,
+        IdSequence<EntityId> entityIds,
+        IdSequence<InventoryId> inventoryIds,
+        InventoryRegistry inventories,
+        SortedDictionary<MaterializationKey, ConstructionEntityMaterializationResult.Materialized>
+            receipts,
+        SortedDictionary<EntityId, EntityRemovalResult.Removed> removalReceipts,
+        GameSessionShipRegistry ships,
+        IdSequence<ShipId> shipIds)
+        : this(movement, control, orders, policies)
+    {
+        _entities = entities;
+        _entityIds = entityIds;
+        _inventoryIds = inventoryIds;
+        _inventories = inventories;
+        _receipts = receipts;
+        _removalReceipts = removalReceipts;
+        _ships = ships;
+        _shipIds = shipIds;
+    }
+
     internal EntityRegistry Entities => _entities;
 
     internal InventoryRegistry Inventories => _inventories;
+
+    /// <summary>
+    /// Captures live identity, inventory ownership, exact allocators, and both
+    /// durable lifecycle receipt sets in stable key order.
+    /// </summary>
+    internal EntityLifecycleCheckpoint CaptureCheckpoint() =>
+        new(
+            _entityIds.CaptureCheckpoint(),
+            _shipIds.CaptureCheckpoint(),
+            _inventoryIds.CaptureCheckpoint(),
+            _inventories.CaptureCheckpoint(),
+            _ships.Ships
+                .Select(ship => new EntityLifecycleShipCheckpoint(
+                    _entities.GetEntityId(ship.Id)
+                        ?? throw new InvalidOperationException(
+                            $"Live ship {ship.Id} has no entity mapping."),
+                    ship.Id,
+                    ship.PrincipalId,
+                    ship.DesignId,
+                    ship.CargoInventoryId))
+                .OrderBy(ship => ship.EntityId.Value),
+            _receipts.Values.Select(receipt =>
+                new EntityMaterializationReceiptCheckpoint(
+                    receipt.Effect,
+                    receipt.EntityId,
+                    receipt.ShipId,
+                    receipt.CargoInventoryId)),
+            _removalReceipts.Values.Select(receipt =>
+                new EntityRemovalReceiptCheckpoint(
+                    receipt.Request,
+                    receipt.ShipId,
+                    receipt.CargoInventoryId)));
+
+    /// <summary>
+    /// Validates and directly restores lifecycle identity, inventories,
+    /// allocators, and receipts without registering setup, materializing, or
+    /// removing an entity through gameplay APIs.
+    /// </summary>
+    internal static CheckpointResult<EntityLifecycleOwner> RestoreCheckpoint(
+        EntityLifecycleCheckpoint checkpoint,
+        SpatialMovement movement,
+        ActorControlRegistry control,
+        ShipOrderCoordinator orders,
+        IEnumerable<ShipMaterializationPolicy> policies)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        ArgumentNullException.ThrowIfNull(movement);
+        ArgumentNullException.ThrowIfNull(control);
+        ArgumentNullException.ThrowIfNull(orders);
+        ArgumentNullException.ThrowIfNull(policies);
+        CheckpointResult<IdSequence<EntityId>> entityIds =
+            IdSequence<EntityId>.RestoreCheckpoint(checkpoint.EntityIds);
+        if (!entityIds.IsSuccess)
+        {
+            return Rejected(
+                "$.checkpoint.lifecycle.entityIds.nextValue",
+                entityIds.Failure!.Message);
+        }
+
+        CheckpointResult<IdSequence<ShipId>> shipIds =
+            IdSequence<ShipId>.RestoreCheckpoint(checkpoint.ShipIds);
+        if (!shipIds.IsSuccess)
+        {
+            return Rejected(
+                "$.checkpoint.lifecycle.shipIds.nextValue",
+                shipIds.Failure!.Message);
+        }
+
+        CheckpointResult<IdSequence<InventoryId>> inventoryIds =
+            IdSequence<InventoryId>.RestoreCheckpoint(checkpoint.InventoryIds);
+        if (!inventoryIds.IsSuccess)
+        {
+            return Rejected(
+                "$.checkpoint.lifecycle.inventoryIds.nextValue",
+                inventoryIds.Failure!.Message);
+        }
+
+        CheckpointResult<InventoryRegistry> inventories =
+            InventoryRegistry.RestoreCheckpoint(checkpoint.Inventories);
+        if (!inventories.IsSuccess)
+        {
+            return CheckpointResult<EntityLifecycleOwner>.Rejected(
+                inventories.Failure!);
+        }
+
+        // The lifecycle allocator also owns economy inventories, so validate
+        // every restored inventory rather than only cargo referenced by ships.
+        for (int index = 0; index < checkpoint.Inventories.Inventories.Count; index++)
+        {
+            InventoryCheckpoint inventory = checkpoint.Inventories.Inventories[index]!;
+            if (!WasAllocated(inventory.Id.Value, checkpoint.InventoryIds))
+            {
+                return Rejected(
+                    $"$.checkpoint.lifecycle.inventories[{index}].id",
+                    "The inventory identifier was not allocated by the saved sequence.");
+            }
+        }
+
+        var entities = new EntityRegistry();
+        var ships = new GameSessionShipRegistry();
+        var liveCargoIds = new HashSet<InventoryId>();
+        CheckpointValidationFailure? liveFailure = RestoreLiveShips(
+            checkpoint,
+            entities,
+            ships,
+            inventories.Value!,
+            liveCargoIds);
+        if (liveFailure is not null)
+        {
+            return CheckpointResult<EntityLifecycleOwner>.Rejected(liveFailure);
+        }
+
+        var removalReceipts =
+            new SortedDictionary<EntityId, EntityRemovalResult.Removed>(
+                EntityIdComparer<EntityId>.Instance);
+        CheckpointValidationFailure? removalFailure = RestoreRemovalReceipts(
+            checkpoint,
+            entities,
+            inventories.Value!,
+            removalReceipts);
+        if (removalFailure is not null)
+        {
+            return CheckpointResult<EntityLifecycleOwner>.Rejected(removalFailure);
+        }
+
+        var receipts =
+            new SortedDictionary<MaterializationKey, ConstructionEntityMaterializationResult.Materialized>();
+        CheckpointValidationFailure? materializationFailure =
+            RestoreMaterializationReceipts(
+                checkpoint,
+                entities,
+                ships,
+                removalReceipts,
+                receipts);
+        if (materializationFailure is not null)
+        {
+            return CheckpointResult<EntityLifecycleOwner>.Rejected(
+                materializationFailure);
+        }
+
+        return CheckpointResult<EntityLifecycleOwner>.Success(
+            new EntityLifecycleOwner(
+                movement,
+                control,
+                orders,
+                policies,
+                entities,
+                entityIds.Value!,
+                inventoryIds.Value!,
+                inventories.Value!,
+                receipts,
+                removalReceipts,
+                ships,
+                shipIds.Value!));
+    }
 
     internal GameSessionShip GetRequiredShip(ShipId shipId) =>
         _ships.Get(shipId)
@@ -399,6 +582,286 @@ internal sealed class EntityLifecycleOwner
             _entities.ApplyAddShip(ship.EntityId, ship.ShipId);
         }
     }
+
+    /// <summary>
+    /// Reconstructs live bidirectional mappings and ship records while proving
+    /// that each cargo inventory and identity was restored exactly once.
+    /// </summary>
+    private static CheckpointValidationFailure? RestoreLiveShips(
+        EntityLifecycleCheckpoint checkpoint,
+        EntityRegistry entities,
+        GameSessionShipRegistry ships,
+        InventoryRegistry inventories,
+        HashSet<InventoryId> liveCargoIds)
+    {
+        const string path = "$.checkpoint.lifecycle.liveShips";
+        for (int index = 0; index < checkpoint.LiveShips.Count; index++)
+        {
+            EntityLifecycleShipCheckpoint? ship = checkpoint.LiveShips[index];
+            if (ship is null)
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}]",
+                    "A live ship checkpoint is missing.");
+            }
+
+            if (!WasAllocated(ship.EntityId.Value, checkpoint.EntityIds))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}].entityId",
+                    "The live entity identifier was not allocated by the saved sequence.");
+            }
+
+            if (!WasAllocated(ship.ShipId.Value, checkpoint.ShipIds))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}].shipId",
+                    "The live ship identifier was not allocated by the saved sequence.");
+            }
+
+            if (!WasAllocated(ship.CargoInventoryId.Value, checkpoint.InventoryIds))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}].cargoInventoryId",
+                    "The cargo inventory identifier was not allocated by the saved sequence.");
+            }
+
+            if (ship.PrincipalId.Value == 0)
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}].principalId",
+                    "A live ship principal identifier must be nonzero.");
+            }
+
+            if (ship.DesignId.Value == 0)
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}].designId",
+                    "A live ship design identifier must be nonzero.");
+            }
+
+            if (!entities.CanAddShip(ship.EntityId, ship.ShipId))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}].entityId",
+                    "A live entity or ship identity is duplicated.");
+            }
+
+            if (!liveCargoIds.Add(ship.CargoInventoryId))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}].cargoInventoryId",
+                    "A cargo inventory cannot belong to more than one live ship.");
+            }
+
+            if (!inventories.Contains(ship.CargoInventoryId))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}].cargoInventoryId",
+                    "A live ship cargo inventory is missing.");
+            }
+
+            ships.ApplyAdd(new GameSessionShip(
+                ship.ShipId,
+                ship.PrincipalId,
+                ship.DesignId,
+                ship.CargoInventoryId));
+            entities.ApplyAddShip(ship.EntityId, ship.ShipId);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Restores removed-entity receipts only when their identities are absent
+    /// from live registries and their discarded cargo is no longer retained.
+    /// </summary>
+    private static CheckpointValidationFailure? RestoreRemovalReceipts(
+        EntityLifecycleCheckpoint checkpoint,
+        EntityRegistry entities,
+        InventoryRegistry inventories,
+        SortedDictionary<EntityId, EntityRemovalResult.Removed> receipts)
+    {
+        var removedShipIds = new HashSet<ShipId>();
+        var removedCargoIds = new HashSet<InventoryId>();
+        const string path = "$.checkpoint.lifecycle.removalReceipts";
+        for (int index = 0; index < checkpoint.RemovalReceipts.Count; index++)
+        {
+            EntityRemovalReceiptCheckpoint? receipt =
+                checkpoint.RemovalReceipts[index];
+            if (receipt is null || !IsValidRemovalRequest(receipt.Request))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}]",
+                    "An entity removal receipt is missing or invalid.");
+            }
+
+            EntityRemovalRequest request = receipt.Request!;
+            if (!WasAllocated(request.EntityId.Value, checkpoint.EntityIds)
+                || !WasAllocated(receipt.ShipId.Value, checkpoint.ShipIds)
+                || !WasAllocated(
+                    receipt.CargoInventoryId.Value,
+                    checkpoint.InventoryIds))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}]",
+                    "A removal receipt identity was not allocated by the saved sequences.");
+            }
+
+            if (entities.GetShipId(request.EntityId) is not null
+                || entities.GetEntityId(receipt.ShipId) is not null
+                || inventories.Contains(receipt.CargoInventoryId))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}]",
+                    "A removed entity, ship, or discarded cargo inventory is still live.");
+            }
+
+            if (!removedShipIds.Add(receipt.ShipId)
+                || !removedCargoIds.Add(receipt.CargoInventoryId)
+                || receipts.ContainsKey(request.EntityId))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}]",
+                    "A removal receipt identity is duplicated.");
+            }
+
+            receipts.Add(
+                request.EntityId,
+                new EntityRemovalResult.Removed(
+                    request,
+                    receipt.ShipId,
+                    receipt.CargoInventoryId));
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Restores durable construction materialization receipts and requires
+    /// every identity to resolve to the same live or removed lifecycle record.
+    /// </summary>
+    private static CheckpointValidationFailure? RestoreMaterializationReceipts(
+        EntityLifecycleCheckpoint checkpoint,
+        EntityRegistry entities,
+        GameSessionShipRegistry ships,
+        SortedDictionary<EntityId, EntityRemovalResult.Removed> removalReceipts,
+        SortedDictionary<MaterializationKey, ConstructionEntityMaterializationResult.Materialized>
+            receipts)
+    {
+        var materializedEntityIds = new HashSet<EntityId>();
+        var materializedShipIds = new HashSet<ShipId>();
+        var materializedCargoIds = new HashSet<InventoryId>();
+        const string path = "$.checkpoint.lifecycle.materializationReceipts";
+        for (int index = 0; index < checkpoint.MaterializationReceipts.Count; index++)
+        {
+            EntityMaterializationReceiptCheckpoint? receipt =
+                checkpoint.MaterializationReceipts[index];
+            if (receipt is null || !IsValidMaterializationEffect(receipt.Effect))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}]",
+                    "A materialization receipt or its construction effect is invalid.");
+            }
+
+            ConstructionMaterializationEffect effect = receipt.Effect!;
+            if (!WasAllocated(receipt.EntityId.Value, checkpoint.EntityIds)
+                || !WasAllocated(receipt.ShipId.Value, checkpoint.ShipIds)
+                || !WasAllocated(
+                    receipt.CargoInventoryId.Value,
+                    checkpoint.InventoryIds))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}]",
+                    "A materialization receipt identity was not allocated by the saved sequences.");
+            }
+
+            var key = new MaterializationKey(effect.FacilityId, effect.OrderId);
+            if (receipts.ContainsKey(key)
+                || !materializedEntityIds.Add(receipt.EntityId)
+                || !materializedShipIds.Add(receipt.ShipId)
+                || !materializedCargoIds.Add(receipt.CargoInventoryId))
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}]",
+                    "A materialization receipt key or identity is duplicated.");
+            }
+
+            ShipId? liveShipId = entities.GetShipId(receipt.EntityId);
+            if (liveShipId is { } liveId)
+            {
+                GameSessionShip? liveShip = ships.Get(liveId);
+                if (liveId != receipt.ShipId
+                    || liveShip is null
+                    || liveShip.CargoInventoryId != receipt.CargoInventoryId
+                    || liveShip.DesignId != effect.DesignId)
+                {
+                    return new CheckpointValidationFailure(
+                        $"{path}[{index}]",
+                        "A materialization receipt disagrees with its live ship.");
+                }
+            }
+            else if (!removalReceipts.TryGetValue(
+                         receipt.EntityId,
+                         out EntityRemovalResult.Removed? removed)
+                     || removed.ShipId != receipt.ShipId
+                     || removed.CargoInventoryId != receipt.CargoInventoryId)
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}]",
+                    "A materialization receipt has no matching live or removed entity.");
+            }
+
+            receipts.Add(
+                key,
+                new ConstructionEntityMaterializationResult.Materialized(
+                    effect,
+                    receipt.EntityId,
+                    receipt.ShipId,
+                    receipt.CargoInventoryId));
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Validates the exact completion identity required for a committed
+    /// session-owned construction materialization.
+    /// </summary>
+    private static bool IsValidMaterializationEffect(
+        ConstructionMaterializationEffect? effect) =>
+        effect is not null
+        && effect.FacilityId.Value != 0
+        && effect.OrderId.Value != 0
+        && effect.DesignId.Value != 0
+        && effect.CompletionEventKey is { } key
+        && key.Timestamp == effect.CompletedAt
+        && key.Phase == EventPhase.PhysicalCompletion;
+
+    /// <summary>
+    /// Validates the stable request fields retained for idempotent removal.
+    /// </summary>
+    private static bool IsValidRemovalRequest(EntityRemovalRequest? request) =>
+        request is not null
+        && request.EntityId.Value != 0
+        && Enum.IsDefined(request.Reason)
+        && request.CargoDisposition == EntityCargoDisposition.DiscardCargo;
+
+    /// <summary>
+    /// Accepts a nonzero identity below the exact next allocator position, or
+    /// any nonzero identity after exhaustion.
+    /// </summary>
+    private static bool WasAllocated(
+        ulong value,
+        IdSequenceCheckpoint sequence) =>
+        value != 0
+        && (sequence.NextValue is not { } next || value < next);
+
+    private static CheckpointResult<EntityLifecycleOwner> Rejected(
+        string path,
+        string message) =>
+        CheckpointResult<EntityLifecycleOwner>.Rejected(
+            new CheckpointValidationFailure(path, message));
 
     private PreparedSetupShip PrepareSetupShip(InitialShipSetup ship)
     {

@@ -64,8 +64,13 @@ strategy for the authoritative inventory defined by `TASK-014`.
     base and override work sets, preserving active, FIFO queued, suspended, and
     last-terminal orders with plans, next-leg positions, and motion/transit
     links. Direct restore emits no lifecycle transitions and rejects invalid
-    roles, identities, plans, links, and unpromoted queues. The full 273-test
-    suite passes.
+    roles, identities, plans, links, and unpromoted queues.
+  - Added entity-lifecycle checkpoints for live bidirectional identity, ship
+    ownership and design references, the complete inventory registry, exact
+    entity/ship/inventory allocators, and durable materialization and removal
+    receipts. Direct restore preserves repeated-delivery results without setup,
+    materialization, or removal replay and rejects orphaned receipts, live
+    removed state, and allocator inconsistency. The full 281-test suite passes.
   - Build on the authoritative boundary from `TASK-014` and the complete
     aggregate admission established by `TASK-034`.
   - Keep content catalog identity, provenance, and saved content-reference
