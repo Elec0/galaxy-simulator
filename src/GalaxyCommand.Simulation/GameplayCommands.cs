@@ -266,6 +266,52 @@ public sealed class GameplayCommandProcessor
         _facts = facts;
     }
 
+    /// <summary>
+    /// Captures command ordering and the monotonic admission-time boundary.
+    /// Diagnostic command records are deliberately excluded.
+    /// </summary>
+    internal CommandAdmissionCheckpoint CaptureCheckpoint() =>
+        new(
+            new IdSequenceCheckpoint(_nextSequence),
+            _lastSubmittedAt);
+
+    /// <summary>
+    /// Validates and directly restores command admission without replaying
+    /// submissions or restoring diagnostic command records.
+    /// </summary>
+    internal static CheckpointResult<GameplayCommandProcessor> RestoreCheckpoint(
+        CommandAdmissionCheckpoint checkpoint,
+        IGameplayCommandHandler handler,
+        GameFactStore facts)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        ArgumentNullException.ThrowIfNull(handler);
+        ArgumentNullException.ThrowIfNull(facts);
+        const string path = "$.checkpoint.commandAdmission";
+        if (checkpoint.Sequences.NextValue == 0)
+        {
+            return Rejected(
+                $"{path}.sequences.nextValue",
+                "The next command sequence must be positive or exhausted.");
+        }
+
+        bool sequenceUnused = checkpoint.Sequences.NextValue == 1;
+        bool hasSubmission = checkpoint.LastSubmittedAt is not null;
+        if (sequenceUnused == hasSubmission)
+        {
+            return Rejected(
+                path,
+                "Command sequence progress and the last admitted time are inconsistent.");
+        }
+
+        var restored = new GameplayCommandProcessor(handler, facts)
+        {
+            _nextSequence = checkpoint.Sequences.NextValue,
+            _lastSubmittedAt = checkpoint.LastSubmittedAt,
+        };
+        return CheckpointResult<GameplayCommandProcessor>.Success(restored);
+    }
+
     public IReadOnlyList<GameplayCommandRecord> Records => _records.AsReadOnly();
 
     public GameFactReadResult ReadFactsAfter(
@@ -337,4 +383,10 @@ public sealed class GameplayCommandProcessor
         _lastSubmittedAt = submittedAt;
         return record;
     }
+
+    private static CheckpointResult<GameplayCommandProcessor> Rejected(
+        string path,
+        string message) =>
+        CheckpointResult<GameplayCommandProcessor>.Rejected(
+            new CheckpointValidationFailure(path, message));
 }

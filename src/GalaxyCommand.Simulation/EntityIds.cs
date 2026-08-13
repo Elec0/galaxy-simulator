@@ -214,6 +214,32 @@ public sealed class IdSequence<TId> where TId : struct, IEntityId<TId>
 {
     private ulong? _next = 1;
 
+    /// <summary>
+    /// Captures the exact next identifier or the exhausted state without
+    /// deriving a high-water mark from live objects.
+    /// </summary>
+    internal IdSequenceCheckpoint CaptureCheckpoint() => new(_next);
+
+    /// <summary>
+    /// Restores an exact allocator position without advancing through or
+    /// allocating any skipped identifiers.
+    /// </summary>
+    internal static CheckpointResult<IdSequence<TId>> RestoreCheckpoint(
+        IdSequenceCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        if (checkpoint.NextValue == 0)
+        {
+            return CheckpointResult<IdSequence<TId>>.Rejected(
+                new CheckpointValidationFailure(
+                    "$.checkpoint.allocators.nextValue",
+                    "An identifier allocator next value must be positive or null when exhausted."));
+        }
+
+        return CheckpointResult<IdSequence<TId>>.Success(
+            new IdSequence<TId> { _next = checkpoint.NextValue });
+    }
+
     public bool TryPeek(out TId next)
     {
         if (_next is not { } value)

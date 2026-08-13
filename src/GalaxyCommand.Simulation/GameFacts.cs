@@ -746,6 +746,118 @@ internal sealed class GameFactStore
     }
 
     /// <summary>
+    /// Captures the exact sequence allocator and retained semantic fact suffix.
+    /// </summary>
+    internal GameFactStoreCheckpoint CaptureCheckpoint()
+    {
+        var retained = new GameFactEnvelope[_count];
+        for (int index = 0; index < retained.Length; index++)
+        {
+            retained[index] = GetAt(index);
+        }
+
+        return new GameFactStoreCheckpoint(
+            _retained.Length,
+            new IdSequenceCheckpoint(_nextSequence),
+            retained);
+    }
+
+    /// <summary>
+    /// Validates and directly restores fact continuity without recommitting
+    /// retained facts or allocating replacement sequence values.
+    /// </summary>
+    internal static CheckpointResult<GameFactStore> RestoreCheckpoint(
+        GameFactStoreCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        const string path = "$.checkpoint.facts";
+        if (checkpoint.Capacity <= 0)
+        {
+            return Rejected(
+                $"{path}.capacity",
+                "Fact retention capacity must be positive.");
+        }
+
+        if (checkpoint.Sequences.NextValue == 0)
+        {
+            return Rejected(
+                $"{path}.sequences.nextValue",
+                "The next fact sequence must be positive or exhausted.");
+        }
+
+        if (checkpoint.RetainedFacts.Count > checkpoint.Capacity)
+        {
+            return Rejected(
+                $"{path}.retained",
+                "Retained facts exceed the configured capacity.");
+        }
+
+        ulong? newest = checkpoint.Sequences.NextValue switch
+        {
+            null => ulong.MaxValue,
+            1 => null,
+            { } next => next - 1,
+        };
+        if (newest is null && checkpoint.RetainedFacts.Count != 0)
+        {
+            return Rejected(
+                $"{path}.retained",
+                "An unused fact sequence cannot have retained facts.");
+        }
+
+        if (newest is not null && checkpoint.RetainedFacts.Count == 0)
+        {
+            return Rejected(
+                $"{path}.retained",
+                "A used fact sequence must retain its newest committed fact.");
+        }
+
+        for (int index = 0; index < checkpoint.RetainedFacts.Count; index++)
+        {
+            GameFactEnvelope? fact = checkpoint.RetainedFacts[index];
+            if (fact is null)
+            {
+                return Rejected(
+                    $"{path}.retained[{index}]",
+                    "A retained fact is missing.");
+            }
+
+            if (index > 0)
+            {
+                GameFactEnvelope previous = checkpoint.RetainedFacts[index - 1]!;
+                if (previous.Sequence.Value == ulong.MaxValue
+                    || fact.Sequence.Value != previous.Sequence.Value + 1)
+                {
+                    return Rejected(
+                        $"{path}.retained[{index}].sequence",
+                        "Retained fact sequences must be contiguous.");
+                }
+            }
+        }
+
+        if (newest is { } expectedNewest
+            && checkpoint.RetainedFacts[^1]!.Sequence.Value != expectedNewest)
+        {
+            return Rejected(
+                $"{path}.retained",
+                "Retained facts must end at the newest committed sequence.");
+        }
+
+        var restored = new GameFactStore(checkpoint.Capacity)
+        {
+            _nextSequence = checkpoint.Sequences.NextValue,
+        };
+        foreach (GameFactEnvelope? fact in checkpoint.RetainedFacts)
+        {
+            // Append reconstructs only the ring layout. It does not allocate a
+            // sequence or re-emit the already committed semantic fact.
+            restored.Append(fact!);
+        }
+
+        return CheckpointResult<GameFactStore>.Success(restored);
+    }
+
+    /// <summary>
     /// Reports whether one complete prepared fact batch can receive contiguous
     /// authoritative sequence values without overflow.
     /// </summary>
@@ -871,4 +983,10 @@ internal sealed class GameFactStore
     private GameFactEnvelope GetAt(int index) =>
         _retained[(_start + index) % _retained.Length]
         ?? throw new InvalidOperationException("Retained fact slot was unexpectedly empty.");
+
+    private static CheckpointResult<GameFactStore> Rejected(
+        string path,
+        string message) =>
+        CheckpointResult<GameFactStore>.Rejected(
+            new CheckpointValidationFailure(path, message));
 }

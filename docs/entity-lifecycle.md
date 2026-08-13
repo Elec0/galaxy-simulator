@@ -332,5 +332,5 @@ This task does not decide combat, capture, salvage, wrecks, jettison, cargo
 transfer, ownership transfer, faction behavior, generic components, ECS,
 docking, connector availability, scripts, developer cheats, group orders, save
 serialization, replay, or Phase 1 legacy-location migration. Those decisions
-remain with `TASK-012`, `TASK-014`, `TASK-017`, `TASK-019`, `TASK-027`,
+remain with `TASK-012`, `TASK-014`, `TASK-017`, `TASK-046`, `TASK-027`,
 `TASK-030`, `TASK-032`, and `TASK-033` as applicable.

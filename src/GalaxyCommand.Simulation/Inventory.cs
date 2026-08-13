@@ -60,6 +60,157 @@ public sealed class Inventory
     internal bool HasCommitments =>
         _reservations.Count > 0 || _capacityReservations.Count > 0;
 
+    /// <summary>
+    /// Captures stored material and explicit commitments in stable identity
+    /// order. Derived totals are deliberately excluded.
+    /// </summary>
+    internal InventoryCheckpoint CaptureCheckpoint() =>
+        new(
+            Id,
+            Capacity,
+            _stored
+                .OrderBy(entry => entry.Key.Value)
+                .Select(entry => new InventoryMaterialCheckpoint(
+                    entry.Key,
+                    entry.Value)),
+            _reservations.Values.OrderBy(reservation => reservation.Id.Value),
+            _capacityReservations.Values.OrderBy(reservation => reservation.Id.Value));
+
+    /// <summary>
+    /// Validates and directly restores one inventory without calling mutation
+    /// APIs that would reinterpret saved state as new material movement.
+    /// </summary>
+    internal static CheckpointResult<Inventory> RestoreCheckpoint(
+        InventoryCheckpoint checkpoint,
+        string path = "$.checkpoint.inventories")
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        if (checkpoint.Id.Value == 0)
+        {
+            return Rejected(path, "id", "An inventory identity must be non-zero.");
+        }
+
+        var stored = new SortedDictionary<MaterialId, Quantity>(
+            EntityIdComparer<MaterialId>.Instance);
+        UInt128 totalStored = 0;
+        for (int index = 0; index < checkpoint.StoredMaterials.Count; index++)
+        {
+            InventoryMaterialCheckpoint? material = checkpoint.StoredMaterials[index];
+            if (material is null)
+            {
+                return Rejected(
+                    path,
+                    $"storedMaterials[{index}]",
+                    "A stored material entry is missing.");
+            }
+
+            if (material.MaterialId.Value == 0 || material.Quantity == Quantity.Zero)
+            {
+                return Rejected(
+                    path,
+                    $"storedMaterials[{index}]",
+                    "Stored material requires a non-zero identity and quantity.");
+            }
+
+            if (!stored.TryAdd(material.MaterialId, material.Quantity))
+            {
+                return Rejected(
+                    path,
+                    $"storedMaterials[{index}].materialId",
+                    "Stored material identities must be unique within an inventory.");
+            }
+
+            totalStored += material.Quantity.Units;
+            if (totalStored > checkpoint.Capacity.Units)
+            {
+                return Rejected(
+                    path,
+                    "storedMaterials",
+                    "Stored material exceeds inventory capacity.");
+            }
+        }
+
+        var reservations = new SortedDictionary<ReservationId, Reservation>(
+            EntityIdComparer<ReservationId>.Instance);
+        var reservedByMaterial = new SortedDictionary<MaterialId, UInt128>(
+            EntityIdComparer<MaterialId>.Instance);
+        for (int index = 0; index < checkpoint.Reservations.Count; index++)
+        {
+            Reservation? reservation = checkpoint.Reservations[index];
+            CheckpointValidationFailure? failure = ValidateReservation(
+                checkpoint,
+                stored,
+                reservations,
+                reservedByMaterial,
+                reservation,
+                index,
+                path);
+            if (failure is not null)
+            {
+                return CheckpointResult<Inventory>.Rejected(failure);
+            }
+        }
+
+        var capacityReservations =
+            new SortedDictionary<CapacityReservationId, CapacityReservation>(
+                EntityIdComparer<CapacityReservationId>.Instance);
+        UInt128 reservedCapacity = 0;
+        for (int index = 0; index < checkpoint.CapacityReservations.Count; index++)
+        {
+            CapacityReservation? reservation = checkpoint.CapacityReservations[index];
+            CheckpointValidationFailure? failure = ValidateCapacityReservation(
+                checkpoint,
+                capacityReservations,
+                reservation,
+                index,
+                path,
+                ref reservedCapacity);
+            if (failure is not null)
+            {
+                return CheckpointResult<Inventory>.Rejected(failure);
+            }
+        }
+
+        if (totalStored + reservedCapacity > checkpoint.Capacity.Units)
+        {
+            return Rejected(
+                path,
+                "capacityReservations",
+                "Stored material and reserved capacity exceed inventory capacity.");
+        }
+
+        var restored = new Inventory(checkpoint.Id, checkpoint.Capacity);
+        // Direct assignment preserves the saved commitments without emitting
+        // new reserve, transfer, or consumption operations during load.
+        foreach ((MaterialId materialId, Quantity quantity) in stored)
+        {
+            restored._stored.Add(materialId, quantity);
+        }
+
+        foreach ((ReservationId reservationId, Reservation reservation) in reservations)
+        {
+            restored._reservations.Add(reservationId, reservation);
+        }
+
+        foreach ((MaterialId materialId, UInt128 quantity) in reservedByMaterial)
+        {
+            restored._reservedByMaterial.Add(
+                materialId,
+                new Quantity((ulong)quantity));
+        }
+
+        foreach ((CapacityReservationId reservationId, CapacityReservation reservation)
+                 in capacityReservations)
+        {
+            restored._capacityReservations.Add(reservationId, reservation);
+        }
+
+        restored.TotalStored = new Quantity((ulong)totalStored);
+        restored.ReservedCapacity = new Quantity((ulong)reservedCapacity);
+        return CheckpointResult<Inventory>.Success(restored);
+    }
+
     public Quantity RemainingCapacity =>
         new(Capacity.Units - TotalStored.Units - ReservedCapacity.Units);
 
@@ -268,6 +419,133 @@ public sealed class Inventory
             _reservedByMaterial[materialId] = quantity;
         }
     }
+
+    /// <summary>
+    /// Validates one material reservation and accumulates its derived material
+    /// total without mutating the restored inventory.
+    /// </summary>
+    private static CheckpointValidationFailure? ValidateReservation(
+        InventoryCheckpoint checkpoint,
+        SortedDictionary<MaterialId, Quantity> stored,
+        SortedDictionary<ReservationId, Reservation> reservations,
+        SortedDictionary<MaterialId, UInt128> reservedByMaterial,
+        Reservation? reservation,
+        int index,
+        string path)
+    {
+        string reservationPath = $"reservations[{index}]";
+        if (reservation is null)
+        {
+            return Failure(path, reservationPath, "A material reservation is missing.");
+        }
+
+        if (reservation.Id.Value == 0 ||
+            reservation.InventoryId != checkpoint.Id ||
+            reservation.MaterialId.Value == 0 ||
+            reservation.Quantity == Quantity.Zero ||
+            !IsValidOwner(reservation.Owner))
+        {
+            return Failure(
+                path,
+                reservationPath,
+                "A material reservation has invalid identity, quantity, inventory, material, or owner data.");
+        }
+
+        if (!reservations.TryAdd(reservation.Id, reservation))
+        {
+            return Failure(
+                path,
+                $"{reservationPath}.id",
+                "Material reservation identities must be unique within an inventory.");
+        }
+
+        if (!stored.TryGetValue(
+                reservation.MaterialId,
+                out Quantity storedQuantity))
+        {
+            return Failure(
+                path,
+                $"{reservationPath}.materialId",
+                "A material reservation references material that is not stored.");
+        }
+
+        _ = reservedByMaterial.TryGetValue(
+            reservation.MaterialId,
+            out UInt128 existingReserved);
+        UInt128 materialReserved = existingReserved + reservation.Quantity.Units;
+        if (materialReserved > storedQuantity.Units)
+        {
+            return Failure(
+                path,
+                reservationPath,
+                "Material reservations exceed the stored quantity.");
+        }
+
+        reservedByMaterial[reservation.MaterialId] = materialReserved;
+        return null;
+    }
+
+    /// <summary>
+    /// Validates one capacity reservation and accumulates total committed
+    /// capacity without mutating the restored inventory.
+    /// </summary>
+    private static CheckpointValidationFailure? ValidateCapacityReservation(
+        InventoryCheckpoint checkpoint,
+        SortedDictionary<CapacityReservationId, CapacityReservation> reservations,
+        CapacityReservation? reservation,
+        int index,
+        string path,
+        ref UInt128 reservedCapacity)
+    {
+        string reservationPath = $"capacityReservations[{index}]";
+        if (reservation is null)
+        {
+            return Failure(path, reservationPath, "A capacity reservation is missing.");
+        }
+
+        if (reservation.Id.Value == 0 ||
+            reservation.InventoryId != checkpoint.Id ||
+            reservation.Quantity == Quantity.Zero ||
+            !IsValidOwner(reservation.Owner))
+        {
+            return Failure(
+                path,
+                reservationPath,
+                "A capacity reservation has invalid identity, quantity, inventory, or owner data.");
+        }
+
+        if (!reservations.TryAdd(reservation.Id, reservation))
+        {
+            return Failure(
+                path,
+                $"{reservationPath}.id",
+                "Capacity reservation identities must be unique within an inventory.");
+        }
+
+        reservedCapacity += reservation.Quantity.Units;
+        return null;
+    }
+
+    private static bool IsValidOwner(ReservationOwner? owner) =>
+        owner switch
+        {
+            ReservationOwner.TransportJob value => value.JobId.Value != 0,
+            ReservationOwner.ProductionJob value => value.JobId.Value != 0,
+            ReservationOwner.ConstructionOrder value => value.OrderId.Value != 0,
+            _ => false,
+        };
+
+    private static CheckpointResult<Inventory> Rejected(
+        string path,
+        string field,
+        string message) =>
+        CheckpointResult<Inventory>.Rejected(Failure(path, field, message));
+
+    private static CheckpointValidationFailure Failure(
+        string path,
+        string field,
+        string message) =>
+        new($"{path}.{field}", message);
 }
 
 /// <summary>
@@ -289,6 +567,57 @@ public sealed class InventoryRegistry
         _inventories.ContainsKey(inventoryId);
 
     public Inventory? Get(InventoryId inventoryId) => _inventories.GetValueOrDefault(inventoryId);
+
+    /// <summary>
+    /// Captures every inventory in stable identity order.
+    /// </summary>
+    internal InventoryRegistryCheckpoint CaptureCheckpoint() =>
+        new(_inventories.Values
+            .OrderBy(inventory => inventory.Id.Value)
+            .Select(inventory => inventory.CaptureCheckpoint()));
+
+    /// <summary>
+    /// Validates and directly restores all inventories without transferring
+    /// material or replaying reservation operations.
+    /// </summary>
+    internal static CheckpointResult<InventoryRegistry> RestoreCheckpoint(
+        InventoryRegistryCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        var restored = new InventoryRegistry();
+        for (int index = 0; index < checkpoint.Inventories.Count; index++)
+        {
+            InventoryCheckpoint? inventory = checkpoint.Inventories[index];
+            if (inventory is null)
+            {
+                return CheckpointResult<InventoryRegistry>.Rejected(
+                    new CheckpointValidationFailure(
+                        $"$.checkpoint.inventories[{index}]",
+                        "An inventory checkpoint is missing."));
+            }
+
+            if (restored.Contains(inventory.Id))
+            {
+                return CheckpointResult<InventoryRegistry>.Rejected(
+                    new CheckpointValidationFailure(
+                        $"$.checkpoint.inventories[{index}].id",
+                        "Inventory identities must be unique."));
+            }
+
+            CheckpointResult<Inventory> result = Inventory.RestoreCheckpoint(
+                inventory,
+                $"$.checkpoint.inventories[{index}]");
+            if (!result.IsSuccess)
+            {
+                return CheckpointResult<InventoryRegistry>.Rejected(
+                    result.Failure!);
+            }
+
+            restored.Add(result.Value!);
+        }
+
+        return CheckpointResult<InventoryRegistry>.Success(restored);
+    }
 
     internal bool ApplyRemove(InventoryId inventoryId) =>
         _inventories.Remove(inventoryId);

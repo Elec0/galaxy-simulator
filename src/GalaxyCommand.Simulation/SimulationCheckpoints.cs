@@ -75,3 +75,140 @@ internal sealed class SimulationEngineCheckpoint<TEvent>
 
     internal EventAgendaCheckpoint<TEvent> Agenda { get; }
 }
+
+internal sealed record IdSequenceCheckpoint(ulong? NextValue);
+
+internal sealed record CommandAdmissionCheckpoint(
+    IdSequenceCheckpoint Sequences,
+    SimulationTime? LastSubmittedAt);
+
+internal sealed class GameFactStoreCheckpoint
+{
+    internal GameFactStoreCheckpoint(
+        int capacity,
+        IdSequenceCheckpoint sequences,
+        IEnumerable<GameFactEnvelope?> retainedFacts)
+    {
+        ArgumentNullException.ThrowIfNull(sequences);
+        ArgumentNullException.ThrowIfNull(retainedFacts);
+        Capacity = capacity;
+        Sequences = sequences;
+        RetainedFacts = new ReadOnlyCollection<GameFactEnvelope?>(
+            retainedFacts.ToArray());
+    }
+
+    internal int Capacity { get; }
+
+    internal IdSequenceCheckpoint Sequences { get; }
+
+    internal ReadOnlyCollection<GameFactEnvelope?> RetainedFacts { get; }
+}
+
+internal sealed record InventoryMaterialCheckpoint(
+    MaterialId MaterialId,
+    Quantity Quantity);
+
+internal sealed class InventoryCheckpoint
+{
+    internal InventoryCheckpoint(
+        InventoryId id,
+        Quantity capacity,
+        IEnumerable<InventoryMaterialCheckpoint> storedMaterials,
+        IEnumerable<Reservation> reservations,
+        IEnumerable<CapacityReservation> capacityReservations)
+    {
+        ArgumentNullException.ThrowIfNull(storedMaterials);
+        ArgumentNullException.ThrowIfNull(reservations);
+        ArgumentNullException.ThrowIfNull(capacityReservations);
+        Id = id;
+        Capacity = capacity;
+        StoredMaterials = new ReadOnlyCollection<InventoryMaterialCheckpoint>(
+            storedMaterials.ToArray());
+        Reservations = new ReadOnlyCollection<Reservation>(
+            reservations.ToArray());
+        CapacityReservations = new ReadOnlyCollection<CapacityReservation>(
+            capacityReservations.ToArray());
+    }
+
+    internal InventoryId Id { get; }
+
+    internal Quantity Capacity { get; }
+
+    internal ReadOnlyCollection<InventoryMaterialCheckpoint> StoredMaterials { get; }
+
+    internal ReadOnlyCollection<Reservation> Reservations { get; }
+
+    internal ReadOnlyCollection<CapacityReservation> CapacityReservations { get; }
+}
+
+internal sealed class InventoryRegistryCheckpoint
+{
+    internal InventoryRegistryCheckpoint(
+        IEnumerable<InventoryCheckpoint> inventories)
+    {
+        ArgumentNullException.ThrowIfNull(inventories);
+        Inventories = new ReadOnlyCollection<InventoryCheckpoint>(
+            inventories.ToArray());
+    }
+
+    internal ReadOnlyCollection<InventoryCheckpoint> Inventories { get; }
+}
+
+internal abstract record ShipSpatialStateCheckpoint
+{
+    private ShipSpatialStateCheckpoint()
+    {
+    }
+
+    internal sealed record AtPosition(SystemPosition Position)
+        : ShipSpatialStateCheckpoint;
+
+    internal sealed record LocalMotion(
+        MotionId Id,
+        EventGeneration Generation,
+        SystemPosition Origin,
+        SystemPosition Destination,
+        SimulationTime DepartedAt,
+        SimulationTime ArrivesAt,
+        EventKey? CompletionEventKey)
+        : ShipSpatialStateCheckpoint;
+
+    internal sealed record ConnectorTransit(
+        ConnectorTransitId Id,
+        EventGeneration Generation,
+        TransitConnectionId ConnectionId,
+        SystemPosition Source,
+        SystemPosition Destination,
+        SimulationTime DepartedAt,
+        SimulationTime ArrivesAt,
+        EventKey? CompletionEventKey)
+        : ShipSpatialStateCheckpoint;
+}
+
+internal sealed record SpatialActorCheckpoint(
+    ShipId ShipId,
+    EventGeneration Generation,
+    ShipSpatialStateCheckpoint State);
+
+internal sealed class SpatialMovementCheckpoint
+{
+    internal SpatialMovementCheckpoint(
+        IdSequenceCheckpoint motionIds,
+        IdSequenceCheckpoint transitIds,
+        IEnumerable<SpatialActorCheckpoint> actors)
+    {
+        ArgumentNullException.ThrowIfNull(motionIds);
+        ArgumentNullException.ThrowIfNull(transitIds);
+        ArgumentNullException.ThrowIfNull(actors);
+        MotionIds = motionIds;
+        TransitIds = transitIds;
+        Actors = new ReadOnlyCollection<SpatialActorCheckpoint>(
+            actors.ToArray());
+    }
+
+    internal IdSequenceCheckpoint MotionIds { get; }
+
+    internal IdSequenceCheckpoint TransitIds { get; }
+
+    internal ReadOnlyCollection<SpatialActorCheckpoint> Actors { get; }
+}

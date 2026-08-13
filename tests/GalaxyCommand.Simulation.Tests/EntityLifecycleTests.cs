@@ -75,6 +75,40 @@ public sealed class EntityLifecycleTests
     }
 
     [Fact]
+    public void SequenceCheckpointRestoresExactNextValueAndExhaustion()
+    {
+        var sequence = new IdSequence<EntityId>();
+        sequence.AdvancePast(new EntityId(41));
+
+        CheckpointResult<IdSequence<EntityId>> restored =
+            IdSequence<EntityId>.RestoreCheckpoint(
+                sequence.CaptureCheckpoint());
+        CheckpointResult<IdSequence<EntityId>> exhausted =
+            IdSequence<EntityId>.RestoreCheckpoint(
+                new IdSequenceCheckpoint(NextValue: null));
+
+        Assert.True(restored.IsSuccess);
+        Assert.Equal(new EntityId(42), restored.Value!.Allocate());
+        Assert.True(exhausted.IsSuccess);
+        Assert.False(exhausted.Value!.CanAllocate(1));
+        Assert.Throws<InvalidOperationException>(
+            () => exhausted.Value.Allocate());
+    }
+
+    [Fact]
+    public void SequenceRestoreRejectsZeroNextValue()
+    {
+        CheckpointResult<IdSequence<EntityId>> restored =
+            IdSequence<EntityId>.RestoreCheckpoint(
+                new IdSequenceCheckpoint(NextValue: 0));
+
+        Assert.False(restored.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.allocators.nextValue",
+            restored.Failure!.Path);
+    }
+
+    [Fact]
     public void RemovalUnpublishesCompleteEntityAndCancelsScheduledArrival()
     {
         GameSession session = GameSessionTestFixture.Create();

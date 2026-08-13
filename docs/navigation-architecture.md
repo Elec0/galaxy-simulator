@@ -419,7 +419,8 @@ scale target exists:
 - Runtime connector enablement, disablement, access policy, and the authority
   allowed to change topology
 - Whether inactive systems use reduced-detail movement
-- Combat interaction with scheduled motion
+- Interaction with scheduled motion, including combat, remains to be defined by
+  `TASK-019`
 - Sensor knowledge and whether a planner may use undiscovered topology
 - Travel-cost policy beyond deterministic duration and availability
 

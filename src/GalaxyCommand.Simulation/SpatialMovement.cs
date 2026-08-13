@@ -336,6 +336,186 @@ public sealed class SpatialMovement
     private readonly IdSequence<MotionId> _motionIds = new();
     private readonly IdSequence<ConnectorTransitId> _transitIds = new();
 
+    /// <summary>
+    /// Creates an empty spatial owner with fresh movement identity sequences.
+    /// </summary>
+    public SpatialMovement()
+    {
+    }
+
+    private SpatialMovement(
+        IdSequence<MotionId> motionIds,
+        IdSequence<ConnectorTransitId> transitIds)
+    {
+        _motionIds = motionIds;
+        _transitIds = transitIds;
+    }
+
+    /// <summary>
+    /// Captures every actor and the exact motion and transit allocator states
+    /// at one completed simulation time.
+    /// </summary>
+    internal CheckpointResult<SpatialMovementCheckpoint> CaptureCheckpoint(
+        SimulationTime currentTime)
+    {
+        IdSequenceCheckpoint motionIds = _motionIds.CaptureCheckpoint();
+        IdSequenceCheckpoint transitIds = _transitIds.CaptureCheckpoint();
+        var actors = new List<SpatialActorCheckpoint>(_actors.Count);
+        foreach ((ShipId shipId, ActorState actor) in _actors)
+        {
+            ShipSpatialStateCheckpoint state;
+            switch (actor.State)
+            {
+                case ShipSpatialState.AtPosition atPosition:
+                    if (!IsValidPosition(atPosition.Position))
+                    {
+                        return CaptureRejected(
+                            shipId,
+                            "position",
+                            "A stationary actor has an invalid system position.");
+                    }
+
+                    state = new ShipSpatialStateCheckpoint.AtPosition(
+                        atPosition.Position);
+                    break;
+                case ShipSpatialState.Moving moving:
+                    LocalMotionSegment motion = moving.Motion;
+                    if (motion.Generation != actor.Generation ||
+                        !WasAllocated(motionIds, motion.Id.Value) ||
+                        !IsValidCompletionKey(
+                            motion.CompletionEventKey,
+                            motion.ArrivesAt) ||
+                        currentTime < motion.DepartedAt ||
+                        currentTime >= motion.ArrivesAt)
+                    {
+                        return CaptureRejected(
+                            shipId,
+                            "motion",
+                            "An active local motion is outside its time range or lacks its exact completion event key.");
+                    }
+
+                    state = new ShipSpatialStateCheckpoint.LocalMotion(
+                        motion.Id,
+                        motion.Generation,
+                        motion.Origin,
+                        motion.Destination,
+                        motion.DepartedAt,
+                        motion.ArrivesAt,
+                        motion.CompletionEventKey);
+                    break;
+                case ShipSpatialState.ConnectorTransit traversing:
+                    ConnectorTransitSegment transit = traversing.Transit;
+                    if (transit.Generation != actor.Generation ||
+                        !WasAllocated(transitIds, transit.Id.Value) ||
+                        !IsValidCompletionKey(
+                            transit.CompletionEventKey,
+                            transit.ArrivesAt) ||
+                        currentTime < transit.DepartedAt ||
+                        currentTime >= transit.ArrivesAt)
+                    {
+                        return CaptureRejected(
+                            shipId,
+                            "transit",
+                            "An active connector transit is outside its time range or lacks its exact completion event key.");
+                    }
+
+                    state = new ShipSpatialStateCheckpoint.ConnectorTransit(
+                        transit.Id,
+                        transit.Generation,
+                        transit.ConnectionId,
+                        transit.Source,
+                        transit.Destination,
+                        transit.DepartedAt,
+                        transit.ArrivesAt,
+                        transit.CompletionEventKey);
+                    break;
+                default:
+                    return CaptureRejected(
+                        shipId,
+                        "state",
+                        "A spatial actor has an unsupported state.");
+            }
+
+            actors.Add(new SpatialActorCheckpoint(
+                shipId,
+                actor.Generation,
+                state));
+        }
+
+        return CheckpointResult<SpatialMovementCheckpoint>.Success(
+            new SpatialMovementCheckpoint(
+                motionIds,
+                transitIds,
+                actors));
+    }
+
+    /// <summary>
+    /// Validates and directly restores spatial actors and allocator positions
+    /// without starting motion, scheduling completion, or allocating identity.
+    /// </summary>
+    internal static CheckpointResult<SpatialMovement> RestoreCheckpoint(
+        SpatialMovementCheckpoint checkpoint,
+        SimulationTime currentTime)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        CheckpointResult<IdSequence<MotionId>> motionIds =
+            IdSequence<MotionId>.RestoreCheckpoint(checkpoint.MotionIds);
+        if (!motionIds.IsSuccess)
+        {
+            return RestoreRejected(
+                "motionIds",
+                motionIds.Failure!.Message);
+        }
+
+        CheckpointResult<IdSequence<ConnectorTransitId>> transitIds =
+            IdSequence<ConnectorTransitId>.RestoreCheckpoint(
+                checkpoint.TransitIds);
+        if (!transitIds.IsSuccess)
+        {
+            return RestoreRejected(
+                "transitIds",
+                transitIds.Failure!.Message);
+        }
+
+        var restored = new SpatialMovement(motionIds.Value!, transitIds.Value!);
+        for (int index = 0; index < checkpoint.Actors.Count; index++)
+        {
+            SpatialActorCheckpoint? actor = checkpoint.Actors[index];
+            if (actor is null || actor.ShipId.Value == 0 || actor.State is null)
+            {
+                return RestoreRejected(
+                    $"actors[{index}]",
+                    "A spatial actor has missing or invalid identity or state.");
+            }
+
+            if (restored._actors.ContainsKey(actor.ShipId))
+            {
+                return RestoreRejected(
+                    $"actors[{index}].shipId",
+                    "Spatial actor identities must be unique.");
+            }
+
+            CheckpointValidationFailure? failure = RestoreState(
+                checkpoint,
+                actor,
+                currentTime,
+                index,
+                out ShipSpatialState? state);
+            if (failure is not null)
+            {
+                return CheckpointResult<SpatialMovement>.Rejected(failure);
+            }
+
+            // The generation and active segment are restored together so stale
+            // agenda work retains its original comparison boundary.
+            restored._actors.Add(
+                actor.ShipId,
+                new ActorState(actor.Generation, state!));
+        }
+
+        return CheckpointResult<SpatialMovement>.Success(restored);
+    }
+
     public void Add(ShipId shipId, SystemPosition position)
     {
         ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
@@ -749,11 +929,152 @@ public sealed class SpatialMovement
                 $"Unsupported spatial state {actor.State.GetType().Name}."),
         };
 
+    /// <summary>
+    /// Validates one discriminated actor state and reconstructs active segment
+    /// objects with their original completion keys.
+    /// </summary>
+    private static CheckpointValidationFailure? RestoreState(
+        SpatialMovementCheckpoint checkpoint,
+        SpatialActorCheckpoint actor,
+        SimulationTime currentTime,
+        int index,
+        out ShipSpatialState? restored)
+    {
+        string path = $"$.checkpoint.spatial.actors[{index}].state";
+        restored = null;
+        switch (actor.State)
+        {
+            case ShipSpatialStateCheckpoint.AtPosition atPosition:
+                if (!IsValidPosition(atPosition.Position))
+                {
+                    return new CheckpointValidationFailure(
+                        path,
+                        "A stationary actor has an invalid system position.");
+                }
+
+                restored = new ShipSpatialState.AtPosition(atPosition.Position);
+                return null;
+            case ShipSpatialStateCheckpoint.LocalMotion motion:
+                if (motion.Id.Value == 0 ||
+                    !WasAllocated(checkpoint.MotionIds, motion.Id.Value) ||
+                    motion.Generation != actor.Generation ||
+                    !IsValidPosition(motion.Origin) ||
+                    !IsValidPosition(motion.Destination) ||
+                    motion.Origin.SystemId != motion.Destination.SystemId ||
+                    motion.ArrivesAt <= motion.DepartedAt ||
+                    currentTime < motion.DepartedAt ||
+                    currentTime >= motion.ArrivesAt ||
+                    !IsValidCompletionKey(
+                        motion.CompletionEventKey,
+                        motion.ArrivesAt))
+                {
+                    return new CheckpointValidationFailure(
+                        path,
+                        "An active local motion has invalid identity, generation, position, timing, allocator, or completion-key data.");
+                }
+
+                var restoredMotion = new LocalMotionSegment(
+                    motion.Id,
+                    motion.Generation,
+                    motion.Origin,
+                    motion.Destination,
+                    motion.DepartedAt,
+                    motion.ArrivesAt)
+                {
+                    // The agenda allocated this key before capture. Rebinding
+                    // through normal commit code would allocate duplicate work.
+                    CompletionEventKey = motion.CompletionEventKey,
+                };
+                restored = new ShipSpatialState.Moving(restoredMotion);
+                return null;
+            case ShipSpatialStateCheckpoint.ConnectorTransit transit:
+                if (transit.Id.Value == 0 ||
+                    !WasAllocated(checkpoint.TransitIds, transit.Id.Value) ||
+                    transit.Generation != actor.Generation ||
+                    transit.ConnectionId.Value == 0 ||
+                    !IsValidPosition(transit.Source) ||
+                    !IsValidPosition(transit.Destination) ||
+                    transit.Source.SystemId == transit.Destination.SystemId ||
+                    transit.ArrivesAt <= transit.DepartedAt ||
+                    currentTime < transit.DepartedAt ||
+                    currentTime >= transit.ArrivesAt ||
+                    !IsValidCompletionKey(
+                        transit.CompletionEventKey,
+                        transit.ArrivesAt))
+                {
+                    return new CheckpointValidationFailure(
+                        path,
+                        "An active connector transit has invalid identity, generation, connection, position, timing, allocator, or completion-key data.");
+                }
+
+                var restoredTransit = new ConnectorTransitSegment(
+                    transit.Id,
+                    transit.Generation,
+                    transit.ConnectionId,
+                    transit.Source,
+                    transit.Destination,
+                    transit.DepartedAt,
+                    transit.ArrivesAt)
+                {
+                    // Preserve the already committed emergence event rather
+                    // than scheduling another completion during restore.
+                    CompletionEventKey = transit.CompletionEventKey,
+                };
+                restored = new ShipSpatialState.ConnectorTransit(
+                    restoredTransit);
+                return null;
+            default:
+                return new CheckpointValidationFailure(
+                    path,
+                    "A spatial actor has an unsupported state.");
+        }
+    }
+
+    private static bool IsValidPosition(SystemPosition position) =>
+        position.SystemId.Value != 0;
+
+    private static bool WasAllocated(
+        IdSequenceCheckpoint sequence,
+        ulong value) =>
+        sequence.NextValue is not { } next || value < next;
+
+    private static bool IsValidCompletionKey(
+        EventKey? key,
+        SimulationTime arrivesAt) =>
+        key is { } value &&
+        value.Timestamp == arrivesAt &&
+        value.Phase == EventPhase.PhysicalCompletion;
+
+    private static CheckpointResult<SpatialMovementCheckpoint> CaptureRejected(
+        ShipId shipId,
+        string field,
+        string message) =>
+        CheckpointResult<SpatialMovementCheckpoint>.Rejected(
+            new CheckpointValidationFailure(
+                $"$.checkpoint.spatial.actors[{shipId.Value}].{field}",
+                message));
+
+    private static CheckpointResult<SpatialMovement> RestoreRejected(
+        string field,
+        string message) =>
+        CheckpointResult<SpatialMovement>.Rejected(
+            new CheckpointValidationFailure(
+                $"$.checkpoint.spatial.{field}",
+                message));
+
     private sealed class ActorState
     {
         public ActorState(SystemPosition position)
         {
             State = new ShipSpatialState.AtPosition(position);
+        }
+
+        public ActorState(
+            EventGeneration generation,
+            ShipSpatialState state)
+        {
+            Generation = generation;
+            State = state;
         }
 
         public EventGeneration Generation { get; set; } = new(0);

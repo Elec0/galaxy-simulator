@@ -106,6 +106,206 @@ public sealed class InventoryTests
         Assert.Equal(Quantity.Zero, destination.ReservedCapacity);
     }
 
+    [Fact]
+    public void CheckpointRestoresStoredMaterialAndCommitmentsDirectly()
+    {
+        var inventory = new Inventory(new InventoryId(7), new Quantity(20));
+        var firstMaterial = new MaterialId(1);
+        var secondMaterial = new MaterialId(2);
+        var materialOwner = new ReservationOwner.ProductionJob(
+            new ProductionJobId(3));
+        var capacityOwner = new ReservationOwner.TransportJob(
+            new TransportJobId(4));
+        inventory.Add(secondMaterial, new Quantity(3));
+        inventory.Add(firstMaterial, new Quantity(8));
+        inventory.Reserve(
+            new ReservationId(5),
+            firstMaterial,
+            new Quantity(2),
+            materialOwner);
+        inventory.ReserveCapacity(
+            new CapacityReservationId(6),
+            new Quantity(4),
+            capacityOwner);
+
+        InventoryCheckpoint checkpoint = inventory.CaptureCheckpoint();
+        CheckpointResult<Inventory> restoration =
+            Inventory.RestoreCheckpoint(checkpoint);
+
+        Assert.True(restoration.IsSuccess);
+        Inventory restored = restoration.Value!;
+        Assert.Equal(inventory.Id, restored.Id);
+        Assert.Equal(inventory.Capacity, restored.Capacity);
+        Assert.Equal(inventory.TotalStored, restored.TotalStored);
+        Assert.Equal(inventory.ReservedCapacity, restored.ReservedCapacity);
+        Assert.Equal(inventory.RemainingCapacity, restored.RemainingCapacity);
+        Assert.Equal(inventory.Stored(firstMaterial), restored.Stored(firstMaterial));
+        Assert.Equal(inventory.Stored(secondMaterial), restored.Stored(secondMaterial));
+        Assert.Equal(inventory.Reserved(firstMaterial), restored.Reserved(firstMaterial));
+        Assert.Equal(
+            inventory.GetReservation(new ReservationId(5)),
+            restored.GetReservation(new ReservationId(5)));
+        Assert.Equal(
+            inventory.GetCapacityReservation(new CapacityReservationId(6)),
+            restored.GetCapacityReservation(new CapacityReservationId(6)));
+
+        Assert.Equal(
+            inventory.Release(new ReservationId(5)),
+            restored.Release(new ReservationId(5)));
+        Assert.Equal(
+            inventory.ReleaseCapacity(new CapacityReservationId(6)),
+            restored.ReleaseCapacity(new CapacityReservationId(6)));
+        Assert.Equal(inventory.RemainingCapacity, restored.RemainingCapacity);
+    }
+
+    [Fact]
+    public void RestoreAcceptsEditedUnorderedMaterialsAndCanonicalizesCapture()
+    {
+        var checkpoint = new InventoryCheckpoint(
+            new InventoryId(1),
+            new Quantity(10),
+            [
+                new InventoryMaterialCheckpoint(
+                    new MaterialId(2),
+                    new Quantity(3)),
+                new InventoryMaterialCheckpoint(
+                    new MaterialId(1),
+                    new Quantity(4)),
+            ],
+            Array.Empty<Reservation>(),
+            Array.Empty<CapacityReservation>());
+
+        CheckpointResult<Inventory> restoration =
+            Inventory.RestoreCheckpoint(checkpoint);
+
+        Assert.True(restoration.IsSuccess);
+        Assert.Equal(
+            [new MaterialId(1), new MaterialId(2)],
+            restoration.Value!.CaptureCheckpoint().StoredMaterials
+                .Select(material => material.MaterialId));
+    }
+
+    [Fact]
+    public void RestoreRejectsStoredMaterialBeyondCapacity()
+    {
+        var checkpoint = new InventoryCheckpoint(
+            new InventoryId(1),
+            new Quantity(4),
+            [
+                new InventoryMaterialCheckpoint(
+                    new MaterialId(1),
+                    new Quantity(5)),
+            ],
+            Array.Empty<Reservation>(),
+            Array.Empty<CapacityReservation>());
+
+        CheckpointResult<Inventory> restoration =
+            Inventory.RestoreCheckpoint(checkpoint);
+
+        Assert.False(restoration.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.inventories.storedMaterials",
+            restoration.Failure!.Path);
+    }
+
+    [Fact]
+    public void RestoreRejectsReservationsBeyondStoredMaterial()
+    {
+        var inventoryId = new InventoryId(1);
+        var materialId = new MaterialId(1);
+        var checkpoint = new InventoryCheckpoint(
+            inventoryId,
+            new Quantity(10),
+            [new InventoryMaterialCheckpoint(materialId, new Quantity(3))],
+            [
+                new Reservation(
+                    new ReservationId(1),
+                    inventoryId,
+                    materialId,
+                    new Quantity(4),
+                    new ReservationOwner.ProductionJob(
+                        new ProductionJobId(1))),
+            ],
+            Array.Empty<CapacityReservation>());
+
+        CheckpointResult<Inventory> restoration =
+            Inventory.RestoreCheckpoint(checkpoint);
+
+        Assert.False(restoration.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.inventories.reservations[0]",
+            restoration.Failure!.Path);
+    }
+
+    [Fact]
+    public void RestoreRejectsStoredMaterialAndReservedCapacityBeyondCapacity()
+    {
+        var inventoryId = new InventoryId(1);
+        var checkpoint = new InventoryCheckpoint(
+            inventoryId,
+            new Quantity(10),
+            [
+                new InventoryMaterialCheckpoint(
+                    new MaterialId(1),
+                    new Quantity(7)),
+            ],
+            Array.Empty<Reservation>(),
+            [
+                new CapacityReservation(
+                    new CapacityReservationId(1),
+                    inventoryId,
+                    new Quantity(4),
+                    new ReservationOwner.TransportJob(new TransportJobId(1))),
+            ]);
+
+        CheckpointResult<Inventory> restoration =
+            Inventory.RestoreCheckpoint(checkpoint);
+
+        Assert.False(restoration.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.inventories.capacityReservations",
+            restoration.Failure!.Path);
+    }
+
+    [Fact]
+    public void RegistryCheckpointRestoresInventoriesInStableIdentityOrder()
+    {
+        var registry = new InventoryRegistry();
+        registry.Add(new Inventory(new InventoryId(2), new Quantity(20)));
+        registry.Add(new Inventory(new InventoryId(1), new Quantity(10)));
+
+        InventoryRegistryCheckpoint checkpoint = registry.CaptureCheckpoint();
+        CheckpointResult<InventoryRegistry> restoration =
+            InventoryRegistry.RestoreCheckpoint(checkpoint);
+
+        Assert.Equal(
+            [new InventoryId(1), new InventoryId(2)],
+            checkpoint.Inventories.Select(inventory => inventory.Id));
+        Assert.True(restoration.IsSuccess);
+        Assert.NotNull(restoration.Value!.Get(new InventoryId(1)));
+        Assert.NotNull(restoration.Value.Get(new InventoryId(2)));
+    }
+
+    [Fact]
+    public void RegistryRestoreRejectsDuplicateInventoryIdentity()
+    {
+        var inventory = new InventoryCheckpoint(
+            new InventoryId(1),
+            new Quantity(10),
+            Array.Empty<InventoryMaterialCheckpoint>(),
+            Array.Empty<Reservation>(),
+            Array.Empty<CapacityReservation>());
+        var checkpoint = new InventoryRegistryCheckpoint([inventory, inventory]);
+
+        CheckpointResult<InventoryRegistry> restoration =
+            InventoryRegistry.RestoreCheckpoint(checkpoint);
+
+        Assert.False(restoration.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.inventories[1].id",
+            restoration.Failure!.Path);
+    }
+
     private static InventoryFixture CreateFixture(ulong capacity)
     {
         var inventoryIds = new IdSequence<InventoryId>();

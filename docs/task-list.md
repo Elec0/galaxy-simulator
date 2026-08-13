@@ -37,7 +37,25 @@ strategy for the authoritative inventory defined by `TASK-014`.
     initialization, accrual, pending event keys and payloads, the exact next
     creation sequence, and exhaustion. Direct restore validates these values
     without reconciliation, accrual, scheduling, dispatch, or allocation.
-    Focused checkpoint tests and the full 237-test suite pass.
+  - Added exact generic identifier allocator checkpoints and shared inventory
+    checkpoints. Inventory restore rebuilds derived totals from stored material
+    and explicit reservations, accepts non-semantic collection reordering, and
+    validates identity, capacity, ownership, and commitment consistency before
+    direct construction. No allocation, transfer, reserve, or consumption API
+    is replayed.
+  - Added spatial movement checkpoints for stable ship-local position, active
+    local motion and connector transit, actor generations, exact completion
+    event keys, and motion/transit allocators. Direct restore neither starts nor
+    schedules movement; focused continuation and corruption tests prove the
+    original pending event completes restored motion exactly once.
+  - Added semantic fact continuity checkpoints for the exact next sequence or
+    exhaustion, configured retention capacity, and retained ordered suffix.
+    Direct restore neither recommits facts nor allocates replacement sequences;
+    focused continuation, exhaustion, eviction, and corruption tests pass.
+  - Added command admission checkpoints for the exact next sequence or
+    exhaustion and the last admitted timestamp. Direct restore preserves the
+    monotonic time floor without replaying commands or restoring diagnostic
+    command records. The full 261-test suite passes.
   - Build on the authoritative boundary from `TASK-014` and the complete
     aggregate admission established by `TASK-034`.
   - Keep content catalog identity, provenance, and saved content-reference
@@ -50,9 +68,60 @@ These items are intentionally retained without implying that they should be
 worked on now. Promote an item to current or near-term work when its
 prerequisites and desired behavior are sufficiently defined.
 
+- [ ] **TASK-043: Review gameplay systems for scope gaps**
+  - Review the player experience, gameplay, economy, faction, navigation,
+    entity, information, and simulation architecture documents together with
+    the tracked tasks to identify missing gameplay decisions and ownership
+    boundaries.
+  - Distinguish a genuine unresolved gameplay contract from a deliberately
+    deferred decision, implementation detail, or acceptance-only fixture.
+  - Record each confirmed gap as a separately scoped task in this canonical
+    list, with prerequisite tasks and the relevant design-document context.
+    Do not silently expand an existing task to absorb a gap.
+
+- [ ] **TASK-044: Inventory the planned game systems in documentation**
+  - Produce an exhaustive inventory of the game systems the project expects to
+    need, including systems deferred beyond the current roadmap.
+  - Ensure every identified system is mentioned at least once in project
+    documentation and has a clear owning design document, tracked task, or
+    explicitly stated deferral.
+  - Reconcile the inventory with `TASK-043`; add separately scoped tasks for
+    confirmed missing contracts rather than treating the inventory as an
+    implementation commitment.
+
+- [ ] **TASK-045: Plan internationalization before game-layer expansion**
+  - Define the localization boundary before gameplay systems introduce
+    player-facing text: stable domain identifiers and reason codes remain in
+    authoritative simulation state, while presentation resolves localized
+    wording, formatting, icons, and layout.
+  - Decide supported locale selection and fallback, resource and content
+    organization, pluralization and parameter formatting, right-to-left and
+    text-expansion requirements, font coverage, and localized authored content.
+  - Define how localization applies to UI, semantic facts, dialogue, objectives,
+    item and equipment content, and accessibility without making locale or
+    translated text part of deterministic simulation, snapshots, or save state.
+  - Complete this plan before broad game-layer implementation adds player-facing
+    contracts; coordinate content ownership with `TASK-023`, dialogue with
+    `TASK-016`, objectives with `TASK-018`, and generalized item content with
+    `TASK-041`.
+
 - [ ] **TASK-015: Decide the initial meaning and scope of individual NPCs**
   - Decide whether the first NPC model represents ships, person-level
     characters, crew, or multiple categories.
+
+- [ ] **TASK-042: Define NPC skills and bounded decision quality**
+  - Decide which NPC categories, if any, have skills, competencies, preferences,
+    risk tolerance, or other decision-shaping traits, and whether they are
+    authored, learned, temporary, or persistent.
+  - Define how those traits limit information, evaluate alternatives, or select
+    a satisfactory action without requiring every NPC to make the globally
+    optimal choice on every decision.
+  - Preserve deterministic outcomes by defining stable inputs, tie-breaking,
+    decision cadence, state ownership, facts, snapshots, and save requirements;
+    do not make results depend on worker count or evaluation completion order.
+  - Coordinate the NPC categories with `TASK-015`, player and NPC information
+    boundaries with `TASK-020`, and faction objectives and order generation with
+    `TASK-026`.
 
 - [ ] **TASK-016: Design dialogue state and presentation**
   - Define availability, conditions, choices, repeatability, memory,
@@ -75,11 +144,32 @@ prerequisites and desired behavior are sufficiently defined.
   - Represent milestones as persistent state and semantic facts rather than
     implicit engine termination.
 
-- [ ] **TASK-019: Define combat resolution**
-  - Define orders, targeting, damage, withdrawal, surrender, capture, and
-    destruction.
+- [ ] **TASK-019: Define interactions between ships in motion**
+  - Define how the simulation discovers, schedules, and resolves interactions
+    involving ships that remain on authoritative local-motion segments rather
+    than requiring them to stop or arrive first.
+  - Cover moving-versus-moving range crossing, proximity and swept-path
+    queries, exact interaction timestamps, following and interception, target
+    replanning, and deterministic handling of simultaneous interactions.
+  - Decide when fixed simulation steps, scheduled encounter events, or
+    triggered reevaluation apply, including how interactions interrupt,
+    preserve, or replace existing motion and what is possible during connector
+    transit.
+  - Keep crowded-system queries spatially partitionable and results independent
+    of worker count, partition shape, batch size, and evaluation completion
+    order. Provide the shared physical interaction substrate required by
+    combat, sensors, avoidance, inspection, assistance, and other ship-local
+    gameplay without defining each domain's outcome policy.
+  - Context: [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Simulation architecture](simulation-architecture.md)
+
+- [ ] **TASK-046: Define combat resolution**
+  - Define combat orders, targeting policy, damage, withdrawal, surrender,
+    capture, and destruction.
   - Decide how observed and unobserved combat differ without changing causal
     outcomes.
+  - Build combat engagement and pursuit on the moving-ship interaction contract
+    from `TASK-019`; do not introduce a separate combat-only position or motion
+    model.
 
 - [ ] **TASK-020: Define player knowledge and information staleness**
   - Separate complete authoritative state from currently known, observed, or
@@ -94,6 +184,18 @@ prerequisites and desired behavior are sufficiently defined.
     scriptable.
   - Revisit modding goals and security constraints at that time.
   - Feed the selected content identity and provenance model into `TASK-037`.
+
+- [ ] **TASK-041: Define generalized inventory, cargo, and ship equipment**
+  - Evolve the current material-only inventory model so ships and other owners
+    can hold the approved categories of physical items, without treating every
+    item as a material unit.
+  - Define item identity and stacks, capacity or slot semantics, equipment
+    installation and removal, ownership, transfer, reservations, destruction
+    disposition, authoritative snapshots, and save-state requirements.
+  - Preserve the existing material-production and transport contracts until a
+    compatible migration is explicitly designed. Coordinate catalog-defined
+    item and equipment data with `TASK-023`, and combat or repair behavior
+    with `TASK-046`.
 
 - [ ] **TASK-037: Version content catalogs and migrate saved content references**
   - Begin after `TASK-022` selects save versioning and `TASK-023` selects the
@@ -192,7 +294,7 @@ prerequisites and desired behavior are sufficiently defined.
   - Define how piracy affects the offender, asset owner, controller, victim,
     territorial authority, and informed third parties without adding automatic
     economic guilt by association.
-  - Coordinate with combat in `TASK-019`, player knowledge in `TASK-020`, and
+  - Coordinate with combat in `TASK-046`, player knowledge in `TASK-020`, and
     the accepted relational gameplay model before choosing simulation state or
     commands.
   - Context: [Relational gameplay model](factions.md)

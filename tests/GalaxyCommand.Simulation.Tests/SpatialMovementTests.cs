@@ -322,9 +322,220 @@ public sealed class SpatialMovementTests
             disposition);
     }
 
+    [Fact]
+    public void CheckpointRestoreContinuesActiveMotionWithoutRescheduling()
+    {
+        var fixture = new MovementFixture();
+        SystemPosition origin = Position(0, 0);
+        fixture.Movement.Add(fixture.ShipId, origin);
+        fixture.Start(origin, Position(100, 40), new SimulationDuration(100));
+        fixture.Engine.RunUntil(new SimulationTime(40));
+        SpatialMovementCheckpoint movementCheckpoint = fixture.Movement
+            .CaptureCheckpoint(fixture.Engine.CurrentTime).Value!;
+        SimulationEngineCheckpoint<SpatialMovementEvent> engineCheckpoint =
+            fixture.Engine.CaptureCheckpoint().Value!;
+
+        CheckpointResult<SpatialMovement> movementRestoration =
+            SpatialMovement.RestoreCheckpoint(
+                movementCheckpoint,
+                fixture.Engine.CurrentTime);
+        var restoredRuntime = new MovementRuntime(movementRestoration.Value!);
+        CheckpointResult<SimulationEngine<SpatialMovementEvent>> engineRestoration =
+            SimulationEngine<SpatialMovementEvent>.RestoreCheckpoint(
+                restoredRuntime,
+                engineCheckpoint);
+
+        Assert.True(movementRestoration.IsSuccess);
+        Assert.True(engineRestoration.IsSuccess);
+        Assert.Equal(
+            fixture.Movement.CaptureSnapshot(fixture.Engine.CurrentTime),
+            movementRestoration.Value!.CaptureSnapshot(
+                engineRestoration.Value!.CurrentTime));
+        Assert.Single(engineCheckpoint.Agenda.PendingEvents);
+
+        fixture.Engine.RunUntil(new SimulationTime(100));
+        engineRestoration.Value.RunUntil(new SimulationTime(100));
+
+        Assert.Equal(
+            fixture.Movement.CaptureSnapshot(fixture.Engine.CurrentTime),
+            movementRestoration.Value.CaptureSnapshot(
+                engineRestoration.Value.CurrentTime));
+        Assert.Equal(
+            fixture.Runtime.Dispositions,
+            restoredRuntime.Dispositions);
+    }
+
+    [Fact]
+    public void CheckpointRestoresConnectorTransitAndCompletionIdentity()
+    {
+        var shipId = new ShipId(3);
+        var generation = new EventGeneration(7);
+        var transitId = new ConnectorTransitId(1);
+        var arrivesAt = new SimulationTime(100);
+        var completionKey = new EventKey(
+            arrivesAt,
+            EventPhase.PhysicalCompletion,
+            CreationSequence: 12);
+        var checkpoint = new SpatialMovementCheckpoint(
+            new IdSequenceCheckpoint(NextValue: 1),
+            new IdSequenceCheckpoint(NextValue: 2),
+            [
+                new SpatialActorCheckpoint(
+                    shipId,
+                    generation,
+                    new ShipSpatialStateCheckpoint.ConnectorTransit(
+                        transitId,
+                        generation,
+                        new TransitConnectionId(9),
+                        Position(new SystemId(1), 10, 20),
+                        Position(new SystemId(2), -30, 40),
+                        SimulationTime.Zero,
+                        arrivesAt,
+                        completionKey)),
+            ]);
+
+        CheckpointResult<SpatialMovement> restoration =
+            SpatialMovement.RestoreCheckpoint(
+                checkpoint,
+                new SimulationTime(50));
+
+        Assert.True(restoration.IsSuccess);
+        var state = Assert.IsType<ShipSpatialState.ConnectorTransit>(
+            restoration.Value!.GetState(shipId));
+        Assert.Equal(transitId, state.Transit.Id);
+        Assert.Equal(completionKey, state.Transit.CompletionEventKey);
+        var pending = Assert.IsType<PendingMovementCompletion.Emergence>(
+            restoration.Value.GetPendingCompletion(shipId));
+        Assert.Equal(transitId, pending.TransitId);
+        Assert.Equal(completionKey, pending.EventKey);
+    }
+
+    [Fact]
+    public void CheckpointRestoresAllocatorBeyondRetiredMotion()
+    {
+        var fixture = new MovementFixture();
+        SystemPosition origin = Position(0, 0);
+        fixture.Movement.Add(fixture.ShipId, origin);
+        fixture.Start(origin, Position(100, 0), new SimulationDuration(100));
+        fixture.Engine.RunUntil(new SimulationTime(40));
+        Assert.True(fixture.Movement.CommitCancel(
+            fixture.ShipId,
+            fixture.Engine.CurrentTime));
+        SpatialMovementCheckpoint checkpoint = fixture.Movement
+            .CaptureCheckpoint(fixture.Engine.CurrentTime).Value!;
+        SpatialMovement restored = SpatialMovement.RestoreCheckpoint(
+            checkpoint,
+            fixture.Engine.CurrentTime).Value!;
+        SystemPosition restoredOrigin = Assert.IsType<SystemPosition>(
+            restored.PositionAt(fixture.ShipId, fixture.Engine.CurrentTime));
+
+        LocalMotionCommit<SpatialMovementEvent> next =
+            restored.CommitStartOrReplace(
+                fixture.ShipId,
+                new TravelLeg.Local(
+                    restoredOrigin,
+                    Position(40, 100),
+                    new SimulationDuration(60)),
+                fixture.Engine.CurrentTime,
+                static movementEvent => movementEvent);
+
+        Assert.Equal(new MotionId(2), next.Motion!.Id);
+    }
+
+    [Fact]
+    public void CheckpointCaptureRejectsActiveMotionWithoutCommittedEventKey()
+    {
+        var movement = new SpatialMovement();
+        var shipId = new ShipId(1);
+        SystemPosition origin = Position(0, 0);
+        movement.Add(shipId, origin);
+        _ = movement.CommitStartOrReplace(
+            shipId,
+            new TravelLeg.Local(
+                origin,
+                Position(100, 0),
+                new SimulationDuration(100)),
+            SimulationTime.Zero,
+            static movementEvent => movementEvent);
+
+        CheckpointResult<SpatialMovementCheckpoint> capture =
+            movement.CaptureCheckpoint(SimulationTime.Zero);
+
+        Assert.False(capture.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.spatial.actors[1].motion",
+            capture.Failure!.Path);
+    }
+
+    [Fact]
+    public void RestoreRejectsActiveMotionNotBelowAllocatorPosition()
+    {
+        var generation = new EventGeneration(0);
+        var arrivesAt = new SimulationTime(100);
+        var checkpoint = new SpatialMovementCheckpoint(
+            new IdSequenceCheckpoint(NextValue: 1),
+            new IdSequenceCheckpoint(NextValue: 1),
+            [
+                new SpatialActorCheckpoint(
+                    new ShipId(1),
+                    generation,
+                    new ShipSpatialStateCheckpoint.LocalMotion(
+                        new MotionId(1),
+                        generation,
+                        Position(0, 0),
+                        Position(100, 0),
+                        SimulationTime.Zero,
+                        arrivesAt,
+                        new EventKey(
+                            arrivesAt,
+                            EventPhase.PhysicalCompletion,
+                            CreationSequence: 0))),
+            ]);
+
+        CheckpointResult<SpatialMovement> restoration =
+            SpatialMovement.RestoreCheckpoint(
+                checkpoint,
+                new SimulationTime(50));
+
+        Assert.False(restoration.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.spatial.actors[0].state",
+            restoration.Failure!.Path);
+    }
+
+    [Fact]
+    public void RestoreAcceptsUnorderedActorsAndCanonicalizesCapture()
+    {
+        var checkpoint = new SpatialMovementCheckpoint(
+            new IdSequenceCheckpoint(NextValue: 1),
+            new IdSequenceCheckpoint(NextValue: 1),
+            [
+                new SpatialActorCheckpoint(
+                    new ShipId(2),
+                    new EventGeneration(0),
+                    new ShipSpatialStateCheckpoint.AtPosition(Position(20, 0))),
+                new SpatialActorCheckpoint(
+                    new ShipId(1),
+                    new EventGeneration(0),
+                    new ShipSpatialStateCheckpoint.AtPosition(Position(10, 0))),
+            ]);
+
+        SpatialMovement restored = SpatialMovement.RestoreCheckpoint(
+            checkpoint,
+            SimulationTime.Zero).Value!;
+
+        Assert.Equal(
+            [new ShipId(1), new ShipId(2)],
+            restored.CaptureCheckpoint(SimulationTime.Zero).Value!.Actors
+                .Select(actor => actor.ShipId));
+    }
+
     private static SystemPosition Position(long x, long y) =>
+        Position(new SystemId(1), x, y);
+
+    private static SystemPosition Position(SystemId systemId, long x, long y) =>
         new(
-            new SystemId(1),
+            systemId,
             new SpatialPosition(
                 new SpatialCoordinate(x),
                 new SpatialCoordinate(y)));
@@ -347,6 +558,10 @@ public sealed class SpatialMovementTests
 
         public SimulationEngine<SpatialMovementEvent> Engine { get; }
 
+        /// <summary>
+        /// Starts one test motion and binds the exact key allocated by the
+        /// agenda, matching the production coordinator's completed commit.
+        /// </summary>
         public LocalMotionSegment? Start(
             SystemPosition origin,
             SystemPosition destination,
@@ -360,7 +575,12 @@ public sealed class SpatialMovementTests
                     static movementEvent => movementEvent);
             if (commit.EventProposal is { } eventProposal)
             {
-                AgendaCommitOwner.Commit(Agenda, [eventProposal]);
+                AgendaCommitResult result = AgendaCommitOwner.Commit(
+                    Agenda,
+                    [eventProposal]);
+                Movement.BindCompletionEvent(
+                    ShipId,
+                    Assert.Single(result.EventKeys));
             }
 
             return commit.Motion;
