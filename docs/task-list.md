@@ -87,6 +87,15 @@ strategy for the authoritative inventory defined by `TASK-014`.
     same-system connections, and zero transit duration. The runtime coordinator
     now uses this owner for snapshots and connector-leg validation. The full
     300-test suite passes.
+  - Added the deterministic runtime-policy manifest for stable navigation and
+    travel-time kinds with explicit behavior versions, exact travel parameters,
+    fact-retention capacity, and complete materialization policy and ship-design
+    definitions. Resolution binds hierarchical navigation to the restored
+    topology and rejects unavailable kinds or versions, unregistered injected
+    implementations, topology mismatch, invalid owner references, and duplicate
+    facility or design identities. Godot now uses the registered Chebyshev map
+    travel policy with its existing timing parameter. The full 308-test suite
+    passes.
   - Build on the authoritative boundary from `TASK-014` and the complete
     aggregate admission established by `TASK-034`.
   - Keep content catalog identity, provenance, and saved content-reference

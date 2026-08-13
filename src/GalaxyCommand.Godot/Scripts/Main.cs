@@ -90,7 +90,8 @@ public partial class Main : Node
 			factRetentionCapacity: 1024);
 		return new GameSession(
 			setup,
-			new DirectLocalNavigationPlanner(new MapTravelTimeEstimator()));
+			new DirectLocalNavigationPlanner(
+				new ChebyshevLocalTravelTimeEstimator(millisecondsPerMapUnit: 10)));
 	}
 
 	private void OnSelectionChanged()
@@ -228,33 +229,4 @@ public partial class Main : Node
 		return $"{elapsed.Minutes:00}:{elapsed.Seconds:00}.{elapsed.Milliseconds:000}";
 	}
 
-	private sealed class MapTravelTimeEstimator : ILocalTravelTimeEstimator
-	{
-		private const ulong MillisecondsPerMapUnit = 10;
-
-		public SimulationDuration Estimate(
-			ShipId actorId,
-			SystemPosition origin,
-			SystemPosition destination)
-		{
-			ulong horizontal = Distance(
-				origin.Position.X.Units,
-				destination.Position.X.Units);
-			ulong vertical = Distance(
-				origin.Position.Y.Units,
-				destination.Position.Y.Units);
-			ulong distance = Math.Max(horizontal, vertical);
-			return new SimulationDuration(
-				checked(distance * MillisecondsPerMapUnit));
-		}
-
-		private static ulong Distance(long first, long second)
-		{
-			Int128 difference = (Int128)first - second;
-			UInt128 magnitude = difference < 0
-				? (UInt128)(-difference)
-				: (UInt128)difference;
-			return checked((ulong)magnitude);
-		}
-	}
 }

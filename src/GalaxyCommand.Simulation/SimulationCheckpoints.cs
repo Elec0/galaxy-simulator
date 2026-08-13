@@ -122,6 +122,43 @@ internal sealed class WorldTopologyCheckpoint
     internal ReadOnlyCollection<WorldTransitConnectionCheckpoint?> Connections { get; }
 }
 
+internal sealed record NavigationPolicyCheckpoint(
+    string? Kind,
+    int BehaviorVersion);
+
+internal sealed record TravelTimePolicyCheckpoint(
+    string? Kind,
+    int BehaviorVersion,
+    ulong MillisecondsPerMapUnit);
+
+internal sealed record ConstructionInputPolicyCheckpoint(
+    MaterialId MaterialId,
+    Quantity Quantity);
+
+internal sealed record ShipDesignPolicyCheckpoint(
+    ConstructionDesignId Id,
+    string? Name,
+    IReadOnlyList<ConstructionInputPolicyCheckpoint?> Inputs,
+    Work RequiredWork,
+    Quantity CargoCapacity);
+
+internal sealed record MaterializationPolicyCheckpoint(
+    FacilityId FacilityId,
+    PrincipalId PrincipalId,
+    SystemId SystemId,
+    SpatialCoordinate X,
+    SpatialCoordinate Y,
+    ActorControllerKind BaseControllerKind,
+    string? BaseControllerId,
+    InitialShipOrderPolicy InitialOrderPolicy,
+    IReadOnlyList<ShipDesignPolicyCheckpoint?> AllowedDesigns);
+
+internal sealed record RuntimePolicyManifestCheckpoint(
+    NavigationPolicyCheckpoint? Navigation,
+    TravelTimePolicyCheckpoint? TravelTime,
+    IReadOnlyList<MaterializationPolicyCheckpoint?> MaterializationPolicies,
+    int FactRetentionCapacity);
+
 internal sealed record RelationshipPrincipalCheckpoint(
     PrincipalId Id,
     string? ContentId,

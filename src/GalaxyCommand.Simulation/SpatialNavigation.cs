@@ -684,6 +684,55 @@ public interface ILocalTravelTimeEstimator
 }
 
 /// <summary>
+/// Stable versioned local timing policy that uses Chebyshev map distance.
+/// </summary>
+public sealed class ChebyshevLocalTravelTimeEstimator : ILocalTravelTimeEstimator
+{
+    /// <summary>
+    /// Creates a registered timing policy with an exact positive map-unit scale.
+    /// </summary>
+    public ChebyshevLocalTravelTimeEstimator(ulong millisecondsPerMapUnit)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(millisecondsPerMapUnit);
+        MillisecondsPerMapUnit = millisecondsPerMapUnit;
+    }
+
+    public ulong MillisecondsPerMapUnit { get; }
+
+    /// <inheritdoc />
+    public SimulationDuration Estimate(
+        ShipId actorId,
+        SystemPosition origin,
+        SystemPosition destination)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(actorId.Value);
+        if (origin.SystemId != destination.SystemId)
+        {
+            throw new ArgumentException(
+                "Local travel timing requires positions in the same system.",
+                nameof(destination));
+        }
+
+        ulong horizontal = Distance(origin.Position.X.Units, destination.Position.X.Units);
+        ulong vertical = Distance(origin.Position.Y.Units, destination.Position.Y.Units);
+        return new SimulationDuration(
+            checked(Math.Max(horizontal, vertical) * MillisecondsPerMapUnit));
+    }
+
+    /// <summary>
+    /// Computes the exact unsigned magnitude without overflowing signed coordinates.
+    /// </summary>
+    private static ulong Distance(long first, long second)
+    {
+        Int128 difference = (Int128)first - second;
+        UInt128 magnitude = difference < 0
+            ? (UInt128)(-difference)
+            : (UInt128)difference;
+        return checked((ulong)magnitude);
+    }
+}
+
+/// <summary>
 /// Read-only boundary that turns stable destination intent into replaceable
 /// path-selected travel legs.
 /// </summary>
@@ -706,6 +755,8 @@ public sealed class DirectLocalNavigationPlanner : ISpatialNavigationPlanner
         ArgumentNullException.ThrowIfNull(travelTime);
         _travelTime = travelTime;
     }
+
+    internal ILocalTravelTimeEstimator TravelTime => _travelTime;
 
     public NavigationPlanResult Plan(NavigationRequest request)
     {
@@ -766,6 +817,10 @@ public sealed class HierarchicalNavigationPlanner : ISpatialNavigationPlanner
         _topology = topology;
         _travelTime = travelTime;
     }
+
+    internal ConnectorTopology Topology => _topology;
+
+    internal ILocalTravelTimeEstimator TravelTime => _travelTime;
 
     public NavigationPlanResult Plan(NavigationRequest request)
     {
