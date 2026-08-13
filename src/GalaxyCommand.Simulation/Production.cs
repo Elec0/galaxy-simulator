@@ -134,14 +134,39 @@ public sealed class ProductionJob
     internal IReadOnlyList<ReservationId> AllReservationIds() =>
         _reservationIds.Values.SelectMany(ids => ids).ToArray();
 
+    internal IEnumerable<ProductionReservationLinkCheckpoint> ReservationLinks =>
+        _reservationIds.SelectMany(pair => pair.Value.Select(reservationId =>
+            new ProductionReservationLinkCheckpoint(pair.Key, reservationId)));
+
     internal void ClearReservations() => _reservationIds.Clear();
 }
 
 public sealed class ProductionIdSequences
 {
-    private readonly IdSequence<ProductionJobId> _jobs = new();
+    private readonly IdSequence<ProductionJobId> _jobs;
+
+    public ProductionIdSequences()
+        : this(new IdSequence<ProductionJobId>())
+    {
+    }
+
+    private ProductionIdSequences(IdSequence<ProductionJobId> jobs) =>
+        _jobs = jobs;
 
     internal ProductionJobId AllocateJob() => _jobs.Allocate();
+
+    internal IdSequenceCheckpoint CaptureCheckpoint() => _jobs.CaptureCheckpoint();
+
+    internal static CheckpointResult<ProductionIdSequences> RestoreCheckpoint(
+        IdSequenceCheckpoint checkpoint)
+    {
+        CheckpointResult<IdSequence<ProductionJobId>> restored =
+            IdSequence<ProductionJobId>.RestoreCheckpoint(checkpoint);
+        return restored.IsSuccess
+            ? CheckpointResult<ProductionIdSequences>.Success(
+                new ProductionIdSequences(restored.Value!))
+            : CheckpointResult<ProductionIdSequences>.Rejected(restored.Failure!);
+    }
 }
 
 /// <summary>
@@ -168,12 +193,70 @@ public sealed class ProductionLine
 
     public InventoryId InventoryId { get; }
 
+    internal Throughput Throughput => _throughput;
+
     public ProductionJob? ActiveJob { get; private set; }
 
     public int QueuedJobCount => _queued.Count;
 
     public ProductionJob? GetJob(ProductionJobId jobId) =>
         _jobs.GetValueOrDefault(jobId);
+
+    /// <summary>
+    /// Captures the exact job registry, active identity, FIFO queue, recipes,
+    /// reservations, generations, and completion state in stable job order.
+    /// </summary>
+    internal ProductionLineCheckpoint CaptureCheckpoint() =>
+        new(
+            FacilityId,
+            InventoryId,
+            _throughput,
+            ActiveJob?.Id,
+            _queued.Select(job => job.Id).ToArray(),
+            _jobs.Values.Select(job => new ProductionJobCheckpoint(
+                job.Id,
+                new ProductionRecipeCheckpoint(
+                    job.Recipe.Inputs.Select(input =>
+                        new ConstructionInputPolicyCheckpoint(input.Key, input.Value)).ToArray(),
+                    job.Recipe.OutputMaterial,
+                    job.Recipe.OutputQuantity,
+                    job.Recipe.RequiredWork),
+                job.IsRepeating,
+                job.Status,
+                job.CompletesAt,
+                job.Generation,
+                job.ReservationLinks
+                    .OrderBy(link => link.MaterialId.Value)
+                    .ThenBy(link => link.ReservationId.Value)
+                    .ToArray()))
+                .ToArray());
+
+    /// <summary>
+    /// Directly assembles already validated job state without enqueueing,
+    /// reserving inventory, consuming inputs, or scheduling completion.
+    /// </summary>
+    internal static ProductionLine RestoreDirect(
+        FacilityId facilityId,
+        InventoryId inventoryId,
+        Throughput throughput,
+        IReadOnlyDictionary<ProductionJobId, ProductionJob> jobs,
+        ProductionJobId? activeJobId,
+        IEnumerable<ProductionJobId> queuedJobIds)
+    {
+        var line = new ProductionLine(facilityId, inventoryId, throughput);
+        foreach ((ProductionJobId jobId, ProductionJob job) in jobs)
+        {
+            line._jobs.Add(jobId, job);
+        }
+
+        line.ActiveJob = activeJobId is { } active ? jobs[active] : null;
+        foreach (ProductionJobId queuedJobId in queuedJobIds)
+        {
+            line._queued.Enqueue(jobs[queuedJobId]);
+        }
+
+        return line;
+    }
 
     public IReadOnlyDictionary<MaterialId, Quantity> UnmetInputs(Inventory inventory)
     {

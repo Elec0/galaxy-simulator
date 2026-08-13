@@ -96,6 +96,13 @@ strategy for the authoritative inventory defined by `TASK-014`.
     facility or design identities. Godot now uses the registered Chebyshev map
     travel policy with its existing timing parameter. The full 308-test suite
     passes.
+  - Added production workflow checkpoints for the exact job allocator, facility
+    and inventory binding, throughput, complete recipe definitions, active and
+    FIFO queued work, retained terminal jobs, repetition, status, generation,
+    completion time, and job-local reservation links. Direct restore neither
+    enqueues nor prepares work and rejects allocator inconsistency, invalid job
+    partitioning, malformed scheduling state, and any disagreement with shared
+    inventory reservation authority. The full 318-test suite passes.
   - Build on the authoritative boundary from `TASK-014` and the complete
     aggregate admission established by `TASK-034`.
   - Keep content catalog identity, provenance, and saved content-reference
