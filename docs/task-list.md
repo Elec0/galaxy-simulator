@@ -70,7 +70,15 @@ strategy for the authoritative inventory defined by `TASK-014`.
     entity/ship/inventory allocators, and durable materialization and removal
     receipts. Direct restore preserves repeated-delivery results without setup,
     materialization, or removal replay and rejects orphaned receipts, live
-    removed state, and allocator inconsistency. The full 281-test suite passes.
+    removed state, and allocator inconsistency.
+  - Added relationship checkpoints for principal and content identity, the
+    player principal, exact standing policy and complete directional values,
+    complete diplomacy, issued and revoked grants, and both durable batch
+    receipt families. Direct restore emits no facts or relationship deliveries,
+    isolates decoded collections, canonicalizes unordered owner state, and
+    rejects incomplete matrices, invalid derived outcomes, noncanonical
+    proposals, and contradictory grant provenance. The full 292-test suite
+    passes.
   - Build on the authoritative boundary from `TASK-014` and the complete
     aggregate admission established by `TASK-034`.
   - Keep content catalog identity, provenance, and saved content-reference

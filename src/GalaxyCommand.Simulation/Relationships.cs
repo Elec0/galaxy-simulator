@@ -1347,7 +1347,178 @@ internal sealed class RelationshipOwner
         PlayerPrincipalId = setup.PlayerPrincipalId;
     }
 
+    /// <summary>
+    /// Directly constructs a fully validated restored owner without replaying
+    /// setup or committed relationship deliveries.
+    /// </summary>
+    private RelationshipOwner(
+        IReadOnlyList<PrincipalDefinition> principals,
+        StandingPolicy standingPolicy,
+        Dictionary<(PrincipalId Assessing, PrincipalId Subject), StandingValue> standings,
+        Dictionary<(PrincipalId Lower, PrincipalId Upper), DiplomaticCondition> diplomacy,
+        Dictionary<RelationshipGrantId, RelationshipGrantState> grants,
+        Dictionary<StandingChangeBatchId, CommittedStandingBatch> standingReceipts,
+        Dictionary<RelationshipPolicyChangeBatchId, CommittedRelationshipPolicyBatch>
+            policyReceipts,
+        PrincipalId playerPrincipalId)
+    {
+        _principals = principals;
+        _principalIds = principals.Select(principal => principal.Id).ToHashSet();
+        _standingPolicy = standingPolicy;
+        _standingOverrides = standings;
+        _diplomaticConditions = diplomacy;
+        _grants = grants;
+        _committedStandingBatches = standingReceipts;
+        _committedPolicyBatches = policyReceipts;
+        PlayerPrincipalId = playerPrincipalId;
+    }
+
     internal PrincipalId PlayerPrincipalId { get; }
+
+    /// <summary>
+    /// Captures complete relationship truth and durable delivery receipts in
+    /// stable identity order, excluding derived bands and projections.
+    /// </summary>
+    internal RelationshipCheckpoint CaptureCheckpoint()
+    {
+        RelationshipSnapshot snapshot = CaptureSnapshot();
+        return new RelationshipCheckpoint(
+            PlayerPrincipalId,
+            new RelationshipStandingPolicyCheckpoint(
+                _standingPolicy.Id.Value,
+                _standingPolicy.Minimum,
+                _standingPolicy.Maximum,
+                _standingPolicy.Initial,
+                _standingPolicy.AdversarialThreshold,
+                _standingPolicy.NeutralThreshold,
+                _standingPolicy.FavorableThreshold,
+                _standingPolicy.AlliedThreshold),
+            _principals.Select(principal => new RelationshipPrincipalCheckpoint(
+                principal.Id,
+                principal.ContentId.Value,
+                principal.Name)),
+            snapshot.Standings.Select(standing => new RelationshipStandingCheckpoint(
+                standing.AssessingPrincipalId,
+                standing.SubjectPrincipalId,
+                standing.Value)),
+            snapshot.DiplomaticConditions.Select(value =>
+                new RelationshipDiplomacyCheckpoint(
+                    value.LowerPrincipalId,
+                    value.UpperPrincipalId,
+                    value.Condition)),
+            _grants.Values
+                .OrderBy(grant => grant.Id.Value)
+                .Select(grant => new RelationshipGrantCheckpoint(
+                    grant.Id,
+                    grant.IssuerPrincipalId,
+                    grant.HolderPrincipalId,
+                    grant.Kind.Value,
+                    grant.MinimumStandingBand,
+                    grant.IsIssued)),
+            _committedStandingBatches
+                .OrderBy(value => value.Key.SourceKind)
+                .ThenBy(value => value.Key.Value)
+                .Select(value => new StandingBatchReceiptCheckpoint(
+                    value.Key,
+                    value.Value.Proposals,
+                    value.Value.Result)),
+            _committedPolicyBatches
+                .OrderBy(value => value.Key.SourceKind)
+                .ThenBy(value => value.Key.Value)
+                .Select(value => new PolicyBatchReceiptCheckpoint(
+                    value.Key,
+                    value.Value.Proposals,
+                    value.Value.Result)));
+    }
+
+    /// <summary>
+    /// Validates and directly restores complete relationship truth and
+    /// idempotency receipts without emitting facts or replaying any batch.
+    /// </summary>
+    internal static CheckpointResult<RelationshipOwner> RestoreCheckpoint(
+        RelationshipCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        CheckpointResult<StandingPolicy> policyResult = RestoreStandingPolicy(
+            checkpoint.StandingPolicy);
+        if (!policyResult.IsSuccess)
+        {
+            return CheckpointResult<RelationshipOwner>.Rejected(policyResult.Failure!);
+        }
+
+        CheckpointResult<IReadOnlyList<PrincipalDefinition>> principalResult =
+            RestorePrincipals(checkpoint);
+        if (!principalResult.IsSuccess)
+        {
+            return CheckpointResult<RelationshipOwner>.Rejected(principalResult.Failure!);
+        }
+
+        IReadOnlyList<PrincipalDefinition> principals = principalResult.Value!;
+        var principalIds = principals.Select(principal => principal.Id).ToHashSet();
+        if (checkpoint.PlayerPrincipalId.Value == 0
+            || !principalIds.Contains(checkpoint.PlayerPrincipalId))
+        {
+            return Rejected(
+                "$.checkpoint.relationships.playerPrincipalId",
+                "The player principal must name one registered principal.");
+        }
+
+        CheckpointResult<Dictionary<
+            (PrincipalId Assessing, PrincipalId Subject), StandingValue>> standingResult =
+            RestoreStandings(checkpoint, principalIds, policyResult.Value!);
+        if (!standingResult.IsSuccess)
+        {
+            return CheckpointResult<RelationshipOwner>.Rejected(standingResult.Failure!);
+        }
+
+        CheckpointResult<Dictionary<
+            (PrincipalId Lower, PrincipalId Upper), DiplomaticCondition>> diplomacyResult =
+            RestoreDiplomacy(checkpoint, principalIds);
+        if (!diplomacyResult.IsSuccess)
+        {
+            return CheckpointResult<RelationshipOwner>.Rejected(diplomacyResult.Failure!);
+        }
+
+        CheckpointResult<Dictionary<RelationshipGrantId, RelationshipGrantState>> grantResult =
+            RestoreGrants(checkpoint, principalIds);
+        if (!grantResult.IsSuccess)
+        {
+            return CheckpointResult<RelationshipOwner>.Rejected(grantResult.Failure!);
+        }
+
+        CheckpointResult<Dictionary<StandingChangeBatchId, CommittedStandingBatch>>
+            standingReceiptResult = RestoreStandingReceipts(
+                checkpoint,
+                principalIds,
+                policyResult.Value!);
+        if (!standingReceiptResult.IsSuccess)
+        {
+            return CheckpointResult<RelationshipOwner>.Rejected(
+                standingReceiptResult.Failure!);
+        }
+
+        CheckpointResult<Dictionary<
+            RelationshipPolicyChangeBatchId, CommittedRelationshipPolicyBatch>>
+            policyReceiptResult = RestorePolicyReceipts(
+                checkpoint,
+                principalIds,
+                grantResult.Value!);
+        if (!policyReceiptResult.IsSuccess)
+        {
+            return CheckpointResult<RelationshipOwner>.Rejected(
+                policyReceiptResult.Failure!);
+        }
+
+        return CheckpointResult<RelationshipOwner>.Success(new RelationshipOwner(
+            principals,
+            policyResult.Value!,
+            standingResult.Value!,
+            diplomacyResult.Value!,
+            grantResult.Value!,
+            standingReceiptResult.Value!,
+            policyReceiptResult.Value!,
+            checkpoint.PlayerPrincipalId));
+    }
 
     /// <summary>
     /// Validates and reduces a complete batch without mutating relationship state.
@@ -1758,6 +1929,737 @@ internal sealed class RelationshipOwner
                     grant.IsIssued,
                     IsEffective(grant)))));
     }
+
+    /// <summary>
+    /// Reconstructs the exact standing policy after validating its raw saved
+    /// identity, bounds, initial value, and ordered thresholds.
+    /// </summary>
+    private static CheckpointResult<StandingPolicy> RestoreStandingPolicy(
+        RelationshipStandingPolicyCheckpoint? checkpoint)
+    {
+        const string path = "$.checkpoint.relationships.standingPolicy";
+        if (checkpoint is null || string.IsNullOrWhiteSpace(checkpoint.Id))
+        {
+            return RejectedPolicy(path, "The standing policy identity is required.");
+        }
+
+        if (checkpoint.Minimum.Value >= checkpoint.AdversarialThreshold.Value
+            || checkpoint.AdversarialThreshold.Value >= checkpoint.NeutralThreshold.Value
+            || checkpoint.NeutralThreshold.Value >= checkpoint.FavorableThreshold.Value
+            || checkpoint.FavorableThreshold.Value >= checkpoint.AlliedThreshold.Value
+            || checkpoint.AlliedThreshold.Value > checkpoint.Maximum.Value)
+        {
+            return RejectedPolicy(path, "Standing bounds and thresholds are not ordered.");
+        }
+
+        if (!IsWithinPolicy(
+                checkpoint.Initial,
+                checkpoint.Minimum,
+                checkpoint.Maximum))
+        {
+            return RejectedPolicy(
+                $"{path}.initial",
+                "The initial standing is outside the policy bounds.");
+        }
+
+        return CheckpointResult<StandingPolicy>.Success(new StandingPolicy(
+            new StandingPolicyId(checkpoint.Id),
+            checkpoint.Minimum,
+            checkpoint.Maximum,
+            checkpoint.Initial,
+            checkpoint.AdversarialThreshold,
+            checkpoint.NeutralThreshold,
+            checkpoint.FavorableThreshold,
+            checkpoint.AlliedThreshold));
+    }
+
+    /// <summary>
+    /// Restores unique runtime and content principal identities in canonical
+    /// order without resolving display metadata from an implicit catalog.
+    /// </summary>
+    private static CheckpointResult<IReadOnlyList<PrincipalDefinition>> RestorePrincipals(
+        RelationshipCheckpoint checkpoint)
+    {
+        const string path = "$.checkpoint.relationships.principals";
+        var ids = new HashSet<PrincipalId>();
+        var contentIds = new HashSet<string>(StringComparer.Ordinal);
+        var principals = new List<PrincipalDefinition>(checkpoint.Principals.Count);
+        for (int index = 0; index < checkpoint.Principals.Count; index++)
+        {
+            RelationshipPrincipalCheckpoint? principal = checkpoint.Principals[index];
+            if (principal is null || principal.Id.Value == 0)
+            {
+                return RejectedPrincipals(
+                    $"{path}[{index}]",
+                    "A principal checkpoint with a nonzero identity is required.");
+            }
+
+            if (!ids.Add(principal.Id))
+            {
+                return RejectedPrincipals(
+                    $"{path}[{index}].id",
+                    "The principal identity is duplicated.");
+            }
+
+            if (string.IsNullOrWhiteSpace(principal.ContentId)
+                || !contentIds.Add(principal.ContentId))
+            {
+                return RejectedPrincipals(
+                    $"{path}[{index}].contentId",
+                    "The principal content identity is missing or duplicated.");
+            }
+
+            if (string.IsNullOrWhiteSpace(principal.Name))
+            {
+                return RejectedPrincipals(
+                    $"{path}[{index}].name",
+                    "The principal display name is required.");
+            }
+
+            principals.Add(new PrincipalDefinition(
+                principal.Id,
+                new PrincipalContentId(principal.ContentId),
+                principal.Name));
+        }
+
+        principals.Sort((left, right) => left.Id.Value.CompareTo(right.Id.Value));
+        return CheckpointResult<IReadOnlyList<PrincipalDefinition>>.Success(
+            new ReadOnlyCollection<PrincipalDefinition>(principals));
+    }
+
+    /// <summary>
+    /// Requires one exact in-range standing value for every directional pair,
+    /// preventing omitted external data from silently taking the policy default.
+    /// </summary>
+    private static CheckpointResult<Dictionary<
+        (PrincipalId Assessing, PrincipalId Subject), StandingValue>> RestoreStandings(
+        RelationshipCheckpoint checkpoint,
+        HashSet<PrincipalId> principalIds,
+        StandingPolicy policy)
+    {
+        const string path = "$.checkpoint.relationships.standings";
+        int expectedCount = checked(principalIds.Count * Math.Max(0, principalIds.Count - 1));
+        if (checkpoint.Standings.Count != expectedCount)
+        {
+            return RejectedStandings(
+                path,
+                "The complete directional standing matrix is required.");
+        }
+
+        var standings = new Dictionary<
+            (PrincipalId Assessing, PrincipalId Subject), StandingValue>();
+        for (int index = 0; index < checkpoint.Standings.Count; index++)
+        {
+            RelationshipStandingCheckpoint? standing = checkpoint.Standings[index];
+            if (standing is null
+                || standing.AssessingPrincipalId == standing.SubjectPrincipalId
+                || !principalIds.Contains(standing.AssessingPrincipalId)
+                || !principalIds.Contains(standing.SubjectPrincipalId))
+            {
+                return RejectedStandings(
+                    $"{path}[{index}]",
+                    "A standing entry must reference two distinct registered principals.");
+            }
+
+            if (!IsWithinPolicy(standing.Value, policy.Minimum, policy.Maximum))
+            {
+                return RejectedStandings(
+                    $"{path}[{index}].value",
+                    "The standing value is outside the restored policy bounds.");
+            }
+
+            if (!standings.TryAdd(
+                    (standing.AssessingPrincipalId, standing.SubjectPrincipalId),
+                    standing.Value))
+            {
+                return RejectedStandings(
+                    $"{path}[{index}]",
+                    "The directional standing pair is duplicated.");
+            }
+        }
+
+        return CheckpointResult<Dictionary<
+            (PrincipalId Assessing, PrincipalId Subject), StandingValue>>.Success(standings);
+    }
+
+    /// <summary>
+    /// Requires one defined condition for every canonical unordered pair so a
+    /// hand edit cannot accidentally replace missing diplomacy with peace.
+    /// </summary>
+    private static CheckpointResult<Dictionary<
+        (PrincipalId Lower, PrincipalId Upper), DiplomaticCondition>> RestoreDiplomacy(
+        RelationshipCheckpoint checkpoint,
+        HashSet<PrincipalId> principalIds)
+    {
+        const string path = "$.checkpoint.relationships.diplomaticConditions";
+        int expectedCount = checked(
+            principalIds.Count * Math.Max(0, principalIds.Count - 1) / 2);
+        if (checkpoint.DiplomaticConditions.Count != expectedCount)
+        {
+            return RejectedDiplomacy(path, "The complete diplomatic pair matrix is required.");
+        }
+
+        var diplomacy = new Dictionary<
+            (PrincipalId Lower, PrincipalId Upper), DiplomaticCondition>();
+        for (int index = 0; index < checkpoint.DiplomaticConditions.Count; index++)
+        {
+            RelationshipDiplomacyCheckpoint? value =
+                checkpoint.DiplomaticConditions[index];
+            if (value is null
+                || value.LowerPrincipalId.Value >= value.UpperPrincipalId.Value
+                || !principalIds.Contains(value.LowerPrincipalId)
+                || !principalIds.Contains(value.UpperPrincipalId)
+                || !Enum.IsDefined(value.Condition))
+            {
+                return RejectedDiplomacy(
+                    $"{path}[{index}]",
+                    "Diplomacy must name a defined condition for a canonical principal pair.");
+            }
+
+            if (!diplomacy.TryAdd(
+                    (value.LowerPrincipalId, value.UpperPrincipalId),
+                    value.Condition))
+            {
+                return RejectedDiplomacy(
+                    $"{path}[{index}]",
+                    "The diplomatic principal pair is duplicated.");
+            }
+        }
+
+        return CheckpointResult<Dictionary<
+            (PrincipalId Lower, PrincipalId Upper), DiplomaticCondition>>.Success(diplomacy);
+    }
+
+    /// <summary>
+    /// Restores issued and revoked grants as persistent state while leaving
+    /// effectiveness derived from the restored standing matrix.
+    /// </summary>
+    private static CheckpointResult<Dictionary<RelationshipGrantId, RelationshipGrantState>>
+        RestoreGrants(
+            RelationshipCheckpoint checkpoint,
+            HashSet<PrincipalId> principalIds)
+    {
+        const string path = "$.checkpoint.relationships.grants";
+        var grants = new Dictionary<RelationshipGrantId, RelationshipGrantState>();
+        for (int index = 0; index < checkpoint.Grants.Count; index++)
+        {
+            RelationshipGrantCheckpoint? grant = checkpoint.Grants[index];
+            if (grant is null
+                || grant.Id.Value == 0
+                || grant.IssuerPrincipalId == grant.HolderPrincipalId
+                || !principalIds.Contains(grant.IssuerPrincipalId)
+                || !principalIds.Contains(grant.HolderPrincipalId)
+                || string.IsNullOrWhiteSpace(grant.Kind)
+                || !Enum.IsDefined(grant.MinimumStandingBand))
+            {
+                return RejectedGrants(
+                    $"{path}[{index}]",
+                    "A grant has invalid identity, endpoints, kind, or standing band.");
+            }
+
+            var state = new RelationshipGrantState(
+                grant.Id,
+                grant.IssuerPrincipalId,
+                grant.HolderPrincipalId,
+                new RelationshipGrantKind(grant.Kind),
+                grant.MinimumStandingBand,
+                grant.IsIssued);
+            if (!grants.TryAdd(grant.Id, state))
+            {
+                return RejectedGrants(
+                    $"{path}[{index}].id",
+                    "The relationship grant identity is duplicated.");
+            }
+        }
+
+        return CheckpointResult<Dictionary<RelationshipGrantId, RelationshipGrantState>>
+            .Success(grants);
+    }
+
+    /// <summary>
+    /// Restores standing delivery receipts only when their canonical proposals
+    /// and saved outcomes independently prove the same checked reduction.
+    /// </summary>
+    private static CheckpointResult<Dictionary<StandingChangeBatchId, CommittedStandingBatch>>
+        RestoreStandingReceipts(
+            RelationshipCheckpoint checkpoint,
+            HashSet<PrincipalId> principalIds,
+            StandingPolicy policy)
+    {
+        const string path = "$.checkpoint.relationships.standingReceipts";
+        var receipts = new Dictionary<StandingChangeBatchId, CommittedStandingBatch>();
+        for (int index = 0; index < checkpoint.StandingReceipts.Count; index++)
+        {
+            StandingBatchReceiptCheckpoint? receipt = checkpoint.StandingReceipts[index];
+            string receiptPath = $"{path}[{index}]";
+            if (receipt is null
+                || receipt.BatchId.Value == 0
+                || !Enum.IsDefined(receipt.BatchId.SourceKind)
+                || receipt.Proposals is null
+                || receipt.Proposals.Count == 0
+                || receipt.Result is null
+                || receipt.Result.BatchId != receipt.BatchId
+                || receipt.Result.Outcomes is null)
+            {
+                return RejectedStandingReceipts(
+                    receiptPath,
+                    "A standing receipt is missing required identity, proposals, or result.");
+            }
+
+            StandingChangeProposal[] proposals = receipt.Proposals
+                .OfType<StandingChangeProposal>()
+                .ToArray();
+            if (proposals.Length != receipt.Proposals.Count
+                || proposals.Any(proposal =>
+                    !principalIds.Contains(proposal.AssessingPrincipalId)
+                    || !principalIds.Contains(proposal.SubjectPrincipalId)
+                    || proposal.AssessingPrincipalId == proposal.SubjectPrincipalId
+                    || proposal.Contribution.Id.Value == 0
+                    || !Enum.IsDefined(proposal.Contribution.Reason)))
+            {
+                return RejectedStandingReceipts(
+                    $"{receiptPath}.proposals",
+                    "Standing receipt proposals are missing or structurally invalid.");
+            }
+
+            StandingChangeProposal[] canonical = proposals
+                .OrderBy(proposal => proposal.AssessingPrincipalId.Value)
+                .ThenBy(proposal => proposal.SubjectPrincipalId.Value)
+                .ThenBy(proposal => proposal.Contribution.Id.Value)
+                .ToArray();
+            if (!proposals.SequenceEqual(canonical))
+            {
+                return RejectedStandingReceipts(
+                    $"{receiptPath}.proposals",
+                    "Standing receipt proposals are not in canonical order.");
+            }
+
+            var contributionIds = new HashSet<(
+                PrincipalId Assessing,
+                PrincipalId Subject,
+                StandingChangeContributionId Contribution)>();
+            if (proposals.Any(proposal => !contributionIds.Add((
+                    proposal.AssessingPrincipalId,
+                    proposal.SubjectPrincipalId,
+                    proposal.Contribution.Id))))
+            {
+                return RejectedStandingReceipts(
+                    $"{receiptPath}.proposals",
+                    "A standing receipt contribution identity is duplicated.");
+            }
+
+            IGrouping<(PrincipalId Assessing, PrincipalId Subject), StandingChangeProposal>[]
+                groups = proposals.GroupBy(proposal => (
+                    proposal.AssessingPrincipalId,
+                    proposal.SubjectPrincipalId)).ToArray();
+            if (receipt.Result.Outcomes.Count != groups.Length)
+            {
+                return RejectedStandingReceipts(
+                    $"{receiptPath}.result.outcomes",
+                    "Standing receipt outcomes do not match proposal groups.");
+            }
+
+            for (int outcomeIndex = 0; outcomeIndex < groups.Length; outcomeIndex++)
+            {
+                IGrouping<(PrincipalId Assessing, PrincipalId Subject),
+                    StandingChangeProposal> group = groups[outcomeIndex];
+                StandingChangeOutcome? outcome = receipt.Result.Outcomes[outcomeIndex];
+                if (!IsValidStandingOutcome(outcome, group, policy))
+                {
+                    return RejectedStandingReceipts(
+                        $"{receiptPath}.result.outcomes[{outcomeIndex}]",
+                        "The standing outcome disagrees with its proposals or policy.");
+                }
+            }
+
+            var restoredResult = new StandingChangeBatchResult.Applied(
+                receipt.BatchId,
+                GameSnapshotCollection.Copy(receipt.Result.Outcomes));
+            if (!receipts.TryAdd(
+                    receipt.BatchId,
+                    new CommittedStandingBatch(proposals, restoredResult)))
+            {
+                return RejectedStandingReceipts(
+                    $"{receiptPath}.batchId",
+                    "The standing batch identity is duplicated.");
+            }
+        }
+
+        return CheckpointResult<Dictionary<StandingChangeBatchId, CommittedStandingBatch>>
+            .Success(receipts);
+    }
+
+    /// <summary>
+    /// Verifies one saved standing outcome against its exact ordered
+    /// contributions, checked sum, clamping, and policy-derived bands.
+    /// </summary>
+    private static bool IsValidStandingOutcome(
+        StandingChangeOutcome? outcome,
+        IGrouping<(PrincipalId Assessing, PrincipalId Subject), StandingChangeProposal> group,
+        StandingPolicy policy)
+    {
+        if (outcome is null
+            || outcome.AssessingPrincipalId != group.Key.Assessing
+            || outcome.SubjectPrincipalId != group.Key.Subject
+            || outcome.Contributions is null)
+        {
+            return false;
+        }
+
+        StandingChangeContribution[] contributions = group
+            .Select(proposal => proposal.Contribution)
+            .ToArray();
+        if (!outcome.Contributions.SequenceEqual(contributions)
+            || !IsWithinPolicy(outcome.PriorValue, policy.Minimum, policy.Maximum)
+            || !IsWithinPolicy(outcome.ResultingValue, policy.Minimum, policy.Maximum)
+            || outcome.PriorBand != policy.GetBand(outcome.PriorValue)
+            || outcome.ResultingBand != policy.GetBand(outcome.ResultingValue))
+        {
+            return false;
+        }
+
+        try
+        {
+            long delta = 0;
+            foreach (StandingChangeContribution contribution in contributions)
+            {
+                delta = checked(delta + contribution.Delta);
+            }
+
+            long unbounded = checked(outcome.PriorValue.Value + delta);
+            return outcome.CombinedDelta == delta
+                && outcome.ResultingValue.Value == Math.Clamp(
+                    unbounded,
+                    policy.Minimum.Value,
+                    policy.Maximum.Value);
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Restores diplomacy and grant delivery receipts after proving canonical
+    /// proposal order and exact correspondence with their saved outcomes.
+    /// </summary>
+    private static CheckpointResult<Dictionary<
+        RelationshipPolicyChangeBatchId, CommittedRelationshipPolicyBatch>>
+        RestorePolicyReceipts(
+            RelationshipCheckpoint checkpoint,
+            HashSet<PrincipalId> principalIds,
+            Dictionary<RelationshipGrantId, RelationshipGrantState> grants)
+    {
+        const string path = "$.checkpoint.relationships.policyReceipts";
+        var receipts = new Dictionary<
+            RelationshipPolicyChangeBatchId, CommittedRelationshipPolicyBatch>();
+        var issuedGrantIds = new HashSet<RelationshipGrantId>();
+        var revokedGrantIds = new HashSet<RelationshipGrantId>();
+        for (int index = 0; index < checkpoint.PolicyReceipts.Count; index++)
+        {
+            PolicyBatchReceiptCheckpoint? receipt = checkpoint.PolicyReceipts[index];
+            string receiptPath = $"{path}[{index}]";
+            if (receipt is null
+                || receipt.BatchId.Value == 0
+                || !Enum.IsDefined(receipt.BatchId.SourceKind)
+                || receipt.Proposals is null
+                || receipt.Proposals.Count == 0
+                || receipt.Result is null
+                || receipt.Result.BatchId != receipt.BatchId
+                || receipt.Result.DiplomaticOutcomes is null
+                || receipt.Result.GrantOutcomes is null)
+            {
+                return RejectedPolicyReceipts(
+                    receiptPath,
+                    "A policy receipt is missing required identity, proposals, or result.");
+            }
+
+            RelationshipPolicyChangeProposal[] proposals = receipt.Proposals
+                .OfType<RelationshipPolicyChangeProposal>()
+                .ToArray();
+            if (proposals.Length != receipt.Proposals.Count
+                || proposals.Any(proposal => !IsValidPolicyProposal(proposal, principalIds)))
+            {
+                return RejectedPolicyReceipts(
+                    $"{receiptPath}.proposals",
+                    "Policy receipt proposals are missing or structurally invalid.");
+            }
+
+            RelationshipPolicyChangeProposal[] canonical = proposals
+                .OrderBy(ProposalPrimaryIdentity)
+                .ThenBy(ProposalSecondaryIdentity)
+                .ThenBy(ProposalKindOrder)
+                .ThenBy(ProposalGrantIdentity)
+                .ToArray();
+            if (!proposals.SequenceEqual(canonical))
+            {
+                return RejectedPolicyReceipts(
+                    $"{receiptPath}.proposals",
+                    "Policy receipt proposals are not in canonical order.");
+            }
+
+            if (!HasUniquePolicyAssignments(proposals)
+                || !PolicyOutcomesMatch(
+                    proposals,
+                    receipt.Result,
+                    principalIds,
+                    grants))
+            {
+                return RejectedPolicyReceipts(
+                    $"{receiptPath}.result",
+                    "Policy receipt outcomes disagree with their proposals or restored grants.");
+            }
+
+            foreach (RelationshipGrantChangeOutcome outcome in receipt.Result.GrantOutcomes)
+            {
+                HashSet<RelationshipGrantId> identities = outcome.ResultingIssued
+                    ? issuedGrantIds
+                    : revokedGrantIds;
+                if (!identities.Add(outcome.Id))
+                {
+                    return RejectedPolicyReceipts(
+                        $"{receiptPath}.result",
+                        "A grant transition is committed by more than one receipt.");
+                }
+            }
+
+            var restoredResult = new RelationshipPolicyChangeBatchResult.Applied(
+                receipt.BatchId,
+                GameSnapshotCollection.Copy(receipt.Result.DiplomaticOutcomes),
+                GameSnapshotCollection.Copy(receipt.Result.GrantOutcomes));
+            if (!receipts.TryAdd(
+                    receipt.BatchId,
+                    new CommittedRelationshipPolicyBatch(proposals, restoredResult)))
+            {
+                return RejectedPolicyReceipts(
+                    $"{receiptPath}.batchId",
+                    "The policy batch identity is duplicated.");
+            }
+        }
+        foreach (RelationshipGrantState grant in grants.Values)
+        {
+            bool wasRevokedByReceipt = revokedGrantIds.Contains(grant.Id);
+            if (grant.IsIssued == wasRevokedByReceipt)
+            {
+                return RejectedPolicyReceipts(
+                    path,
+                    "Grant state disagrees with its committed issuance and revocation receipts.");
+            }
+        }
+
+        return CheckpointResult<Dictionary<
+            RelationshipPolicyChangeBatchId, CommittedRelationshipPolicyBatch>>
+            .Success(receipts);
+    }
+
+    /// <summary>
+    /// Validates closed policy proposal variants without depending on their
+    /// constructors having run during external decoding.
+    /// </summary>
+    private static bool IsValidPolicyProposal(
+        RelationshipPolicyChangeProposal proposal,
+        HashSet<PrincipalId> principalIds) =>
+        proposal switch
+        {
+            SetDiplomaticConditionProposal value =>
+                value.LowerPrincipalId.Value < value.UpperPrincipalId.Value
+                && principalIds.Contains(value.LowerPrincipalId)
+                && principalIds.Contains(value.UpperPrincipalId)
+                && Enum.IsDefined(value.Condition)
+                && Enum.IsDefined(value.Reason),
+            IssueRelationshipGrantProposal value =>
+                value.Id.Value != 0
+                && value.IssuerPrincipalId != value.HolderPrincipalId
+                && principalIds.Contains(value.IssuerPrincipalId)
+                && principalIds.Contains(value.HolderPrincipalId)
+                && !string.IsNullOrWhiteSpace(value.Kind.Value)
+                && Enum.IsDefined(value.MinimumStandingBand)
+                && Enum.IsDefined(value.Reason),
+            RevokeRelationshipGrantProposal value =>
+                value.Id.Value != 0 && Enum.IsDefined(value.Reason),
+            _ => false,
+        };
+
+    /// <summary>
+    /// Enforces the same one-assignment-per-pair and per-grant invariant used
+    /// by live policy batch preparation.
+    /// </summary>
+    private static bool HasUniquePolicyAssignments(
+        IEnumerable<RelationshipPolicyChangeProposal> proposals)
+    {
+        var diplomaticPairs = new HashSet<(PrincipalId Lower, PrincipalId Upper)>();
+        var grantIds = new HashSet<RelationshipGrantId>();
+        foreach (RelationshipPolicyChangeProposal proposal in proposals)
+        {
+            switch (proposal)
+            {
+                case SetDiplomaticConditionProposal value
+                    when !diplomaticPairs.Add((
+                        value.LowerPrincipalId,
+                        value.UpperPrincipalId)):
+                case IssueRelationshipGrantProposal issue
+                    when !grantIds.Add(issue.Id):
+                case RevokeRelationshipGrantProposal revoke
+                    when !grantIds.Add(revoke.Id):
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Matches each saved result list to its proposal subset and verifies that
+    /// grant metadata remains anchored by the restored authoritative grant.
+    /// </summary>
+    private static bool PolicyOutcomesMatch(
+        IReadOnlyList<RelationshipPolicyChangeProposal> proposals,
+        RelationshipPolicyChangeBatchResult.Applied result,
+        HashSet<PrincipalId> principalIds,
+        Dictionary<RelationshipGrantId, RelationshipGrantState> grants)
+    {
+        SetDiplomaticConditionProposal[] diplomatic = proposals
+            .OfType<SetDiplomaticConditionProposal>()
+            .ToArray();
+        RelationshipPolicyChangeProposal[] grantProposals = proposals
+            .Where(proposal => proposal is IssueRelationshipGrantProposal
+                or RevokeRelationshipGrantProposal)
+            .ToArray();
+        if (result.DiplomaticOutcomes.Count != diplomatic.Length
+            || result.GrantOutcomes.Count != grantProposals.Length)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < diplomatic.Length; index++)
+        {
+            SetDiplomaticConditionProposal proposal = diplomatic[index];
+            DiplomaticConditionChangeOutcome? outcome = result.DiplomaticOutcomes[index];
+            if (outcome is null
+                || outcome.LowerPrincipalId != proposal.LowerPrincipalId
+                || outcome.UpperPrincipalId != proposal.UpperPrincipalId
+                || outcome.ResultingCondition != proposal.Condition
+                || outcome.Reason != proposal.Reason
+                || !principalIds.Contains(outcome.LowerPrincipalId)
+                || !principalIds.Contains(outcome.UpperPrincipalId)
+                || !Enum.IsDefined(outcome.PriorCondition)
+                || !Enum.IsDefined(outcome.ResultingCondition)
+                || !Enum.IsDefined(outcome.Reason))
+            {
+                return false;
+            }
+        }
+
+        for (int index = 0; index < grantProposals.Length; index++)
+        {
+            RelationshipPolicyChangeProposal proposal = grantProposals[index];
+            RelationshipGrantChangeOutcome? outcome = result.GrantOutcomes[index];
+            if (outcome is null
+                || !grants.TryGetValue(outcome.Id, out RelationshipGrantState? grant)
+                || grant.IssuerPrincipalId != outcome.IssuerPrincipalId
+                || grant.HolderPrincipalId != outcome.HolderPrincipalId
+                || grant.Kind != outcome.Kind
+                || grant.MinimumStandingBand != outcome.MinimumStandingBand
+                || outcome.PriorIssued == outcome.ResultingIssued
+                || !Enum.IsDefined(outcome.MinimumStandingBand)
+                || !Enum.IsDefined(outcome.Reason))
+            {
+                return false;
+            }
+
+            bool matches = proposal switch
+            {
+                IssueRelationshipGrantProposal issue =>
+                    outcome.Id == issue.Id
+                    && outcome.IssuerPrincipalId == issue.IssuerPrincipalId
+                    && outcome.HolderPrincipalId == issue.HolderPrincipalId
+                    && outcome.Kind == issue.Kind
+                    && outcome.MinimumStandingBand == issue.MinimumStandingBand
+                    && !outcome.PriorIssued
+                    && outcome.ResultingIssued
+                    && outcome.Reason == issue.Reason,
+                RevokeRelationshipGrantProposal revoke =>
+                    outcome.Id == revoke.Id
+                    && outcome.PriorIssued
+                    && !outcome.ResultingIssued
+                    && outcome.Reason == revoke.Reason,
+                _ => false,
+            };
+            if (!matches)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsWithinPolicy(
+        StandingValue value,
+        StandingValue minimum,
+        StandingValue maximum) =>
+        value.Value >= minimum.Value && value.Value <= maximum.Value;
+
+    private static CheckpointResult<T> RejectedCheckpoint<T>(
+        string path,
+        string message)
+        where T : class =>
+        CheckpointResult<T>.Rejected(new CheckpointValidationFailure(path, message));
+
+    private static CheckpointResult<RelationshipOwner> Rejected(
+        string path,
+        string message) =>
+        RejectedCheckpoint<RelationshipOwner>(path, message);
+
+    private static CheckpointResult<StandingPolicy> RejectedPolicy(
+        string path,
+        string message) =>
+        RejectedCheckpoint<StandingPolicy>(path, message);
+
+    private static CheckpointResult<IReadOnlyList<PrincipalDefinition>> RejectedPrincipals(
+        string path,
+        string message) =>
+        RejectedCheckpoint<IReadOnlyList<PrincipalDefinition>>(path, message);
+
+    private static CheckpointResult<Dictionary<
+        (PrincipalId Assessing, PrincipalId Subject), StandingValue>> RejectedStandings(
+        string path,
+        string message) =>
+        RejectedCheckpoint<Dictionary<
+            (PrincipalId Assessing, PrincipalId Subject), StandingValue>>(path, message);
+
+    private static CheckpointResult<Dictionary<
+        (PrincipalId Lower, PrincipalId Upper), DiplomaticCondition>> RejectedDiplomacy(
+        string path,
+        string message) =>
+        RejectedCheckpoint<Dictionary<
+            (PrincipalId Lower, PrincipalId Upper), DiplomaticCondition>>(path, message);
+
+    private static CheckpointResult<Dictionary<
+        RelationshipGrantId, RelationshipGrantState>> RejectedGrants(
+        string path,
+        string message) =>
+        RejectedCheckpoint<Dictionary<RelationshipGrantId, RelationshipGrantState>>(
+            path,
+            message);
+
+    private static CheckpointResult<Dictionary<
+        StandingChangeBatchId, CommittedStandingBatch>> RejectedStandingReceipts(
+        string path,
+        string message) =>
+        RejectedCheckpoint<Dictionary<StandingChangeBatchId, CommittedStandingBatch>>(
+            path,
+            message);
+
+    private static CheckpointResult<Dictionary<
+        RelationshipPolicyChangeBatchId, CommittedRelationshipPolicyBatch>>
+        RejectedPolicyReceipts(
+            string path,
+            string message) =>
+        RejectedCheckpoint<Dictionary<
+            RelationshipPolicyChangeBatchId, CommittedRelationshipPolicyBatch>>(
+                path,
+                message);
 
     private StandingValue GetStanding(
         PrincipalId assessingPrincipalId,
