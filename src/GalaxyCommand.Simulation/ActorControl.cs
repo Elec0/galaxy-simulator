@@ -118,6 +118,100 @@ internal sealed class ActorControlRegistry
     private readonly SortedDictionary<ShipId, ControlState> _actors =
         new(EntityIdComparer<ShipId>.Instance);
 
+    /// <summary>
+    /// Captures base control, any active scripted override, and exact revisions
+    /// in stable ship order.
+    /// </summary>
+    internal ActorControlRegistryCheckpoint CaptureCheckpoint() =>
+        new(_actors.Select(pair => new ActorControlCheckpoint(
+            pair.Key,
+            pair.Value.BaseController,
+            pair.Value.Override,
+            pair.Value.OverrideReason,
+            pair.Value.Revision)));
+
+    /// <summary>
+    /// Validates and directly restores actor control without beginning or
+    /// ending overrides and therefore without advancing saved revisions.
+    /// </summary>
+    internal static CheckpointResult<ActorControlRegistry> RestoreCheckpoint(
+        ActorControlRegistryCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        const string path = "$.checkpoint.control.actors";
+        var restored = new ActorControlRegistry();
+        for (int index = 0; index < checkpoint.Actors.Count; index++)
+        {
+            ActorControlCheckpoint? actor = checkpoint.Actors[index];
+            if (actor is null)
+            {
+                return Rejected(
+                    $"{path}[{index}]",
+                    "An actor control checkpoint is missing.");
+            }
+
+            if (actor.ShipId.Value == 0)
+            {
+                return Rejected(
+                    $"{path}[{index}].shipId",
+                    "A controlled ship identifier must be nonzero.");
+            }
+
+            if (restored._actors.ContainsKey(actor.ShipId))
+            {
+                return Rejected(
+                    $"{path}[{index}].shipId",
+                    $"Duplicate controlled ship {actor.ShipId}.");
+            }
+
+            if (!IsValidBaseController(actor.BaseController))
+            {
+                return Rejected(
+                    $"{path}[{index}].baseController",
+                    "A base controller must be a valid player or autonomous controller.");
+            }
+
+            bool hasOverride = actor.TemporaryOverride is not null;
+            bool hasReason = actor.TemporaryOverrideReason is { } reason
+                && !string.IsNullOrWhiteSpace(reason.Value);
+            if (hasOverride != hasReason)
+            {
+                return Rejected(
+                    $"{path}[{index}]",
+                    "A temporary override and its reason must either both be present or both be absent.");
+            }
+
+            if (actor.TemporaryOverride is { } temporaryOverride
+                && (temporaryOverride.Kind != ActorControllerKind.Script
+                    || string.IsNullOrWhiteSpace(temporaryOverride.Id.Value)))
+            {
+                return Rejected(
+                    $"{path}[{index}].temporaryOverride",
+                    "A temporary override must be a valid script controller.");
+            }
+
+            // Begin and end each advance the revision once, so odd revisions
+            // are precisely the checkpoints with an active override.
+            bool revisionHasOverride = (actor.Revision.Value & 1UL) != 0;
+            if (revisionHasOverride != hasOverride)
+            {
+                return Rejected(
+                    $"{path}[{index}].revision",
+                    "Control revision parity does not match the saved override state.");
+            }
+
+            var state = new ControlState(actor.BaseController!)
+            {
+                Override = actor.TemporaryOverride,
+                OverrideReason = actor.TemporaryOverrideReason,
+                Revision = actor.Revision,
+            };
+            restored._actors.Add(actor.ShipId, state);
+        }
+
+        return CheckpointResult<ActorControlRegistry>.Success(restored);
+    }
+
     internal void Add(ShipId shipId, ActorController baseController)
     {
         ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
@@ -264,6 +358,22 @@ internal sealed class ActorControlRegistry
     private ControlState GetRequired(ShipId shipId) =>
         _actors.GetValueOrDefault(shipId)
         ?? throw new KeyNotFoundException($"Unknown controlled actor {shipId}.");
+
+    /// <summary>
+    /// Accepts only persistent controller kinds with a usable local identity.
+    /// Script controllers are valid exclusively as temporary overrides.
+    /// </summary>
+    private static bool IsValidBaseController(ActorController? controller) =>
+        controller is not null
+        && controller.Kind is ActorControllerKind.Player
+            or ActorControllerKind.Autonomous
+        && !string.IsNullOrWhiteSpace(controller.Id.Value);
+
+    private static CheckpointResult<ActorControlRegistry> Rejected(
+        string path,
+        string message) =>
+        CheckpointResult<ActorControlRegistry>.Rejected(
+            new CheckpointValidationFailure(path, message));
 
     private sealed class ControlState
     {

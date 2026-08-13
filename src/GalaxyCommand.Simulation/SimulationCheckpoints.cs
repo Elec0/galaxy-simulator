@@ -82,6 +82,26 @@ internal sealed record CommandAdmissionCheckpoint(
     IdSequenceCheckpoint Sequences,
     SimulationTime? LastSubmittedAt);
 
+internal sealed record ActorControlCheckpoint(
+    ShipId ShipId,
+    ActorController? BaseController,
+    ActorController? TemporaryOverride,
+    ActorOverrideReasonId? TemporaryOverrideReason,
+    ActorControlRevision Revision);
+
+internal sealed class ActorControlRegistryCheckpoint
+{
+    internal ActorControlRegistryCheckpoint(
+        IEnumerable<ActorControlCheckpoint?> actors)
+    {
+        ArgumentNullException.ThrowIfNull(actors);
+        Actors = new ReadOnlyCollection<ActorControlCheckpoint?>(
+            actors.ToArray());
+    }
+
+    internal ReadOnlyCollection<ActorControlCheckpoint?> Actors { get; }
+}
+
 internal sealed class GameFactStoreCheckpoint
 {
     internal GameFactStoreCheckpoint(

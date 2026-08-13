@@ -55,7 +55,12 @@ strategy for the authoritative inventory defined by `TASK-014`.
   - Added command admission checkpoints for the exact next sequence or
     exhaustion and the last admitted timestamp. Direct restore preserves the
     monotonic time floor without replaying commands or restoring diagnostic
-    command records. The full 261-test suite passes.
+    command records.
+  - Added actor-control checkpoints for each ship's base controller, temporary
+    scripted override and reason, and exact control revision. Restore accepts
+    non-semantic actor reordering, canonicalizes later capture, and directly
+    reconstructs control without beginning or ending overrides. The full
+    266-test suite passes.
   - Build on the authoritative boundary from `TASK-014` and the complete
     aggregate admission established by `TASK-034`.
   - Keep content catalog identity, provenance, and saved content-reference
