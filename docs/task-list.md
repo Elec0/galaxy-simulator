@@ -16,25 +16,30 @@ rather than deleting them.
 `TASK-023` is complete. The project now has an accepted gameplay-content,
 static-scenario, stable-identity, validation, and trust-boundary design.
 The project is returning to design discovery before further implementation.
-`TASK-044` is complete. The exhaustive planned-system inventory now gives every
-identified system a design owner, tracked task, or explicit deferral. `TASK-043`
-is next: use that inventory to review gameplay contracts and ownership
-boundaries for genuine gaps. `TASK-048` remains the next implementation
-dependency in the content and save chain, but it is intentionally parked until
-this broader design work is complete.
+`TASK-043` and `TASK-044` are complete. The planned-system inventory and its
+scope-gap review now give every identified system an accepted owner, a tracked
+design task, or an explicit deferral. `TASK-045` is next so localization and
+accessibility boundaries are established before broader player-facing game
+work. `TASK-048` remains the next implementation dependency in the content and
+save chain, but it is intentionally parked until that design work is complete.
 
 ## Near-term work
 
-- [ ] **TASK-043: Review gameplay systems for scope gaps**
-  - Begin from the `TASK-044` inventory, then review the player experience,
-    gameplay, economy, faction, navigation, entity, information, and simulation
-    architecture documents together with the tracked tasks to identify missing
-    gameplay decisions and ownership boundaries.
-  - Distinguish a genuine unresolved gameplay contract from a deliberately
-    deferred decision, implementation detail, or acceptance-only fixture.
-  - Record each confirmed gap as a separately scoped task in this canonical
-    list, with prerequisite tasks and the relevant design-document context.
-    Do not silently expand an existing task to absorb a gap.
+- [ ] **TASK-045: Plan internationalization before game-layer expansion**
+  - Define the localization boundary before gameplay systems introduce
+    player-facing text: stable domain identifiers and reason codes remain in
+    authoritative simulation state, while presentation resolves localized
+    wording, formatting, icons, and layout.
+  - Decide supported locale selection and fallback, resource and content
+    organization, pluralization and parameter formatting, right-to-left and
+    text-expansion requirements, font coverage, and localized authored content.
+  - Define how localization applies to UI, semantic facts, dialogue, objectives,
+    item and equipment content, and accessibility without making locale or
+    translated text part of deterministic simulation, snapshots, or save state.
+  - Complete this plan before broad game-layer implementation adds player-facing
+    contracts; coordinate content ownership with `TASK-023`, dialogue with
+    `TASK-016`, objectives with `TASK-018`, and generalized item content with
+    `TASK-041`.
 
 ## Future parking lot
 
@@ -59,22 +64,6 @@ prerequisites and desired behavior are sufficiently defined.
     intentionally deferred until later gameplay and world-shape requirements
     provide concrete constraints.
   - Context: [Gameplay content](gameplay-content.md) · [Simulation architecture](simulation-architecture.md) · [Initial roadmap](roadmap.md)
-
-- [ ] **TASK-045: Plan internationalization before game-layer expansion**
-  - Define the localization boundary before gameplay systems introduce
-    player-facing text: stable domain identifiers and reason codes remain in
-    authoritative simulation state, while presentation resolves localized
-    wording, formatting, icons, and layout.
-  - Decide supported locale selection and fallback, resource and content
-    organization, pluralization and parameter formatting, right-to-left and
-    text-expansion requirements, font coverage, and localized authored content.
-  - Define how localization applies to UI, semantic facts, dialogue, objectives,
-    item and equipment content, and accessibility without making locale or
-    translated text part of deterministic simulation, snapshots, or save state.
-  - Complete this plan before broad game-layer implementation adds player-facing
-    contracts; coordinate content ownership with `TASK-023`, dialogue with
-    `TASK-016`, objectives with `TASK-018`, and generalized item content with
-    `TASK-041`.
 
 - [ ] **TASK-015: Decide the initial meaning and scope of individual NPCs**
   - Decide whether the first NPC model represents ships, person-level
@@ -289,7 +278,159 @@ prerequisites and desired behavior are sufficiently defined.
     commands.
   - Context: [Relational gameplay model](factions.md)
 
+- [ ] **TASK-049: Define the application shell and map experience**
+  - Define new-game, load-game, active-session, leave-session, and fatal-startup
+    flows for the local desktop application without making Godot an
+    authoritative simulation owner.
+  - Define the galaxy and system view hierarchy, camera and zoom behavior,
+    generic entity selection and inspection, overlays, notification surfaces,
+    and stale or removed entity handling needed by the minimal map application.
+  - Build on the immutable presentation boundary from `TASK-010`; coordinate
+    time controls with `TASK-038`, information visibility with `TASK-020`,
+    localization and accessibility with `TASK-045`, and recovery with
+    `TASK-040`.
+  - Context: [Player experience](player-experience.md) · [Technical direction](technical-direction.md) · [Presentation snapshots](presentation-snapshots.md) · [Initial roadmap](roadmap.md)
+
+- [ ] **TASK-050: Define save slots, autosave, and local preference storage**
+  - Define slot naming and discovery, manual-save and autosave behavior,
+    cadence, retention, backup visibility, overwrite confirmation, and
+    cross-device or external-edit conflict handling around the validated file
+    store from `TASK-022`.
+  - Define storage and reset behavior for local pacing, presentation,
+    localization, and accessibility preferences while keeping them outside the
+    authoritative session unless an owning gameplay task explicitly requires
+    otherwise.
+  - Begin after `TASK-045` defines locale and accessibility ownership;
+    coordinate failed-load recovery with `TASK-040` and pacing preferences with
+    `TASK-038`.
+  - Context: [Save format and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md) · [Time and pacing](time-and-pacing.md)
+
+- [ ] **TASK-051: Define docking, undocking, and berth capacity**
+  - Define approach, access validation, berth or docking-capacity allocation,
+    queueing, arrival, docked state, undocking, cancellation, and failure for
+    ships interacting with stations or other facilities.
+  - Define how docking composes with motion, orders, loading and unloading,
+    permissions, facility removal, facts, snapshots, checkpoints, and
+    deterministic congestion resolution.
+  - Begin after `TASK-019` supplies moving-ship interaction timing; coordinate
+    access with `TASK-030`, group intent with `TASK-033`, and station ownership
+    with `TASK-057`.
+  - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Navigation architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
+
+- [ ] **TASK-052: Define standing orders and player-configurable automation**
+  - Define recurring trade, mining, patrol, defense, and route intent without
+    introducing a second command or order lifecycle.
+  - Decide policy configuration, eligible actors, cadence and wake triggers,
+    replacement and suspension, bounded failure and retry, player override,
+    explanation, snapshots, and save requirements.
+  - Build on `TASK-006`; coordinate group targets with `TASK-033`, knowledge
+    limits with `TASK-020`, and domain-specific orders with their owning tasks.
+  - Context: [Player experience](player-experience.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
+
+- [ ] **TASK-053: Define autonomous ship work selection**
+  - Define how non-player ships discover, evaluate, select, and stop ordinary
+    work through the same commands and order lifecycle used by player intent.
+  - Separate ship-local policy from faction strategy, define authoritative
+    policy ownership, stable inputs, cadence, contention and tie-breaking,
+    bounded retry, explanation, snapshots, and save requirements.
+  - Build on `TASK-006` and the production domain owners from `TASK-009` and
+    `TASK-034`; coordinate information with `TASK-020`, faction objectives with
+    `TASK-026`, and bounded competence with `TASK-042`.
+  - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
+
+- [ ] **TASK-054: Define general resource acquisition and deposits**
+  - Evolve the acceptance-only mining source into production gameplay with
+    explicit deposits or other sources, discoverability, extraction capability,
+    work scheduling, depletion or renewal, interruption, output ownership, and
+    resulting inventory.
+  - Define content, commands, facts, snapshots, checkpoints, and deterministic
+    batching without promoting the Phase 1 fixture into session authority.
+  - Coordinate items and equipment with `TASK-041`, player knowledge with
+    `TASK-020`, movement interactions with `TASK-019`, and autonomous selection
+    with `TASK-053`.
+  - Context: [Economy](economy.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md)
+
+- [ ] **TASK-055: Define trade, contracts, currency, prices, and markets**
+  - Define purchase, sale, procurement, and transport agreements for player and
+    autonomous actors, including offer identity, eligibility, acceptance,
+    reservation, fulfillment, cancellation, failure, and explanation.
+  - Decide currency ownership and conservation, pricing and price discovery,
+    transaction atomicity, public-market versus internal logistics boundaries,
+    relationship effects, snapshots, saves, and deterministic contention.
+  - Begin after `TASK-041` defines tradable inventory categories; coordinate
+    logistics with `TASK-009`, docking with `TASK-051`, knowledge with
+    `TASK-020`, and economic facts with `TASK-032`.
+  - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Factions](factions.md)
+
+- [ ] **TASK-056: Define ship acquisition, replacement, and upgrades**
+  - Define how the player and autonomous principals purchase, receive,
+    construct, replace, sell, and improve ships without bypassing material
+    construction, ownership, or content compatibility.
+  - Define acquisition eligibility and cost, initial control and orders,
+    equipment changes, transfer and failure behavior, semantic facts,
+    snapshots, checkpoints, and the viability of continued one-ship play.
+  - Begin after `TASK-041` defines equipment and `TASK-055` defines exchange;
+    coordinate construction with `TASK-034` and combat losses with `TASK-046`.
+  - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md)
+
+- [ ] **TASK-057: Define station composition, construction, and expansion**
+  - Define persistent facilities composed from storage, production, trade,
+    repair, construction, defense, and service capabilities, with explicit
+    content identity and authoritative ownership.
+  - Define how station construction and expansion consume material and work,
+    choose location, allocate identity, change regional capacity, handle
+    interruption or removal, and join commands, facts, snapshots, and saves.
+  - Begin after `TASK-041` defines installed equipment and `TASK-048` supplies
+    content catalogs; coordinate docking with `TASK-051`, territory with
+    `TASK-059`, and strategic construction with `TASK-026`.
+  - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md)
+
+- [ ] **TASK-058: Define repair and maintenance**
+  - Define damage states that can be repaired, required facilities or field
+    capabilities, material and equipment inputs, reservations, scheduled work,
+    interruption, completion, failure, and resulting asset availability.
+  - Preserve material causality and use ordinary orders, facts, snapshots, and
+    checkpoints rather than silently restoring damaged assets.
+  - Begin after damage in `TASK-046`, generalized inventory in `TASK-041`, and
+    station capabilities in `TASK-057`; coordinate docking with `TASK-051`.
+  - Context: [Economy](economy.md) · [Player experience](player-experience.md)
+
+- [ ] **TASK-059: Define territory claiming and political expansion**
+  - Define territory identities, boundaries, controlling authority, claim and
+    loss conditions, restricted-space policy, and the player path from an
+    independent principal to a territorial power without making expansion
+    mandatory.
+  - Define how stations, knowledge, conflict, permissions, law, facts,
+    snapshots, and saves participate without deriving every right from
+    directional standing.
+  - Begin after player knowledge in `TASK-020`, station expansion in `TASK-057`,
+    and combat in `TASK-046`; coordinate strategic ownership with `TASK-026`
+    and mutable connector access with `TASK-030`.
+  - Context: [Player experience](player-experience.md) · [Relational gameplay model](factions.md) · [Relational simulation architecture](relational-simulation-architecture.md)
+
+- [ ] **TASK-060: Define deterministic compatibility across platforms and versions**
+  - Decide the supported reproducibility guarantee across operating systems,
+    architectures, .NET versions, and game versions, including numeric,
+    collection, hashing, serialization, and algorithm-version boundaries.
+  - Define compatibility evidence, canonical digest scope, expected rejection
+    versus migration behavior, and how single-thread and concurrent reference
+    results are compared without promising unsupported bitwise identity.
+  - Begin after `TASK-021` defines random streams and use evidence from
+    `TASK-029`; coordinate save and content compatibility with `TASK-022` and
+    `TASK-037`.
+  - Context: [Technical direction](technical-direction.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Save format and migration](save-format-and-migration.md)
+
 ## Completed foundations
+
+- [x] **TASK-043: Review gameplay systems for scope gaps**
+  - Reviewed the `TASK-044` inventory against the player experience, roadmap,
+    gameplay, economy, faction, navigation, lifecycle, information,
+    presentation, save, and simulation architecture documents.
+  - Classified each unowned area as a confirmed contract gap or a deliberate
+    optional, evidence-gated, or prerequisite-gated deferral. Added
+    `TASK-049` through `TASK-060` for the confirmed gaps without widening
+    existing task boundaries.
+  - Context: [Planned game-system inventory](planned-systems.md#task-043-scope-gap-review)
 
 - [x] **TASK-044: Inventory the planned game systems in documentation**
   - Added an exhaustive inventory of established, planned, and deliberately
@@ -300,8 +441,8 @@ prerequisites and desired behavior are sufficiently defined.
     explicit inventory deferral without treating deferred systems as
     implementation commitments. Recorded the strict single-player exclusions
     separately so they cannot be mistaken for missing systems.
-  - `TASK-043` now owns the review of this inventory for genuine gameplay
-    contract and ownership gaps.
+  - Supplied the canonical input used by the completed `TASK-043` review of
+    gameplay contract and ownership gaps.
   - Context: [Planned game-system inventory](planned-systems.md)
 
 - [x] **TASK-023: Define gameplay content categories and format boundaries**

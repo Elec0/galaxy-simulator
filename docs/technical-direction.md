@@ -73,15 +73,19 @@ The headless simulation should support:
 - Performance benchmarks at increasing scales
 - Recorded commands and event traces for reproduction
 
-## Unresolved choices
+## Tracked and unresolved choices
 
-- Final application and UI framework
-- Entity storage model
-- Save-file format and migration strategy
-- Determinism guarantees across platforms and versions
-- Initial scale targets for systems, stations, and ships
-- Exact treatment of observed and unobserved combat
+Godot with C# is the accepted application framework, `TASK-022` selected the
+save format and migration mechanics, and `TASK-024` accepted the initial scale
+envelopes. The remaining choices have explicit owners:
 
-The first milestone should collect evidence for these choices rather than settle all of them in advance.
+- `TASK-027` reevaluates entity storage only when query or scale evidence
+  justifies a broader model.
+- `TASK-046` decides observed and unobserved combat behavior with `TASK-020`.
+- `TASK-060` defines the reproducibility guarantee across platforms and
+  versions, using concurrency and benchmark evidence from `TASK-029`.
+
+These owners should collect the evidence required by their prerequisites rather
+than settling the choices inside unrelated implementation work.
 
 The implementation contract for that milestone is the [Phase 1 simulation specification](phase-1-simulation-spec.md).
