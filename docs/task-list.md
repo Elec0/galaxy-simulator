@@ -13,19 +13,28 @@ rather than deleting them.
 
 ## Current focus
 
-`TASK-022` is complete. The authoritative aggregate now has an externally
-editable JSON format contract, complete internal checkpoint and direct-restore
-boundaries, and atomic file storage mechanics. `TASK-023` is the next dependency:
-select the gameplay content format needed before `TASK-037` can make general
-saved sessions content-compatible.
+`TASK-023` is complete. The project now has an accepted gameplay-content,
+static-scenario, stable-identity, validation, and trust-boundary design.
+The project is returning to design discovery before further implementation.
+`TASK-044` is complete. The exhaustive planned-system inventory now gives every
+identified system a design owner, tracked task, or explicit deferral. `TASK-043`
+is next: use that inventory to review gameplay contracts and ownership
+boundaries for genuine gaps. `TASK-048` remains the next implementation
+dependency in the content and save chain, but it is intentionally parked until
+this broader design work is complete.
 
 ## Near-term work
 
-- [ ] **TASK-023: Decide the gameplay content format**
-  - Determine which content is code-defined, data-defined, or externally
-    scriptable.
-  - Revisit modding goals and security constraints at that time.
-  - Feed the selected content identity and provenance model into `TASK-037`.
+- [ ] **TASK-043: Review gameplay systems for scope gaps**
+  - Begin from the `TASK-044` inventory, then review the player experience,
+    gameplay, economy, faction, navigation, entity, information, and simulation
+    architecture documents together with the tracked tasks to identify missing
+    gameplay decisions and ownership boundaries.
+  - Distinguish a genuine unresolved gameplay contract from a deliberately
+    deferred decision, implementation detail, or acceptance-only fixture.
+  - Record each confirmed gap as a separately scoped task in this canonical
+    list, with prerequisite tasks and the relevant design-document context.
+    Do not silently expand an existing task to absorb a gap.
 
 ## Future parking lot
 
@@ -33,26 +42,23 @@ These items are intentionally retained without implying that they should be
 worked on now. Promote an item to current or near-term work when its
 prerequisites and desired behavior are sufficiently defined.
 
-- [ ] **TASK-043: Review gameplay systems for scope gaps**
-  - Review the player experience, gameplay, economy, faction, navigation,
-    entity, information, and simulation architecture documents together with
-    the tracked tasks to identify missing gameplay decisions and ownership
-    boundaries.
-  - Distinguish a genuine unresolved gameplay contract from a deliberately
-    deferred decision, implementation detail, or acceptance-only fixture.
-  - Record each confirmed gap as a separately scoped task in this canonical
-    list, with prerequisite tasks and the relevant design-document context.
-    Do not silently expand an existing task to absorb a gap.
-
-- [ ] **TASK-044: Inventory the planned game systems in documentation**
-  - Produce an exhaustive inventory of the game systems the project expects to
-    need, including systems deferred beyond the current roadmap.
-  - Ensure every identified system is mentioned at least once in project
-    documentation and has a clear owning design document, tracked task, or
-    explicitly stated deferral.
-  - Reconcile the inventory with `TASK-043`; add separately scoped tasks for
-    confirmed missing contracts rather than treating the inventory as an
-    implementation commitment.
+- [ ] **TASK-047: Define procedural new-game generation**
+  - Generate a complete new-game composition that passes the same production
+    validation and session-creation boundary as a static authored scenario;
+    do not create a second initialization or authority path.
+  - Define player-selectable generation inputs, constraints, failure behavior,
+    reproducibility, seed and random-stream ownership, algorithm versioning,
+    stable identity assignment, and independence from worker count or
+    generation completion order.
+  - Decide which authored definitions and scenario fragments a generator may
+    select or compose without changing their content identities or silently
+    manufacturing incompatible definitions.
+  - Begin only after `TASK-023` establishes the static content and new-game
+    composition design, `TASK-048` implements that shared boundary, and
+    `TASK-021` establishes deterministic randomness. Procedural generation is
+    intentionally deferred until later gameplay and world-shape requirements
+    provide concrete constraints.
+  - Context: [Gameplay content](gameplay-content.md) · [Simulation architecture](simulation-architecture.md) · [Initial roadmap](roadmap.md)
 
 - [ ] **TASK-045: Plan internationalization before game-layer expansion**
   - Define the localization boundary before gameplay systems introduce
@@ -156,9 +162,34 @@ prerequisites and desired behavior are sufficiently defined.
     item and equipment data with `TASK-023`, and combat or repair behavior
     with `TASK-046`.
 
+- [ ] **TASK-048: Implement the gameplay content pipeline and headless validator**
+  - Begin only after the current design-discovery work establishes enough of
+    the planned gameplay and content surface to avoid premature schemas.
+  - Implement format-neutral package, definition, static-scenario, reference,
+    and diagnostic models, with strict UTF-8 JSON parsing and writing isolated
+    behind the initial physical-format adapter.
+  - Implement one production path for bounded validation, dependency and
+    reference resolution, collision detection, canonicalization, fingerprints,
+    immutable catalog construction, and static-scenario validation.
+  - Add a headless production validator that reports stable diagnostics and can
+    inspect resolved package order, qualified-key inventory, and fingerprints
+    without Godot or session mutation.
+  - Move built-in definitions and the minimal static new-game scenario through
+    the disk-backed production path. Retain direct neutral-model builders only
+    for focused tests; package and scenario coverage cannot bypass production
+    validation or catalog construction.
+  - Prove identical catalogs, fingerprints, and diagnostics across accepted
+    document ordering, worker counts, batch layouts, and completion order, with
+    a single-thread reference path.
+  - Do not implement content-version compatibility or saved-reference migration;
+    provide the resolved catalog and qualified references consumed by
+    `TASK-037`.
+  - Context: [Gameplay content and static new-game composition](gameplay-content.md) · [Gameplay integration](gameplay-integration.md) · [Initial roadmap](roadmap.md) · [Save format and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
+
 - [ ] **TASK-037: Version content catalogs and migrate saved content references**
-  - Begin after `TASK-022` selects save versioning and `TASK-023` selects the
-    gameplay content format.
+  - Begin after `TASK-022` selects save versioning, `TASK-023` selects the
+    gameplay content format, and `TASK-048` implements the resolved catalog and
+    qualified-reference boundary.
   - Define stable content catalog identities, versions, dependency metadata,
     and source provenance for built-in and mod-provided content.
   - Detect identifier collisions across combined content sources without
@@ -260,6 +291,33 @@ prerequisites and desired behavior are sufficiently defined.
 
 ## Completed foundations
 
+- [x] **TASK-044: Inventory the planned game systems in documentation**
+  - Added an exhaustive inventory of established, planned, and deliberately
+    deferred systems across the player application, content, simulation,
+    navigation, actors, economy, factions, conflict, narrative, and supporting
+    architecture.
+  - Assigned every inventory entry to an accepted design, tracked task, or
+    explicit inventory deferral without treating deferred systems as
+    implementation commitments. Recorded the strict single-player exclusions
+    separately so they cannot be mistaken for missing systems.
+  - `TASK-043` now owns the review of this inventory for genuine gameplay
+    contract and ownership gaps.
+  - Context: [Planned game-system inventory](planned-systems.md)
+
+- [x] **TASK-023: Define gameplay content categories and format boundaries**
+  - Accepted strict UTF-8 JSON behind a replaceable format adapter, one
+    format-neutral validation and catalog-construction path, qualified authored
+    identities, immutable disk-loaded definitions, static new-game composition,
+    deterministic package composition, and no initial external executable
+    content.
+  - Required production-grade headless validation, canonical fingerprints for
+    rapid iteration, and invariant fallback strings for headless inspection
+    without making wording simulation authority or save data.
+  - Implementation remains `TASK-048`; catalog compatibility and saved-reference
+    migration remain `TASK-037`; procedural new-game generation remains
+    `TASK-047`.
+  - Context: [Gameplay content and static new-game composition](gameplay-content.md)
+
 - [x] **TASK-022: Select save format, versioning, and migration strategy**
   - Selected externally editable strict UTF-8 JSON, stable current-schema
     writing, bounded decoding, typed rejection, and deterministic contiguous
@@ -271,9 +329,9 @@ prerequisites and desired behavior are sufficiently defined.
     synchronization, one explicit backup, portable validated slot identifiers,
     symbolic-link rejection, and cleanup that preserves the prior committed
     primary across pre-publication failures. The full 368-test suite passes.
-  - General saved sessions remain unavailable until `TASK-023` supplies the
-    content format and `TASK-037` adds catalog compatibility and saved-reference
-    migration.
+  - General saved sessions remain unavailable until `TASK-048` supplies
+    resolved content catalogs and `TASK-037` adds catalog compatibility and
+    saved-reference migration.
   - Context: [Save format, versioning, and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
 
 - [x] **TASK-034: Integrate clean-session economy and transport with entity lifecycle**

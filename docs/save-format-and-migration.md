@@ -21,8 +21,9 @@ format, subject to the same complete validation as a game-written save.
 
 **Implementation status:** `TASK-022` completed slices 1 through 4: strict
 format mechanics, complete current-owner checkpoints, whole-session isolated
-restore, and atomic file storage. General saved sessions remain unavailable
-until `TASK-023` defines the content format and `TASK-037` implements content
+restore, and atomic file storage. `TASK-023` has defined the content format and
+boundaries. General saved sessions remain unavailable until `TASK-048`
+implements the resolved content catalogs and `TASK-037` implements content
 compatibility and saved-reference migration.
 
 ## Decisions at a glance
