@@ -109,8 +109,9 @@ resource and falls back to the invariant string when necessary.
 
 The fallback string is diagnostic and presentational data. It is not used for
 identity, ordering, equality, deterministic decisions, compatibility, or saved
-state. `TASK-045` owns locale selection, resource layout, formatting,
-pluralization, font coverage, and other localization behavior.
+state. [Internationalization and localization](internationalization-and-localization.md)
+defines locale selection, resource layout, formatting, pluralization, font
+coverage, and other localization behavior under completed `TASK-045`.
 
 ### Executable scripts
 

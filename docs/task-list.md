@@ -16,30 +16,18 @@ rather than deleting them.
 `TASK-023` is complete. The project now has an accepted gameplay-content,
 static-scenario, stable-identity, validation, and trust-boundary design.
 The project is returning to design discovery before further implementation.
-`TASK-043` and `TASK-044` are complete. The planned-system inventory and its
-scope-gap review now give every identified system an accepted owner, a tracked
-design task, or an explicit deferral. `TASK-045` is next so localization and
-accessibility boundaries are established before broader player-facing game
-work. `TASK-048` remains the next implementation dependency in the content and
-save chain, but it is intentionally parked until that design work is complete.
+`TASK-043`, `TASK-044`, and `TASK-045` are complete. The planned-system
+inventory and scope-gap review give every identified system an accepted owner,
+a tracked design task, or an explicit deferral. Localization boundaries are now
+established before broader player-facing game work. `TASK-061` separately owns
+comprehensive accessibility design. `TASK-048` remains the next implementation
+dependency in the content and save chain, but no task is currently promoted to
+active implementation.
 
 ## Near-term work
 
-- [ ] **TASK-045: Plan internationalization before game-layer expansion**
-  - Define the localization boundary before gameplay systems introduce
-    player-facing text: stable domain identifiers and reason codes remain in
-    authoritative simulation state, while presentation resolves localized
-    wording, formatting, icons, and layout.
-  - Decide supported locale selection and fallback, resource and content
-    organization, pluralization and parameter formatting, right-to-left and
-    text-expansion requirements, font coverage, and localized authored content.
-  - Define how localization applies to UI, semantic facts, dialogue, objectives,
-    item and equipment content, and accessibility without making locale or
-    translated text part of deterministic simulation, snapshots, or save state.
-  - Complete this plan before broad game-layer implementation adds player-facing
-    contracts; coordinate content ownership with `TASK-023`, dialogue with
-    `TASK-016`, objectives with `TASK-018`, and generalized item content with
-    `TASK-041`.
+No task is currently promoted to near-term work. Select the next task from the
+accepted dependencies and design backlog before beginning implementation.
 
 ## Future parking lot
 
@@ -420,7 +408,33 @@ prerequisites and desired behavior are sufficiently defined.
     `TASK-037`.
   - Context: [Technical direction](technical-direction.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Save format and migration](save-format-and-migration.md)
 
+- [ ] **TASK-061: Define comprehensive accessibility behavior**
+  - Define input remapping, keyboard and controller equivalence, focus
+    navigation, assistive-technology and screen-reader behavior, contrast and
+    non-color cues, reduced motion and flashing, captions, audio cues, and
+    supported text-scale behavior.
+  - Establish platform capability boundaries, user-visible modes, interactions
+    between settings, and acceptance evidence without making accessibility
+    preferences authoritative simulation or save state.
+  - Build on the localized text, layout, semantic-label, and expansion baseline
+    from `TASK-045`; coordinate application controls with `TASK-049` and local
+    preference storage with `TASK-050`.
+  - Context: [Internationalization and localization](internationalization-and-localization.md) · [Player experience](player-experience.md) · [Presentation snapshots](presentation-snapshots.md)
+
 ## Completed foundations
+
+- [x] **TASK-045: Plan internationalization before game-layer expansion**
+  - Defined locale selection and fallback, gettext catalog and stable-key
+    ownership, typed parameter and plural formatting, localized authored
+    content, right-to-left and text-expansion behavior, font coverage, and
+    focused validation evidence.
+  - Kept locale, translated strings, fonts, layout, and accessibility
+    preferences outside deterministic simulation, snapshots, content identity,
+    and authoritative saves. Preserved invariant authored fallbacks for
+    headless inspection.
+  - Established the localization-related accessibility baseline and assigned
+    comprehensive accessibility modes and acceptance criteria to `TASK-061`.
+  - Context: [Internationalization and localization](internationalization-and-localization.md)
 
 - [x] **TASK-043: Review gameplay systems for scope gaps**
   - Reviewed the `TASK-044` inventory against the player experience, roadmap,
