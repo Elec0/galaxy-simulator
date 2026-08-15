@@ -420,8 +420,6 @@ serialization format.
 
 ## 4. Topics that need more definition
 
-- Whether “individual NPC” initially means individually controlled ships,
-  person-level characters, crew, or more than one of these
 - The actor order vocabulary and the difference between an order, task, action,
   objective, and standing order
 - Coordinate precision and units for system-local authoritative space

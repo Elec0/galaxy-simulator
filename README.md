@@ -12,6 +12,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Runtime orchestration and domain ownership](docs/runtime-orchestration.md)
 - [Navigation and spatial architecture](docs/navigation-architecture.md)
 - [Actor control and order lifecycle](docs/actor-control-and-orders.md)
+- [Individual NPC scope](docs/individual-npc-scope.md)
 - [Semantic game facts](docs/semantic-game-facts.md)
 - [Presentation snapshots](docs/presentation-snapshots.md)
 - [Entity lifecycle and explicit spawning](docs/entity-lifecycle.md)

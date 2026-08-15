@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -21,8 +21,9 @@ inventory and scope-gap review give every identified system an accepted owner,
 a tracked design task, or an explicit deferral. Localization boundaries are now
 established before broader player-facing game work. `TASK-061` separately owns
 comprehensive accessibility design. `TASK-048` remains the next implementation
-dependency in the content and save chain, but no task is currently promoted to
-active implementation.
+dependency in the content and save chain. `TASK-015` established the initial
+ship-only NPC boundary. `TASK-042` and `TASK-053` may now design NPC decision
+quality and autonomous work selection without introducing person-level state.
 
 ## Near-term work
 
@@ -53,10 +54,6 @@ prerequisites and desired behavior are sufficiently defined.
     provide concrete constraints.
   - Context: [Gameplay content](gameplay-content.md) · [Simulation architecture](simulation-architecture.md) · [Initial roadmap](roadmap.md)
 
-- [ ] **TASK-015: Decide the initial meaning and scope of individual NPCs**
-  - Decide whether the first NPC model represents ships, person-level
-    characters, crew, or multiple categories.
-
 - [ ] **TASK-042: Define NPC skills and bounded decision quality**
   - Decide which NPC categories, if any, have skills, competencies, preferences,
     risk tolerance, or other decision-shaping traits, and whether they are
@@ -70,6 +67,20 @@ prerequisites and desired behavior are sufficiently defined.
   - Coordinate the NPC categories with `TASK-015`, player and NPC information
     boundaries with `TASK-020`, and faction objectives and order generation with
     `TASK-026`.
+
+- [ ] **TASK-062: Define personnel, crew, and person-level simulation if required**
+  - Begin only when a concrete gameplay need cannot be expressed through the
+    accepted ship-only NPC model from `TASK-015`.
+  - Decide whether captains, crew, employees, passengers, population members,
+    or other person-level categories exist; do not infer any category from a
+    ship merely because it is autonomous.
+  - Define identity, ship and organization relationships, authority, knowledge,
+    skills, employment, lifecycle, snapshots, saves, scale targets, and
+    deterministic evaluation and commit before adding person-level state.
+  - Coordinate dialogue with `TASK-016`, NPC decision quality with `TASK-042`,
+    factions with `TASK-026`, and inventory or passenger cargo only if their
+    owning contracts require it.
+  - Context: [Individual NPC scope](individual-npc-scope.md) · [Vision](vision.md) · [Player experience](player-experience.md)
 
 - [ ] **TASK-016: Design dialogue state and presentation**
   - Define availability, conditions, choices, repeatability, memory,
@@ -422,6 +433,15 @@ prerequisites and desired behavior are sufficiently defined.
   - Context: [Internationalization and localization](internationalization-and-localization.md) · [Player experience](player-experience.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-015: Decide the initial meaning and scope of individual NPCs**
+  - Established that the initial NPC is an individually identifiable autonomous
+    ship, using the existing ship, controller, order, snapshot, save, and
+    deterministic commit boundaries rather than a new entity category.
+  - Deferred persons, captains, crew, employees, passengers, and population to
+    `TASK-062`; `TASK-042` and `TASK-053` retain the later work for ship
+    decision quality and autonomous work selection.
+  - Context: [Individual NPC scope](individual-npc-scope.md)
 
 - [x] **TASK-045: Plan internationalization before game-layer expansion**
   - Defined locale selection and fallback, gettext catalog and stable-key

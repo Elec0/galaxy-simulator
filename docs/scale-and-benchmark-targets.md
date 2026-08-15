@@ -93,9 +93,10 @@ requirement.
 | Pending scheduled events | 250,000 | 1,000,000 | Exercises agenda memory, ordering, and timestamp density |
 | Retained semantic facts | 50,000 | 250,000 | Exercises bounded retention and lagging cursor reads |
 
-The architecture intentionally does not assign an NPC count. `TASK-015` must first
-decide whether an NPC is a ship, a person, a crew member, or more than one of
-those.
+The accepted `TASK-015` boundary defines an NPC as an autonomous ship, so the
+ship counts above are also the initial NPC scale envelope. A future person or
+crew model is separately deferred to `TASK-062` and must establish its own
+scale targets before it changes this table.
 
 Counts for factions and scripts are capacity budgets only until those models
 exist. `TASK-024` must not introduce placeholder gameplay systems merely to

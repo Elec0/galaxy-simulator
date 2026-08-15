@@ -108,9 +108,9 @@ implementation.
 | Order queues and lifecycle | Replace, append, promote, suspend, restore, cancel, wait, fail, and complete actor intent through one shared model. | Completed `TASK-006`. |
 | Standing orders and recurring automation | Let the player delegate repeatable trade, mining, patrol, defense, and other routine work without creating a second command model. | `TASK-052`, building on completed `TASK-006`. |
 | Autonomous ship behavior | Select ordinary ship work through the same command and order boundaries used by player intent. | `TASK-053`, coordinated with `TASK-020`, `TASK-026`, and `TASK-042`. |
-| Individual NPC scope | Decide whether NPCs represent ships, persons, crew, or multiple categories. | `TASK-015`. |
+| Individual NPC scope | Treat an NPC as an individually identifiable autonomous ship without creating a new entity category. | Completed `TASK-015`; [individual NPC scope](individual-npc-scope.md). |
 | NPC competence and preference | Bound information and decision quality through skills, preferences, risk tolerance, cadence, and deterministic satisfactory choices. | `TASK-042`. |
-| Crew, population, and personnel | Represent people, employment, population, or crew-level effects if the later game requires them. | Explicitly outside the first version in [vision](vision.md) and [Phase 1](phase-1-simulation-spec.md); deferred pending `TASK-015`. |
+| Crew, population, and personnel | Represent people, employment, population, or crew-level effects if the later game requires them. | Explicitly outside the first version in [vision](vision.md) and [Phase 1](phase-1-simulation-spec.md); separately deferred to `TASK-062` by [individual NPC scope](individual-npc-scope.md). |
 
 ## Economy, assets, and industry
 
