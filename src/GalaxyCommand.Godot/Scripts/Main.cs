@@ -1,5 +1,6 @@
 using GalaxyCommand.Simulation;
 using Godot;
+using CryptographicRandomNumberGenerator = System.Security.Cryptography.RandomNumberGenerator;
 
 namespace GalaxyCommand.GodotClient;
 
@@ -87,6 +88,9 @@ public partial class Main : Node
 					new StandingValue(50),
 					new StandingValue(90)),
 				[]),
+			// Resolve entropy in the application shell before constructing authority.
+			RandomRootSeed.FromBytes(
+				CryptographicRandomNumberGenerator.GetBytes(RandomRootSeed.ByteCount)),
 			factRetentionCapacity: 1024);
 		return new GameSession(
 			setup,

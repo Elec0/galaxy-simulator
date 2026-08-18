@@ -14,6 +14,9 @@ internal static class GameSessionTestFixture
 
     internal static PrincipalId Principal { get; } = new(1);
 
+    internal static RandomRootSeed RootSeed { get; } =
+        RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]);
+
     internal static StandingPolicy StandingPolicy { get; } = new(
         new StandingPolicyId("test-standing"),
         new StandingValue(-100),
@@ -47,7 +50,8 @@ internal static class GameSessionTestFixture
     internal static GameSession Create(
         ActorController? baseController = null,
         ISpatialNavigationPlanner? navigation = null,
-        int factRetentionCapacity = 256)
+        int factRetentionCapacity = 256,
+        RandomRootSeed? randomRootSeed = null)
     {
         var setup = new GameSessionSetup(
             [new StarSystem(System, "Test System")],
@@ -62,6 +66,7 @@ internal static class GameSessionTestFixture
                     baseController ?? PlayerController),
             ],
             Relationships,
+            randomRootSeed ?? RootSeed,
             factRetentionCapacity);
         return new GameSession(
             setup,

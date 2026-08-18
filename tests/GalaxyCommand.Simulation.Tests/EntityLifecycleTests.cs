@@ -48,6 +48,7 @@ public sealed class EntityLifecycleTests
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
                 setupShips,
                 GameSessionTestFixture.Relationships,
+                GameSessionTestFixture.RootSeed,
                 factRetentionCapacity: 256));
     }
 
@@ -323,6 +324,7 @@ public sealed class EntityLifecycleTests
                     GameSessionTestFixture.PlayerController),
             ],
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 256);
         return new GameSession(
             setup,

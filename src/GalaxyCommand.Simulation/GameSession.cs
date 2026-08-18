@@ -7,8 +7,13 @@ public sealed class GameSession : IGameplayCommandHandler
 {
     private readonly GameFactStore _facts;
     private readonly ActorOrderRuntimeCoordinator _runtime;
+    private readonly DeterministicRandomOwner _random;
     private readonly GameplayCommandProcessor _commands;
 
+    /// <summary>
+    /// Creates one clean authoritative session from validated setup, including
+    /// the setup's required deterministic random root.
+    /// </summary>
     public GameSession(
         GameSessionSetup setup,
         ISpatialNavigationPlanner navigation)
@@ -16,16 +21,23 @@ public sealed class GameSession : IGameplayCommandHandler
         ArgumentNullException.ThrowIfNull(setup);
         _facts = new GameFactStore(setup.FactRetentionCapacity);
         _runtime = new ActorOrderRuntimeCoordinator(setup, navigation, _facts);
+        _random = new DeterministicRandomOwner(setup.RandomRootSeed);
         _commands = new GameplayCommandProcessor(this, _facts);
     }
 
+    /// <summary>
+    /// Publishes owners that were restored and validated independently, then
+    /// restores command admission against the assembled session boundary.
+    /// </summary>
     private GameSession(
         GameFactStore facts,
         ActorOrderRuntimeCoordinator runtime,
+        DeterministicRandomOwner random,
         CommandAdmissionCheckpoint commandAdmission)
     {
         _facts = facts;
         _runtime = runtime;
+        _random = random;
         CheckpointResult<GameplayCommandProcessor> commands =
             GameplayCommandProcessor.RestoreCheckpoint(
                 commandAdmission,
@@ -175,6 +187,7 @@ public sealed class GameSession : IGameplayCommandHandler
             value.Lifecycle,
             value.Relationships,
             value.Economy,
+            _random.CaptureCheckpoint(),
             facts,
             _commands.CaptureCheckpoint());
         return CheckpointResult<GameSessionCheckpoint>.Success(checkpoint);
@@ -188,6 +201,21 @@ public sealed class GameSession : IGameplayCommandHandler
         GameSessionCheckpoint checkpoint)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
+        if (checkpoint.Random is null)
+        {
+            return CheckpointResult<GameSession>.Rejected(
+                new CheckpointValidationFailure(
+                    "$.checkpoint.random",
+                    "The deterministic random checkpoint is required."));
+        }
+
+        CheckpointResult<DeterministicRandomOwner> random =
+            DeterministicRandomOwner.RestoreCheckpoint(checkpoint.Random);
+        if (!random.IsSuccess)
+        {
+            return CheckpointResult<GameSession>.Rejected(random.Failure!);
+        }
+
         CheckpointResult<GameFactStore> facts =
             GameFactStore.RestoreCheckpoint(checkpoint.Facts);
         if (!facts.IsSuccess)
@@ -229,6 +257,7 @@ public sealed class GameSession : IGameplayCommandHandler
                 new GameSession(
                     facts.Value!,
                     runtime.Value!,
+                    random.Value!,
                     checkpoint.CommandAdmission));
         }
         catch (InvalidOperationException error)

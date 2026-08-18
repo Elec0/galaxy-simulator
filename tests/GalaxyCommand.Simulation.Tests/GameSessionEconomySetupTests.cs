@@ -15,6 +15,7 @@ public sealed class GameSessionEconomySetupTests
             [CreateMaterializationPolicy()],
             economy,
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 16);
 
         Assert.Same(economy, setup.Economy);
@@ -36,6 +37,7 @@ public sealed class GameSessionEconomySetupTests
             [],
             CreateEconomySeed(),
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 16));
 
         Assert.Contains("materialization policy", error.Message);
@@ -51,6 +53,7 @@ public sealed class GameSessionEconomySetupTests
             [CreateMaterializationPolicy()],
             CreateEconomySeed(),
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 16);
         var session = new GameSession(
             setup,
@@ -155,6 +158,7 @@ public sealed class GameSessionEconomySetupTests
             ],
             economy,
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 16);
         var session = new GameSession(
             setup,
@@ -200,6 +204,7 @@ public sealed class GameSessionEconomySetupTests
                 [design])],
             CreateTransportEconomySeed(material, design),
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 16);
         var session = new GameSession(
             setup,

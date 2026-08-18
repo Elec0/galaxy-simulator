@@ -301,6 +301,7 @@ public sealed class GamePresentationSnapshotTests
                     GameSessionTestFixture.PlayerController),
             ],
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 256);
         return new GameSession(
             setup,
@@ -349,6 +350,7 @@ public sealed class GamePresentationSnapshotTests
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
                 [],
                 relationships,
+                GameSessionTestFixture.RootSeed,
                 factRetentionCapacity: 256),
             new DirectLocalNavigationPlanner(
                 new GameSessionTestFixture.FixedTravelTimeEstimator()));

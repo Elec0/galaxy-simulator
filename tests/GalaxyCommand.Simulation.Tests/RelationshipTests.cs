@@ -109,6 +109,7 @@ public sealed class RelationshipTests
             [new StarSystem(GameSessionTestFixture.System, "Test System")],
             [ship],
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 256));
     }
 
@@ -131,6 +132,7 @@ public sealed class RelationshipTests
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
                 [],
                 relationships,
+                GameSessionTestFixture.RootSeed,
                 factRetentionCapacity: 256),
             new DirectLocalNavigationPlanner(
                 new GameSessionTestFixture.FixedTravelTimeEstimator()));
@@ -836,6 +838,7 @@ public sealed class RelationshipTests
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
                 [],
                 relationships,
+                GameSessionTestFixture.RootSeed,
                 factRetentionCapacity: 256),
             new DirectLocalNavigationPlanner(
                 new GameSessionTestFixture.FixedTravelTimeEstimator()));

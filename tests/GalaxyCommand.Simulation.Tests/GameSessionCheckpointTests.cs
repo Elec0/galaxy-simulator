@@ -86,8 +86,9 @@ public sealed class GameSessionCheckpointTests
                 GameSessionTestFixture.Principal,
                 GameSessionTestFixture.Design,
                 GameSessionTestFixture.Position(0, 0),
-                GameSessionTestFixture.PlayerController)],
+            GameSessionTestFixture.PlayerController)],
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 64);
         var session = new GameSession(
             setup,
@@ -290,6 +291,7 @@ public sealed class GameSessionCheckpointTests
                 InitialShipOrderPolicy.NoInitialOrder,
                 [GameSessionTestFixture.Design])],
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 64);
         return new GameSession(
             setup,
@@ -352,6 +354,7 @@ public sealed class GameSessionCheckpointTests
                 [GameSessionTestFixture.Design])],
             economy,
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 64);
         return new GameSession(setup, navigation);
     }

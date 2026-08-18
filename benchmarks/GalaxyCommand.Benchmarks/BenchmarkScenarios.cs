@@ -49,6 +49,7 @@ internal sealed class SpatialBenchmarkScenario : IBenchmarkScenario
                 systems,
                 ships,
                 ScenarioSetup.Relationships,
+                ScenarioSetup.RootSeed,
                 configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity)),
             new DirectLocalNavigationPlanner(
                 new FixedTravelTimeEstimator(travelDuration)));
@@ -96,6 +97,7 @@ internal sealed class ConnectorNavigationBenchmarkScenario : IBenchmarkScenario
                 ships,
                 topology,
                 ScenarioSetup.Relationships,
+                ScenarioSetup.RootSeed,
                 configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity)),
             new HierarchicalNavigationPlanner(
                 topology,
@@ -161,6 +163,7 @@ internal sealed class FactBenchmarkScenario : IBenchmarkScenario
                 systems,
                 ships,
                 ScenarioSetup.Relationships,
+                ScenarioSetup.RootSeed,
                 configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity)),
             new DirectLocalNavigationPlanner(
                 new FixedTravelTimeEstimator(duration)));
@@ -223,6 +226,9 @@ internal static class ScenarioSetup
 
     internal static CommandSource AutonomousSource { get; } =
         new(CommandSourceKind.Autonomous, BenchmarkSourceId);
+
+    internal static RandomRootSeed RootSeed { get; } =
+        RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]);
 
     internal static RelationshipSetup Relationships { get; } = new(
         [

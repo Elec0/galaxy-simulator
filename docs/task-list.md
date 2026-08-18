@@ -145,6 +145,10 @@ the project-level **Near-term work** section above.
   - Context: [Dialogue](dialogue.md) · [Gameplay content](gameplay-content.md) · [Time and pacing](time-and-pacing.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-066: Implement deterministic random foundations**
+  - Core derivation, generator, integer sampling, commit-only proposals,
+    checkpoint validation, and session aggregate integration are implemented
+    with focused proof. Stable stream retirement and owning-domain reference
+    validation remain before completion.
   - Implement the accepted 256-bit root seed, versioned SHA-256 canonical
     derivation, stateless named samples, scoped stateful `xoshiro256**`
     streams, and integer sampling capabilities from `TASK-021`.

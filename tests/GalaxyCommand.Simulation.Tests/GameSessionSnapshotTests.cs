@@ -94,6 +94,7 @@ public sealed class GameSessionSnapshotTests
                 [new StarSystem(GameSessionTestFixture.System, "Test System")],
                 [ship],
                 GameSessionTestFixture.Relationships,
+                GameSessionTestFixture.RootSeed,
                 factRetentionCapacity: 256));
     }
 
@@ -125,6 +126,7 @@ public sealed class GameSessionSnapshotTests
                 ],
                 topology,
                 GameSessionTestFixture.Relationships,
+                GameSessionTestFixture.RootSeed,
                 factRetentionCapacity: 256));
     }
 
@@ -145,6 +147,7 @@ public sealed class GameSessionSnapshotTests
                         GameSessionTestFixture.PlayerController),
                 ],
                 GameSessionTestFixture.Relationships,
+                GameSessionTestFixture.RootSeed,
                 factRetentionCapacity: 0));
     }
 }

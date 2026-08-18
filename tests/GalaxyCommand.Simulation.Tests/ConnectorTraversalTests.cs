@@ -248,6 +248,7 @@ public sealed class ConnectorTraversalTests
             ],
             topology,
             GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
             factRetentionCapacity: 256);
         return new GameSession(
             setup,

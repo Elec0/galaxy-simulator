@@ -64,12 +64,14 @@ public sealed record InitialShipSetup
 public sealed class GameSessionSetup
 {
     /// <summary>
-    /// Creates setup without connector topology or materialization policies.
+    /// Creates setup with a resolved random seed and without connector
+    /// topology or materialization policies.
     /// </summary>
     public GameSessionSetup(
         IEnumerable<StarSystem> systems,
         IEnumerable<InitialShipSetup> ships,
         RelationshipSetup relationships,
+        RandomRootSeed randomRootSeed,
         int factRetentionCapacity)
         : this(
             systems,
@@ -80,18 +82,21 @@ public sealed class GameSessionSetup
             Array.Empty<ShipMaterializationPolicy>(),
             null,
             relationships,
+            randomRootSeed,
             factRetentionCapacity)
     {
     }
 
     /// <summary>
-    /// Creates setup with connector topology and no materialization policies.
+    /// Creates setup with a resolved random seed, connector topology, and no
+    /// materialization policies.
     /// </summary>
     public GameSessionSetup(
         IEnumerable<StarSystem> systems,
         IEnumerable<InitialShipSetup> ships,
         ConnectorTopology connectorTopology,
         RelationshipSetup relationships,
+        RandomRootSeed randomRootSeed,
         int factRetentionCapacity)
         : this(
             systems,
@@ -100,12 +105,14 @@ public sealed class GameSessionSetup
             Array.Empty<ShipMaterializationPolicy>(),
             null,
             relationships,
+            randomRootSeed,
             factRetentionCapacity)
     {
     }
 
     /// <summary>
-    /// Validates and canonicalizes the complete initial clean-session state.
+    /// Validates and canonicalizes the complete initial clean-session state,
+    /// including its required resolved random seed.
     /// </summary>
     public GameSessionSetup(
         IEnumerable<StarSystem> systems,
@@ -113,6 +120,7 @@ public sealed class GameSessionSetup
         ConnectorTopology connectorTopology,
         IEnumerable<ShipMaterializationPolicy> materializationPolicies,
         RelationshipSetup relationships,
+        RandomRootSeed randomRootSeed,
         int factRetentionCapacity)
         : this(
             systems,
@@ -121,13 +129,15 @@ public sealed class GameSessionSetup
             materializationPolicies,
             null,
             relationships,
+            randomRootSeed,
             factRetentionCapacity)
     {
     }
 
     /// <summary>
     /// Validates and canonicalizes complete initial state, including optional
-    /// session-owned economic configuration.
+    /// session-owned economic configuration and the required resolved random
+    /// seed.
     /// </summary>
     public GameSessionSetup(
         IEnumerable<StarSystem> systems,
@@ -136,6 +146,7 @@ public sealed class GameSessionSetup
         IEnumerable<ShipMaterializationPolicy> materializationPolicies,
         GameSessionEconomySetup? economy,
         RelationshipSetup relationships,
+        RandomRootSeed randomRootSeed,
         int factRetentionCapacity)
     {
         ArgumentNullException.ThrowIfNull(systems);
@@ -143,6 +154,7 @@ public sealed class GameSessionSetup
         ArgumentNullException.ThrowIfNull(connectorTopology);
         ArgumentNullException.ThrowIfNull(materializationPolicies);
         ArgumentNullException.ThrowIfNull(relationships);
+        ArgumentNullException.ThrowIfNull(randomRootSeed);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(
             factRetentionCapacity);
 
@@ -250,6 +262,7 @@ public sealed class GameSessionSetup
             new ReadOnlyCollection<ShipMaterializationPolicy>(policyValues);
         Economy = economy;
         Relationships = relationships;
+        RandomRootSeed = randomRootSeed;
         FactRetentionCapacity = factRetentionCapacity;
     }
 
@@ -268,6 +281,11 @@ public sealed class GameSessionSetup
     public GameSessionEconomySetup? Economy { get; }
 
     public RelationshipSetup Relationships { get; }
+
+    /// <summary>
+    /// Gets the resolved authoritative seed required before session creation.
+    /// </summary>
+    public RandomRootSeed RandomRootSeed { get; }
 
     public int FactRetentionCapacity { get; }
 
