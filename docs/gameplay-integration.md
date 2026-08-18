@@ -423,6 +423,17 @@ generations, objectives, dialogue and script progress, and content version.
 The initial requirement is a well-defined authoritative boundary, not a final
 serialization format.
 
+### 3.8 Deterministic randomness
+
+**Status: resolved by `TASK-021`.**
+
+[Deterministic randomness and stream ownership](deterministic-randomness.md)
+defines the accepted 256-bit root, domain-separated derivation, stateless named
+samples, owner-scoped stateful streams, commit-only consumption, script
+capabilities, and exact checkpoint continuation. `TASK-066` owns the shared
+implementation. Gameplay domains retain ownership of the decisions and stable
+identities that use random values.
+
 ## 4. Topics that need more definition
 
 - The actor order vocabulary and the difference between an order, task, action,
@@ -447,8 +458,6 @@ serialization format.
 - The boundary between complete authoritative state and what the player or a
   faction currently knows
 - Objective, mission, victory, defeat, and non-terminal milestone models
-- Random-number stream ownership and how scripted randomness remains
-  reproducible
 - Save compatibility, content versioning, and migration expectations
 - Whether gameplay content will eventually be code-defined, data-defined, or
   externally scriptable

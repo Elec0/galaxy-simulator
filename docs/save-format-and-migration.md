@@ -283,6 +283,7 @@ direct restoration contract.
   cross-device conflict policy belong to the application experience.
 - Content catalog versions, mod provenance, collision handling, and migration
   of saved content references remain `TASK-037`.
-- Reserved runtime owners from `TASK-016` through `TASK-021`, `TASK-025`, and
-  `TASK-038` must define their authoritative state before joining a supported
-  saved session.
+- Reserved runtime owners from `TASK-017` through `TASK-020`, `TASK-025`,
+  `TASK-038`, dialogue implementation in `TASK-065`, and random implementation
+  in `TASK-066` must define their authoritative state before joining a
+  supported saved session.

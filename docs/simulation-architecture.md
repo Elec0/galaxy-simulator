@@ -111,7 +111,11 @@ is crowded. See
 
 ## Reproducibility
 
-The simulation should use explicit seeds and controlled time advancement. Given the same initial state and commands, it should reproduce the same meaningful outcomes wherever practical.
+The simulation uses explicit seeds and controlled time advancement. Given the
+same initial state and commands, it should reproduce the same meaningful
+outcomes wherever practical. [Deterministic randomness and stream ownership](deterministic-randomness.md)
+defines the accepted root seed, derived-value, owned-stream, commit, and save
+contract from completed `TASK-021`.
 
 This supports:
 

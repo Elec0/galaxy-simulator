@@ -1,6 +1,6 @@
 # Concurrency and performance architecture
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Technical direction](technical-direction.md) · [Project task list](task-list.md)
+[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Deterministic randomness](deterministic-randomness.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Technical direction](technical-direction.md) · [Project task list](task-list.md)
 
 ## Purpose
 
@@ -225,6 +225,13 @@ Achieving that requires:
 Cross-platform numeric reproducibility remains a separate decision, especially
 for spatial calculations. Parallel execution must not make that decision
 harder by introducing unspecified reduction order.
+
+Completed `TASK-021` resolves random ownership in
+[Deterministic randomness and stream ownership](deterministic-randomness.md).
+Independent or parallel decisions use values derived from stable decision and
+named sample identities. Genuinely sequential processes use domain-, owner-,
+and purpose-scoped stateful streams whose proposed next state advances only at
+deterministic owner commit. Workers never share or mutate a stream.
 
 ## Data and API design rules
 

@@ -8,9 +8,10 @@ Dialogue needs to remain coherent while the galaxy continues to run, survive
 save and load, submit ordinary gameplay intent, and present localized authored
 text without making Godot or rendered prose authoritative.
 
-This document records the direction approved by the project owner for
-`TASK-016` on 2026-08-17. Design work is active. `TASK-065` owns later
-implementation after this design is complete.
+This document completes the design work approved by the project owner for
+`TASK-016` on 2026-08-17. `TASK-065` owns implementation.
+
+**Decision status:** Accepted by the project owner on 2026-08-17.
 
 ## Decisions at a glance
 
@@ -81,6 +82,20 @@ declarative and cannot introduce executable scripts or assemblies.
 
 The physical JSON representation remains an adapter concern. It must not leak
 into the simulation model or make JSON nodes live authority.
+
+## Starting conversations
+
+The player may request an available conversation through an explicit
+interaction submitted as a normal gameplay command. Trusted session command
+sources may also request a conversation through the same admission boundary.
+Admission validates the definition, participant bindings, repeatability, and
+current start conditions before allocating or publishing an instance.
+
+Initial dialogue does not subscribe directly to facts, time, locations, or
+threshold changes and does not contain a partial trigger runtime. Deterministic
+fact-, time-, location-, and threshold-triggered initiation belongs to
+`TASK-017`. That later system may request a conversation through the accepted
+command boundary rather than creating dialogue state directly.
 
 ## Participants and apparent speakers
 

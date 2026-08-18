@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Dialogue](dialogue.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Dialogue](dialogue.md) · [Deterministic randomness](deterministic-randomness.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -26,20 +26,12 @@ validator. `TASK-048` remains the next content
 integration dependency and retains built-in content plus static new-game
 integration. `TASK-015` established the initial ship-only NPC boundary.
 `TASK-042` and `TASK-053` may now design NPC decision quality and autonomous
-work selection without introducing person-level state. `TASK-016` is the
-current design focus and establishes authoritative dialogue state, participant
-and apparent-speaker boundaries, conversation continuity, choice consequences,
-and Godot presentation behavior.
-
-- [ ] **TASK-016: Design dialogue state and presentation**
-  - Complete the approved dialogue definition, participant, condition, choice,
-    memory, consequence, fact, checkpoint, pacing, and presentation contract.
-  - Support ship, station, and principal respondents while allowing optional
-    presentation-only named-person attribution without introducing simulated
-    people.
-  - Keep rendering and interaction in Godot while gameplay effects use normal
-    commands. Track implementation separately in `TASK-065`.
-  - Context: [Dialogue](dialogue.md) · [Time and pacing](time-and-pacing.md) · [Individual NPC scope](individual-npc-scope.md)
+work selection without introducing person-level state. `TASK-016` completed
+the dialogue definition, authority, participant, condition, choice, memory,
+continuity, consequence, pacing, save, and presentation design. `TASK-065`
+retains dialogue implementation. `TASK-021` completed the deterministic random
+root, derived-value, owned-stream, commit, save, and compatibility design;
+`TASK-066` retains implementation.
 
 ## Near-term work
 
@@ -105,10 +97,6 @@ the project-level **Near-term work** section above.
     conversation behavior.
   - Context: [Dialogue](dialogue.md) · [Player experience](player-experience.md)
 
-- [ ] **TASK-021: Define random-number stream ownership**
-  - Decide how systems and scripts receive deterministic randomness.
-  - Preserve reproducibility when unrelated systems add random draws.
-
 - [ ] **TASK-032: Define semantic economy facts**
   - Define gameplay-facing production, construction, and logistics lifecycle
     facts after `TASK-009` establishes their commit owners.
@@ -136,8 +124,8 @@ the project-level **Near-term work** section above.
   - Load and validate the mod-configurable speed ladder, preserve local player
     pacing preferences, and drain buffered input deterministically before
     further advancement.
-  - Integrate response-required dialogue automatic pause only after `TASK-016`
-    defines the corresponding dialogue state and continuity.
+  - Integrate response-required dialogue automatic pause using the accepted
+    classification and continuity contract from completed `TASK-016`.
   - Context: [Time and pacing](time-and-pacing.md)
 
 - [ ] **TASK-065: Implement dialogue state and presentation**
@@ -150,11 +138,27 @@ the project-level **Near-term work** section above.
   - Coordinate one normal gameplay-command consequence atomically with a
     choice, retain a single-thread reference path, and prove deterministic
     results across supported worker and batch layouts.
-  - Begin after `TASK-016` is accepted. Coordinate content integration with
+  - Build on completed `TASK-016`. Coordinate content integration with
     `TASK-048`, pacing with `TASK-038` and `TASK-064`, the application shell
     with `TASK-049`, station identity with `TASK-057`, and knowledge refinement
     with `TASK-020`.
   - Context: [Dialogue](dialogue.md) · [Gameplay content](gameplay-content.md) · [Time and pacing](time-and-pacing.md) · [Concurrency and performance](concurrency-and-performance.md)
+
+- [ ] **TASK-066: Implement deterministic random foundations**
+  - Implement the accepted 256-bit root seed, versioned SHA-256 canonical
+    derivation, stateless named samples, scoped stateful `xoshiro256**`
+    streams, and integer sampling capabilities from `TASK-021`.
+  - Add aggregate ownership, exact checkpoint and restore, stable stream
+    lifecycle, commit-only consumption, algorithm registration, and clear
+    rejection of incompatible or malformed state.
+  - Prove golden vectors, namespace isolation, unrelated-draw stability,
+    rejected-work non-consumption, exact continuation after restore, and
+    identical results across supported worker and batch layouts.
+  - Begin before the first production gameplay consumer of randomness.
+    Coordinate script capabilities with `TASK-017`, procedural generation with
+    `TASK-047`, save encoding with `TASK-022`, and compatibility with
+    `TASK-060`.
+  - Context: [Deterministic randomness](deterministic-randomness.md) · [Concurrency and performance](concurrency-and-performance.md) · [Authoritative save boundary](authoritative-save-boundary.md)
 
 - [ ] **TASK-041: Define generalized inventory, cargo, and ship equipment**
   - Evolve the current material-only inventory model so ships and other owners
@@ -415,10 +419,10 @@ the project-level **Near-term work** section above.
     manufacturing incompatible definitions.
   - Begin only after `TASK-023` establishes the static content and new-game
     composition design, `TASK-048` implements that shared boundary, and
-    `TASK-021` establishes deterministic randomness. Procedural generation is
-    intentionally deferred until later gameplay and world-shape requirements
-    provide concrete constraints.
-  - Context: [Gameplay content](gameplay-content.md) · [Simulation architecture](simulation-architecture.md) · [Initial roadmap](roadmap.md)
+    `TASK-066` implements the deterministic-randomness foundation designed by
+    completed `TASK-021`. Procedural generation is intentionally deferred until
+    later gameplay and world-shape requirements provide concrete constraints.
+  - Context: [Gameplay content](gameplay-content.md) · [Deterministic randomness](deterministic-randomness.md) · [Simulation architecture](simulation-architecture.md) · [Initial roadmap](roadmap.md)
 
 - [ ] **TASK-056: Define ship acquisition, replacement, and upgrades**
   - Define how the player and autonomous principals purchase, receive,
@@ -461,10 +465,11 @@ the project-level **Near-term work** section above.
   - Define compatibility evidence, canonical digest scope, expected rejection
     versus migration behavior, and how single-thread and concurrent reference
     results are compared without promising unsupported bitwise identity.
-  - Begin after `TASK-021` defines random streams and use evidence from
+  - Build on the bit-exact integer random contract from completed `TASK-021`
+    and use implementation evidence from `TASK-066` plus broader evidence from
     `TASK-029`; coordinate save and content compatibility with `TASK-022` and
     `TASK-037`.
-  - Context: [Technical direction](technical-direction.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Save format and migration](save-format-and-migration.md)
+  - Context: [Technical direction](technical-direction.md) · [Deterministic randomness](deterministic-randomness.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Save format and migration](save-format-and-migration.md)
 
 - [ ] **TASK-062: Define personnel, crew, and person-level simulation if required**
   - Begin only when a concrete gameplay need cannot be expressed through the
@@ -481,6 +486,42 @@ the project-level **Near-term work** section above.
   - Context: [Individual NPC scope](individual-npc-scope.md) · [Vision](vision.md) · [Player experience](player-experience.md)
 
 ## Completed foundations
+
+- [x] **TASK-021: Define random-number stream ownership**
+  - Defined one resolved 256-bit session root with domain-separated generation
+    and runtime scopes, versioned SHA-256 canonical derivation, and bit-exact
+    `xoshiro256**` stateful streams.
+  - Chose a hybrid model of stateless values keyed by stable decision and named
+    sample identity plus stateful streams keyed by domain, owner, and purpose.
+    No global or worker-owned stream exists.
+  - Defined integer-only initial sampling, commit-only state consumption,
+    script capability scoping, exact checkpoint continuation, algorithm-version
+    compatibility, and independence from unrelated draws or work layout.
+  - Save-scumming prevention, cryptographic secrecy, floating distributions,
+    and general probability scripting remain outside the contract.
+  - Implementation remains in `TASK-066`; procedural generation consumes the
+    separate generation scope in `TASK-047`; cross-platform compatibility
+    remains in `TASK-060`.
+  - Context: [Deterministic randomness and stream ownership](deterministic-randomness.md)
+
+- [x] **TASK-016: Design dialogue state and presentation**
+  - Defined immutable dialogue definitions and authoritative conversation
+    instances with stable participant bindings, nodes, choices, conditions,
+    repeatability, structural memory, consequences, facts, checkpoints, and
+    deterministic commit boundaries.
+  - Supported ship, station, and principal respondents plus optional localized
+    named-person attribution that remains presentation text rather than a
+    simulated person.
+  - Defined continuous foreground and suspended conversation behavior,
+    deterministic pending order, response-required automatic-pause
+    integration, and atomic coordination with at most one normal gameplay
+    command consequence.
+  - Kept explicit player and trusted-session initiation inside normal command
+    admission; deferred fact-, time-, location-, and threshold-triggered
+    initiation to `TASK-017`.
+  - Implementation remains in `TASK-065`; player-knowledge refinement remains
+    in `TASK-020`; station identity remains in `TASK-057`.
+  - Context: [Dialogue state and presentation](dialogue.md)
 
 - [x] **TASK-063: Implement the format-neutral content validation foundation**
   - Added independent content, validator, and test projects with immutable
@@ -644,8 +685,8 @@ the project-level **Near-term work** section above.
   - Defined the enabled-by-default player preference for automatically pausing
     response-required dialogue, including manual override and safe restoration
     of the prior speed.
-  - Implementation remains in `TASK-038`; dialogue classification and
-    continuity remain in `TASK-016`.
+  - Implementation remains in `TASK-038`; completed `TASK-016` supplies the
+    dialogue classification and continuity contract.
   - Context: [Time and pacing](time-and-pacing.md)
 
 - [x] **TASK-012: Translate relational gameplay into simulation architecture**

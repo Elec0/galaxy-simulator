@@ -122,8 +122,10 @@ assemblies or invokes package-supplied code.
 
 `TASK-017` may later select a constrained declarative language or sandboxed
 runtime. That work must define triggers, approved effects, scheduling,
-persistence, deterministic randomness, capability limits, and save continuity
-without weakening this package-validation boundary.
+persistence, capability limits, and save continuity without weakening this
+package-validation boundary. Script randomness uses the scoped capability
+contract in [Deterministic randomness and stream ownership](deterministic-randomness.md)
+rather than introducing a separate generator or exposing the root seed.
 
 ## Package and physical format
 
