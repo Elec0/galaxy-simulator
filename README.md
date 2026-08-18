@@ -37,8 +37,10 @@ These documents are an early design draft. Names, quantities, formulas, and tech
 
 ## C# development
 
-The active migration target is a .NET 10 solution containing:
+The active solution contains:
 
+- `GalaxyCommand.Content`: the rendering- and simulation-independent content library
+- `GalaxyCommand.Content.Validator`: the headless production content validator
 - `GalaxyCommand.Simulation`: the rendering-independent simulation library
 - `GalaxyCommand.Simulation.Tests`: deterministic simulation tests
 
@@ -52,6 +54,25 @@ dotnet test GalaxyCommand.slnx --no-build --no-restore
 
 The SDK version is pinned in `global.json`. Shared compiler settings enable
 nullable-reference checking and treat warnings as errors.
+
+## Headless content validation
+
+Validate explicitly selected package directories through the same strict
+adapters, dependency and reference resolution, canonicalization,
+fingerprinting, and immutable catalog construction used by the content library:
+
+```sh
+dotnet run --project src/GalaxyCommand.Content.Validator -- \
+  --package /path/to/package \
+  --allow-kind material \
+  --show-package-order \
+  --show-keys \
+  --show-fingerprints
+```
+
+Repeat `--package` and `--allow-kind` as needed. Use `--workers COUNT` to bound
+parallel read-only package loading. Diagnostics use stable `GC-CONTENT-NNNN`
+codes, and the command does not require Godot or create a game session.
 
 ## Deterministic benchmarks
 

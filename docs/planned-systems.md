@@ -57,11 +57,11 @@ implementation.
 
 | System | Planned responsibility | Current ownership or disposition |
 | --- | --- | --- |
-| Content packages and manifests | Describe explicit content documents, dependencies, package identity, and optional presentation assets through one built-in and external path. | [Gameplay content](gameplay-content.md), completed `TASK-023`; implementation in `TASK-048`. |
-| Declarative definitions and catalogs | Validate stable qualified identities and construct immutable catalogs for materials, designs, principals, policies, and later domain content. | [Gameplay content](gameplay-content.md); `TASK-048`. |
-| Content validation and diagnostics | Headlessly parse, validate, resolve, canonicalize, fingerprint, and report content without publishing partial state. | [Gameplay content](gameplay-content.md); `TASK-048`. |
+| Content packages and manifests | Describe explicit content documents, dependencies, package identity, and optional presentation assets through one built-in and external path. | [Gameplay content](gameplay-content.md), completed `TASK-023` and `TASK-063`; built-in integration remains `TASK-048`. |
+| Declarative definitions and catalogs | Validate stable qualified identities and construct immutable catalogs for materials, designs, principals, policies, and later domain content. | [Gameplay content](gameplay-content.md); completed `TASK-063`. |
+| Content validation and diagnostics | Headlessly parse, validate, resolve, canonicalize, fingerprint, and report content without publishing partial state. | [Gameplay content](gameplay-content.md); completed `TASK-063`. |
 | Content compatibility and migration | Detect incompatible, missing, renamed, replaced, or changed definitions referenced by saved sessions and apply only explicit migrations. | `TASK-037`. |
-| Authored scenario tooling | Support rapid edit, validate, and rerun workflows for static scenarios without creating a weaker validation path. | Basic command in `TASK-048`; watch mode, editor integration, and richer tools are explicitly deferred by [gameplay content](gameplay-content.md). |
+| Authored scenario tooling | Support rapid edit, validate, and rerun workflows for static scenarios without creating a weaker validation path. | Completed `TASK-063` supplies the basic headless command; built-in scenario integration remains `TASK-048`; watch mode, editor integration, and richer tools are explicitly deferred by [gameplay content](gameplay-content.md). |
 | Mod distribution and management | Package, discover, install, update, sign, and select external content and its dependencies. | Explicitly deferred by [gameplay content](gameplay-content.md); no remote repository or mod-manager contract is planned yet. |
 | External scripted content | Add constrained authored behavior only after triggers, capabilities, scheduling, determinism, persistence, and trust are defined. | `TASK-017`; external executable assemblies remain excluded by [gameplay content](gameplay-content.md). |
 

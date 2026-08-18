@@ -14,9 +14,9 @@ This document completes the design work in `TASK-045`. It defines locale and
 resource ownership, fallback, message formatting, authored-content
 localization, text layout, font coverage, and the localization-related
 accessibility baseline. It does not add translations or implement the Godot
-application service. `TASK-048`, `TASK-049`, and `TASK-050` consume these
-decisions when they implement content loading, the application shell, and
-local preference storage.
+application service. Completed `TASK-063` and future `TASK-048`, `TASK-049`, and
+`TASK-050` consume these decisions for content validation, built-in content
+loading, the application shell, and local preference storage.
 
 Comprehensive accessibility design is separately owned by `TASK-061`.
 `TASK-045` establishes only the accessibility constraints inseparable from
@@ -137,7 +137,7 @@ rather than resolved by filesystem or load order. An invalid optional
 translation extension is diagnosed and excluded without changing an otherwise
 valid session.
 
-`TASK-048` must keep the format-neutral definition catalog and its
+Completed `TASK-063` keeps the format-neutral definition catalog and its
 authoritative compatibility data separate from these presentation catalogs.
 Built-in and external definitions still follow the one strict validation and
 admission path established by the gameplay-content design.
@@ -306,7 +306,7 @@ the boundary defined here:
 
 ## Deferred choices and task boundaries
 
-- `TASK-048` implements content catalogs and must preserve the separation
+- Completed `TASK-063` implements content catalogs and preserves the separation
   between authoritative definitions and optional presentation translations.
 - `TASK-049` implements the application localization service and reusable UI
   behavior as player-facing surfaces are added.

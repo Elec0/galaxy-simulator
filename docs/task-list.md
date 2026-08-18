@@ -15,20 +15,23 @@ rather than deleting them.
 
 `TASK-023` is complete. The project now has an accepted gameplay-content,
 static-scenario, stable-identity, validation, and trust-boundary design.
-The project is returning to design discovery before further implementation.
+The shared content-validation foundation is now implemented.
 `TASK-043`, `TASK-044`, and `TASK-045` are complete. The planned-system
 inventory and scope-gap review give every identified system an accepted owner,
 a tracked design task, or an explicit deferral. Localization boundaries are now
 established before broader player-facing game work. `TASK-061` separately owns
-comprehensive accessibility design. `TASK-048` remains the next implementation
-dependency in the content and save chain. `TASK-015` established the initial
-ship-only NPC boundary. `TASK-042` and `TASK-053` may now design NPC decision
-quality and autonomous work selection without introducing person-level state.
+comprehensive accessibility design. `TASK-063` completed the format-neutral
+models, shared production validation path, immutable catalogs, and headless
+validator. `TASK-048` remains the next content
+integration dependency and retains built-in content plus static new-game
+integration. `TASK-015` established the initial ship-only NPC boundary.
+`TASK-042` and `TASK-053` may now design NPC decision quality and autonomous
+work selection without introducing person-level state.
 
 ## Near-term work
 
-No task is currently promoted to near-term work. Select the next task from the
-accepted dependencies and design backlog before beginning implementation.
+No task is currently promoted to near-term work. `TASK-048` remains in the
+near-term parking-lot horizon until the project owner promotes it.
 
 ## Future parking lot
 
@@ -36,51 +39,11 @@ These items are intentionally retained without implying that they should be
 worked on now. Promote an item to current or near-term work when its
 prerequisites and desired behavior are sufficiently defined.
 
-- [ ] **TASK-047: Define procedural new-game generation**
-  - Generate a complete new-game composition that passes the same production
-    validation and session-creation boundary as a static authored scenario;
-    do not create a second initialization or authority path.
-  - Define player-selectable generation inputs, constraints, failure behavior,
-    reproducibility, seed and random-stream ownership, algorithm versioning,
-    stable identity assignment, and independence from worker count or
-    generation completion order.
-  - Decide which authored definitions and scenario fragments a generator may
-    select or compose without changing their content identities or silently
-    manufacturing incompatible definitions.
-  - Begin only after `TASK-023` establishes the static content and new-game
-    composition design, `TASK-048` implements that shared boundary, and
-    `TASK-021` establishes deterministic randomness. Procedural generation is
-    intentionally deferred until later gameplay and world-shape requirements
-    provide concrete constraints.
-  - Context: [Gameplay content](gameplay-content.md) · [Simulation architecture](simulation-architecture.md) · [Initial roadmap](roadmap.md)
+The parking-lot horizons organize deferred work by likely sequencing. A task
+in the **Near term** parking-lot section remains deferred; it is not promoted to
+the project-level **Near-term work** section above.
 
-- [ ] **TASK-042: Define NPC skills and bounded decision quality**
-  - Decide which NPC categories, if any, have skills, competencies, preferences,
-    risk tolerance, or other decision-shaping traits, and whether they are
-    authored, learned, temporary, or persistent.
-  - Define how those traits limit information, evaluate alternatives, or select
-    a satisfactory action without requiring every NPC to make the globally
-    optimal choice on every decision.
-  - Preserve deterministic outcomes by defining stable inputs, tie-breaking,
-    decision cadence, state ownership, facts, snapshots, and save requirements;
-    do not make results depend on worker count or evaluation completion order.
-  - Coordinate the NPC categories with `TASK-015`, player and NPC information
-    boundaries with `TASK-020`, and faction objectives and order generation with
-    `TASK-026`.
-
-- [ ] **TASK-062: Define personnel, crew, and person-level simulation if required**
-  - Begin only when a concrete gameplay need cannot be expressed through the
-    accepted ship-only NPC model from `TASK-015`.
-  - Decide whether captains, crew, employees, passengers, population members,
-    or other person-level categories exist; do not infer any category from a
-    ship merely because it is autonomous.
-  - Define identity, ship and organization relationships, authority, knowledge,
-    skills, employment, lifecycle, snapshots, saves, scale targets, and
-    deterministic evaluation and commit before adding person-level state.
-  - Coordinate dialogue with `TASK-016`, NPC decision quality with `TASK-042`,
-    factions with `TASK-026`, and inventory or passenger cargo only if their
-    owning contracts require it.
-  - Context: [Individual NPC scope](individual-npc-scope.md) · [Vision](vision.md) · [Player experience](player-experience.md)
+### Near term
 
 - [ ] **TASK-016: Design dialogue state and presentation**
   - Define availability, conditions, choices, repeatability, memory,
@@ -89,19 +52,6 @@ prerequisites and desired behavior are sufficiently defined.
   - Keep rendering and interaction in Godot while gameplay effects use normal
     commands.
   - Context: [Time and pacing](time-and-pacing.md)
-
-- [ ] **TASK-017: Design deterministic scripted events**
-  - Define time-, location-, threshold-, and fact-based triggers.
-  - Define one-shot and repeatable persistent state.
-  - Define scheduling, checkpointing, wake, cancellation, and persistence
-    semantics for long-running scripted behavior; the current runtime does not
-    provide long-running script execution.
-  - Restrict effects to an approved command vocabulary.
-  - Separate development cheats from shipped narrative effects.
-
-- [ ] **TASK-018: Design objectives, missions, victory, and defeat**
-  - Represent milestones as persistent state and semantic facts rather than
-    implicit engine termination.
 
 - [ ] **TASK-019: Define interactions between ships in motion**
   - Define how the simulation discovers, schedules, and resolves interactions
@@ -121,15 +71,6 @@ prerequisites and desired behavior are sufficiently defined.
     gameplay without defining each domain's outcome policy.
   - Context: [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Simulation architecture](simulation-architecture.md)
 
-- [ ] **TASK-046: Define combat resolution**
-  - Define combat orders, targeting policy, damage, withdrawal, surrender,
-    capture, and destruction.
-  - Decide how observed and unobserved combat differ without changing causal
-    outcomes.
-  - Build combat engagement and pursuit on the moving-ship interaction contract
-    from `TASK-019`; do not introduce a separate combat-only position or motion
-    model.
-
 - [ ] **TASK-020: Define player knowledge and information staleness**
   - Separate complete authoritative state from currently known, observed, or
     outdated information.
@@ -137,111 +78,6 @@ prerequisites and desired behavior are sufficiently defined.
 - [ ] **TASK-021: Define random-number stream ownership**
   - Decide how systems and scripts receive deterministic randomness.
   - Preserve reproducibility when unrelated systems add random draws.
-
-- [ ] **TASK-041: Define generalized inventory, cargo, and ship equipment**
-  - Evolve the current material-only inventory model so ships and other owners
-    can hold the approved categories of physical items, without treating every
-    item as a material unit.
-  - Define item identity and stacks, capacity or slot semantics, equipment
-    installation and removal, ownership, transfer, reservations, destruction
-    disposition, authoritative snapshots, and save-state requirements.
-  - Preserve the existing material-production and transport contracts until a
-    compatible migration is explicitly designed. Coordinate catalog-defined
-    item and equipment data with `TASK-023`, and combat or repair behavior
-    with `TASK-046`.
-
-- [ ] **TASK-048: Implement the gameplay content pipeline and headless validator**
-  - Begin only after the current design-discovery work establishes enough of
-    the planned gameplay and content surface to avoid premature schemas.
-  - Implement format-neutral package, definition, static-scenario, reference,
-    and diagnostic models, with strict UTF-8 JSON parsing and writing isolated
-    behind the initial physical-format adapter.
-  - Implement one production path for bounded validation, dependency and
-    reference resolution, collision detection, canonicalization, fingerprints,
-    immutable catalog construction, and static-scenario validation.
-  - Add a headless production validator that reports stable diagnostics and can
-    inspect resolved package order, qualified-key inventory, and fingerprints
-    without Godot or session mutation.
-  - Move built-in definitions and the minimal static new-game scenario through
-    the disk-backed production path. Retain direct neutral-model builders only
-    for focused tests; package and scenario coverage cannot bypass production
-    validation or catalog construction.
-  - Prove identical catalogs, fingerprints, and diagnostics across accepted
-    document ordering, worker counts, batch layouts, and completion order, with
-    a single-thread reference path.
-  - Do not implement content-version compatibility or saved-reference migration;
-    provide the resolved catalog and qualified references consumed by
-    `TASK-037`.
-  - Context: [Gameplay content and static new-game composition](gameplay-content.md) · [Gameplay integration](gameplay-integration.md) · [Initial roadmap](roadmap.md) · [Save format and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
-
-- [ ] **TASK-037: Version content catalogs and migrate saved content references**
-  - Begin after `TASK-022` selects save versioning, `TASK-023` selects the
-    gameplay content format, and `TASK-048` implements the resolved catalog and
-    qualified-reference boundary.
-  - Define stable content catalog identities, versions, dependency metadata,
-    and source provenance for built-in and mod-provided content.
-  - Detect identifier collisions across combined content sources without
-    silently replacing definitions, and report both conflicting sources.
-  - Define deterministic migrations or clear incompatibility diagnostics when
-    an older save references renamed, replaced, removed, or changed content.
-  - Context: [Relational simulation architecture](relational-simulation-architecture.md)
-
-- [ ] **TASK-040: Define player-safe recovery from corrupted sessions and content failures**
-  - Decide the player-facing flow for a poisoned live session, failed
-    checkpoint validation, and unavailable, incompatible, or corrupt built-in
-    and mod-provided content.
-  - Preserve the authoritative rule that invalid state never resumes, silently
-    repairs, or publishes a partial session. Determine the safe recovery
-    choices, diagnostic capture, actionable explanation, and how the player
-    returns to a verified session without exposing internal exception detail.
-  - Define the provenance and compatibility information needed to identify a
-    failing content source and the boundary between disabling content for a
-    future load and preserving an already-running authoritative session.
-  - Add focused failure-injection and continuity tests once the recovery
-    contract is accepted. Depends on `TASK-022`, `TASK-023`, and `TASK-037`.
-  - Context: [Authoritative save boundary](authoritative-save-boundary.md) · [Version content catalogs](task-list.md#task-037-version-content-catalogs-and-migrate-saved-content-references)
-
-- [ ] **TASK-038: Implement application pause, speed, and input timing**
-  - Replace fixed real-time advancement with the accepted pacing state and
-    completed-timestamp control checkpoints.
-  - Load and validate the mod-configurable speed ladder, preserve local player
-    pacing preferences, and drain buffered input deterministically before
-    further advancement.
-  - Integrate response-required dialogue automatic pause only after `TASK-016`
-    defines the corresponding dialogue state and continuity.
-  - Context: [Time and pacing](time-and-pacing.md)
-
-- [ ] **TASK-025: Define bounded explanation history**
-  - Retain enough decisions and facts to explain behavior to the player without
-    preserving an unlimited event log.
-
-- [ ] **TASK-026: Expand faction strategic planning**
-  - Turn priorities into executable objectives and orders.
-  - Make logistical disruption constrain achievable plans.
-  - Add faction asymmetry only after one shared planning model is proven.
-
-- [ ] **TASK-027: Evaluate a broader entity storage model**
-  - Reconsider ECS or another indexed model only when concrete query or scale
-    evidence justifies it.
-
-- [ ] **TASK-029: Add long-running stability and performance suites**
-  - Add increasing-scale scenarios, invariant checks, benchmarks, and
-    reproducible failure traces.
-  - Compare deterministic state and event digests across worker counts, batch
-    sizes, and valid partition layouts.
-
-- [ ] **TASK-030: Define runtime connector availability and access**
-  - Define enabled state, actor-specific access requirements, and the authority
-    allowed to change either before adding mutable connector state.
-  - Define replan, wait, wake, failure, command, fact, and snapshot behavior for
-    changes before traversal begins and while transit is active.
-  - Restore whole-simulation disruption coverage after this contract is
-    implemented. It must use authoritative connector state, not a Phase 1
-    test-only route-toggle shim.
-  - Begin only when a concrete gameplay system can own availability or access;
-    faction relationships in `TASK-012` and scripted behavior in `TASK-017`
-    may supply those requirements.
-  - Context: [Navigation and spatial architecture](navigation-architecture.md)
 
 - [ ] **TASK-032: Define semantic economy facts**
   - Define gameplay-facing production, construction, and logistics lifecycle
@@ -264,18 +100,54 @@ prerequisites and desired behavior are sufficiently defined.
     selection contract in `TASK-010`.
   - Context: [Presentation snapshots](presentation-snapshots.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
-- [ ] **TASK-036: Define piracy and its relationship consequences**
-  - Define which acts count as piracy and distinguish piracy from ordinary
-    trade, territorial violations, salvage, privateering, and declared war.
-  - Define victim, witness, attribution, jurisdiction, stolen-property, mission,
-    and retaliation rules before assigning reputation consequences.
-  - Define how piracy affects the offender, asset owner, controller, victim,
-    territorial authority, and informed third parties without adding automatic
-    economic guilt by association.
-  - Coordinate with combat in `TASK-046`, player knowledge in `TASK-020`, and
-    the accepted relational gameplay model before choosing simulation state or
-    commands.
-  - Context: [Relational gameplay model](factions.md)
+- [ ] **TASK-038: Implement application pause, speed, and input timing**
+  - Replace fixed real-time advancement with the accepted pacing state and
+    completed-timestamp control checkpoints.
+  - Load and validate the mod-configurable speed ladder, preserve local player
+    pacing preferences, and drain buffered input deterministically before
+    further advancement.
+  - Integrate response-required dialogue automatic pause only after `TASK-016`
+    defines the corresponding dialogue state and continuity.
+  - Context: [Time and pacing](time-and-pacing.md)
+
+- [ ] **TASK-041: Define generalized inventory, cargo, and ship equipment**
+  - Evolve the current material-only inventory model so ships and other owners
+    can hold the approved categories of physical items, without treating every
+    item as a material unit.
+  - Define item identity and stacks, capacity or slot semantics, equipment
+    installation and removal, ownership, transfer, reservations, destruction
+    disposition, authoritative snapshots, and save-state requirements.
+  - Preserve the existing material-production and transport contracts until a
+    compatible migration is explicitly designed. Coordinate catalog-defined
+    item and equipment data with `TASK-023`, and combat or repair behavior
+    with `TASK-046`.
+
+- [ ] **TASK-042: Define NPC skills and bounded decision quality**
+  - Decide which NPC categories, if any, have skills, competencies, preferences,
+    risk tolerance, or other decision-shaping traits, and whether they are
+    authored, learned, temporary, or persistent.
+  - Define how those traits limit information, evaluate alternatives, or select
+    a satisfactory action without requiring every NPC to make the globally
+    optimal choice on every decision.
+  - Preserve deterministic outcomes by defining stable inputs, tie-breaking,
+    decision cadence, state ownership, facts, snapshots, and save requirements;
+    do not make results depend on worker count or evaluation completion order.
+  - Coordinate the NPC categories with `TASK-015`, player and NPC information
+    boundaries with `TASK-020`, and faction objectives and order generation with
+    `TASK-026`.
+
+- [ ] **TASK-048: Integrate built-in content and static new-game composition**
+  - Build on the format-neutral models, physical-format adapter, production
+    validation path, resolved catalogs, and headless validator completed by
+    `TASK-063`.
+  - Move built-in definitions and the minimal static new-game scenario through
+    the disk-backed production path. Retain direct neutral-model builders only
+    for focused tests; package and scenario coverage cannot bypass production
+    validation or catalog construction.
+  - Do not implement content-version compatibility or saved-reference migration;
+    consume the resolved catalog and qualified references from `TASK-063` at
+    the static session-creation boundary used by `TASK-037`.
+  - Context: [Gameplay content and static new-game composition](gameplay-content.md) · [Gameplay integration](gameplay-integration.md) · [Initial roadmap](roadmap.md) · [Save format and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
 
 - [ ] **TASK-049: Define the application shell and map experience**
   - Define new-game, load-game, active-session, leave-session, and fatal-startup
@@ -304,6 +176,122 @@ prerequisites and desired behavior are sufficiently defined.
     `TASK-038`.
   - Context: [Save format and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md) · [Time and pacing](time-and-pacing.md)
 
+- [ ] **TASK-053: Define autonomous ship work selection**
+  - Define how non-player ships discover, evaluate, select, and stop ordinary
+    work through the same commands and order lifecycle used by player intent.
+  - Separate ship-local policy from faction strategy, define authoritative
+    policy ownership, stable inputs, cadence, contention and tie-breaking,
+    bounded retry, explanation, snapshots, and save requirements.
+  - Build on `TASK-006` and the production domain owners from `TASK-009` and
+    `TASK-034`; coordinate information with `TASK-020`, faction objectives with
+    `TASK-026`, and bounded competence with `TASK-042`.
+  - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
+
+- [ ] **TASK-061: Define comprehensive accessibility behavior**
+  - Define input remapping, keyboard and controller equivalence, focus
+    navigation, assistive-technology and screen-reader behavior, contrast and
+    non-color cues, reduced motion and flashing, captions, audio cues, and
+    supported text-scale behavior.
+  - Establish platform capability boundaries, user-visible modes, interactions
+    between settings, and acceptance evidence without making accessibility
+    preferences authoritative simulation or save state.
+  - Build on the localized text, layout, semantic-label, and expansion baseline
+    from `TASK-045`; coordinate application controls with `TASK-049` and local
+    preference storage with `TASK-050`.
+  - Context: [Internationalization and localization](internationalization-and-localization.md) · [Player experience](player-experience.md) · [Presentation snapshots](presentation-snapshots.md)
+
+### Mid term
+
+- [ ] **TASK-017: Design deterministic scripted events**
+  - Define time-, location-, threshold-, and fact-based triggers.
+  - Define one-shot and repeatable persistent state.
+  - Define scheduling, checkpointing, wake, cancellation, and persistence
+    semantics for long-running scripted behavior; the current runtime does not
+    provide long-running script execution.
+  - Restrict effects to an approved command vocabulary.
+  - Separate development cheats from shipped narrative effects.
+
+- [ ] **TASK-018: Design objectives, missions, victory, and defeat**
+  - Represent milestones as persistent state and semantic facts rather than
+    implicit engine termination.
+
+- [ ] **TASK-025: Define bounded explanation history**
+  - Retain enough decisions and facts to explain behavior to the player without
+    preserving an unlimited event log.
+
+- [ ] **TASK-026: Expand faction strategic planning**
+  - Turn priorities into executable objectives and orders.
+  - Make logistical disruption constrain achievable plans.
+  - Add faction asymmetry only after one shared planning model is proven.
+
+- [ ] **TASK-029: Add long-running stability and performance suites**
+  - Add increasing-scale scenarios, invariant checks, benchmarks, and
+    reproducible failure traces.
+  - Compare deterministic state and event digests across worker counts, batch
+    sizes, and valid partition layouts.
+
+- [ ] **TASK-030: Define runtime connector availability and access**
+  - Define enabled state, actor-specific access requirements, and the authority
+    allowed to change either before adding mutable connector state.
+  - Define replan, wait, wake, failure, command, fact, and snapshot behavior for
+    changes before traversal begins and while transit is active.
+  - Restore whole-simulation disruption coverage after this contract is
+    implemented. It must use authoritative connector state, not a Phase 1
+    test-only route-toggle shim.
+  - Begin only when a concrete gameplay system can own availability or access;
+    faction relationships in `TASK-012` and scripted behavior in `TASK-017`
+    may supply those requirements.
+  - Context: [Navigation and spatial architecture](navigation-architecture.md)
+
+- [ ] **TASK-036: Define piracy and its relationship consequences**
+  - Define which acts count as piracy and distinguish piracy from ordinary
+    trade, territorial violations, salvage, privateering, and declared war.
+  - Define victim, witness, attribution, jurisdiction, stolen-property, mission,
+    and retaliation rules before assigning reputation consequences.
+  - Define how piracy affects the offender, asset owner, controller, victim,
+    territorial authority, and informed third parties without adding automatic
+    economic guilt by association.
+  - Coordinate with combat in `TASK-046`, player knowledge in `TASK-020`, and
+    the accepted relational gameplay model before choosing simulation state or
+    commands.
+  - Context: [Relational gameplay model](factions.md)
+
+- [ ] **TASK-037: Version content catalogs and migrate saved content references**
+  - Begin after `TASK-022` selects save versioning, `TASK-023` selects the
+    gameplay content format, and completed `TASK-063` supplies the resolved
+    catalog and qualified-reference boundary.
+  - Define stable content catalog identities, versions, dependency metadata,
+    and source provenance for built-in and mod-provided content.
+  - Detect identifier collisions across combined content sources without
+    silently replacing definitions, and report both conflicting sources.
+  - Define deterministic migrations or clear incompatibility diagnostics when
+    an older save references renamed, replaced, removed, or changed content.
+  - Context: [Relational simulation architecture](relational-simulation-architecture.md)
+
+- [ ] **TASK-040: Define player-safe recovery from corrupted sessions and content failures**
+  - Decide the player-facing flow for a poisoned live session, failed
+    checkpoint validation, and unavailable, incompatible, or corrupt built-in
+    and mod-provided content.
+  - Preserve the authoritative rule that invalid state never resumes, silently
+    repairs, or publishes a partial session. Determine the safe recovery
+    choices, diagnostic capture, actionable explanation, and how the player
+    returns to a verified session without exposing internal exception detail.
+  - Define the provenance and compatibility information needed to identify a
+    failing content source and the boundary between disabling content for a
+    future load and preserving an already-running authoritative session.
+  - Add focused failure-injection and continuity tests once the recovery
+    contract is accepted. Depends on `TASK-022`, `TASK-023`, and `TASK-037`.
+  - Context: [Authoritative save boundary](authoritative-save-boundary.md) · [Version content catalogs](task-list.md#task-037-version-content-catalogs-and-migrate-saved-content-references)
+
+- [ ] **TASK-046: Define combat resolution**
+  - Define combat orders, targeting policy, damage, withdrawal, surrender,
+    capture, and destruction.
+  - Decide how observed and unobserved combat differ without changing causal
+    outcomes.
+  - Build combat engagement and pursuit on the moving-ship interaction contract
+    from `TASK-019`; do not introduce a separate combat-only position or motion
+    model.
+
 - [ ] **TASK-051: Define docking, undocking, and berth capacity**
   - Define approach, access validation, berth or docking-capacity allocation,
     queueing, arrival, docked state, undocking, cancellation, and failure for
@@ -325,17 +313,6 @@ prerequisites and desired behavior are sufficiently defined.
   - Build on `TASK-006`; coordinate group targets with `TASK-033`, knowledge
     limits with `TASK-020`, and domain-specific orders with their owning tasks.
   - Context: [Player experience](player-experience.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
-
-- [ ] **TASK-053: Define autonomous ship work selection**
-  - Define how non-player ships discover, evaluate, select, and stop ordinary
-    work through the same commands and order lifecycle used by player intent.
-  - Separate ship-local policy from faction strategy, define authoritative
-    policy ownership, stable inputs, cadence, contention and tie-breaking,
-    bounded retry, explanation, snapshots, and save requirements.
-  - Build on `TASK-006` and the production domain owners from `TASK-009` and
-    `TASK-034`; coordinate information with `TASK-020`, faction objectives with
-    `TASK-026`, and bounded competence with `TASK-042`.
-  - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
 - [ ] **TASK-054: Define general resource acquisition and deposits**
   - Evolve the acceptance-only mining source into production gameplay with
@@ -361,6 +338,42 @@ prerequisites and desired behavior are sufficiently defined.
     `TASK-020`, and economic facts with `TASK-032`.
   - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Factions](factions.md)
 
+- [ ] **TASK-057: Define station composition, construction, and expansion**
+  - Define persistent facilities composed from storage, production, trade,
+    repair, construction, defense, and service capabilities, with explicit
+    content identity and authoritative ownership.
+  - Define how station construction and expansion consume material and work,
+    choose location, allocate identity, change regional capacity, handle
+    interruption or removal, and join commands, facts, snapshots, and saves.
+  - Begin after `TASK-041` defines installed equipment; completed `TASK-063`
+    supplies content catalogs. Coordinate docking with `TASK-051`, territory with
+    `TASK-059`, and strategic construction with `TASK-026`.
+  - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md)
+
+### Far term
+
+- [ ] **TASK-027: Evaluate a broader entity storage model**
+  - Reconsider ECS or another indexed model only when concrete query or scale
+    evidence justifies it.
+
+- [ ] **TASK-047: Define procedural new-game generation**
+  - Generate a complete new-game composition that passes the same production
+    validation and session-creation boundary as a static authored scenario;
+    do not create a second initialization or authority path.
+  - Define player-selectable generation inputs, constraints, failure behavior,
+    reproducibility, seed and random-stream ownership, algorithm versioning,
+    stable identity assignment, and independence from worker count or
+    generation completion order.
+  - Decide which authored definitions and scenario fragments a generator may
+    select or compose without changing their content identities or silently
+    manufacturing incompatible definitions.
+  - Begin only after `TASK-023` establishes the static content and new-game
+    composition design, `TASK-048` implements that shared boundary, and
+    `TASK-021` establishes deterministic randomness. Procedural generation is
+    intentionally deferred until later gameplay and world-shape requirements
+    provide concrete constraints.
+  - Context: [Gameplay content](gameplay-content.md) · [Simulation architecture](simulation-architecture.md) · [Initial roadmap](roadmap.md)
+
 - [ ] **TASK-056: Define ship acquisition, replacement, and upgrades**
   - Define how the player and autonomous principals purchase, receive,
     construct, replace, sell, and improve ships without bypassing material
@@ -371,18 +384,6 @@ prerequisites and desired behavior are sufficiently defined.
   - Begin after `TASK-041` defines equipment and `TASK-055` defines exchange;
     coordinate construction with `TASK-034` and combat losses with `TASK-046`.
   - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md)
-
-- [ ] **TASK-057: Define station composition, construction, and expansion**
-  - Define persistent facilities composed from storage, production, trade,
-    repair, construction, defense, and service capabilities, with explicit
-    content identity and authoritative ownership.
-  - Define how station construction and expansion consume material and work,
-    choose location, allocate identity, change regional capacity, handle
-    interruption or removal, and join commands, facts, snapshots, and saves.
-  - Begin after `TASK-041` defines installed equipment and `TASK-048` supplies
-    content catalogs; coordinate docking with `TASK-051`, territory with
-    `TASK-059`, and strategic construction with `TASK-026`.
-  - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md)
 
 - [ ] **TASK-058: Define repair and maintenance**
   - Define damage states that can be repaired, required facilities or field
@@ -419,20 +420,40 @@ prerequisites and desired behavior are sufficiently defined.
     `TASK-037`.
   - Context: [Technical direction](technical-direction.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Save format and migration](save-format-and-migration.md)
 
-- [ ] **TASK-061: Define comprehensive accessibility behavior**
-  - Define input remapping, keyboard and controller equivalence, focus
-    navigation, assistive-technology and screen-reader behavior, contrast and
-    non-color cues, reduced motion and flashing, captions, audio cues, and
-    supported text-scale behavior.
-  - Establish platform capability boundaries, user-visible modes, interactions
-    between settings, and acceptance evidence without making accessibility
-    preferences authoritative simulation or save state.
-  - Build on the localized text, layout, semantic-label, and expansion baseline
-    from `TASK-045`; coordinate application controls with `TASK-049` and local
-    preference storage with `TASK-050`.
-  - Context: [Internationalization and localization](internationalization-and-localization.md) · [Player experience](player-experience.md) · [Presentation snapshots](presentation-snapshots.md)
+- [ ] **TASK-062: Define personnel, crew, and person-level simulation if required**
+  - Begin only when a concrete gameplay need cannot be expressed through the
+    accepted ship-only NPC model from `TASK-015`.
+  - Decide whether captains, crew, employees, passengers, population members,
+    or other person-level categories exist; do not infer any category from a
+    ship merely because it is autonomous.
+  - Define identity, ship and organization relationships, authority, knowledge,
+    skills, employment, lifecycle, snapshots, saves, scale targets, and
+    deterministic evaluation and commit before adding person-level state.
+  - Coordinate dialogue with `TASK-016`, NPC decision quality with `TASK-042`,
+    factions with `TASK-026`, and inventory or passenger cargo only if their
+    owning contracts require it.
+  - Context: [Individual NPC scope](individual-npc-scope.md) · [Vision](vision.md) · [Player experience](player-experience.md)
 
 ## Completed foundations
+
+- [x] **TASK-063: Implement the format-neutral content validation foundation**
+  - Added independent content, validator, and test projects with immutable
+    package, definition, static-scenario, reference, diagnostic, neutral-value,
+    resolved-catalog, and fingerprint models that expose no JSON or simulation
+    types.
+  - Implemented strict bounded UTF-8 JSON readers and stable writers, explicit
+    package document loading, trusted content-kind registration, dependency and
+    reference resolution, cycle and collision detection, canonical ordering,
+    immutable publication, and SHA-256 package and catalog fingerprints.
+  - Added a Godot-free production validator with stable diagnostic codes and
+    optional package-order, qualified-key, and fingerprint inspection.
+  - Proved stable catalogs, fingerprints, and diagnostics across package and
+    document order and worker counts with 27 focused tests. The full 395-test
+    suite, Release build, formatting verification, Godot headless build, and all
+    four canonical benchmark digests pass.
+  - Built-in content and static new-game integration remain `TASK-048`; catalog
+    compatibility and saved-reference migration remain `TASK-037`.
+  - Context: [Gameplay content and static new-game composition](gameplay-content.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [x] **TASK-015: Decide the initial meaning and scope of individual NPCs**
   - Established that the initial NPC is an individually identifiable autonomous
@@ -488,9 +509,11 @@ prerequisites and desired behavior are sufficiently defined.
   - Required production-grade headless validation, canonical fingerprints for
     rapid iteration, and invariant fallback strings for headless inspection
     without making wording simulation authority or save data.
-  - Implementation remains `TASK-048`; catalog compatibility and saved-reference
-    migration remain `TASK-037`; procedural new-game generation remains
-    `TASK-047`.
+  - Format-neutral models, production validation, catalogs, and headless
+    validation were completed by `TASK-063`; built-in content and static
+    new-game integration remain `TASK-048`; catalog compatibility and
+    saved-reference migration remain `TASK-037`; procedural new-game generation
+    remains `TASK-047`.
   - Context: [Gameplay content and static new-game composition](gameplay-content.md)
 
 - [x] **TASK-022: Select save format, versioning, and migration strategy**
@@ -504,9 +527,10 @@ prerequisites and desired behavior are sufficiently defined.
     synchronization, one explicit backup, portable validated slot identifiers,
     symbolic-link rejection, and cleanup that preserves the prior committed
     primary across pre-publication failures. The full 368-test suite passes.
-  - General saved sessions remain unavailable until `TASK-048` supplies
-    resolved content catalogs and `TASK-037` adds catalog compatibility and
-    saved-reference migration.
+  - `TASK-063` now supplies resolved content catalogs. General saved sessions
+    remain unavailable until `TASK-048` integrates the static new-game
+    composition and `TASK-037` adds catalog compatibility and saved-reference
+    migration.
   - Context: [Save format, versioning, and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
 
 - [x] **TASK-034: Integrate clean-session economy and transport with entity lifecycle**

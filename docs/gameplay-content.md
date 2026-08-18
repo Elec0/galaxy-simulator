@@ -17,11 +17,12 @@ package composition, validation behavior, and trust boundary selected by
 
 **Decision status:** Accepted by the project owner on 2026-08-13.
 
-**Implementation status:** `TASK-023` completed the design. `TASK-048` owns the
-format-neutral loading pipeline, JSON adapter, headless validator, and built-in
-content migration. `TASK-037` then owns save compatibility and saved-reference
-migration. Existing C# setup objects and embedded save-policy definitions have
-not yet migrated to this content boundary.
+**Implementation status:** `TASK-023` completed the design. `TASK-063` completed
+the format-neutral loading pipeline, JSON adapter, common production
+validation, immutable catalogs, and headless validator. `TASK-048` owns built-in
+content and static new-game integration, and `TASK-037` owns save compatibility
+and saved-reference migration. Existing C# setup objects and embedded
+save-policy definitions have not yet migrated to this content boundary.
 
 ## Decisions at a glance
 
@@ -298,7 +299,8 @@ emits a fact, or changes a running session.
 
 ## Implementation sequence
 
-`TASK-048` owns slices 1 through 5. `TASK-037` owns slice 6.
+`TASK-063` completed slices 1 through 4. `TASK-048` owns slice 5. `TASK-037`
+owns slice 6.
 
 1. Define the format-neutral package, definition, scenario, reference, and
    diagnostic models without depending on JSON libraries or simulation-owner
