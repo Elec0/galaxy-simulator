@@ -10,7 +10,8 @@ simulation currently performs no random draws, so the ownership contract can
 be established before a subsystem depends on accidental behavior.
 
 This document completes the design work approved by the project owner for
-`TASK-021` on 2026-08-17. `TASK-066` owns implementation.
+`TASK-021` on 2026-08-17. Completed `TASK-066` provides the shared
+implementation and focused proof.
 
 **Decision status:** Accepted by the project owner on 2026-08-17.
 
@@ -110,9 +111,16 @@ filesystem order. Stable numeric identities use their canonical fixed-width
 encoding. Stable content identities use their qualified content key.
 
 The owning domain creates and removes stateful streams through deterministic
-owner commit. A stream cannot be discarded while pending work, saved
-continuation, or a future committed decision can still depend on it. Owner
-identities are not reused to manufacture a fresh sequence after removal.
+owner commit. Retirement is proposed against the stream's exact current state
+and commits only if that state is still current. The owning aggregate confirms
+that no pending work, saved continuation, or future committed decision still
+depends on the stream before committing retirement.
+
+Owner identities are not reused to manufacture a fresh sequence after removal.
+That non-reuse invariant belongs to the owning gameplay domain. The random
+owner retains only live streams and does not persist retired-key tombstones.
+This keeps the checkpoint bounded by live state while requiring each domain to
+make its own identity lifecycle explicit.
 
 There is no API for requesting an anonymous stream or the next stream from a
 global allocator. Duplicate live stream keys are validation faults.
@@ -303,10 +311,16 @@ continuation depend on the current implementation's historical draw behavior.
 
 Restore validates unique keys, registered algorithm versions, nonzero state,
 draw-position bounds, owning-domain references, and cross-owner invariants
-before publishing the session. It restores state directly and never replays
-draws. An unavailable algorithm version rejects the save unless an explicit
-migration proves exact future-output compatibility. A loader cannot silently
-substitute the newest registered algorithm.
+before publishing the session. The saved live-key set must exactly equal the
+combined live-key declarations supplied by owning domains. An unexpected saved
+stream or a declaration without saved state rejects restoration. A session
+with no current stateful consumer therefore accepts only an empty live-stream
+registry.
+
+Restore applies stream state directly and never replays draws. An unavailable
+algorithm version rejects the save unless an explicit migration proves exact
+future-output compatibility. A loader cannot silently substitute the newest
+registered algorithm.
 
 Stateless samples do not create saved stream entries. Their required owner,
 decision, purpose, sample, and attempt identities already belong to the domain
@@ -348,8 +362,8 @@ This design does not provide:
 
 - Completed `TASK-021` owns this random identity, derivation, stream,
   consumption, persistence, and concurrency design.
-- `TASK-066` owns the shared implementation, checkpoint integration, and
-  focused deterministic proof.
+- Completed `TASK-066` provides the shared implementation, checkpoint
+  integration, and focused deterministic proof.
 - `TASK-017` owns script behavior and declares the purposes exposed to each
   script instance.
 - `TASK-047` owns procedural generation inputs, generator behavior, and
@@ -359,9 +373,9 @@ This design does not provide:
 - Each gameplay domain owns the semantic decision identities, purpose IDs,
   attempt lifecycle, and random outcomes it introduces.
 
-## Implementation evidence required by TASK-066
+## Implementation evidence completed by TASK-066
 
-Implementation is not complete until focused tests prove:
+Focused tests prove:
 
 1. SHA-256 canonical-encoding and `xoshiro256**` golden vectors;
 2. root, scope, domain, owner, purpose, decision, attempt, and sample isolation;

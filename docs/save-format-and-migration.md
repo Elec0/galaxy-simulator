@@ -284,6 +284,6 @@ direct restoration contract.
 - Content catalog versions, mod provenance, collision handling, and migration
   of saved content references remain `TASK-037`.
 - Reserved runtime owners from `TASK-017` through `TASK-020`, `TASK-025`,
-  `TASK-038`, dialogue implementation in `TASK-065`, and random implementation
-  in `TASK-066` must define their authoritative state before joining a
-  supported saved session.
+  `TASK-038` and dialogue implementation in `TASK-065` must define their
+  authoritative state before joining the random state completed by `TASK-066`
+  in a supported saved session.

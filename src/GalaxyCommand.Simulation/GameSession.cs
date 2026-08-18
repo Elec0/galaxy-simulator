@@ -209,8 +209,12 @@ public sealed class GameSession : IGameplayCommandHandler
                     "The deterministic random checkpoint is required."));
         }
 
+        // No current gameplay domain declares a stateful stream. Future owners
+        // contribute their complete live-key sets at this aggregate boundary.
         CheckpointResult<DeterministicRandomOwner> random =
-            DeterministicRandomOwner.RestoreCheckpoint(checkpoint.Random);
+            DeterministicRandomOwner.RestoreCheckpoint(
+                checkpoint.Random,
+                new HashSet<RandomStreamKey>());
         if (!random.IsSuccess)
         {
             return CheckpointResult<GameSession>.Rejected(random.Failure!);

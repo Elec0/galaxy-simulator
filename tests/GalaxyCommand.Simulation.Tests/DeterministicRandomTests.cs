@@ -19,6 +19,31 @@ public sealed class DeterministicRandomTests
     }
 
     [Fact]
+    public void RootSeedCopiesCallerOwnedBytes()
+    {
+        var bytes = new byte[RandomRootSeed.ByteCount];
+        RandomRootSeed root = RandomRootSeed.FromBytes(bytes);
+        bytes[0] = 1;
+        var key = new RandomSampleKey(
+            RandomScope.SessionRuntime,
+            "combat",
+            "engagement",
+            42,
+            "attack",
+            7,
+            "hit",
+            0,
+            "primary");
+
+        ulong actual = DeterministicRandomDerivation.DeriveUInt64(root, key);
+        ulong expected = DeterministicRandomDerivation.DeriveUInt64(
+            RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]),
+            key);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
     public void StreamDerivationMatchesCanonicalSha256Vector()
     {
         RandomRootSeed root = RandomRootSeed.FromBytes(
@@ -160,6 +185,33 @@ public sealed class DeterministicRandomTests
     }
 
     [Fact]
+    public void StatelessSampleIsIsolatedByRootSeed()
+    {
+        var firstBytes = new byte[RandomRootSeed.ByteCount];
+        var secondBytes = new byte[RandomRootSeed.ByteCount];
+        secondBytes[0] = 1;
+        var key = new RandomSampleKey(
+            RandomScope.SessionRuntime,
+            "combat",
+            "engagement",
+            42,
+            "attack",
+            7,
+            "hit",
+            3,
+            "primary");
+
+        ulong first = DeterministicRandomDerivation.DeriveUInt64(
+            RandomRootSeed.FromBytes(firstBytes),
+            key);
+        ulong second = DeterministicRandomDerivation.DeriveUInt64(
+            RandomRootSeed.FromBytes(secondBytes),
+            key);
+
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
     public void AddingUnrelatedStreamDoesNotShiftExistingStream()
     {
         RandomRootSeed root = RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]);
@@ -248,6 +300,52 @@ public sealed class DeterministicRandomTests
     }
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(7)]
+    [InlineData(64)]
+    public void StatelessSamplesAreIndependentOfBatchSize(int batchSize)
+    {
+        RandomRootSeed root = RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]);
+        RandomSampleKey[] keys = CreateSampleKeys(257);
+        ulong[] expected = keys
+            .Select(key => DeterministicRandomDerivation.DeriveUInt64(root, key))
+            .ToArray();
+
+        ulong[] actual = keys
+            .Chunk(batchSize)
+            .SelectMany(batch => batch.Select(
+                key => DeterministicRandomDerivation.DeriveUInt64(root, key)))
+            .ToArray();
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    [InlineData(11)]
+    public void StatelessSamplesAreIndependentOfValidPartitionLayout(int partitionCount)
+    {
+        RandomRootSeed root = RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]);
+        RandomSampleKey[] keys = CreateSampleKeys(257);
+        ulong[] expected = keys
+            .Select(key => DeterministicRandomDerivation.DeriveUInt64(root, key))
+            .ToArray();
+
+        ulong[] actual = keys
+            .Select((key, index) => (key, index))
+            .GroupBy(item => item.index % partitionCount)
+            .SelectMany(partition => partition.Select(item => (
+                item.index,
+                value: DeterministicRandomDerivation.DeriveUInt64(root, item.key))))
+            .OrderBy(item => item.index)
+            .Select(item => item.value)
+            .ToArray();
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Theory]
     [InlineData(0UL, false)]
     [InlineData(1UL, true)]
     public void RationalProbabilityConsumesOneCandidateAtBoundary(
@@ -329,6 +427,50 @@ public sealed class DeterministicRandomTests
     }
 
     [Fact]
+    public void RetirementRemovesStreamOnlyWhenCommitted()
+    {
+        RandomRootSeed root = RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]);
+        var key = new RandomStreamKey(
+            RandomScope.SessionRuntime,
+            "combat",
+            "engagement",
+            42,
+            "resolution");
+        var owner = new DeterministicRandomOwner(root);
+        owner.RegisterStream(key);
+        RandomStreamRetirementProposal proposal = owner.EvaluateRetirement(key);
+        RandomStreamProposal pending = owner.EvaluateNextUInt64(key);
+
+        Assert.Single(owner.CaptureCheckpoint().Streams);
+        owner.Commit(proposal);
+        Assert.Empty(owner.CaptureCheckpoint().Streams);
+        Assert.Throws<InvalidOperationException>(() => owner.Commit(pending));
+        Assert.Throws<KeyNotFoundException>(() => owner.EvaluateNextUInt64(key));
+    }
+
+    [Fact]
+    public void RetirementRejectsStateThatChangedAfterEvaluation()
+    {
+        RandomRootSeed root = RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]);
+        var key = new RandomStreamKey(
+            RandomScope.SessionRuntime,
+            "combat",
+            "engagement",
+            42,
+            "resolution");
+        var owner = new DeterministicRandomOwner(root);
+        owner.RegisterStream(key);
+        RandomStreamRetirementProposal stale = owner.EvaluateRetirement(key);
+        owner.Commit(owner.EvaluateNextUInt64(key));
+
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(
+            () => owner.Commit(stale));
+
+        Assert.Contains("no longer matches", error.Message, StringComparison.Ordinal);
+        Assert.Single(owner.CaptureCheckpoint().Streams);
+    }
+
+    [Fact]
     public void OwnedBoundedProposalAdvancesOnlyWhenCommitted()
     {
         RandomRootSeed root = RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]);
@@ -393,6 +535,55 @@ public sealed class DeterministicRandomTests
         Assert.Equal(
             uninterrupted.EvaluateNextUInt64(key),
             restored.Value!.EvaluateNextUInt64(key));
+    }
+
+    [Fact]
+    public void RestoreAcceptsStreamDeclaredByOwningDomain()
+    {
+        DeterministicRandomCheckpoint checkpoint = CreateRandomCheckpoint();
+        RandomStreamKey key = Assert.IsType<RandomStreamCheckpoint>(
+            Assert.Single(checkpoint.Streams)).Key!;
+        CheckpointResult<DeterministicRandomOwner> result =
+            DeterministicRandomOwner.RestoreCheckpoint(
+                checkpoint,
+                new HashSet<RandomStreamKey> { key });
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public void RestoreRejectsStreamAbsentFromOwningDomainDeclarations()
+    {
+        DeterministicRandomCheckpoint checkpoint = CreateRandomCheckpoint();
+
+        CheckpointResult<DeterministicRandomOwner> result =
+            DeterministicRandomOwner.RestoreCheckpoint(
+                checkpoint,
+                new HashSet<RandomStreamKey>());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("$.checkpoint.random.streams[0].key", result.Failure!.Path);
+    }
+
+    [Fact]
+    public void RestoreRejectsOwningDomainDeclarationWithoutSavedStream()
+    {
+        RandomRootSeed root = RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]);
+        var checkpoint = new DeterministicRandomOwner(root).CaptureCheckpoint();
+        var key = new RandomStreamKey(
+            RandomScope.SessionRuntime,
+            "combat",
+            "engagement",
+            42,
+            "resolution");
+
+        CheckpointResult<DeterministicRandomOwner> result =
+            DeterministicRandomOwner.RestoreCheckpoint(
+                checkpoint,
+                new HashSet<RandomStreamKey> { key });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("$.checkpoint.random.streams", result.Failure!.Path);
     }
 
     [Fact]
@@ -641,6 +832,33 @@ public sealed class DeterministicRandomTests
 
         Assert.Equal(8UL, state.NextPosition);
     }
+
+    [Fact]
+    public void ExhaustedStreamRejectsAnotherOutput()
+    {
+        var last = new Xoshiro256State(1, 2, 3, 4, ulong.MaxValue);
+        Xoshiro256State exhausted = Xoshiro256StarStar.Next(last).NextState;
+
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(
+            () => Xoshiro256StarStar.Next(exhausted));
+
+        Assert.Null(exhausted.NextPosition);
+        Assert.Contains("exhausted", error.Message, StringComparison.Ordinal);
+    }
+
+    private static RandomSampleKey[] CreateSampleKeys(int count) =>
+        Enumerable.Range(0, count)
+            .Select(value => new RandomSampleKey(
+                RandomScope.SessionRuntime,
+                "combat",
+                "engagement",
+                (ulong)value,
+                "attack",
+                7,
+                "hit",
+                0,
+                "primary"))
+            .ToArray();
 
     private static DeterministicRandomCheckpoint CreateRandomCheckpoint()
     {

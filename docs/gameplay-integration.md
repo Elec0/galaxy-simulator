@@ -430,9 +430,9 @@ serialization format.
 [Deterministic randomness and stream ownership](deterministic-randomness.md)
 defines the accepted 256-bit root, domain-separated derivation, stateless named
 samples, owner-scoped stateful streams, commit-only consumption, script
-capabilities, and exact checkpoint continuation. `TASK-066` owns the shared
-implementation. Gameplay domains retain ownership of the decisions and stable
-identities that use random values.
+capabilities, and exact checkpoint continuation. Completed `TASK-066` provides
+the shared implementation. Gameplay domains retain ownership of the decisions
+and stable identities that use random values.
 
 ## 4. Topics that need more definition
 

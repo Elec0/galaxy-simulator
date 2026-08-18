@@ -102,4 +102,34 @@ public sealed class GameSessionRandomSetupTests
         Assert.False(result.IsSuccess);
         Assert.Equal("$.checkpoint.random", result.Failure!.Path);
     }
+
+    [Fact]
+    public void SessionRestoreRejectsStreamWithoutOwningDomainDeclaration()
+    {
+        var setup = new GameSessionSetup(
+            [],
+            [],
+            GameSessionTestFixture.Relationships,
+            GameSessionTestFixture.RootSeed,
+            factRetentionCapacity: 64);
+        var session = new GameSession(
+            setup,
+            new DirectLocalNavigationPlanner(
+                new ChebyshevLocalTravelTimeEstimator(100)));
+        GameSessionCheckpoint checkpoint = Assert.IsType<GameSessionCheckpoint>(
+            session.CaptureCheckpoint().Value);
+        var random = new DeterministicRandomOwner(GameSessionTestFixture.RootSeed);
+        random.RegisterStream(new RandomStreamKey(
+            RandomScope.SessionRuntime,
+            "combat",
+            "engagement",
+            42,
+            "resolution"));
+
+        CheckpointResult<GameSession> result = GameSession.RestoreCheckpoint(
+            checkpoint with { Random = random.CaptureCheckpoint() });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("$.checkpoint.random.streams[0].key", result.Failure!.Path);
+    }
 }

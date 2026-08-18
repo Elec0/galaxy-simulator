@@ -86,6 +86,10 @@ internal sealed record RandomBooleanProposal(
     bool Value,
     Xoshiro256State NextState);
 
+internal sealed record RandomStreamRetirementProposal(
+    RandomStreamKey Key,
+    Xoshiro256State ExpectedState);
+
 internal sealed class DeterministicRandomOwner
 {
     private readonly RandomRootSeed _root;
@@ -97,6 +101,10 @@ internal sealed class DeterministicRandomOwner
         _root = root;
     }
 
+    /// <summary>
+    /// Registers one live key after its domain has enforced owner-identity
+    /// non-reuse; the random owner intentionally stores no retired tombstones.
+    /// </summary>
     internal void RegisterStream(RandomStreamKey key)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -182,6 +190,16 @@ internal sealed class DeterministicRandomOwner
             numerator,
             denominator);
         return new RandomBooleanProposal(key, state, step.Value, step.NextState);
+    }
+
+    /// <summary>
+    /// Captures the exact live state that an owning aggregate proposes to
+    /// retire without changing the stream registry during evaluation.
+    /// </summary>
+    internal RandomStreamRetirementProposal EvaluateRetirement(RandomStreamKey key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        return new RandomStreamRetirementProposal(key, _streams[key]);
     }
 
     /// <summary>
@@ -303,6 +321,45 @@ internal sealed class DeterministicRandomOwner
     }
 
     /// <summary>
+    /// Restores structurally valid state against the complete set of live keys
+    /// declared by authoritative gameplay domains.
+    /// </summary>
+    internal static CheckpointResult<DeterministicRandomOwner> RestoreCheckpoint(
+        DeterministicRandomCheckpoint checkpoint,
+        IReadOnlySet<RandomStreamKey> declaredLiveStreams)
+    {
+        ArgumentNullException.ThrowIfNull(declaredLiveStreams);
+        CheckpointResult<DeterministicRandomOwner> restored =
+            RestoreCheckpoint(checkpoint);
+        if (!restored.IsSuccess)
+        {
+            return restored;
+        }
+
+        for (int index = 0; index < checkpoint.Streams.Count; index++)
+        {
+            RandomStreamKey key = checkpoint.Streams[index]!.Key!;
+            if (!declaredLiveStreams.Contains(key))
+            {
+                return CheckpointResult<DeterministicRandomOwner>.Rejected(
+                    new CheckpointValidationFailure(
+                        $"$.checkpoint.random.streams[{index}].key",
+                        "Random stream has no declaration from an owning domain."));
+            }
+        }
+
+        if (checkpoint.Streams.Count != declaredLiveStreams.Count)
+        {
+            return CheckpointResult<DeterministicRandomOwner>.Rejected(
+                new CheckpointValidationFailure(
+                    "$.checkpoint.random.streams",
+                    "An owning-domain random stream declaration has no saved state."));
+        }
+
+        return restored;
+    }
+
+    /// <summary>
     /// Checks only the random contract's structural requirements. Each owning
     /// domain remains responsible for its approved identifier grammar.
     /// </summary>
@@ -352,10 +409,34 @@ internal sealed class DeterministicRandomOwner
         CommitState(proposal.Key, proposal.ExpectedState, proposal.NextState);
     }
 
+    /// <summary>
+    /// Removes a stream only at the owning aggregate's deterministic commit
+    /// boundary, rejecting a proposal evaluated before its latest committed
+    /// draw. Owner-reference validation remains the aggregate's duty.
+    /// </summary>
+    internal void Commit(RandomStreamRetirementProposal proposal)
+    {
+        ArgumentNullException.ThrowIfNull(proposal);
+        RequireCurrentState(proposal.Key, proposal.ExpectedState);
+        _streams.Remove(proposal.Key);
+    }
+
     private void CommitState(
         RandomStreamKey key,
         Xoshiro256State expectedState,
         Xoshiro256State nextState)
+    {
+        RequireCurrentState(key, expectedState);
+        _streams[key] = nextState;
+    }
+
+    /// <summary>
+    /// Rejects stale advancement and retirement proposals through the same
+    /// exact-snapshot invariant.
+    /// </summary>
+    private void RequireCurrentState(
+        RandomStreamKey key,
+        Xoshiro256State expectedState)
     {
         if (!_streams.TryGetValue(key, out Xoshiro256State current)
             || current != expectedState)
@@ -363,8 +444,6 @@ internal sealed class DeterministicRandomOwner
             throw new InvalidOperationException(
                 "Random proposal expected state no longer matches its owned stream.");
         }
-
-        _streams[key] = nextState;
     }
 }
 

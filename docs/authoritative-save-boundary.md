@@ -114,7 +114,7 @@ section whose owning task has not yet defined its internal model.
 | Relationships | The complete relationship inventory and direct restoration contract specified in [Relational simulation architecture](relational-simulation-architecture.md#authoritative-relationship-save-inventory): principal/content identity, player principal, exact standing policy and values, diplomacy, grants, and committed source-scoped standing and policy batch receipts. | Current relationship owner. |
 | Command admission | The next command sequence or exhausted state, last admitted command time, and any admitted-but-not-applied ordered command queue. Retained command records are history, not command authority. | Current processor sequence and admission time; queue reserved for `TASK-038`. |
 | Semantic fact continuity | The next `GameFactSequence` or exhausted state; required persistent consumer cursors; and only the configured retained fact suffix when a feature explicitly requires it after load. | Current fact store; consumer ownership and explanation retention in `TASK-025`. |
-| Deterministic randomness | The resolved 256-bit root seed; derivation, generator, and sampling algorithm identities and versions; and every live stateful stream's canonical scope/domain/owner/purpose key, complete state, and next-draw position. Stateless samples have no individual stream state; their decision and attempt identities remain with the domain owner that defines them. | Defined by [Deterministic randomness and stream ownership](deterministic-randomness.md) in completed `TASK-021`; implementation reserved for `TASK-066`. |
+| Deterministic randomness | The resolved 256-bit root seed; derivation, generator, and sampling algorithm identities and versions; and every live stateful stream's canonical scope/domain/owner/purpose key, complete state, and next-draw position. Stateless samples have no individual stream state; their decision and attempt identities remain with the domain owner that defines them. | Defined by [Deterministic randomness and stream ownership](deterministic-randomness.md) in completed `TASK-021`; implemented by completed `TASK-066`. |
 | Objectives and end state | Every active, completed, failed, or superseded objective; its stable content reference; ordered progress, prerequisites, irreversible choices, timers, and victory or defeat state. | Reserved for `TASK-018`. |
 | Script execution | Every persistent script instance, definition reference, program/version checkpoint, trigger subscriptions, one-shot or repeatable memory, locals that affect future behavior, pending wake/cancellation state, and script-owned idempotency receipts. Scheduled wakes also appear in the agenda. | Reserved for `TASK-017`. |
 | Dialogue continuity | Every active or suspended conversation, participant and definition references, current node, availability/consumption/repeatability memory, selected consequences, response-required state, and any deterministic timeout or wake state. | Defined by [Dialogue state and presentation](dialogue.md) under `TASK-016`; implementation reserved for `TASK-065`. |
@@ -322,8 +322,8 @@ that the boundary is complete.
 `TASK-022` owns encoded save schema, versioning, migration, corruption
 handling, and storage mechanics. `TASK-037` owns versioned content catalogs,
 source provenance, and saved content-reference migration. `TASK-017` through
-`TASK-020`, `TASK-025`, `TASK-038`, dialogue implementation in `TASK-065`, and
-random implementation in `TASK-066` must each supply the precise state for
-their reserved section before their runtime owner can participate in a
-supported save. `TASK-034` completed the first aggregate-admission prerequisite
-for supported save and load work.
+`TASK-020`, `TASK-025`, `TASK-038`, and dialogue implementation in `TASK-065`
+must each supply the precise state for their reserved section before their
+runtime owner can participate in a supported save. Completed `TASK-066`
+supplies the deterministic-randomness section. `TASK-034` completed the first
+aggregate-admission prerequisite for supported save and load work.

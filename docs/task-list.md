@@ -30,8 +30,9 @@ work selection without introducing person-level state. `TASK-016` completed
 the dialogue definition, authority, participant, condition, choice, memory,
 continuity, consequence, pacing, save, and presentation design. `TASK-065`
 retains dialogue implementation. `TASK-021` completed the deterministic random
-root, derived-value, owned-stream, commit, save, and compatibility design;
-`TASK-066` retains implementation.
+root, derived-value, owned-stream, commit, save, and compatibility design.
+`TASK-066` completed the shared deterministic-randomness implementation,
+session ownership, checkpoint integration, retirement, and focused proof.
 
 ## Near-term work
 
@@ -143,26 +144,6 @@ the project-level **Near-term work** section above.
     with `TASK-049`, station identity with `TASK-057`, and knowledge refinement
     with `TASK-020`.
   - Context: [Dialogue](dialogue.md) · [Gameplay content](gameplay-content.md) · [Time and pacing](time-and-pacing.md) · [Concurrency and performance](concurrency-and-performance.md)
-
-- [ ] **TASK-066: Implement deterministic random foundations**
-  - Core derivation, generator, integer sampling, commit-only proposals,
-    checkpoint validation, and session aggregate integration are implemented
-    with focused proof. Stable stream retirement and owning-domain reference
-    validation remain before completion.
-  - Implement the accepted 256-bit root seed, versioned SHA-256 canonical
-    derivation, stateless named samples, scoped stateful `xoshiro256**`
-    streams, and integer sampling capabilities from `TASK-021`.
-  - Add aggregate ownership, exact checkpoint and restore, stable stream
-    lifecycle, commit-only consumption, algorithm registration, and clear
-    rejection of incompatible or malformed state.
-  - Prove golden vectors, namespace isolation, unrelated-draw stability,
-    rejected-work non-consumption, exact continuation after restore, and
-    identical results across supported worker and batch layouts.
-  - Begin before the first production gameplay consumer of randomness.
-    Coordinate script capabilities with `TASK-017`, procedural generation with
-    `TASK-047`, save encoding with `TASK-022`, and compatibility with
-    `TASK-060`.
-  - Context: [Deterministic randomness](deterministic-randomness.md) · [Concurrency and performance](concurrency-and-performance.md) · [Authoritative save boundary](authoritative-save-boundary.md)
 
 - [ ] **TASK-041: Define generalized inventory, cargo, and ship equipment**
   - Evolve the current material-only inventory model so ships and other owners
@@ -423,7 +404,7 @@ the project-level **Near-term work** section above.
     manufacturing incompatible definitions.
   - Begin only after `TASK-023` establishes the static content and new-game
     composition design, `TASK-048` implements that shared boundary, and
-    `TASK-066` implements the deterministic-randomness foundation designed by
+    completed `TASK-066` provides the deterministic-randomness foundation designed by
     completed `TASK-021`. Procedural generation is intentionally deferred until
     later gameplay and world-shape requirements provide concrete constraints.
   - Context: [Gameplay content](gameplay-content.md) · [Deterministic randomness](deterministic-randomness.md) · [Simulation architecture](simulation-architecture.md) · [Initial roadmap](roadmap.md)
@@ -470,7 +451,7 @@ the project-level **Near-term work** section above.
     versus migration behavior, and how single-thread and concurrent reference
     results are compared without promising unsupported bitwise identity.
   - Build on the bit-exact integer random contract from completed `TASK-021`
-    and use implementation evidence from `TASK-066` plus broader evidence from
+    and use implementation evidence from completed `TASK-066` plus broader evidence from
     `TASK-029`; coordinate save and content compatibility with `TASK-022` and
     `TASK-037`.
   - Context: [Technical direction](technical-direction.md) · [Deterministic randomness](deterministic-randomness.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Save format and migration](save-format-and-migration.md)
@@ -491,6 +472,26 @@ the project-level **Near-term work** section above.
 
 ## Completed foundations
 
+- [x] **TASK-066: Implement deterministic random foundations**
+  - Implemented the required immutable 256-bit root seed, versioned SHA-256
+    canonical derivation, stateless named samples, scoped stateful
+    `xoshiro256**` streams, and integer sampling capabilities from `TASK-021`.
+  - Added session-owned aggregate state, exact live-stream checkpoint and
+    restore, strict algorithm and malformed-state rejection, commit-only draw
+    consumption, and expected-state stream retirement.
+  - Required saved live streams to match owning-domain declarations exactly;
+    domains own identity non-reuse and the aggregate confirms references are
+    clear before retirement without retaining retired-key tombstones.
+  - Proved golden vectors, root and namespace isolation, unbiased sampling,
+    rejected-work non-consumption, retirement safety, exact continuation, and
+    worker, batch, and partition independence with 55 focused test cases. The
+    full 423-test simulation suite, 27 content tests, Release build, formatting,
+    Godot headless build, and all canonical benchmark digests pass.
+  - Script use remains `TASK-017`, procedural generation remains `TASK-047`,
+    and broader cross-platform and cross-version compatibility remains
+    `TASK-060`.
+  - Context: [Deterministic randomness](deterministic-randomness.md) · [Concurrency and performance](concurrency-and-performance.md) · [Authoritative save boundary](authoritative-save-boundary.md)
+
 - [x] **TASK-021: Define random-number stream ownership**
   - Defined one resolved 256-bit session root with domain-separated generation
     and runtime scopes, versioned SHA-256 canonical derivation, and bit-exact
@@ -503,8 +504,8 @@ the project-level **Near-term work** section above.
     compatibility, and independence from unrelated draws or work layout.
   - Save-scumming prevention, cryptographic secrecy, floating distributions,
     and general probability scripting remain outside the contract.
-  - Implementation remains in `TASK-066`; procedural generation consumes the
-    separate generation scope in `TASK-047`; cross-platform compatibility
+  - Implementation was completed by `TASK-066`; procedural generation consumes
+    the separate generation scope in `TASK-047`; cross-platform compatibility
     remains in `TASK-060`.
   - Context: [Deterministic randomness and stream ownership](deterministic-randomness.md)
 
