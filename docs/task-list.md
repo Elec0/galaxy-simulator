@@ -33,6 +33,9 @@ retains dialogue implementation. `TASK-021` completed the deterministic random
 root, derived-value, owned-stream, commit, save, and compatibility design.
 `TASK-066` completed the shared deterministic-randomness implementation,
 session ownership, checkpoint integration, retirement, and focused proof.
+`TASK-050` completed the player-facing save-slot, autosave, external-edit, and
+local-preference design. `TASK-067` retains the required save-envelope display
+name implementation; cross-device synchronization remains out of scope.
 
 ## Near-term work
 
@@ -197,20 +200,6 @@ the project-level **Near-term work** section above.
     `TASK-040`.
   - Context: [Player experience](player-experience.md) · [Technical direction](technical-direction.md) · [Presentation snapshots](presentation-snapshots.md) · [Initial roadmap](roadmap.md)
 
-- [ ] **TASK-050: Define save slots, autosave, and local preference storage**
-  - Define slot naming and discovery, manual-save and autosave behavior,
-    cadence, retention, backup visibility, overwrite confirmation, and
-    cross-device or external-edit conflict handling around the validated file
-    store from `TASK-022`.
-  - Define storage and reset behavior for local pacing, presentation,
-    localization, and accessibility preferences while keeping them outside the
-    authoritative session unless an owning gameplay task explicitly requires
-    otherwise.
-  - Begin after `TASK-045` defines locale and accessibility ownership;
-    coordinate failed-load recovery with `TASK-040` and pacing preferences with
-    `TASK-038`.
-  - Context: [Save format and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md) · [Time and pacing](time-and-pacing.md)
-
 - [ ] **TASK-053: Define autonomous ship work selection**
   - Define how non-player ships discover, evaluate, select, and stop ordinary
     work through the same commands and order lifecycle used by player intent.
@@ -236,6 +225,17 @@ the project-level **Near-term work** section above.
   - Context: [Internationalization and localization](internationalization-and-localization.md) · [Player experience](player-experience.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ### Mid term
+
+- [ ] **TASK-067: Add player-visible save names to the strict save envelope**
+  - Extend the versioned `TASK-022` save envelope with the non-authoritative,
+    player-editable display name accepted by `TASK-050`.
+  - Define and implement strict current-schema validation and deterministic
+    migration behavior for existing saves without inventing an authoritative
+    value, changing compatibility decisions, or affecting continuation.
+  - Keep the display name separate from slot-path validation, save identity,
+    and all authoritative checkpoint state. Coordinate discovery and stale-file
+    revision tokens with the application implementation of `TASK-050`.
+  - Context: [Save slots, autosave, and local preferences](save-slots-and-local-preferences.md) · [Save format and migration](save-format-and-migration.md)
 
 - [ ] **TASK-017: Design deterministic scripted events**
   - Define time-, location-, threshold-, and fact-based triggers.
@@ -471,6 +471,27 @@ the project-level **Near-term work** section above.
   - Context: [Individual NPC scope](individual-npc-scope.md) · [Vision](vision.md) · [Player experience](player-experience.md)
 
 ## Completed foundations
+
+- [x] **TASK-050: Define save slots, autosave, and local preference storage**
+  - Defined stable manual-slot IDs, player-editable display names, distinct
+    autosaves, and manual-save retention. The display name is non-authoritative
+    save-envelope metadata; its strict-schema implementation remains `TASK-067`.
+  - Defined locally configurable autosaves: a five-minute real-time default,
+    five retained by default, ranges of one through 60 minutes and one through
+    20 saves, explicit disablement, completed-boundary capture, no paused write,
+    and rotation that never evicts manual slots.
+  - Required one explicit backup recovery choice, confirmation before manual
+    overwrite, and revision-token detection of local external edits. A stale
+    save flow requires reload, save as new, or explicit overwrite. Cross-device
+    synchronization and external-sync conflict resolution are out of scope.
+  - Defined one versioned device-local preference JSON store, in-memory
+    migration, safe default use and explicit reset after invalid or unsupported
+    data, category reset, and reset-all. Preferences remain outside saves and
+    authoritative state.
+  - `TASK-040` retains failed-load recovery, `TASK-038` pacing behavior,
+    `TASK-061` accessibility behavior, and `TASK-067` save-envelope display
+    names.
+  - Context: [Save slots, autosave, and local preferences](save-slots-and-local-preferences.md) · [Save format and migration](save-format-and-migration.md) · [Time and pacing](time-and-pacing.md)
 
 - [x] **TASK-066: Implement deterministic random foundations**
   - Implemented the required immutable 256-bit root seed, versioned SHA-256

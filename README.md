@@ -20,6 +20,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Entity lifecycle and explicit spawning](docs/entity-lifecycle.md)
 - [Authoritative save boundary](docs/authoritative-save-boundary.md)
 - [Save format, versioning, and migration](docs/save-format-and-migration.md)
+- [Save slots, autosave, and local preferences](docs/save-slots-and-local-preferences.md)
 - [Gameplay content and static new-game composition](docs/gameplay-content.md)
 - [Internationalization and localization](docs/internationalization-and-localization.md)
 - [Planned game-system inventory](docs/planned-systems.md)
