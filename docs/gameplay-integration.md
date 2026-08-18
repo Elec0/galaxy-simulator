@@ -385,6 +385,11 @@ Dialogue presentation belongs in Godot, while gameplay-affecting conditions,
 choices, completion state, and effects belong to the authoritative game
 session. A gameplay-affecting choice should submit a normal command.
 
+[Dialogue state and presentation](dialogue.md) resolves the definition,
+participant, condition, choice, memory, consequence, continuity, fact,
+checkpoint, localization, and foreground-presentation boundaries under
+`TASK-016`. `TASK-065` owns implementation.
+
 Scripted behavior needs deterministic triggers, persistent one-time state, and
 a restricted set of command effects. It should consume semantic facts rather
 than internal transport or production implementation events.
@@ -430,10 +435,6 @@ serialization format.
   temporary scripted control
 - Which activities may be interrupted immediately and which require a safe
   transition or explicit failure
-- Whether dialogue pauses by default and whether simulation-time conditions can
-  change while dialogue is open
-- Dialogue availability, choice conditions, repeatability, memory, and
-  consequences
 - Script trigger semantics, including one-shot, repeatable, threshold,
   time-based, location-based, and fact-based triggers
 - The permitted effects of scripts and whether development-only effects are

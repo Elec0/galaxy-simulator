@@ -161,8 +161,10 @@ speed unchanged. If the game was already paused when dialogue opened, or the
 player manually pauses during the dialogue, closing it leaves the game paused.
 
 Multiple screens belonging to one continuous conversation retain one automatic
-pause without resuming between screens. `TASK-016` remains responsible for
-defining dialogue state, response availability, and conversation continuity.
+pause without resuming between screens. [Dialogue state and presentation](dialogue.md)
+defines response-required classification, foreground opening, pending
+conversations, response availability, and conversation continuity under
+`TASK-016`. `TASK-065` owns dialogue implementation.
 
 ## Pacing levers
 

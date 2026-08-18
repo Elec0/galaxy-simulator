@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Dialogue](dialogue.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -26,7 +26,20 @@ validator. `TASK-048` remains the next content
 integration dependency and retains built-in content plus static new-game
 integration. `TASK-015` established the initial ship-only NPC boundary.
 `TASK-042` and `TASK-053` may now design NPC decision quality and autonomous
-work selection without introducing person-level state.
+work selection without introducing person-level state. `TASK-016` is the
+current design focus and establishes authoritative dialogue state, participant
+and apparent-speaker boundaries, conversation continuity, choice consequences,
+and Godot presentation behavior.
+
+- [ ] **TASK-016: Design dialogue state and presentation**
+  - Complete the approved dialogue definition, participant, condition, choice,
+    memory, consequence, fact, checkpoint, pacing, and presentation contract.
+  - Support ship, station, and principal respondents while allowing optional
+    presentation-only named-person attribution without introducing simulated
+    people.
+  - Keep rendering and interaction in Godot while gameplay effects use normal
+    commands. Track implementation separately in `TASK-065`.
+  - Context: [Dialogue](dialogue.md) · [Time and pacing](time-and-pacing.md) · [Individual NPC scope](individual-npc-scope.md)
 
 ## Near-term work
 
@@ -45,13 +58,24 @@ the project-level **Near-term work** section above.
 
 ### Near term
 
-- [ ] **TASK-016: Design dialogue state and presentation**
-  - Define availability, conditions, choices, repeatability, memory,
-    consequences, response-required classification, and conversation
-    continuity under the accepted pause behavior.
-  - Keep rendering and interaction in Godot while gameplay effects use normal
-    commands.
-  - Context: [Time and pacing](time-and-pacing.md)
+- [ ] **TASK-064: Design event-responsive simulation pacing**
+  - Define how authoritative or presentation events can request a local pacing
+    response without becoming simulation owners or interrupting an in-progress
+    timestamp cycle.
+  - Establish the trigger categories, player-configurable policy, priority and
+    conflict behavior, acknowledgement and override semantics, and visible
+    explanation required for event-driven speed changes. Include the desired
+    examples of reducing to `1x` when a new dialogue event arrives and pausing
+    when offscreen combat begins.
+  - Decide how event delivery, knowledge or visibility, repeated events,
+    dismissal, save or load, and multiple simultaneous requests interact with
+    the player-controlled pacing state. Preserve local single-player ownership,
+    deterministic simulation outcomes, and the completed-timestamp checkpoint
+    boundary.
+  - Coordinate response-required dialogue with `TASK-016`, player knowledge
+    and offscreen-event visibility with `TASK-020`, semantic event consumption
+    with `TASK-008`, and pacing implementation with `TASK-038`.
+  - Context: [Time and pacing](time-and-pacing.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md)
 
 - [ ] **TASK-019: Define interactions between ships in motion**
   - Define how the simulation discovers, schedules, and resolves interactions
@@ -74,6 +98,12 @@ the project-level **Near-term work** section above.
 - [ ] **TASK-020: Define player knowledge and information staleness**
   - Separate complete authoritative state from currently known, observed, or
     outdated information.
+  - Refine the initial dialogue rule that conditions may inspect any approved
+    authoritative data: decide which conditions should instead use player
+    knowledge, how availability discloses hidden or stale information, and how
+    authored content adopts that refinement without silently changing existing
+    conversation behavior.
+  - Context: [Dialogue](dialogue.md) · [Player experience](player-experience.md)
 
 - [ ] **TASK-021: Define random-number stream ownership**
   - Decide how systems and scripts receive deterministic randomness.
@@ -109,6 +139,22 @@ the project-level **Near-term work** section above.
   - Integrate response-required dialogue automatic pause only after `TASK-016`
     defines the corresponding dialogue state and continuity.
   - Context: [Time and pacing](time-and-pacing.md)
+
+- [ ] **TASK-065: Implement dialogue state and presentation**
+  - Implement the accepted authored-definition, validation, authoritative
+    conversation, participant, condition, choice, memory, fact, snapshot,
+    checkpoint, and restore contracts from `TASK-016`.
+  - Add the Godot foreground and pending-conversation surfaces, localized
+    dialogue and optional named-person attribution, and response-required
+    pacing integration without making presentation state authoritative.
+  - Coordinate one normal gameplay-command consequence atomically with a
+    choice, retain a single-thread reference path, and prove deterministic
+    results across supported worker and batch layouts.
+  - Begin after `TASK-016` is accepted. Coordinate content integration with
+    `TASK-048`, pacing with `TASK-038` and `TASK-064`, the application shell
+    with `TASK-049`, station identity with `TASK-057`, and knowledge refinement
+    with `TASK-020`.
+  - Context: [Dialogue](dialogue.md) · [Gameplay content](gameplay-content.md) · [Time and pacing](time-and-pacing.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-041: Define generalized inventory, cargo, and ship equipment**
   - Evolve the current material-only inventory model so ships and other owners
