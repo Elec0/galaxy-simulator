@@ -1,6 +1,6 @@
 # Economy and production
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Time and pacing](time-and-pacing.md)
+[Project index](../README.md) · [Inventory and cargo](inventory-and-cargo.md) · [Simulation architecture](simulation-architecture.md) · [Time and pacing](time-and-pacing.md)
 
 ## Purpose
 
@@ -41,6 +41,12 @@ Transport jobs reserve source inventory and cargo capacity so multiple ships can
 Prices can help allocate scarce goods, but price alone should not be the only coordination mechanism. Factions may reserve strategic resources, prioritize military deliveries, or operate internal logistics without treating every transfer as a public-market purchase.
 
 Currency and market pricing are excluded from Phase 1. The first milestone tests the physical economy before adding price feedback.
+
+All trade uses one unified currency called Credits. Credits are an economic
+ledger value rather than physical inventory, consume no cargo capacity, and do
+not move through material or item transfers. `TASK-055` defines Credit balance
+ownership and conservation, pricing, contracts, and atomic settlement with
+physical delivery.
 
 ## Construction
 

@@ -312,9 +312,9 @@ the boundary defined here:
   behavior as player-facing surfaces are added.
 - `TASK-050` owns persistence, reset, and discovery of local locale, text-scale,
   and other presentation preferences.
-- `TASK-016`, `TASK-018`, and `TASK-041` define the semantic fields and argument
-  contracts needed by dialogue, objectives, items, and equipment. They do not
-  invent separate localization systems.
+- `TASK-016`, `TASK-018`, `TASK-041`, and `TASK-068` define the semantic fields
+  and argument contracts needed by dialogue, objectives, items, and equipment.
+  They do not invent separate localization systems.
 - `TASK-061` owns comprehensive accessibility modes and acceptance criteria.
 - The exact additional shipped locales, font files, translator platform,
   translation staffing, and release schedule remain product decisions. Adding

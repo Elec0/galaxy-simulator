@@ -22,6 +22,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Save format, versioning, and migration](docs/save-format-and-migration.md)
 - [Save slots, autosave, and local preferences](docs/save-slots-and-local-preferences.md)
 - [Gameplay content and static new-game composition](docs/gameplay-content.md)
+- [Generalized inventory and cargo](docs/inventory-and-cargo.md)
 - [Internationalization and localization](docs/internationalization-and-localization.md)
 - [Planned game-system inventory](docs/planned-systems.md)
 - [Concurrency and performance architecture](docs/concurrency-and-performance.md)

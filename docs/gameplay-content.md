@@ -63,7 +63,8 @@ already planned examples include:
 - material definitions;
 - principal definitions;
 - standing policies;
-- later item and equipment definitions owned by `TASK-041`;
+- item definitions designed by completed `TASK-041` and implemented by
+  `TASK-069`, plus equipment definitions owned by `TASK-068`;
 - later dialogue, objective, and other authored definitions after their owning
   tasks establish the corresponding domain contracts.
 
@@ -327,7 +328,9 @@ or scenario coverage.
 
 This decision does not define:
 
-- generalized item, stack, cargo, or equipment semantics from `TASK-041`;
+- generalized item, stack, and cargo implementation from `TASK-069`, following
+  the accepted design from completed `TASK-041`;
+- equipment, ship-slot, installation, and removal semantics from `TASK-068`;
 - procedural new-game generation from `TASK-047`;
 - script triggers, effects, persistence, or scheduling from `TASK-017`;
 - localization mechanics from `TASK-045` beyond the recommended headless

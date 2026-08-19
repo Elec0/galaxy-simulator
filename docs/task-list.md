@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Dialogue](dialogue.md) · [Deterministic randomness](deterministic-randomness.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Dialogue](dialogue.md) · [Deterministic randomness](deterministic-randomness.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -36,11 +36,18 @@ session ownership, checkpoint integration, retirement, and focused proof.
 `TASK-050` completed the player-facing save-slot, autosave, external-edit, and
 local-preference design. `TASK-067` retains the required save-envelope display
 name implementation; cross-device synchronization remains out of scope.
+`TASK-041` completed the generalized inventory and cargo design while
+preserving the existing material contracts until an explicit compatible
+migration is implemented. `TASK-069` retains that implementation. `TASK-068`
+separately owns equipment and ship-slot design. Trade uses the single unified
+currency Credits; `TASK-055` retains its balance, pricing, and settlement
+design.
 
 ## Near-term work
 
-No task is currently promoted to near-term work. `TASK-048` remains in the
-near-term parking-lot horizon until the project owner promotes it.
+No task is currently promoted to near-term work. `TASK-048`, `TASK-068`, and
+`TASK-069` remain in the near-term parking-lot horizon until the project owner
+promotes one of them.
 
 ## Future parking lot
 
@@ -53,6 +60,34 @@ in the **Near term** parking-lot section remains deferred; it is not promoted to
 the project-level **Near-term work** section above.
 
 ### Near term
+
+- [ ] **TASK-069: Implement generalized inventory and cargo**
+  - Implement the accepted physical-definition, fungible-holding, discrete-item,
+    custody, integer-capacity, reservation, atomic-transfer, and explicit
+    destruction-disposition contracts from completed `TASK-041`.
+  - Add immutable presentation snapshots, complete checkpoints and restore,
+    material-ledger compatibility, stable typed outcomes, and deterministic
+    proposal ordering with single-thread and worker-layout proof.
+  - Preserve existing production and transport behavior until their callers
+    migrate through the explicit compatibility boundary. Build on completed
+    `TASK-063`; coordinate production content admission with `TASK-048`, saved
+    content references with `TASK-037`, and equipment items with `TASK-068`.
+  - Context: [Generalized inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md) · [Authoritative save boundary](authoritative-save-boundary.md) · [Concurrency and performance](concurrency-and-performance.md)
+
+- [ ] **TASK-068: Define equipment, ship slots, installation, and removal**
+  - Define which generalized physical items can become equipment and how ship
+    designs declare stable slots, hardpoints, compatibility, limits, and
+    installed capability contributions without prescribing later combat,
+    repair, or station outcome policy.
+  - Define equipment installation, removal, replacement, reservation,
+    ownership, activation, damage or destruction boundaries, commands, facts,
+    snapshots, checkpoints, saves, and deterministic contention behavior.
+  - Build on the generalized item identity, cargo, and transfer semantics from
+    completed `TASK-041` and the content catalogs completed by `TASK-063`.
+    Coordinate authored definitions with `TASK-023`, combat effects with
+    `TASK-046`, ship progression with `TASK-056`, station capabilities with
+    `TASK-057`, and repair behavior with `TASK-058`.
+  - Context: [Gameplay content](gameplay-content.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-064: Design event-responsive simulation pacing**
   - Define how authoritative or presentation events can request a local pacing
@@ -147,18 +182,6 @@ the project-level **Near-term work** section above.
     with `TASK-049`, station identity with `TASK-057`, and knowledge refinement
     with `TASK-020`.
   - Context: [Dialogue](dialogue.md) · [Gameplay content](gameplay-content.md) · [Time and pacing](time-and-pacing.md) · [Concurrency and performance](concurrency-and-performance.md)
-
-- [ ] **TASK-041: Define generalized inventory, cargo, and ship equipment**
-  - Evolve the current material-only inventory model so ships and other owners
-    can hold the approved categories of physical items, without treating every
-    item as a material unit.
-  - Define item identity and stacks, capacity or slot semantics, equipment
-    installation and removal, ownership, transfer, reservations, destruction
-    disposition, authoritative snapshots, and save-state requirements.
-  - Preserve the existing material-production and transport contracts until a
-    compatible migration is explicitly designed. Coordinate catalog-defined
-    item and equipment data with `TASK-023`, and combat or repair behavior
-    with `TASK-046`.
 
 - [ ] **TASK-042: Define NPC skills and bounded decision quality**
   - Decide which NPC categories, if any, have skills, competencies, preferences,
@@ -356,21 +379,25 @@ the project-level **Near-term work** section above.
     resulting inventory.
   - Define content, commands, facts, snapshots, checkpoints, and deterministic
     batching without promoting the Phase 1 fixture into session authority.
-  - Coordinate items and equipment with `TASK-041`, player knowledge with
+  - Coordinate item design with completed `TASK-041`, inventory implementation
+    with `TASK-069`, equipment with `TASK-068`, player knowledge with
     `TASK-020`, movement interactions with `TASK-019`, and autonomous selection
     with `TASK-053`.
   - Context: [Economy](economy.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md)
 
-- [ ] **TASK-055: Define trade, contracts, currency, prices, and markets**
+- [ ] **TASK-055: Define trade, contracts, Credits, prices, and markets**
   - Define purchase, sale, procurement, and transport agreements for player and
     autonomous actors, including offer identity, eligibility, acceptance,
     reservation, fulfillment, cancellation, failure, and explanation.
-  - Decide currency ownership and conservation, pricing and price discovery,
-    transaction atomicity, public-market versus internal logistics boundaries,
-    relationship effects, snapshots, saves, and deterministic contention.
-  - Begin after `TASK-041` defines tradable inventory categories; coordinate
-    logistics with `TASK-009`, docking with `TASK-051`, knowledge with
-    `TASK-020`, and economic facts with `TASK-032`.
+  - Use the single unified currency Credits. Define Credit balance ownership
+    and conservation, pricing and price discovery, transaction atomicity,
+    public-market versus internal logistics boundaries, relationship effects,
+    snapshots, saves, and deterministic contention. Credits are not physical
+    inventory and consume no cargo capacity.
+  - Build on the tradable inventory categories defined by completed `TASK-041`;
+    coordinate implementation with `TASK-069`, logistics with `TASK-009`,
+    docking with `TASK-051`, knowledge with `TASK-020`, and economic facts with
+    `TASK-032`.
   - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Factions](factions.md)
 
 - [ ] **TASK-057: Define station composition, construction, and expansion**
@@ -380,7 +407,7 @@ the project-level **Near-term work** section above.
   - Define how station construction and expansion consume material and work,
     choose location, allocate identity, change regional capacity, handle
     interruption or removal, and join commands, facts, snapshots, and saves.
-  - Begin after `TASK-041` defines installed equipment; completed `TASK-063`
+  - Begin after `TASK-068` defines installed equipment; completed `TASK-063`
     supplies content catalogs. Coordinate docking with `TASK-051`, territory with
     `TASK-059`, and strategic construction with `TASK-026`.
   - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md)
@@ -416,7 +443,7 @@ the project-level **Near-term work** section above.
   - Define acquisition eligibility and cost, initial control and orders,
     equipment changes, transfer and failure behavior, semantic facts,
     snapshots, checkpoints, and the viability of continued one-ship play.
-  - Begin after `TASK-041` defines equipment and `TASK-055` defines exchange;
+  - Begin after `TASK-068` defines equipment and `TASK-055` defines exchange;
     coordinate construction with `TASK-034` and combat losses with `TASK-046`.
   - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md)
 
@@ -426,8 +453,9 @@ the project-level **Near-term work** section above.
     interruption, completion, failure, and resulting asset availability.
   - Preserve material causality and use ordinary orders, facts, snapshots, and
     checkpoints rather than silently restoring damaged assets.
-  - Begin after damage in `TASK-046`, generalized inventory in `TASK-041`, and
-    station capabilities in `TASK-057`; coordinate docking with `TASK-051`.
+  - Begin after damage in `TASK-046`, generalized inventory in `TASK-041`,
+    equipment in `TASK-068`, and station capabilities in `TASK-057`; coordinate
+    docking with `TASK-051`.
   - Context: [Economy](economy.md) · [Player experience](player-experience.md)
 
 - [ ] **TASK-059: Define territory claiming and political expansion**
@@ -471,6 +499,23 @@ the project-level **Near-term work** section above.
   - Context: [Individual NPC scope](individual-npc-scope.md) · [Vision](vision.md) · [Player experience](player-experience.md)
 
 ## Completed foundations
+
+- [x] **TASK-041: Define generalized inventory and cargo**
+  - Defined fungible materials and ordinary cargo plus stable discrete physical
+    items, with qualified content identity and no authoritative stack IDs.
+  - Defined one integer cargo-capacity dimension, explicit physical custody,
+    fungible, instance, and incoming-capacity reservations, atomic transfers,
+    and explicit destruction or transfer disposition.
+  - Kept Credits, people, permissions, objectives, nonphysical mission state,
+    and equipment installation outside inventory. Trade uses the single unified
+    currency Credits under `TASK-055`; equipment and ship slots remain
+    `TASK-068`.
+  - Defined immutable presentation views, complete checkpoint and restore state,
+    exact content-reference migration, material-ledger compatibility, and
+    deterministic proposal commit independent of worker or batch layout.
+  - Implementation remains `TASK-069`; content-reference migration remains
+    `TASK-037`.
+  - Context: [Generalized inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md) · [Economy](economy.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [x] **TASK-050: Define save slots, autosave, and local preference storage**
   - Defined stable manual-slot IDs, player-editable display names, distinct
