@@ -92,11 +92,11 @@ implementation.
 | System-local movement | Plan destination intent and execute authoritative scheduled motion without making rendered interpolation authoritative. | [Navigation architecture](navigation-architecture.md), completed `TASK-005` and `TASK-028`. |
 | Inter-system travel | Compose local approach, connector transit, emergence, and continuation behind opaque plans. | [Navigation architecture](navigation-architecture.md), completed `TASK-028` and `TASK-031`. |
 | Dynamic connectors and access | Change connector availability or actor access with explicit authority, waiting, wake, replan, failure, fact, and save behavior. | `TASK-030`. |
-| Moving-ship interactions | Discover and resolve range crossing, proximity, following, interception, assistance, and other interactions while ships remain in motion. | `TASK-019`. |
-| Collision and avoidance | Define collision geometry, swept interaction, avoidance policy, and any fixed-step participation. | Explicitly deferred by [navigation architecture](navigation-architecture.md); physical substrate begins with `TASK-019`. |
+| Moving-ship interactions | Discover and resolve range crossing, proximity, following, interception, assistance, and other interactions while ships remain in motion. | Defined by [moving-ship interactions](moving-ship-interactions.md) in completed `TASK-019`; implementation retained by `TASK-071`. |
+| Collision and avoidance | Define collision geometry, swept interaction, avoidance policy, and any fixed-step participation. | `TASK-072`, building on the physical substrate designed by completed `TASK-019` and implemented by `TASK-071`. |
 | Hazards and environmental effects | Represent spatial hazards, exposure, route cost, interruption, and consequences if required by later gameplay. | Inventory deferral beyond the current roadmap; navigation already reserves hazard-aware planning and interruption boundaries. |
-| Docking, undocking, and berths | Approach a facility, obtain access or capacity, transition between moving and docked state, and expose congestion. | `TASK-051`, after the shared moving-interaction substrate in `TASK-019`. |
-| Formations and fleet movement | Preserve group intent, relative movement policy, replanning, and deterministic membership behavior. | Inventory deferral after `TASK-019` and `TASK-033`; formation movement is explicitly deferred by [navigation architecture](navigation-architecture.md). |
+| Docking, undocking, and berths | Approach a facility, obtain access or capacity, transition between moving and docked state, and expose congestion. | `TASK-051`, building on the shared moving-interaction design from completed `TASK-019`. |
+| Formations and fleet movement | Preserve group intent, relative movement policy, replanning, and deterministic membership behavior. | Inventory deferral building on completed `TASK-019` and later `TASK-033`; formation movement is explicitly deferred by [navigation architecture](navigation-architecture.md). |
 | Sensors, detection, and scouting | Determine what an observer can detect, identify, track, or lose, including stale positions and undiscovered topology. | `TASK-020`; detailed sensor mechanics are explicitly deferred by [player experience](player-experience.md) and [navigation architecture](navigation-architecture.md). |
 | Reduced-detail inactive simulation | Reduce work for unobserved or inactive systems without changing causal outcomes. | Explicitly deferred by [navigation architecture](navigation-architecture.md) and [concurrency and performance](concurrency-and-performance.md), pending evidence. |
 
@@ -156,7 +156,7 @@ implementation.
 
 | System | Planned responsibility | Current ownership or disposition |
 | --- | --- | --- |
-| Combat engagement | Admit attack, defense, patrol, escort, withdrawal, and avoidance intent and resolve moving engagements without a combat-only motion model. | `TASK-046`, built on `TASK-019`. |
+| Combat engagement | Admit attack, defense, patrol, escort, withdrawal, and avoidance intent and resolve moving engagements without a combat-only motion model. | `TASK-046`, built on completed `TASK-019`. |
 | Damage, destruction, and loss | Apply damage, disable or destroy assets, invalidate work, dispose of cargo, and create replacement demand and facts. | `TASK-046`; entity removal foundation in completed `TASK-011` and `TASK-039`. |
 | Surrender, capture, and control reassignment | End conflict without destruction and transfer control or ownership through explicit policy. | `TASK-046`; relationship architecture explicitly defers transfer policy to the combat owner. |
 | Observed and unobserved conflict | Preserve identical causal outcomes while varying only player knowledge, presentation, and possibly simulation detail proven safe. | `TASK-046` with `TASK-020`; [technical direction](technical-direction.md) leaves the exact treatment open. |
@@ -192,14 +192,16 @@ The review added separate tasks rather than widening accepted owners:
 | Territory claiming and political expansion | `TASK-059` | Territorial progression is promised, while the relational foundation intentionally left identities, boundaries, and claim policy unowned. |
 | Cross-platform and version reproducibility | `TASK-060` | The architecture promises reproducibility but explicitly leaves its compatibility envelope unresolved. |
 
-The review retained the following as deliberate deferrals: final visual style,
-audio, mod distribution, full replay and telemetry, collision and avoidance,
-hazards, formation geometry, reduced-detail inactive simulation, detailed
-sensors, crew and population, salvage and wreck recovery, law and policing,
-membership hierarchies, autonomous diplomacy, narrative campaigns, and
-technology or research. These areas are optional, evidence-gated, or depend on
-later gameplay contracts. Their inventory rows remain sufficient ownership
-until a concrete scenario requires promotion to a tracker task.
+Collision and avoidance, originally retained as an inventory-only deferral,
+are now tracked separately by `TASK-072`. The review retains the following as
+inventory-only deferrals: final visual style, audio, mod distribution, full
+replay and telemetry, hazards, formation geometry, reduced-detail inactive
+simulation, detailed sensors, crew and population, salvage and wreck recovery,
+law and policing, membership hierarchies, autonomous diplomacy, narrative
+campaigns, and technology or research. These areas are optional,
+evidence-gated, or depend on later gameplay contracts. Their inventory rows
+remain sufficient ownership until a concrete scenario requires promotion to a
+tracker task.
 
 ## Cross-cutting ownership rules
 

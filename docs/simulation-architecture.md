@@ -1,6 +1,6 @@
 # Simulation architecture
 
-[Project index](../README.md) · [Runtime orchestration](runtime-orchestration.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Concurrency and performance](concurrency-and-performance.md) · [Technical direction](technical-direction.md) · [Time and pacing](time-and-pacing.md)
+[Project index](../README.md) · [Runtime orchestration](runtime-orchestration.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Concurrency and performance](concurrency-and-performance.md) · [Technical direction](technical-direction.md) · [Time and pacing](time-and-pacing.md)
 
 ## Goals
 
@@ -100,6 +100,14 @@ Different activities should use the update model appropriate to them:
 - Visual interpolation between authoritative simulation changes
 
 An entity remains individually simulated even when it is represented by scheduled events rather than continuous polling.
+
+Moving-ship interactions follow this mixed update model without introducing a
+global movement tick. Constant local-motion segments use analytic swept-range
+crossings, authoritative changes trigger reevaluation, and only an explicit
+active gameplay interaction may opt into domain-owned fixed steps. Due crossing
+work evaluates in the state-update phase after same-timestamp physical
+completions. See
+[Moving-ship interaction architecture](moving-ship-interactions.md).
 
 Parallel evaluation must preserve this update model and its deterministic phase
 barriers. Systems read stable phase state and publish buffered effects;

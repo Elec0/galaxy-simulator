@@ -1,6 +1,6 @@
 # Navigation and spatial architecture
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Concurrency and performance](concurrency-and-performance.md) · [Player experience](player-experience.md) · [Gameplay integration](gameplay-integration.md) · [Project task list](task-list.md)
+[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Concurrency and performance](concurrency-and-performance.md) · [Player experience](player-experience.md) · [Gameplay integration](gameplay-integration.md) · [Project task list](task-list.md)
 
 ## Purpose
 
@@ -172,9 +172,10 @@ completion events without mutating every ship at rendering frequency.
 
 Godot may interpolate from that authoritative segment for smooth display.
 Rendered frame positions are not written back into the simulation. Activities
-that need intermediate physical interaction, such as active combat or hazard
-avoidance, may later use fixed simulation steps without changing the system,
-target, or order contracts.
+that need intermediate physical interaction use the analytic crossing,
+triggered reevaluation, and domain-owned opt-in fixed-step boundaries defined
+by completed `TASK-019` in
+[Moving-ship interaction architecture](moving-ship-interactions.md).
 
 ## Navigation contracts
 
@@ -413,14 +414,13 @@ scale target exists:
 
 - Coordinate unit scale, precision requirements, and world bounds; the initial
   implementation uses signed 64-bit integer units
-- Ship acceleration, turning, collision, and formation movement
+- Ship acceleration, turning, and formation movement; `TASK-072` separately
+  owns ship geometry, physical collision, and avoidance
 - Local obstacle representation and pathfinding algorithm
 - Gate queueing, congestion, animation, and failure while in transit
 - Runtime connector enablement, disablement, access policy, and the authority
   allowed to change topology
 - Whether inactive systems use reduced-detail movement
-- Interaction with scheduled motion, including combat, remains to be defined by
-  `TASK-019`
 - Sensor knowledge and whether a planner may use undiscovered topology
 - Travel-cost policy beyond deterministic duration and availability
 

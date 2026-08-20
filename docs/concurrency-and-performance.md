@@ -1,6 +1,6 @@
 # Concurrency and performance architecture
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Deterministic randomness](deterministic-randomness.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Technical direction](technical-direction.md) · [Project task list](task-list.md)
+[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md) · [Deterministic randomness](deterministic-randomness.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Technical direction](technical-direction.md) · [Project task list](task-list.md)
 
 ## Purpose
 
@@ -154,6 +154,13 @@ but publish mutations only through effects returned to the owning commit step.
 Partition size and work-batch size are runtime tuning parameters, not gameplay
 rules. Dense areas may split into more batches; sparse areas may be combined to
 avoid scheduling overhead.
+
+Completed `TASK-019` defines the interaction-specific reduction contract.
+Candidates use canonical system, timestamp, ship-pair, and interaction-interest
+keys, so duplicate discovery through cells or neighboring partitions reduces to
+one result. Same-timestamp interaction evaluation reads one stable spatial view;
+partition ownership and worker completion order cannot become tie-breakers. See
+[Moving-ship interaction architecture](moving-ship-interactions.md).
 
 ### Non-spatial systems also expose independent work
 

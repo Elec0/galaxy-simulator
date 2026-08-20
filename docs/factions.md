@@ -488,8 +488,9 @@ when a concrete scenario cannot be expressed clearly without one of them.
 - `TASK-012` will translate approved concepts into deterministic simulation
   state and behavior boundaries. It must not introduce new gameplay policy.
 - `TASK-018` owns missions, persistent player objectives, victory, and defeat.
-- `TASK-019` owns the shared physical contract for interactions between moving
-  ships; `TASK-046` owns combat, surrender, capture, and destruction policy.
+- Completed `TASK-019` defines the shared physical contract for interactions
+  between moving ships; `TASK-046` owns combat, surrender, capture, and
+  destruction policy.
 - `TASK-020` owns detailed player knowledge, observation, and staleness.
 - `TASK-026` owns strategic planning and the conversion of goals into work.
 - `TASK-030` owns mutable connector availability and access once this design

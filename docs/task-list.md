@@ -41,13 +41,17 @@ preserving the existing material contracts until an explicit compatible
 migration is implemented. `TASK-069` retains that implementation. `TASK-068`
 separately owns equipment and ship-slot design. Trade uses the single unified
 currency Credits; `TASK-055` retains its balance, pricing, and settlement
-design.
+design. `TASK-019` completed the moving-ship proximity, swept-crossing,
+interaction-timing, reevaluation, following, interception, fixed-step,
+connector-transit, and deterministic-ordering design. `TASK-071` retains its
+implementation; `TASK-072` separately owns ship geometry, physical collision,
+and avoidance.
 
 ## Near-term work
 
-No task is currently promoted to near-term work. `TASK-048`, `TASK-068`, and
-`TASK-069` remain in the near-term parking-lot horizon until the project owner
-promotes one of them.
+No task is currently promoted to near-term work. `TASK-048`, `TASK-068`,
+`TASK-069`, and `TASK-071` remain in the near-term parking-lot horizon until the
+project owner promotes one of them.
 
 ## Future parking lot
 
@@ -60,6 +64,20 @@ in the **Near term** parking-lot section remains deferred; it is not promoted to
 the project-level **Near-term work** section above.
 
 ### Near term
+
+- [ ] **TASK-071: Implement moving-ship interaction discovery and timing**
+  - Implement the accepted `TASK-019` contracts for explicit interaction
+    interests, system-local proximity and swept-path evaluation, exact
+    millisecond crossing schedules, invalidation, and deterministic candidate
+    normalization.
+  - Retain the single-thread reference path and add focused crossing,
+    replanning, connector-emergence, restore, partition, batch-layout, and
+    worker-count proof before a gameplay domain depends on the substrate.
+  - Build on completed `TASK-019`. Keep combat, sensors, inspection, assistance,
+    and docking outcomes with their owning tasks, and ship geometry, collision,
+    and avoidance with `TASK-072`, rather than inventing placeholder policy
+    here.
+  - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-069: Implement generalized inventory and cargo**
   - Implement the accepted physical-definition, fungible-holding, discrete-item,
@@ -107,24 +125,6 @@ the project-level **Near-term work** section above.
     and offscreen-event visibility with `TASK-020`, semantic event consumption
     with `TASK-008`, and pacing implementation with `TASK-038`.
   - Context: [Time and pacing](time-and-pacing.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md)
-
-- [ ] **TASK-019: Define interactions between ships in motion**
-  - Define how the simulation discovers, schedules, and resolves interactions
-    involving ships that remain on authoritative local-motion segments rather
-    than requiring them to stop or arrive first.
-  - Cover moving-versus-moving range crossing, proximity and swept-path
-    queries, exact interaction timestamps, following and interception, target
-    replanning, and deterministic handling of simultaneous interactions.
-  - Decide when fixed simulation steps, scheduled encounter events, or
-    triggered reevaluation apply, including how interactions interrupt,
-    preserve, or replace existing motion and what is possible during connector
-    transit.
-  - Keep crowded-system queries spatially partitionable and results independent
-    of worker count, partition shape, batch size, and evaluation completion
-    order. Provide the shared physical interaction substrate required by
-    combat, sensors, avoidance, inspection, assistance, and other ship-local
-    gameplay without defining each domain's outcome policy.
-  - Context: [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Simulation architecture](simulation-architecture.md)
 
 - [ ] **TASK-020: Define player knowledge and information staleness**
   - Separate complete authoritative state from currently known, observed, or
@@ -347,8 +347,8 @@ the project-level **Near-term work** section above.
   - Decide how observed and unobserved combat differ without changing causal
     outcomes.
   - Build combat engagement and pursuit on the moving-ship interaction contract
-    from `TASK-019`; do not introduce a separate combat-only position or motion
-    model.
+    from completed `TASK-019`; do not introduce a separate combat-only position
+    or motion model.
 
 - [ ] **TASK-051: Define docking, undocking, and berth capacity**
   - Define approach, access validation, berth or docking-capacity allocation,
@@ -357,9 +357,9 @@ the project-level **Near-term work** section above.
   - Define how docking composes with motion, orders, loading and unloading,
     permissions, facility removal, facts, snapshots, checkpoints, and
     deterministic congestion resolution.
-  - Begin after `TASK-019` supplies moving-ship interaction timing; coordinate
-    access with `TASK-030`, group intent with `TASK-033`, and station ownership
-    with `TASK-057`.
+  - Build on the moving-ship interaction timing from completed `TASK-019`;
+    coordinate access with `TASK-030`, group intent with `TASK-033`, and station
+    ownership with `TASK-057`.
   - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Navigation architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
 - [ ] **TASK-052: Define standing orders and player-configurable automation**
@@ -381,8 +381,8 @@ the project-level **Near-term work** section above.
     batching without promoting the Phase 1 fixture into session authority.
   - Coordinate item design with completed `TASK-041`, inventory implementation
     with `TASK-069`, equipment with `TASK-068`, player knowledge with
-    `TASK-020`, movement interactions with `TASK-019`, and autonomous selection
-    with `TASK-053`.
+    `TASK-020`, completed movement-interaction design from `TASK-019`, and
+    autonomous selection with `TASK-053`.
   - Context: [Economy](economy.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md)
 
 - [ ] **TASK-055: Define trade, contracts, Credits, prices, and markets**
@@ -498,7 +498,45 @@ the project-level **Near-term work** section above.
     owning contracts require it.
   - Context: [Individual NPC scope](individual-npc-scope.md) · [Vision](vision.md) · [Player experience](player-experience.md)
 
+- [ ] **TASK-070: Evaluate sub-`1x` player-controlled simulation speeds**
+  - Revisit whether the configurable running-speed ladder should permit
+    positive multipliers below `1x`, while retaining pause as a separate
+    application state and preserving deterministic simulation outcomes.
+  - Decide the player-facing need, default presets, speed-step behavior around
+    pause and `1x`, configuration validation, and interaction with automatic
+    pacing requests before changing the accepted `TASK-013` contract.
+  - The current accepted minimum running speed remains `1x` unless this task is
+    promoted and approved.
+  - Context: [Time and pacing](time-and-pacing.md)
+
+- [ ] **TASK-072: Define ship geometry, physical collision, and avoidance**
+  - Decide whether ships remain point positions for generic movement or have
+    authoritative two-dimensional occupied geometry, and whether ships may
+    pass through one another when no gameplay domain requests an interaction.
+  - Define collision discovery, avoidance intent and priority, overlap or
+    impact resolution, motion interruption and replanning, simultaneous
+    contacts, fixed-step participation, connector boundaries, facts,
+    snapshots, checkpoints, saves, and deterministic batching if physical
+    collision becomes authoritative.
+  - Build on the moving-range and swept-path contract from completed `TASK-019`
+    and its implementation in `TASK-071`. Do not widen either task with
+    collision policy before this task is promoted and approved.
+  - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+
 ## Completed foundations
+
+- [x] **TASK-019: Define interactions between ships in motion**
+  - Defined domain-requested proximity and analytic swept-path evaluation over
+    authoritative local-motion segments, with fractional crossings rounded up
+    to the millisecond timeline without losing brief between-millisecond
+    passes.
+  - Defined durable interaction interests, triggered forecast invalidation,
+    state-update-phase evaluation, explicit motion effects, following and
+    interception replanning, opt-in fixed steps, connector-transit exclusion,
+    and canonical deterministic candidate ordering.
+  - `TASK-071` retains implementation. `TASK-072` separately owns ship geometry,
+    physical collision, and avoidance.
+  - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Simulation architecture](simulation-architecture.md)
 
 - [x] **TASK-041: Define generalized inventory and cargo**
   - Defined fungible materials and ordinary cargo plus stable discrete physical
