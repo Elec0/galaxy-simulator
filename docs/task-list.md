@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Dialogue](dialogue.md) · [Deterministic randomness](deterministic-randomness.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -45,13 +45,18 @@ design. `TASK-019` completed the moving-ship proximity, swept-crossing,
 interaction-timing, reevaluation, following, interception, fixed-step,
 connector-transit, and deterministic-ordering design. `TASK-071` retains its
 implementation; `TASK-072` separately owns ship geometry, physical collision,
-and avoidance.
+and avoidance. `TASK-020` completed the player-facing fog-of-war, live sensor
+coverage, transient-contact, persistent-discovery, stale-observation,
+fact-disclosure, dialogue, save, and deterministic-commit design. `TASK-073`
+retains its implementation without adding a general NPC knowledge model.
+`TASK-074` separately owns the missing deployable-entity design rather than
+letting sensor implementation invent placement and lifecycle policy.
 
 ## Near-term work
 
 No task is currently promoted to near-term work. `TASK-048`, `TASK-068`,
-`TASK-069`, and `TASK-071` remain in the near-term parking-lot horizon until the
-project owner promotes one of them.
+`TASK-069`, `TASK-071`, `TASK-073`, and `TASK-074` remain in the near-term
+parking-lot horizon until the project owner promotes one of them.
 
 ## Future parking lot
 
@@ -78,6 +83,40 @@ the project-level **Near-term work** section above.
     and avoidance with `TASK-072`, rather than inventing placeholder policy
     here.
   - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+
+- [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
+  - Implement the accepted `TASK-020` contracts for player-owned ship,
+    station, and deployable sensor coverage, live authoritative contacts,
+    transient ship disappearance, persistent structure discovery, stale
+    last-observed views, refresh, and confirmed absence.
+  - Cover moving-to-moving, moving-to-stationary, stationary-to-moving,
+    overlapping-source, connector-emergence, creation, removal, fact-disclosure,
+    checkpoint, and restore behavior without expanding `TASK-071` with sensor
+    outcome policy.
+  - Retain a single-thread reference path and prove identical results across
+    supported worker, partition, and batch layouts. Do not add NPC fog-of-war,
+    allied sensor sharing, sensor equipment modifiers, stealth, occlusion, or
+    extrapolated moving contacts.
+  - Build on completed `TASK-020` and the spatial substrate implemented by
+    `TASK-071`; coordinate station participation with `TASK-057`, deployable
+    participation with `TASK-074`, equipment contributions with `TASK-068`,
+    and the application surface with `TASK-049`. Do not invent either missing
+    entity domain inside sensor implementation.
+  - Context: [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Presentation snapshots](presentation-snapshots.md) · [Concurrency and performance](concurrency-and-performance.md)
+
+- [ ] **TASK-074: Define sensor deployables and their placement lifecycle**
+  - Define the initial stationary sensor deployable without assuming whether it
+    is an inventory item materialized into an entity, a distinct constructed
+    asset, or another unapproved structure.
+  - Decide stable identity, content definition, ownership, sensor capability,
+    placement, valid position, pickup or redeployment, damage and removal,
+    inventory interaction, commands, facts, snapshots, checkpoints, saves, and
+    deterministic contention before implementation creates the entity type.
+  - Build on completed `TASK-011`, `TASK-020`, and `TASK-041`; coordinate
+    generalized inventory implementation with `TASK-069`, equipment boundaries
+    with `TASK-068`, sensor consumption with `TASK-073`, and entity-specific
+    damage with `TASK-046`.
+  - Context: [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Entity lifecycle](entity-lifecycle.md) · [Inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md)
 
 - [ ] **TASK-069: Implement generalized inventory and cargo**
   - Implement the accepted physical-definition, fungible-holding, discrete-item,
@@ -121,20 +160,10 @@ the project-level **Near-term work** section above.
     the player-controlled pacing state. Preserve local single-player ownership,
     deterministic simulation outcomes, and the completed-timestamp checkpoint
     boundary.
-  - Coordinate response-required dialogue with `TASK-016`, player knowledge
-    and offscreen-event visibility with `TASK-020`, semantic event consumption
-    with `TASK-008`, and pacing implementation with `TASK-038`.
+  - Coordinate response-required dialogue with `TASK-016`, player fog-of-war
+    and offscreen-event visibility with completed `TASK-020`, semantic event
+    consumption with `TASK-008`, and pacing implementation with `TASK-038`.
   - Context: [Time and pacing](time-and-pacing.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md)
-
-- [ ] **TASK-020: Define player knowledge and information staleness**
-  - Separate complete authoritative state from currently known, observed, or
-    outdated information.
-  - Refine the initial dialogue rule that conditions may inspect any approved
-    authoritative data: decide which conditions should instead use player
-    knowledge, how availability discloses hidden or stale information, and how
-    authored content adopts that refinement without silently changing existing
-    conversation behavior.
-  - Context: [Dialogue](dialogue.md) · [Player experience](player-experience.md)
 
 - [ ] **TASK-032: Define semantic economy facts**
   - Define gameplay-facing production, construction, and logistics lifecycle
@@ -179,8 +208,8 @@ the project-level **Near-term work** section above.
     results across supported worker and batch layouts.
   - Build on completed `TASK-016`. Coordinate content integration with
     `TASK-048`, pacing with `TASK-038` and `TASK-064`, the application shell
-    with `TASK-049`, station identity with `TASK-057`, and knowledge refinement
-    with `TASK-020`.
+    with `TASK-049`, station identity with `TASK-057`, and the narrow
+    fog-of-war predicates accepted by completed `TASK-020`.
   - Context: [Dialogue](dialogue.md) · [Gameplay content](gameplay-content.md) · [Time and pacing](time-and-pacing.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-042: Define NPC skills and bounded decision quality**
@@ -193,9 +222,9 @@ the project-level **Near-term work** section above.
   - Preserve deterministic outcomes by defining stable inputs, tie-breaking,
     decision cadence, state ownership, facts, snapshots, and save requirements;
     do not make results depend on worker count or evaluation completion order.
-  - Coordinate the NPC categories with `TASK-015`, player and NPC information
-    boundaries with `TASK-020`, and faction objectives and order generation with
-    `TASK-026`.
+  - Coordinate the NPC categories with `TASK-015`, retain the authoritative NPC
+    read boundary and player-only fog-of-war accepted by completed `TASK-020`,
+    and coordinate faction objectives and order generation with `TASK-026`.
 
 - [ ] **TASK-048: Integrate built-in content and static new-game composition**
   - Build on the format-neutral models, physical-format adapter, production
@@ -218,9 +247,9 @@ the project-level **Near-term work** section above.
     generic entity selection and inspection, overlays, notification surfaces,
     and stale or removed entity handling needed by the minimal map application.
   - Build on the immutable presentation boundary from `TASK-010`; coordinate
-    time controls with `TASK-038`, information visibility with `TASK-020`,
-    localization and accessibility with `TASK-045`, and recovery with
-    `TASK-040`.
+    time controls with `TASK-038`, information visibility with completed
+    `TASK-020` and its implementation in `TASK-073`, localization and
+    accessibility with `TASK-045`, and recovery with `TASK-040`.
   - Context: [Player experience](player-experience.md) · [Technical direction](technical-direction.md) · [Presentation snapshots](presentation-snapshots.md) · [Initial roadmap](roadmap.md)
 
 - [ ] **TASK-053: Define autonomous ship work selection**
@@ -230,8 +259,9 @@ the project-level **Near-term work** section above.
     policy ownership, stable inputs, cadence, contention and tie-breaking,
     bounded retry, explanation, snapshots, and save requirements.
   - Build on `TASK-006` and the production domain owners from `TASK-009` and
-    `TASK-034`; coordinate information with `TASK-020`, faction objectives with
-    `TASK-026`, and bounded competence with `TASK-042`.
+    `TASK-034`; retain the authoritative autonomous-read boundary accepted by
+    completed `TASK-020`, and coordinate faction objectives with `TASK-026`
+    and bounded competence with `TASK-042`.
   - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
 - [ ] **TASK-061: Define comprehensive accessibility behavior**
@@ -309,9 +339,9 @@ the project-level **Near-term work** section above.
   - Define how piracy affects the offender, asset owner, controller, victim,
     territorial authority, and informed third parties without adding automatic
     economic guilt by association.
-  - Coordinate with combat in `TASK-046`, player knowledge in `TASK-020`, and
-    the accepted relational gameplay model before choosing simulation state or
-    commands.
+  - Coordinate with combat in `TASK-046`, player visibility from completed
+    `TASK-020`, and the accepted relational gameplay model before choosing
+    simulation state or commands.
   - Context: [Relational gameplay model](factions.md)
 
 - [ ] **TASK-037: Version content catalogs and migrate saved content references**
@@ -368,8 +398,9 @@ the project-level **Near-term work** section above.
   - Decide policy configuration, eligible actors, cadence and wake triggers,
     replacement and suspension, bounded failure and retry, player override,
     explanation, snapshots, and save requirements.
-  - Build on `TASK-006`; coordinate group targets with `TASK-033`, knowledge
-    limits with `TASK-020`, and domain-specific orders with their owning tasks.
+  - Build on `TASK-006`; coordinate group targets with `TASK-033`, player-facing
+    fog-of-war with completed `TASK-020`, and domain-specific orders with their
+    owning tasks.
   - Context: [Player experience](player-experience.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
 - [ ] **TASK-054: Define general resource acquisition and deposits**
@@ -380,9 +411,9 @@ the project-level **Near-term work** section above.
   - Define content, commands, facts, snapshots, checkpoints, and deterministic
     batching without promoting the Phase 1 fixture into session authority.
   - Coordinate item design with completed `TASK-041`, inventory implementation
-    with `TASK-069`, equipment with `TASK-068`, player knowledge with
-    `TASK-020`, completed movement-interaction design from `TASK-019`, and
-    autonomous selection with `TASK-053`.
+    with `TASK-069`, equipment with `TASK-068`, resource discoverability with
+    completed `TASK-020`, completed movement-interaction design from
+    `TASK-019`, and autonomous selection with `TASK-053`.
   - Context: [Economy](economy.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md)
 
 - [ ] **TASK-055: Define trade, contracts, Credits, prices, and markets**
@@ -396,8 +427,8 @@ the project-level **Near-term work** section above.
     inventory and consume no cargo capacity.
   - Build on the tradable inventory categories defined by completed `TASK-041`;
     coordinate implementation with `TASK-069`, logistics with `TASK-009`,
-    docking with `TASK-051`, knowledge with `TASK-020`, and economic facts with
-    `TASK-032`.
+    docking with `TASK-051`, stale observed market state with completed
+    `TASK-020`, and economic facts with `TASK-032`.
   - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Factions](factions.md)
 
 - [ ] **TASK-057: Define station composition, construction, and expansion**
@@ -466,9 +497,9 @@ the project-level **Near-term work** section above.
   - Define how stations, knowledge, conflict, permissions, law, facts,
     snapshots, and saves participate without deriving every right from
     directional standing.
-  - Begin after player knowledge in `TASK-020`, station expansion in `TASK-057`,
-    and combat in `TASK-046`; coordinate strategic ownership with `TASK-026`
-    and mutable connector access with `TASK-030`.
+  - Begin after fog-of-war implementation in `TASK-073`, station expansion in
+    `TASK-057`, and combat in `TASK-046`; coordinate strategic ownership with
+    `TASK-026` and mutable connector access with `TASK-030`.
   - Context: [Player experience](player-experience.md) · [Relational gameplay model](factions.md) · [Relational simulation architecture](relational-simulation-architecture.md)
 
 - [ ] **TASK-060: Define deterministic compatibility across platforms and versions**
@@ -524,6 +555,28 @@ the project-level **Near-term work** section above.
   - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 ## Completed foundations
+
+- [x] **TASK-020: Define player fog-of-war and information staleness**
+  - Chose player-facing spatial fog-of-war rather than a general belief,
+    confidence, or knowledge-propagation model for every principal. NPC
+    decision quality remains separate and may read approved authoritative
+    state.
+  - Defined circular coverage from player-owned ships, stations, and
+    deployables; live authoritative presentation while covered; always-current
+    owned assets; transient non-owned ships with no ghost contacts; and
+    persistent last-observed stations and stationary deployables.
+  - Defined refresh, confirmed absence without inferred cause or time,
+    commit-time fact disclosure, narrow dialogue visibility predicates,
+    complete discovery checkpoint state, derived coverage rebuild, and stable
+    deterministic observation commit.
+  - Deferred sensor sharing, NPC fog-of-war, misinformation, confidence,
+    stealth, occlusion, equipment modifiers, communications delay,
+    moving-contact extrapolation, automatic forgetting, and unspecified
+    entity-category discovery.
+  - Implementation remains `TASK-073`; deployable entity design remains
+    `TASK-074`; equipment contributions remain `TASK-068`; the reusable
+    application surface remains `TASK-049`.
+  - Context: [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Player experience](player-experience.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Dialogue](dialogue.md) · [Presentation snapshots](presentation-snapshots.md)
 
 - [x] **TASK-019: Define interactions between ships in motion**
   - Defined domain-requested proximity and analytic swept-path evaluation over
@@ -628,8 +681,9 @@ the project-level **Near-term work** section above.
   - Kept explicit player and trusted-session initiation inside normal command
     admission; deferred fact-, time-, location-, and threshold-triggered
     initiation to `TASK-017`.
-  - Implementation remains in `TASK-065`; player-knowledge refinement remains
-    in `TASK-020`; station identity remains in `TASK-057`.
+  - Implementation remains in `TASK-065`; completed `TASK-020` adds only narrow
+    fog-of-war predicates without reinterpreting existing authoritative
+    conditions; station identity remains in `TASK-057`.
   - Context: [Dialogue state and presentation](dialogue.md)
 
 - [x] **TASK-063: Implement the format-neutral content validation foundation**

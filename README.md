@@ -15,6 +15,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Actor control and order lifecycle](docs/actor-control-and-orders.md)
 - [Individual NPC scope](docs/individual-npc-scope.md)
 - [Dialogue state and presentation](docs/dialogue.md)
+- [Fog-of-war and scouting](docs/fog-of-war-and-scouting.md)
 - [Deterministic randomness and stream ownership](docs/deterministic-randomness.md)
 - [Semantic game facts](docs/semantic-game-facts.md)
 - [Presentation snapshots](docs/presentation-snapshots.md)

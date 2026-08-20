@@ -46,7 +46,7 @@ recorded for `TASK-014`.
 | How is diplomacy represented? | Store one mutual condition for a canonical unordered principal pair. The initial vocabulary is `Peace` and `War`. |
 | How are important permissions represented? | Store explicit directional grants from issuer to holder. A grant is effective only while issued and while its standing requirement is satisfied. |
 | How do other domains change relationships? | They submit typed immutable proposals with explicit subjects, reasons, and stable ordering keys. Only the relationship owner validates and commits them. |
-| What does presentation receive? | Full diagnostic snapshots remain separate from observer-scoped relationship views. Public truth may be shown directly; private or discoverable truth requires the knowledge boundary from `TASK-020`. |
+| What does presentation receive? | Full diagnostic snapshots remain separate from observer-scoped relationship views. Public identity and diplomacy plus the player's incoming standing and held grants remain visible; completed `TASK-020` does not replace this with a general belief model. |
 | What must a save eventually preserve? | Principal identity, standing values, diplomatic conditions, issued grants, policy identity, and owner ordering state. Facts are not the source of truth. |
 
 ## Terminology and identity
@@ -131,7 +131,7 @@ flowchart LR
     owner --> snapshots["Diagnostic and scoped read models"]
 
     planner["Strategic planning, TASK-026"] -. reads stable view .-> snapshots
-    knowledge["Knowledge and staleness, TASK-020"] -. filters truth .-> snapshots
+    fog["Player fog-of-war, completed TASK-020"] -. scopes spatial presentation .-> snapshots
 ```
 
 The relationship owner exposes stable immutable reads for evaluation. Workers
@@ -432,8 +432,10 @@ view may expose:
 
 The reverse private assessment, unobserved incidents, private agreements, and
 strategic goals must not enter the player view merely because they exist in the
-diagnostic snapshot. `TASK-020` defines confirmed, reported, and stale knowledge
-and will expand the scoped projection.
+diagnostic snapshot. Completed `TASK-020` retains this explicit relationship
+projection and separately defines spatial fog-of-war plus stale observations of
+discovered persistent structures. It does not add general confirmed, reported,
+or confidence-bearing relationship knowledge.
 
 `GamePresentationSnapshot` no longer wraps the complete `GameSnapshot`. Its
 request identifies the observing principal, its presentation-safe world omits

@@ -126,9 +126,10 @@ The clean application snapshot now exposes systems, authoritative ship
 positions, active motion segments, and current move-order destination, status,
 and reason. Godot no longer consumes `PhaseOneSnapshot`.
 
-The presentation model still lacks controller identity, semantic fact history,
-factions, relationships, dialogue state, objectives, and player knowledge.
-Those fields should be added only as their authoritative models are introduced.
+The presentation model still lacks dialogue state, objectives, and the
+fog-of-war projection defined by completed `TASK-020`. `TASK-073` adds player
+sensor visibility and stale persistent discoveries; other fields should be
+added only as their authoritative models are introduced.
 
 ### 1.9 The Phase 1 navigation boundary exposes its graph model
 
@@ -314,8 +315,8 @@ gameplay needs rather than the Phase 1 fixture. `TASK-005` introduced
 `GameSnapshot` with system, ship position, motion, current order, destination,
 status, and reason. `TASK-006` added base and active controllers, controller
 revision, queued orders, and suspended base work. Semantic history remains in
-`TASK-008`. Add dialogue, faction, objective, and knowledge views only when
-their authoritative models exist.
+`TASK-008`. Add dialogue and objective views only when their authoritative
+models exist; `TASK-073` owns the accepted fog-of-war projection.
 
 ### 2.10 Establish hierarchical spatial navigation
 

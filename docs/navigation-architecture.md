@@ -421,7 +421,9 @@ scale target exists:
 - Runtime connector enablement, disablement, access policy, and the authority
   allowed to change topology
 - Whether inactive systems use reduced-detail movement
-- Sensor knowledge and whether a planner may use undiscovered topology
+- Undiscovered topology and whether a planner may route through it; completed
+  `TASK-020` deliberately limits its accepted fog-of-war persistence to
+  stations and stationary deployables
 - Travel-cost policy beyond deterministic duration and availability
 
 ## Migration sequence

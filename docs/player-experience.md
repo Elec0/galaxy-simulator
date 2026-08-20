@@ -38,7 +38,12 @@ Selecting an entity should expose its current state and relevant history. Depend
 - Recent transactions and material sources
 - Current faction or player objective
 
-The interface should distinguish what the player knows from the galaxy's complete internal state. The eventual role of sensors, scouting, and stale information remains an open design question.
+The interface distinguishes player-visible information from complete internal
+state through the spatial sensor coverage defined in [Fog-of-war and
+scouting](fog-of-war-and-scouting.md). Player-owned ships, stations, and
+deployables reveal current state within their sensor radii. Non-owned ships
+disappear outside coverage, while discovered stations and stationary
+deployables retain a stale last-observed view until sensors return.
 
 ## Progression
 

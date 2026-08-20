@@ -35,6 +35,12 @@ observer cross the private boundary. Relationship facts use the same filter,
 and `NextFactCursor` advances past inspected hidden facts without exposing
 their payloads.
 
+Completed `TASK-020` now defines the next presentation boundary: player-owned
+sensor coverage exposes live authoritative contacts, non-owned ships disappear
+outside coverage, and discovered stations or stationary deployables retain a
+typed last-observed view. `TASK-073` will replace the currently complete spatial
+world exposure with that accepted fog-of-war projection.
+
 ## Starting point
 
 The clean `GameSession` runtime, rather than `PhaseOneScenario`, already
@@ -211,8 +217,9 @@ This task does not decide:
 - Group or fleet command submission, including whether an intent succeeds
   atomically, permits partial acceptance, or targets a persistent group rather
   than a transient presentation selection. `TASK-033` owns that contract.
-- Faction, relationship, dialogue, objective, knowledge, combat, production,
-  construction, or logistics presentation fields.
+- Faction, dialogue, objective, combat, production, construction, or logistics
+  presentation fields. Fog-of-war and stale persistent discoveries are now
+  defined by completed `TASK-020` and implemented by `TASK-073`.
 - Player-facing notification wording, accessibility behavior, localization,
   grouping, priorities, or cross-save history.
 - Camera controls, map scaling, visual effects, or a physical coordinate unit.

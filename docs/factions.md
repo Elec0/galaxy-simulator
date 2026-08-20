@@ -127,8 +127,10 @@ maker. The player should be able to distinguish confirmed information,
 reported information, and old information when that distinction affects a
 choice.
 
-The detailed observation and staleness model remains `TASK-020`. This task must
-still decide what relationship information is public, private, or discoverable.
+Completed `TASK-020` uses player-facing spatial fog-of-war rather than a
+general belief model for every power. Public and observer-scoped relationship
+information retains the boundary defined here; private strategy remains absent
+from player presentation rather than becoming a simulated confidence record.
 
 ## Accepted relationship experience
 
@@ -462,9 +464,10 @@ final direction.
 ### Q11. What does the player know about other powers?
 
 Public diplomatic conditions and territorial rules are known. Strategic goals,
-private attitudes, and unobserved incidents require contact, observation, or
-information sharing. `TASK-020` defines the detailed acquisition and staleness
-rules.
+private attitudes, and unobserved incidents remain outside the player view
+unless a later owning system explicitly reveals them. Completed `TASK-020`
+defines spatial sensor coverage and stale persistent discoveries without adding
+general information sharing or faction belief state.
 
 ### Q12. Can the player join another power?
 
@@ -491,7 +494,8 @@ when a concrete scenario cannot be expressed clearly without one of them.
 - Completed `TASK-019` defines the shared physical contract for interactions
   between moving ships; `TASK-046` owns combat, surrender, capture, and
   destruction policy.
-- `TASK-020` owns detailed player knowledge, observation, and staleness.
+- Completed `TASK-020` owns player-facing fog-of-war, observation, and stale
+  persistent discoveries; implementation remains `TASK-073`.
 - `TASK-026` owns strategic planning and the conversion of goals into work.
 - `TASK-030` owns mutable connector availability and access once this design
   supplies a concrete relational requirement.

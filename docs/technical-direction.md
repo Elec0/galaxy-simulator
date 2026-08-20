@@ -81,7 +81,8 @@ envelopes. The remaining choices have explicit owners:
 
 - `TASK-027` reevaluates entity storage only when query or scale evidence
   justifies a broader model.
-- `TASK-046` decides observed and unobserved combat behavior with `TASK-020`.
+- `TASK-046` decides combat behavior while using the player sensor-visibility
+  boundary accepted by completed `TASK-020`.
 - `TASK-060` defines the reproducibility guarantee across platforms and
   versions, using concurrency and benchmark evidence from `TASK-029`.
 

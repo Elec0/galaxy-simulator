@@ -150,8 +150,11 @@ read contract.
 This access does not permit arbitrary executable content, mutable callbacks,
 reflection over the session, direct owner mutation, or presentation text as an
 input. Each condition kind has stable typed inputs, explicit validation, and a
-deterministic evaluator. `TASK-020` must later refine knowledge-aware dialogue,
-including when availability itself discloses hidden or stale information.
+deterministic evaluator. Completed `TASK-020` preserves this authoritative
+default and permits narrow currently-detected, previously-discovered, and
+observation-age predicates when authored availability should respect
+fog-of-war. It does not silently reinterpret existing content or introduce a
+general knowledge-condition language.
 
 ## Conversation lifecycle and continuity
 
@@ -383,8 +386,9 @@ evaluation requires focused agreement tests before it is enabled.
   integrates the response-required signal. It does not own dialogue state.
 - `TASK-064` owns broader event-responsive pacing beyond the accepted
   response-required behavior.
-- `TASK-020` refines whether and how player knowledge constrains or annotates
-  dialogue conditions and disclosures.
+- Completed `TASK-020` defines narrow fog-of-war predicates for authored
+  dialogue conditions and disclosures without changing existing authoritative
+  evaluation.
 - `TASK-017` owns fact-, time-, threshold-, and location-triggered scripted
   initiation and long-running scripted behavior.
 - `TASK-045` and `TASK-049` own the shared localization service and reusable

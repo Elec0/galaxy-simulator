@@ -189,7 +189,8 @@ in stable identity order. Within each inventory it lists fungible holdings by
 qualified key and discrete instances by instance ID, with stored, reserved, and
 available values where applicable. Presentation may group or filter these
 records, but it cannot reconstruct authoritative state from rendered stacks.
-Player-knowledge filtering remains `TASK-020`.
+Player-visible inventory fields follow the live and last-observed boundaries
+accepted by completed `TASK-020`; implementation remains `TASK-073`.
 
 ## Checkpoints, saves, and compatibility
 

@@ -118,7 +118,7 @@ section whose owning task has not yet defined its internal model.
 | Objectives and end state | Every active, completed, failed, or superseded objective; its stable content reference; ordered progress, prerequisites, irreversible choices, timers, and victory or defeat state. | Reserved for `TASK-018`. |
 | Script execution | Every persistent script instance, definition reference, program/version checkpoint, trigger subscriptions, one-shot or repeatable memory, locals that affect future behavior, pending wake/cancellation state, and script-owned idempotency receipts. Scheduled wakes also appear in the agenda. | Reserved for `TASK-017`. |
 | Dialogue continuity | Every active or suspended conversation, participant and definition references, current node, availability/consumption/repeatability memory, selected consequences, response-required state, and any deterministic timeout or wake state. | Defined by [Dialogue state and presentation](dialogue.md) under `TASK-016`; implementation reserved for `TASK-065`. |
-| Knowledge and player state | Any future authoritative knowledge, staleness, discovery, or player preference state whose absence changes commands or simulation behavior. Purely local presentation settings are excluded. | Knowledge in `TASK-020`; pacing/input preferences in `TASK-038`. |
+| Player observation state | Every discovered persistent entity's stable identity and category, last known position, observation time, typed last-observed presentation state, confirmed-missing state, and any implementation policy, allocator, or receipt state. Current sensor coverage and spatial indexes are derived. Purely local presentation settings are excluded. | Defined by [Fog-of-war and scouting](fog-of-war-and-scouting.md) in completed `TASK-020`; implementation in `TASK-073`. Pacing/input preferences remain `TASK-038`. |
 | Future domain owners | Complete workflow state, pending effects, reservations, commitments, scheduling links, allocator state, and committed receipts for every owner later added to `GameSession`. | Required aggregate-admission rule for all later work. |
 
 The former Phase 1 acceptance composition has its own fixture state and does
@@ -322,8 +322,10 @@ that the boundary is complete.
 `TASK-022` owns encoded save schema, versioning, migration, corruption
 handling, and storage mechanics. `TASK-037` owns versioned content catalogs,
 source provenance, and saved content-reference migration. `TASK-017` through
-`TASK-020`, `TASK-025`, `TASK-038`, and dialogue implementation in `TASK-065`
-must each supply the precise state for their reserved section before their
-runtime owner can participate in a supported save. Completed `TASK-066`
-supplies the deterministic-randomness section. `TASK-034` completed the first
+`TASK-019`, `TASK-025`, `TASK-038`, fog-of-war implementation in `TASK-073`,
+and dialogue implementation in `TASK-065` must each supply the precise state
+for their reserved section before their runtime owner can participate in a
+supported save. Completed `TASK-020` defines the observation inventory and
+completed `TASK-066` supplies the deterministic-randomness section. `TASK-034`
+completed the first
 aggregate-admission prerequisite for supported save and load work.
