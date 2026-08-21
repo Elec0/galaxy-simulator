@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Sensor deployables](sensor-deployables.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -49,13 +49,14 @@ and avoidance. `TASK-020` completed the player-facing fog-of-war, live sensor
 coverage, transient-contact, persistent-discovery, stale-observation,
 fact-disclosure, dialogue, save, and deterministic-commit design. `TASK-073`
 retains its implementation without adding a general NPC knowledge model.
-`TASK-074` separately owns the missing deployable-entity design rather than
-letting sensor implementation invent placement and lifecycle policy.
+`TASK-074` completed the deployable-entity, inventory, lifecycle, and sensor
+handoff contract. `TASK-075` separately retains the deferred numeric deployment
+and pickup range policy.
 
 ## Near-term work
 
 No task is currently promoted to near-term work. `TASK-048`, `TASK-068`,
-`TASK-069`, `TASK-071`, `TASK-073`, and `TASK-074` remain in the near-term
+`TASK-069`, `TASK-071`, `TASK-073`, and `TASK-075` remain in the near-term
 parking-lot horizon until the project owner promotes one of them.
 
 ## Future parking lot
@@ -69,6 +70,18 @@ in the **Near term** parking-lot section remains deferred; it is not promoted to
 the project-level **Near-term work** section above.
 
 ### Near term
+
+- [ ] **TASK-075: Define deployable deployment and pickup ranges**
+  - Define the bounded numeric range and policy source for authorized ships to
+    deploy or pick up stationary sensor deployables, measured from the acting
+    ship's committed system-local position.
+  - Define admission-time reevaluation while the ship or target moves, command
+    failure behavior, facts, snapshots, checkpoints, and saves without creating
+    collision, avoidance, combat, or a general NPC knowledge model.
+  - Build on completed `TASK-019` and `TASK-074`; coordinate spatial
+    implementation with `TASK-071`, sensor consumption with `TASK-073`, and
+    combat range with `TASK-046` without merging their policies.
+  - Context: [Sensor deployables](sensor-deployables.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-071: Implement moving-ship interaction discovery and timing**
   - Implement the accepted `TASK-019` contracts for explicit interaction
@@ -103,20 +116,6 @@ the project-level **Near-term work** section above.
     and the application surface with `TASK-049`. Do not invent either missing
     entity domain inside sensor implementation.
   - Context: [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Presentation snapshots](presentation-snapshots.md) · [Concurrency and performance](concurrency-and-performance.md)
-
-- [ ] **TASK-074: Define sensor deployables and their placement lifecycle**
-  - Define the initial stationary sensor deployable without assuming whether it
-    is an inventory item materialized into an entity, a distinct constructed
-    asset, or another unapproved structure.
-  - Decide stable identity, content definition, ownership, sensor capability,
-    placement, valid position, pickup or redeployment, damage and removal,
-    inventory interaction, commands, facts, snapshots, checkpoints, saves, and
-    deterministic contention before implementation creates the entity type.
-  - Build on completed `TASK-011`, `TASK-020`, and `TASK-041`; coordinate
-    generalized inventory implementation with `TASK-069`, equipment boundaries
-    with `TASK-068`, sensor consumption with `TASK-073`, and entity-specific
-    damage with `TASK-046`.
-  - Context: [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Entity lifecycle](entity-lifecycle.md) · [Inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md)
 
 - [ ] **TASK-069: Implement generalized inventory and cargo**
   - Implement the accepted physical-definition, fungible-holding, discrete-item,
@@ -555,6 +554,18 @@ the project-level **Near-term work** section above.
   - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 ## Completed foundations
+
+- [x] **TASK-074: Define sensor deployables and their placement lifecycle**
+  - Defined portable discrete sensor items that atomically materialize into
+    fresh stationary deployed entities and return equivalent new items on
+    authorized pickup, with no deployed identity retained through redeployment.
+  - Defined ownership, authorized ship interaction, fixed sensor capability,
+    valid system-local placement, no initial occupancy rule, deterministic
+    contention, facts, observed presentation, checkpoint and save state, and
+    the committed sensor-source handoff consumed by `TASK-073`.
+  - Deferred numeric deployment and pickup range policy to `TASK-075`, and
+    combat targeting, destruction, and disposition to `TASK-046`.
+  - Context: [Sensor deployables](sensor-deployables.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Entity lifecycle](entity-lifecycle.md) · [Inventory and cargo](inventory-and-cargo.md)
 
 - [x] **TASK-020: Define player fog-of-war and information staleness**
   - Chose player-facing spatial fog-of-war rather than a general belief,

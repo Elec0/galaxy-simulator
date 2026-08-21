@@ -78,11 +78,12 @@ entities inside existing coverage, or overlapping sensor sources. `TASK-073`
 must implement those cases without silently widening `TASK-071`.
 
 Station participation depends on the station identity and lifecycle owned by
-`TASK-057`. The project does not yet have an authoritative deployable entity
-contract. `TASK-074` must define deployable identity, placement, ownership,
-pickup or redeployment, removal, inventory interaction, facts, presentation,
-and persistence rather than allowing sensor implementation to invent them.
-`TASK-073` consumes those entity contracts once available.
+`TASK-057`. `TASK-074` has established that a deployable is a portable
+inventory item that materializes into a deployed entity, including its identity,
+placement, ownership, pickup, facts, presentation, persistence, and committed
+sensor-source handoff in [Sensor deployables](sensor-deployables.md). `TASK-075`
+retains only the deferred numeric deployment and pickup range policy. `TASK-073`
+consumes the completed deployable contract.
 
 ## Live contacts and retained discoveries
 
