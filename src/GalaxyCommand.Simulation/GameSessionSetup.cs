@@ -253,7 +253,13 @@ public sealed class GameSessionSetup
             }
         }
 
-        ValidateEconomy(economy, systemIds, shipIds, cargoInventoryIds, policyValues);
+        ValidateEconomy(
+            economy,
+            systemIds,
+            shipIds,
+            cargoInventoryIds,
+            principalIds,
+            policyValues);
 
         Systems = new ReadOnlyCollection<StarSystem>(systemValues);
         Ships = new ReadOnlyCollection<InitialShipSetup>(shipValues);
@@ -294,6 +300,7 @@ public sealed class GameSessionSetup
         HashSet<SystemId> systemIds,
         HashSet<ShipId> shipIds,
         HashSet<InventoryId> cargoInventoryIds,
+        HashSet<PrincipalId> principalIds,
         IEnumerable<ShipMaterializationPolicy> policies)
     {
         if (economy is null)
@@ -302,6 +309,7 @@ public sealed class GameSessionSetup
         }
 
         var facilityIds = new HashSet<FacilityId>();
+        var policiesByFacility = policies.ToDictionary(policy => policy.FacilityId);
         foreach (EconomyFacilitySetup facility in economy.Facilities)
         {
             if (!systemIds.Contains(facility.Position.SystemId)
@@ -310,6 +318,19 @@ public sealed class GameSessionSetup
             {
                 throw new ArgumentException(
                     $"Economy facility {facility.FacilityId} has an unknown system, conflicts with ship cargo, or is duplicated.",
+                    nameof(economy));
+            }
+
+            if (economy.MaterialCompatibility is not null
+                && (facility.ControllingPrincipalId is not { } principalId
+                    || !principalIds.Contains(principalId)
+                    || policiesByFacility.TryGetValue(
+                        facility.FacilityId,
+                        out ShipMaterializationPolicy? policy)
+                    && policy.PrincipalId != principalId))
+            {
+                throw new ArgumentException(
+                    $"Economy facility {facility.FacilityId} has an unknown or inconsistent controlling principal.",
                     nameof(economy));
             }
         }
@@ -324,7 +345,6 @@ public sealed class GameSessionSetup
             }
         }
 
-        var policiesByFacility = policies.ToDictionary(policy => policy.FacilityId);
         foreach (InitialConstructionOrderSetup order in economy.ConstructionOrders)
         {
             if (!policiesByFacility.TryGetValue(order.FacilityId, out ShipMaterializationPolicy? policy)

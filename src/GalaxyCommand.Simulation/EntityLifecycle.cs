@@ -312,6 +312,7 @@ internal sealed class EntityLifecycleOwner
     private readonly IdSequence<EntityId> _entityIds = new();
     private readonly IdSequence<InventoryId> _inventoryIds = new();
     private readonly InventoryRegistry _inventories = new();
+    private readonly MaterialInventoryCompatibilityMap? _materialCompatibility;
     private readonly SpatialMovement _movement;
     private readonly ShipOrderCoordinator _orders;
     private readonly SortedDictionary<FacilityId, ShipMaterializationPolicy> _policies;
@@ -326,11 +327,13 @@ internal sealed class EntityLifecycleOwner
         SpatialMovement movement,
         ActorControlRegistry control,
         ShipOrderCoordinator orders,
-        IEnumerable<ShipMaterializationPolicy> policies)
+        IEnumerable<ShipMaterializationPolicy> policies,
+        MaterialInventoryCompatibilityMap? materialCompatibility = null)
     {
         _movement = movement ?? throw new ArgumentNullException(nameof(movement));
         _control = control ?? throw new ArgumentNullException(nameof(control));
         _orders = orders ?? throw new ArgumentNullException(nameof(orders));
+        _materialCompatibility = materialCompatibility;
         ArgumentNullException.ThrowIfNull(policies);
         _policies = new SortedDictionary<FacilityId, ShipMaterializationPolicy>(
             EntityIdComparer<FacilityId>.Instance);
@@ -353,8 +356,9 @@ internal sealed class EntityLifecycleOwner
             receipts,
         SortedDictionary<EntityId, EntityRemovalResult.Removed> removalReceipts,
         GameSessionShipRegistry ships,
-        IdSequence<ShipId> shipIds)
-        : this(movement, control, orders, policies)
+        IdSequence<ShipId> shipIds,
+        MaterialInventoryCompatibilityMap? materialCompatibility)
+        : this(movement, control, orders, policies, materialCompatibility)
     {
         _entities = entities;
         _entityIds = entityIds;
@@ -415,7 +419,64 @@ internal sealed class EntityLifecycleOwner
         SpatialMovement movement,
         ActorControlRegistry control,
         ShipOrderCoordinator orders,
-        IEnumerable<ShipMaterializationPolicy> policies)
+        IEnumerable<ShipMaterializationPolicy> policies) =>
+        RestoreCheckpointCore(
+            checkpoint,
+            movement,
+            control,
+            orders,
+            policies,
+            definitions: null,
+            materialCompatibility: null);
+
+    internal static CheckpointResult<EntityLifecycleOwner> RestoreCheckpoint(
+        EntityLifecycleCheckpoint checkpoint,
+        SpatialMovement movement,
+        ActorControlRegistry control,
+        ShipOrderCoordinator orders,
+        IEnumerable<ShipMaterializationPolicy> policies,
+        PhysicalDefinitionCatalog definitions)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        return RestoreCheckpointCore(
+            checkpoint,
+            movement,
+            control,
+            orders,
+            policies,
+            definitions,
+            materialCompatibility: null);
+    }
+
+    internal static CheckpointResult<EntityLifecycleOwner> RestoreCheckpoint(
+        EntityLifecycleCheckpoint checkpoint,
+        SpatialMovement movement,
+        ActorControlRegistry control,
+        ShipOrderCoordinator orders,
+        IEnumerable<ShipMaterializationPolicy> policies,
+        PhysicalDefinitionCatalog definitions,
+        MaterialInventoryCompatibilityMap materialCompatibility)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        ArgumentNullException.ThrowIfNull(materialCompatibility);
+        return RestoreCheckpointCore(
+            checkpoint,
+            movement,
+            control,
+            orders,
+            policies,
+            definitions,
+            materialCompatibility);
+    }
+
+    private static CheckpointResult<EntityLifecycleOwner> RestoreCheckpointCore(
+        EntityLifecycleCheckpoint checkpoint,
+        SpatialMovement movement,
+        ActorControlRegistry control,
+        ShipOrderCoordinator orders,
+        IEnumerable<ShipMaterializationPolicy> policies,
+        PhysicalDefinitionCatalog? definitions,
+        MaterialInventoryCompatibilityMap? materialCompatibility)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         ArgumentNullException.ThrowIfNull(movement);
@@ -449,8 +510,16 @@ internal sealed class EntityLifecycleOwner
                 inventoryIds.Failure!.Message);
         }
 
-        CheckpointResult<InventoryRegistry> inventories =
-            InventoryRegistry.RestoreCheckpoint(checkpoint.Inventories);
+        CheckpointResult<InventoryRegistry> inventories = definitions is null
+            ? InventoryRegistry.RestoreCheckpoint(checkpoint.Inventories)
+            : materialCompatibility is not null
+                ? InventoryRegistry.RestoreCheckpoint(
+                    checkpoint.Inventories,
+                    definitions,
+                    materialCompatibility)
+            : InventoryRegistry.RestoreCheckpoint(
+                checkpoint.Inventories,
+                definitions);
         if (!inventories.IsSuccess)
         {
             return CheckpointResult<EntityLifecycleOwner>.Rejected(
@@ -525,7 +594,8 @@ internal sealed class EntityLifecycleOwner
                 receipts,
                 removalReceipts,
                 ships,
-                shipIds.Value!));
+                shipIds.Value!,
+                materialCompatibility));
     }
 
     internal GameSessionShip GetRequiredShip(ShipId shipId) =>
@@ -538,6 +608,24 @@ internal sealed class EntityLifecycleOwner
         return _inventories.Get(ship.CargoInventoryId)
             ?? throw new InvalidOperationException(
                 $"Ship {shipId} has no cargo inventory {ship.CargoInventoryId}.");
+    }
+
+    private Inventory CreateCargoInventory(
+        InventoryId inventoryId,
+        EntityId entityId,
+        PrincipalId principalId,
+        Quantity capacity)
+    {
+        var custody = new InventoryCustody(
+            new InventoryOwnerReference.SessionEntity(entityId),
+            principalId);
+        return _materialCompatibility is null
+            ? new Inventory(inventoryId, custody, capacity)
+            : new Inventory(
+                inventoryId,
+                custody,
+                capacity,
+                _materialCompatibility);
     }
 
     /// <summary>
@@ -573,11 +661,10 @@ internal sealed class EntityLifecycleOwner
 
         foreach (PreparedSetupShip ship in prepared)
         {
-            _inventories.Add(new Inventory(
+            _inventories.Add(CreateCargoInventory(
                 ship.CargoInventoryId,
-                new InventoryCustody(
-                    new InventoryOwnerReference.SessionEntity(ship.EntityId),
-                    ship.PrincipalId),
+                ship.EntityId,
+                ship.PrincipalId,
                 ship.CargoCapacity));
             _ships.ApplyAdd(new GameSessionShip(
                 ship.ShipId,
@@ -976,11 +1063,10 @@ internal sealed class EntityLifecycleOwner
                 "Prepared materialization identifiers changed before commit.");
         }
 
-        _inventories.Add(new Inventory(
+        _inventories.Add(CreateCargoInventory(
             inventoryId,
-            new InventoryCustody(
-                new InventoryOwnerReference.SessionEntity(entityId),
-                policy!.PrincipalId),
+            entityId,
+            policy!.PrincipalId,
             design!.CargoCapacity));
         _ships.ApplyAdd(new GameSessionShip(
             shipId,

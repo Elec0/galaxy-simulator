@@ -49,6 +49,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     private readonly WorldTopology _worldTopology;
     private readonly ISpatialNavigationPlanner _navigation;
     private readonly EntityLifecycleOwner _lifecycle;
+    private readonly InventoryCommitOwner _inventoryCommit;
     private readonly SessionEconomyOwner? _economy;
     private readonly RelationshipOwner _relationships;
     private readonly GameFactStore _facts;
@@ -75,12 +76,14 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             _movement,
             _control,
             _orders,
-            setup.MaterializationPolicies);
+            setup.MaterializationPolicies,
+            setup.Economy?.MaterialCompatibility);
 
         _lifecycle.RegisterSetup(setup.Ships);
         _economy = setup.Economy is null
             ? null
             : new SessionEconomyOwner(setup.Economy, _lifecycle);
+        _inventoryCommit = new InventoryCommitOwner(_lifecycle.Inventories);
 
         _engine = new SimulationEngine<GameEvent>(this, _agenda);
     }
@@ -93,6 +96,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         ActorControlRegistry control,
         ShipOrderCoordinator orders,
         EntityLifecycleOwner lifecycle,
+        InventoryCommitOwner inventoryCommit,
         RelationshipOwner relationships,
         SessionEconomyOwner? economy,
         SimulationEngineCheckpoint<GameEvent> engineCheckpoint)
@@ -104,6 +108,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         _control = control;
         _orders = orders;
         _lifecycle = lifecycle;
+        _inventoryCommit = inventoryCommit;
         _relationships = relationships;
         _economy = economy;
         CheckpointResult<SimulationEngine<GameEvent>> engine =
@@ -126,6 +131,10 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
 
     internal EntityId? ResolveEntity(ShipId shipId) =>
         _lifecycle.Entities.GetEntityId(shipId);
+
+    internal InventoryCommitBatchResult CommitInventoryMutations(
+        IEnumerable<InventoryMutationProposal> proposals) =>
+        _inventoryCommit.CommitBatch(proposals);
 
     /// <summary>
     /// Emits one lifecycle fact for a newly applied materialization and emits
@@ -233,7 +242,8 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             _orders.CaptureCheckpoint(),
             _lifecycle.CaptureCheckpoint(),
             _relationships.CaptureCheckpoint(),
-            economyCheckpoint);
+            economyCheckpoint,
+            _inventoryCommit.CaptureCheckpoint());
         CheckpointValidationFailure? ownerFailure = ValidateActorOwnership(checkpoint);
         if (ownerFailure is not null)
         {
@@ -255,7 +265,38 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     /// </summary>
     internal static CheckpointResult<ActorOrderRuntimeCoordinator> RestoreCheckpoint(
         GameSessionRuntimeCheckpoint checkpoint,
-        GameFactStore facts)
+        GameFactStore facts) =>
+        RestoreCheckpointCore(checkpoint, facts, definitions: null);
+
+    internal static CheckpointResult<ActorOrderRuntimeCoordinator> RestoreCheckpoint(
+        GameSessionRuntimeCheckpoint checkpoint,
+        GameFactStore facts,
+        PhysicalDefinitionCatalog definitions)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        return RestoreCheckpointCore(checkpoint, facts, definitions);
+    }
+
+    internal static CheckpointResult<ActorOrderRuntimeCoordinator> RestoreCheckpoint(
+        GameSessionRuntimeCheckpoint checkpoint,
+        GameFactStore facts,
+        PhysicalDefinitionCatalog definitions,
+        MaterialInventoryCompatibilityMap materialCompatibility)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        ArgumentNullException.ThrowIfNull(materialCompatibility);
+        return RestoreCheckpointCore(
+            checkpoint,
+            facts,
+            definitions,
+            materialCompatibility);
+    }
+
+    private static CheckpointResult<ActorOrderRuntimeCoordinator> RestoreCheckpointCore(
+        GameSessionRuntimeCheckpoint checkpoint,
+        GameFactStore facts,
+        PhysicalDefinitionCatalog? definitions,
+        MaterialInventoryCompatibilityMap? materialCompatibility = null)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         ArgumentNullException.ThrowIfNull(facts);
@@ -305,16 +346,45 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             return CheckpointResult<ActorOrderRuntimeCoordinator>.Rejected(orders.Failure!);
         }
 
-        CheckpointResult<EntityLifecycleOwner> lifecycle =
-            EntityLifecycleOwner.RestoreCheckpoint(
+        CheckpointResult<EntityLifecycleOwner> lifecycle = definitions is null
+            ? EntityLifecycleOwner.RestoreCheckpoint(
                 checkpoint.Lifecycle,
                 movement.Value!,
                 control.Value!,
                 orders.Value!,
-                policies.Value!.MaterializationPolicies);
+                policies.Value!.MaterializationPolicies)
+            : materialCompatibility is not null
+                ? EntityLifecycleOwner.RestoreCheckpoint(
+                    checkpoint.Lifecycle,
+                    movement.Value!,
+                    control.Value!,
+                    orders.Value!,
+                    policies.Value!.MaterializationPolicies,
+                    definitions,
+                    materialCompatibility)
+            : EntityLifecycleOwner.RestoreCheckpoint(
+                checkpoint.Lifecycle,
+                movement.Value!,
+                control.Value!,
+                orders.Value!,
+                policies.Value!.MaterializationPolicies,
+                definitions);
         if (!lifecycle.IsSuccess)
         {
             return CheckpointResult<ActorOrderRuntimeCoordinator>.Rejected(lifecycle.Failure!);
+        }
+
+        CheckpointResult<InventoryCommitOwner>? inventoryCommit =
+            checkpoint.InventoryCommit is null
+                ? null
+                : InventoryCommitOwner.RestoreCheckpoint(
+                    checkpoint.InventoryCommit,
+                    lifecycle.Value!.Inventories,
+                    definitions ?? new PhysicalDefinitionCatalog([]));
+        if (inventoryCommit is not null && !inventoryCommit.IsSuccess)
+        {
+            return CheckpointResult<ActorOrderRuntimeCoordinator>.Rejected(
+                inventoryCommit.Failure!);
         }
 
         CheckpointValidationFailure? ownerFailure = ValidateActorOwnership(checkpoint);
@@ -362,6 +432,8 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                 control.Value!,
                 orders.Value!,
                 lifecycle.Value!,
+                inventoryCommit?.Value
+                    ?? new InventoryCommitOwner(lifecycle.Value!.Inventories),
                 relationships.Value!,
                 economy,
                 checkpoint.Engine);

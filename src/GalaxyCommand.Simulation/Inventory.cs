@@ -38,6 +38,7 @@ public sealed record CapacityReservation(
 /// </summary>
 public sealed partial class Inventory
 {
+    private readonly MaterialInventoryCompatibilityMap? _materialCompatibility;
     private readonly Dictionary<MaterialId, Quantity> _stored = [];
     private readonly Dictionary<MaterialId, Quantity> _reservedByMaterial = [];
     private readonly Dictionary<ReservationId, Reservation> _reservations = [];
@@ -66,6 +67,21 @@ public sealed partial class Inventory
     {
         ArgumentNullException.ThrowIfNull(custody);
         Custody = custody;
+    }
+
+    /// <summary>
+    /// Creates a generalized inventory whose legacy material facade resolves
+    /// through one explicit, validated compatibility mapping.
+    /// </summary>
+    public Inventory(
+        InventoryId id,
+        InventoryCustody custody,
+        Quantity capacity,
+        MaterialInventoryCompatibilityMap materialCompatibility)
+        : this(id, custody, capacity)
+    {
+        ArgumentNullException.ThrowIfNull(materialCompatibility);
+        _materialCompatibility = materialCompatibility;
     }
 
     public InventoryId Id { get; }
@@ -118,7 +134,11 @@ public sealed partial class Inventory
     internal static CheckpointResult<Inventory> RestoreCheckpoint(
         InventoryCheckpoint checkpoint,
         string path = "$.checkpoint.inventories") =>
-        RestoreCheckpointCore(checkpoint, definitions: null, path);
+        RestoreCheckpointCore(
+            checkpoint,
+            definitions: null,
+            materialCompatibility: null,
+            path);
 
     /// <summary>
     /// Restores generalized holdings by resolving every saved qualified key
@@ -130,7 +150,30 @@ public sealed partial class Inventory
         string path = "$.checkpoint.inventories")
     {
         ArgumentNullException.ThrowIfNull(definitions);
-        return RestoreCheckpointCore(checkpoint, definitions, path);
+        return RestoreCheckpointCore(
+            checkpoint,
+            definitions,
+            materialCompatibility: null,
+            path);
+    }
+
+    /// <summary>
+    /// Restores generalized holdings and preserves the validated legacy
+    /// material facade used by mapped economy sessions.
+    /// </summary>
+    internal static CheckpointResult<Inventory> RestoreCheckpoint(
+        InventoryCheckpoint checkpoint,
+        PhysicalDefinitionCatalog definitions,
+        MaterialInventoryCompatibilityMap materialCompatibility,
+        string path = "$.checkpoint.inventories")
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        ArgumentNullException.ThrowIfNull(materialCompatibility);
+        return RestoreCheckpointCore(
+            checkpoint,
+            definitions,
+            materialCompatibility,
+            path);
     }
 
     /// <summary>
@@ -140,6 +183,7 @@ public sealed partial class Inventory
     private static CheckpointResult<Inventory> RestoreCheckpointCore(
         InventoryCheckpoint checkpoint,
         PhysicalDefinitionCatalog? definitions,
+        MaterialInventoryCompatibilityMap? materialCompatibility,
         string path)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
@@ -199,6 +243,7 @@ public sealed partial class Inventory
             CheckpointValidationFailure? failure = ValidateReservation(
                 checkpoint,
                 stored,
+                materialCompatibility,
                 reservations,
                 reservedByMaterial,
                 reservation,
@@ -238,9 +283,45 @@ public sealed partial class Inventory
                 "Stored material and reserved capacity exceed inventory capacity.");
         }
 
-        Inventory restored = checkpoint.Custody is null
-            ? new Inventory(checkpoint.Id, checkpoint.Capacity)
-            : new Inventory(checkpoint.Id, checkpoint.Custody, checkpoint.Capacity);
+        if (materialCompatibility is not null && checkpoint.Custody is null)
+        {
+            return Rejected(
+                path,
+                "custody",
+                "A mapped material inventory requires explicit custody.");
+        }
+
+        if (materialCompatibility is not null && stored.Count > 0)
+        {
+            return Rejected(
+                path,
+                "storedMaterials",
+                "A mapped material inventory must save materials as generalized holdings.");
+        }
+
+        if (definitions is not null && materialCompatibility is not null)
+        {
+            foreach (PhysicalDefinition mapped in materialCompatibility.Mappings.Values)
+            {
+                if (definitions.Get(mapped.Key) != mapped)
+                {
+                    return Rejected(
+                        path,
+                        "materialCompatibility",
+                        $"Mapped definition {mapped.Key} does not match the restore catalog.");
+                }
+            }
+        }
+
+        Inventory restored = materialCompatibility is not null
+            ? new Inventory(
+                checkpoint.Id,
+                checkpoint.Custody!,
+                checkpoint.Capacity,
+                materialCompatibility)
+            : checkpoint.Custody is null
+                ? new Inventory(checkpoint.Id, checkpoint.Capacity)
+                : new Inventory(checkpoint.Id, checkpoint.Custody, checkpoint.Capacity);
         // Direct assignment preserves the saved commitments without emitting
         // new reserve, transfer, or consumption operations during load.
         foreach ((MaterialId materialId, Quantity quantity) in stored)
@@ -284,8 +365,18 @@ public sealed partial class Inventory
     public Quantity RemainingCapacity =>
         new(Capacity.Units - UsedCapacity.Units - ReservedCapacity.Units);
 
-    public Quantity Stored(MaterialId materialId) =>
-        _stored.GetValueOrDefault(materialId, Quantity.Zero);
+    public Quantity Stored(MaterialId materialId)
+    {
+        if (_materialCompatibility is null)
+        {
+            return _stored.GetValueOrDefault(materialId, Quantity.Zero);
+        }
+
+        PhysicalDefinition? definition = _materialCompatibility.Get(materialId);
+        return definition is null
+            ? Quantity.Zero
+            : FungibleStored(definition.Key);
+    }
 
     public Quantity Reserved(MaterialId materialId) =>
         _reservedByMaterial.GetValueOrDefault(materialId, Quantity.Zero);
@@ -304,12 +395,24 @@ public sealed partial class Inventory
         if (!TryAdd(materialId, quantity))
         {
             throw new InvalidOperationException(
-                $"Inventory capacity {Capacity.Units} exceeded by adding {quantity.Units} to {TotalStored.Units} stored units.");
+                $"Inventory capacity {Capacity.Units} exceeded by adding {quantity.Units} to {UsedCapacity.Units} stored units.");
         }
     }
 
     public bool TryAdd(MaterialId materialId, Quantity quantity)
     {
+        if (_materialCompatibility is not null)
+        {
+            if (quantity == Quantity.Zero)
+            {
+                return true;
+            }
+
+            return StoreFungible(
+                _materialCompatibility.GetRequired(materialId),
+                quantity).IsAccepted;
+        }
+
         if (quantity > RemainingCapacity)
         {
             return false;
@@ -363,8 +466,12 @@ public sealed partial class Inventory
                 $"Material {materialId} has {available.Units} available units, but {quantity.Units} were requested.");
         }
 
-        SetMaterialQuantity(materialId, Stored(materialId).Subtract(quantity));
-        TotalStored = TotalStored.Subtract(quantity);
+        if (quantity == Quantity.Zero)
+        {
+            return;
+        }
+
+        RemoveStoredMaterial(materialId, quantity);
     }
 
     public Reservation Reserve(
@@ -451,9 +558,8 @@ public sealed partial class Inventory
 
         foreach ((MaterialId materialId, Quantity quantity) in materialTotals)
         {
-            SetMaterialQuantity(materialId, Stored(materialId).Subtract(quantity));
+            RemoveStoredMaterial(materialId, quantity);
             SetReservedQuantity(materialId, Reserved(materialId).Subtract(quantity));
-            TotalStored = TotalStored.Subtract(quantity);
         }
 
         return selected;
@@ -479,6 +585,19 @@ public sealed partial class Inventory
         }
     }
 
+    private void RemoveStoredMaterial(MaterialId materialId, Quantity quantity)
+    {
+        if (_materialCompatibility is { } compatibility)
+        {
+            PhysicalDefinition definition = compatibility.GetRequired(materialId);
+            ApplyRemoveFungible(definition.Key, quantity, quantity);
+            return;
+        }
+
+        SetMaterialQuantity(materialId, Stored(materialId).Subtract(quantity));
+        TotalStored = TotalStored.Subtract(quantity);
+    }
+
     private void SetReservedQuantity(MaterialId materialId, Quantity quantity)
     {
         if (quantity == Quantity.Zero)
@@ -498,6 +617,7 @@ public sealed partial class Inventory
     private static CheckpointValidationFailure? ValidateReservation(
         InventoryCheckpoint checkpoint,
         SortedDictionary<MaterialId, Quantity> stored,
+        MaterialInventoryCompatibilityMap? materialCompatibility,
         SortedDictionary<ReservationId, Reservation> reservations,
         SortedDictionary<MaterialId, UInt128> reservedByMaterial,
         Reservation? reservation,
@@ -530,7 +650,10 @@ public sealed partial class Inventory
                 "Material reservation identities must be unique within an inventory.");
         }
 
-        if (!stored.TryGetValue(
+        if (!TryGetReservationHolding(
+                checkpoint,
+                stored,
+                materialCompatibility,
                 reservation.MaterialId,
                 out Quantity storedQuantity))
         {
@@ -554,6 +677,35 @@ public sealed partial class Inventory
 
         reservedByMaterial[reservation.MaterialId] = materialReserved;
         return null;
+    }
+
+    private static bool TryGetReservationHolding(
+        InventoryCheckpoint checkpoint,
+        SortedDictionary<MaterialId, Quantity> stored,
+        MaterialInventoryCompatibilityMap? materialCompatibility,
+        MaterialId materialId,
+        out Quantity quantity)
+    {
+        if (materialCompatibility is null)
+        {
+            return stored.TryGetValue(materialId, out quantity);
+        }
+
+        PhysicalDefinition? definition = materialCompatibility.Get(materialId);
+        if (definition is not null)
+        {
+            foreach (InventoryFungibleCheckpoint? holding in checkpoint.FungibleHoldings)
+            {
+                if (holding is not null && holding.DefinitionKey == definition.Key)
+                {
+                    quantity = holding.Quantity;
+                    return true;
+                }
+            }
+        }
+
+        quantity = Quantity.Zero;
+        return false;
     }
 
     /// <summary>
@@ -653,7 +805,10 @@ public sealed partial class InventoryRegistry
     /// </summary>
     internal static CheckpointResult<InventoryRegistry> RestoreCheckpoint(
         InventoryRegistryCheckpoint checkpoint) =>
-        RestoreCheckpointCore(checkpoint, definitions: null);
+        RestoreCheckpointCore(
+            checkpoint,
+            definitions: null,
+            materialCompatibility: null);
 
     /// <summary>
     /// Restores every inventory against one compatible immutable definition
@@ -664,12 +819,29 @@ public sealed partial class InventoryRegistry
         PhysicalDefinitionCatalog definitions)
     {
         ArgumentNullException.ThrowIfNull(definitions);
-        return RestoreCheckpointCore(checkpoint, definitions);
+        return RestoreCheckpointCore(
+            checkpoint,
+            definitions,
+            materialCompatibility: null);
+    }
+
+    internal static CheckpointResult<InventoryRegistry> RestoreCheckpoint(
+        InventoryRegistryCheckpoint checkpoint,
+        PhysicalDefinitionCatalog definitions,
+        MaterialInventoryCompatibilityMap materialCompatibility)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        ArgumentNullException.ThrowIfNull(materialCompatibility);
+        return RestoreCheckpointCore(
+            checkpoint,
+            definitions,
+            materialCompatibility);
     }
 
     private static CheckpointResult<InventoryRegistry> RestoreCheckpointCore(
         InventoryRegistryCheckpoint checkpoint,
-        PhysicalDefinitionCatalog? definitions)
+        PhysicalDefinitionCatalog? definitions,
+        MaterialInventoryCompatibilityMap? materialCompatibility)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         var restored = new InventoryRegistry();
@@ -696,6 +868,12 @@ public sealed partial class InventoryRegistry
                 ? Inventory.RestoreCheckpoint(
                     inventory,
                     $"$.checkpoint.inventories[{index}]")
+                : materialCompatibility is not null
+                    ? Inventory.RestoreCheckpoint(
+                        inventory,
+                        definitions,
+                        materialCompatibility,
+                        $"$.checkpoint.inventories[{index}]")
                 : Inventory.RestoreCheckpoint(
                     inventory,
                     definitions,

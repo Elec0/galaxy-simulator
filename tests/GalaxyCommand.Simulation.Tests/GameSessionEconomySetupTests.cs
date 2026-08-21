@@ -1,9 +1,112 @@
+using GalaxyCommand.Content;
 using GalaxyCommand.Simulation;
 
 namespace GalaxyCommand.Simulation.Tests;
 
 public sealed class GameSessionEconomySetupTests
 {
+    [Fact]
+    public void MappedEconomyCreatesCustodyAwareGeneralizedFacilityInventory()
+    {
+        MaterialId materialId = new(1);
+        PhysicalDefinition definition = FungibleDefinition("ore", 1);
+        var mapping = new MaterialInventoryCompatibilityMap([
+            new KeyValuePair<MaterialId, PhysicalDefinition>(materialId, definition),
+        ]);
+        GameSessionEconomySetup economy = CreateEconomySeed(
+            GameSessionTestFixture.Principal,
+            mapping);
+        var lifecycle = new EntityLifecycleOwner(
+            new SpatialMovement(),
+            new ActorControlRegistry(),
+            new ShipOrderCoordinator(),
+            policies: []);
+        lifecycle.RegisterSetup([CreateInitialShip()]);
+
+        _ = new SessionEconomyOwner(economy, lifecycle);
+
+        Inventory inventory = lifecycle.Inventories.Get(new InventoryId(2))!;
+        Assert.Equal(
+            new InventoryCustody(
+                new InventoryOwnerReference.Facility(new FacilityId(1)),
+                GameSessionTestFixture.Principal),
+            inventory.Custody);
+        Assert.Equal<ulong>(5, inventory.Stored(materialId).Units);
+        Assert.Equal<ulong>(5, inventory.FungibleStored(definition.Key).Units);
+        InventoryCheckpoint checkpoint = inventory.CaptureCheckpoint();
+        Assert.Empty(checkpoint.StoredMaterials);
+        Assert.Single(checkpoint.FungibleHoldings);
+    }
+
+    [Fact]
+    public void MappedEconomyRequiresEveryUsedMaterialAndFacilityPrincipal()
+    {
+        MaterialId materialId = new(1);
+        var emptyMapping = new MaterialInventoryCompatibilityMap([]);
+
+        Assert.Throws<ArgumentException>(() =>
+            CreateEconomySeed(GameSessionTestFixture.Principal, emptyMapping));
+        Assert.Throws<ArgumentException>(() =>
+            CreateEconomySeed(null, new MaterialInventoryCompatibilityMap([
+                new KeyValuePair<MaterialId, PhysicalDefinition>(
+                    materialId,
+                    FungibleDefinition("ore", 1)),
+            ])));
+    }
+
+    [Fact]
+    public void MaterialCompatibilityMappingRequiresUniqueUnitCostFungibleDefinitions()
+    {
+        MaterialId first = new(1);
+        MaterialId second = new(2);
+        PhysicalDefinition ore = FungibleDefinition("ore", 1);
+
+        Assert.Throws<ArgumentException>(() => new MaterialInventoryCompatibilityMap([
+            new KeyValuePair<MaterialId, PhysicalDefinition>(first, ore),
+            new KeyValuePair<MaterialId, PhysicalDefinition>(second, ore),
+        ]));
+        Assert.Throws<ArgumentException>(() => new MaterialInventoryCompatibilityMap([
+            new KeyValuePair<MaterialId, PhysicalDefinition>(
+                first,
+                FungibleDefinition("dense-ore", 2)),
+        ]));
+        Assert.Throws<ArgumentException>(() => new MaterialInventoryCompatibilityMap([
+            new KeyValuePair<MaterialId, PhysicalDefinition>(
+                first,
+                new PhysicalDefinition(
+                    QualifiedContentKey.Create("core", "cargo", "sensor"),
+                    PhysicalHoldingKind.Discrete,
+                    new Quantity(1))),
+        ]));
+    }
+
+    [Fact]
+    public void SessionRejectsMappedFacilityWithUnknownControllingPrincipal()
+    {
+        MaterialId materialId = new(1);
+        var mapping = new MaterialInventoryCompatibilityMap([
+            new KeyValuePair<MaterialId, PhysicalDefinition>(
+                materialId,
+                FungibleDefinition("ore", 1)),
+        ]);
+        GameSessionEconomySetup economy = CreateEconomySeed(
+            new PrincipalId(99),
+            mapping);
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() =>
+            new GameSessionSetup(
+                [new StarSystem(GameSessionTestFixture.System, "Test System")],
+                [CreateInitialShip()],
+                new ConnectorTopology([], []),
+                [CreateMaterializationPolicy()],
+                economy,
+                GameSessionTestFixture.Relationships,
+                GameSessionTestFixture.RootSeed,
+                factRetentionCapacity: 16));
+
+        Assert.Contains("controlling principal", error.Message);
+    }
+
     [Fact]
     public void SessionSetupRetainsValidatedGenericEconomySeed()
     {
@@ -249,7 +352,9 @@ public sealed class GameSessionEconomySetupTests
         InitialShipOrderPolicy.NoInitialOrder,
         [GameSessionTestFixture.Design]);
 
-    private static GameSessionEconomySetup CreateEconomySeed() => new(
+    private static GameSessionEconomySetup CreateEconomySeed(
+        PrincipalId? controllingPrincipalId = null,
+        MaterialInventoryCompatibilityMap? materialCompatibility = null) => new(
         [
             new InitialInventorySetup(
                 new InventoryId(2),
@@ -261,7 +366,8 @@ public sealed class GameSessionEconomySetupTests
                 new FacilityId(1),
                 new InventoryId(2),
                 new LocationId(1),
-                GameSessionTestFixture.Position(0, 0)),
+                GameSessionTestFixture.Position(0, 0),
+                controllingPrincipalId),
         ],
         [],
         [new ConstructionFacilitySetup(new FacilityId(1), new Throughput(1))],
@@ -272,7 +378,16 @@ public sealed class GameSessionEconomySetupTests
         new TransportTiming(
             SimulationDuration.Zero,
             new TransferRate(1),
-            new TransferRate(1)));
+            new TransferRate(1)),
+        materialCompatibility);
+
+    private static PhysicalDefinition FungibleDefinition(
+        string localId,
+        ulong capacityCost) =>
+        new(
+            QualifiedContentKey.Create("core", "cargo", localId),
+            PhysicalHoldingKind.Fungible,
+            new Quantity(capacityCost));
 
     private static GameSessionEconomySetup CreateTransportEconomySeed(
         MaterialId material,

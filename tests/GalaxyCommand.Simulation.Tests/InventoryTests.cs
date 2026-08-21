@@ -1,9 +1,90 @@
 using GalaxyCommand.Simulation;
 
+using GalaxyCommand.Content;
+
 namespace GalaxyCommand.Simulation.Tests;
 
 public sealed class InventoryTests
 {
+    [Fact]
+    public void MappedLegacyReservationRoundTripsAgainstGeneralizedHolding()
+    {
+        MaterialId oreId = new(1);
+        PhysicalDefinition ore = new(
+            QualifiedContentKey.Create("core", "cargo", "ore"),
+            PhysicalHoldingKind.Fungible,
+            new Quantity(1));
+        var compatibility = new MaterialInventoryCompatibilityMap([
+            new KeyValuePair<MaterialId, PhysicalDefinition>(oreId, ore),
+        ]);
+        var inventory = new Inventory(
+            new InventoryId(1),
+            Custody(17),
+            new Quantity(10),
+            compatibility);
+        inventory.Add(oreId, new Quantity(6));
+        inventory.Reserve(
+            new ReservationId(1),
+            oreId,
+            new Quantity(2),
+            new ReservationOwner.ProductionJob(new ProductionJobId(1)));
+
+        CheckpointResult<Inventory> restored = Inventory.RestoreCheckpoint(
+            inventory.CaptureCheckpoint(),
+            new PhysicalDefinitionCatalog([ore]),
+            compatibility);
+
+        Assert.True(restored.IsSuccess, restored.Failure?.Message);
+        Assert.Equal(new Quantity(6), restored.Value!.Stored(oreId));
+        Assert.Equal(new Quantity(2), restored.Value.Reserved(oreId));
+    }
+
+    [Fact]
+    public void MappedLegacyFacadePreservesReservationConsumptionAndTransferBehavior()
+    {
+        MaterialId oreId = new(1);
+        PhysicalDefinition ore = new(
+            QualifiedContentKey.Create("core", "cargo", "ore"),
+            PhysicalHoldingKind.Fungible,
+            new Quantity(1));
+        var compatibility = new MaterialInventoryCompatibilityMap([
+            new KeyValuePair<MaterialId, PhysicalDefinition>(oreId, ore),
+        ]);
+        var source = new Inventory(
+            new InventoryId(1),
+            Custody(17),
+            new Quantity(10),
+            compatibility);
+        var destination = new Inventory(
+            new InventoryId(2),
+            Custody(18),
+            new Quantity(10),
+            compatibility);
+        var inventories = new InventoryRegistry();
+        inventories.Add(source);
+        inventories.Add(destination);
+        source.Add(oreId, new Quantity(6));
+        Reservation reservation = source.Reserve(
+            new ReservationId(1),
+            oreId,
+            new Quantity(2),
+            new ReservationOwner.ProductionJob(new ProductionJobId(1)));
+
+        source.ConsumeReservations([reservation.Id], reservation.Owner);
+        inventories.TransferAvailable(
+            source.Id,
+            destination.Id,
+            oreId,
+            new Quantity(3));
+
+        Assert.Equal<ulong>(1, source.Stored(oreId).Units);
+        Assert.Equal<ulong>(1, source.FungibleStored(ore.Key).Units);
+        Assert.Equal<ulong>(3, destination.Stored(oreId).Units);
+        Assert.Equal<ulong>(3, destination.FungibleStored(ore.Key).Units);
+        Assert.Equal(Quantity.Zero, source.Reserved(oreId));
+        Assert.Equal(Quantity.Zero, source.Stored(new MaterialId(99)));
+        Assert.Empty(source.CaptureCheckpoint().StoredMaterials);
+    }
     [Fact]
     public void SharedCapacityAppliesAcrossMaterials()
     {
@@ -317,6 +398,11 @@ public sealed class InventoryTests
             new IdSequence<ProductionJobId>(),
             new IdSequence<ReservationId>());
     }
+
+    private static InventoryCustody Custody(ulong entityId) =>
+        new(
+            new InventoryOwnerReference.SessionEntity(new EntityId(entityId)),
+            new PrincipalId(1));
 
     private sealed record InventoryFixture(
         Inventory Inventory,

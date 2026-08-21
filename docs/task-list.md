@@ -38,7 +38,7 @@ local-preference design. `TASK-067` retains the required save-envelope display
 name implementation; cross-device synchronization remains out of scope.
 `TASK-041` completed the generalized inventory and cargo design while
 preserving the existing material contracts until an explicit compatible
-migration is implemented. `TASK-069` retains that implementation. `TASK-068`
+migration is implemented. `TASK-069` completed that implementation. `TASK-068`
 separately owns equipment and ship-slot design. Trade uses the single unified
 currency Credits; `TASK-055` retains its balance, pricing, and settlement
 design. `TASK-019` completed the moving-ship proximity, swept-crossing,
@@ -55,50 +55,7 @@ and pickup range policy.
 
 ## Near-term work
 
-- [ ] **TASK-069: Implement generalized inventory and cargo**
-  - Implement the accepted physical-definition, fungible-holding, discrete-item,
-    custody, integer-capacity, reservation, atomic-transfer, and explicit
-    destruction-disposition contracts from completed `TASK-041`.
-  - Add immutable presentation snapshots, complete checkpoints and restore,
-    material-ledger compatibility, stable typed outcomes, and deterministic
-    proposal ordering with single-thread and worker-layout proof.
-  - Preserve existing production and transport behavior until their callers
-    migrate through the explicit compatibility boundary. Build on completed
-    `TASK-063`; coordinate production content admission with `TASK-048`, saved
-    content references with `TASK-037`, and equipment items with `TASK-068`.
-  - Implementation is underway with the immutable physical-definition catalog,
-    session-scoped discrete-item identity, and custody references for all
-    session entities plus non-entity facilities. Existing material inventories
-    retain their custody-free compatibility constructor and checkpoint path.
-    Custody-aware inventories now aggregate fungible holdings, retain discrete
-    instances, enforce shared checked capacity, and reserve fungible quantities,
-    exact instances, or incoming capacity through stable typed outcomes in
-    memory. Atomic transfers now preserve fungible quantities and discrete
-    identity while consuming exact source and incoming-capacity reservations.
-    Inventory removal now requires explicit destruction or complete transfer to
-    an existing destination and rejects live commitments without mutation.
-    Locale-neutral presentation snapshots now expose immutable, stably ordered
-    custody, capacity, holding, instance, and reservation summaries.
-    Catalog-aware checkpoints now restore custody, holdings, instances, and all
-    generalized reservation subjects from exact qualified references without
-    saving definition bodies. A deterministic commit owner now canonically
-    orders storage, discrete-instance creation, and reservation proposals by
-    caller-supplied operation key; rejects duplicate keys; allocates identities
-    only for accepted commits; and checkpoints exact receipts plus allocator
-    exhaustion without saving definition bodies. The same boundary now admits
-    atomic transfers and explicit inventory removal, preserving replay after
-    holdings move or the removed inventory no longer exists. Owner-checked
-    reservation release now uses the same deterministic admission and durable
-    replay contract. Lifecycle setup and construction materialization now give
-    every ship cargo inventory explicit entity and principal custody, and
-    restore rejects disagreement with the live ship. Facility material callers
-    remain on the compatibility facade because current setup supplies neither
-    a facility controlling principal nor the exact `MaterialId` to qualified
-    definition mapping owned with `TASK-048` and `TASK-037`; selecting those
-    inputs remains an owner decision.
-  - Context: [Generalized inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md) · [Authoritative save boundary](authoritative-save-boundary.md) · [Concurrency and performance](concurrency-and-performance.md)
-
-`TASK-069` is the current near-term implementation. `TASK-048`, `TASK-068`,
+`TASK-048`, `TASK-068`,
 `TASK-071`, `TASK-073`, and `TASK-075` remain in the near-term parking-lot
 horizon until the project owner promotes one of them.
 
@@ -439,9 +396,9 @@ the project-level **Near-term work** section above.
     resulting inventory.
   - Define content, commands, facts, snapshots, checkpoints, and deterministic
     batching without promoting the Phase 1 fixture into session authority.
-  - Coordinate item design with completed `TASK-041`, inventory implementation
-    with `TASK-069`, equipment with `TASK-068`, resource discoverability with
-    completed `TASK-020`, completed movement-interaction design from
+  - Coordinate item design with completed `TASK-041`, inventory behavior with
+    completed `TASK-069`, equipment with `TASK-068`, resource discoverability
+    with completed `TASK-020`, completed movement-interaction design from
     `TASK-019`, and autonomous selection with `TASK-053`.
   - Context: [Economy](economy.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md)
 
@@ -454,10 +411,10 @@ the project-level **Near-term work** section above.
     public-market versus internal logistics boundaries, relationship effects,
     snapshots, saves, and deterministic contention. Credits are not physical
     inventory and consume no cargo capacity.
-  - Build on the tradable inventory categories defined by completed `TASK-041`;
-    coordinate implementation with `TASK-069`, logistics with `TASK-009`,
-    docking with `TASK-051`, stale observed market state with completed
-    `TASK-020`, and economic facts with `TASK-032`.
+  - Build on the tradable inventory categories defined by completed `TASK-041`
+    and their implementation in completed `TASK-069`; coordinate logistics
+    with `TASK-009`, docking with `TASK-051`, stale observed market state with
+    completed `TASK-020`, and economic facts with `TASK-032`.
   - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Factions](factions.md)
 
 - [ ] **TASK-057: Define station composition, construction, and expansion**
@@ -585,6 +542,24 @@ the project-level **Near-term work** section above.
 
 ## Completed foundations
 
+- [x] **TASK-069: Implement generalized inventory and cargo**
+  - Implemented qualified physical definitions, fungible holdings, stable
+    discrete instances, explicit custody, checked integer capacity, typed
+    reservations, atomic transfers, and explicit destruction or transfer
+    disposition across session-owned inventories.
+  - Added locale-neutral presentation snapshots, catalog-aware checkpoints and
+    restore, stable typed outcomes, durable idempotency receipts, and
+    accepted-only item and reservation identity allocation.
+  - Preserved production and transport behavior through an explicit validated
+    one-to-one material compatibility mapping with facility and ship custody.
+  - Integrated one authoritative commit owner with the session runtime and
+    proved identical holdings, commitments, allocator states, outcomes, facts,
+    receipts, and restore behavior across single-thread and parallel
+    worker-buffer layouts with varied batch sizes.
+  - Content admission remains `TASK-048`, saved-reference compatibility remains
+    `TASK-037`, and installed equipment remains `TASK-068`.
+  - Context: [Generalized inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md) · [Authoritative save boundary](authoritative-save-boundary.md) · [Concurrency and performance](concurrency-and-performance.md)
+
 - [x] **TASK-074: Define sensor deployables and their placement lifecycle**
   - Defined portable discrete sensor items that atomically materialize into
     fresh stationary deployed entities and return equivalent new items on
@@ -645,8 +620,8 @@ the project-level **Near-term work** section above.
   - Defined immutable presentation views, complete checkpoint and restore state,
     exact content-reference migration, material-ledger compatibility, and
     deterministic proposal commit independent of worker or batch layout.
-  - Implementation remains `TASK-069`; content-reference migration remains
-    `TASK-037`.
+  - Implementation is complete in `TASK-069`; content-reference migration
+    remains `TASK-037`.
   - Context: [Generalized inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md) · [Economy](economy.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [x] **TASK-050: Define save slots, autosave, and local preference storage**

@@ -69,7 +69,8 @@ public sealed record EconomyFacilitySetup(
     FacilityId FacilityId,
     InventoryId InventoryId,
     LocationId LogisticsLocationId,
-    SystemPosition Position);
+    SystemPosition Position,
+    PrincipalId? ControllingPrincipalId = null);
 
 /// <summary>
 /// Initial recurring production behavior for one facility.
@@ -129,7 +130,8 @@ public sealed class GameSessionEconomySetup
         IEnumerable<InitialConstructionOrderSetup> constructionOrders,
         IEnumerable<InitialFreighterSetup> freighters,
         ILogisticsNavigation navigation,
-        TransportTiming transportTiming)
+        TransportTiming transportTiming,
+        MaterialInventoryCompatibilityMap? materialCompatibility = null)
     {
         ArgumentNullException.ThrowIfNull(inventories);
         ArgumentNullException.ThrowIfNull(facilities);
@@ -153,6 +155,12 @@ public sealed class GameSessionEconomySetup
         ValidateProduction(productionValues, facilityValues);
         ValidateConstructionFacilities(constructionFacilityValues, facilityValues);
         _shipDesigns = ValidateShipDesigns(shipDesigns);
+        ValidateMaterialCompatibility(
+            materialCompatibility,
+            inventoryValues,
+            facilityValues,
+            productionValues,
+            _shipDesigns.Values);
         ValidateConstruction(
             constructionValues,
             constructionFacilityValues,
@@ -165,6 +173,7 @@ public sealed class GameSessionEconomySetup
         _constructionFacilities = new ReadOnlyCollection<ConstructionFacilitySetup>(constructionFacilityValues);
         _constructionOrders = new ReadOnlyCollection<InitialConstructionOrderSetup>(constructionValues);
         _freighters = new ReadOnlyCollection<InitialFreighterSetup>(freighterValues);
+        MaterialCompatibility = materialCompatibility;
     }
 
     public IReadOnlyList<InitialInventorySetup> Inventories => _inventories;
@@ -184,6 +193,8 @@ public sealed class GameSessionEconomySetup
     public ILogisticsNavigation Navigation { get; }
 
     public TransportTiming TransportTiming { get; }
+
+    public MaterialInventoryCompatibilityMap? MaterialCompatibility { get; }
 
     private static void ValidateInventories(IEnumerable<InitialInventorySetup> inventories)
     {
@@ -324,6 +335,67 @@ public sealed class GameSessionEconomySetup
                     $"Freighter {freighter.ShipId} is duplicated or references unknown logistics location {freighter.LogisticsLocationId}.",
                     nameof(freighters));
             }
+        }
+    }
+
+    /// <summary>
+    /// Requires complete explicit ownership and material coverage only when a
+    /// setup opts into the generalized compatibility path.
+    /// </summary>
+    private static void ValidateMaterialCompatibility(
+        MaterialInventoryCompatibilityMap? compatibility,
+        IReadOnlyCollection<InitialInventorySetup> inventories,
+        IReadOnlyCollection<EconomyFacilitySetup> facilities,
+        IReadOnlyCollection<ProductionFacilitySetup> productionFacilities,
+        IEnumerable<ShipDesign> shipDesigns)
+    {
+        if (compatibility is null)
+        {
+            return;
+        }
+
+        var facilitiesByInventory = new Dictionary<InventoryId, EconomyFacilitySetup>();
+        foreach (EconomyFacilitySetup facility in facilities)
+        {
+            if (facility.ControllingPrincipalId is not { Value: > 0 }
+                || !facilitiesByInventory.TryAdd(facility.InventoryId, facility))
+            {
+                throw new ArgumentException(
+                    "Mapped economy facilities require one explicit controlling principal and one inventory each.",
+                    nameof(facilities));
+            }
+        }
+
+        if (inventories.Any(inventory =>
+                !facilitiesByInventory.ContainsKey(inventory.InventoryId)))
+        {
+            throw new ArgumentException(
+                "Every mapped economy inventory must belong to exactly one facility.",
+                nameof(inventories));
+        }
+
+        var usedMaterials = new HashSet<MaterialId>();
+        foreach (InitialInventorySetup inventory in inventories)
+        {
+            usedMaterials.UnionWith(inventory.StoredMaterials.Keys);
+        }
+
+        foreach (ProductionFacilitySetup production in productionFacilities)
+        {
+            usedMaterials.UnionWith(production.Recipe.Inputs.Keys);
+            usedMaterials.Add(production.Recipe.OutputMaterial);
+        }
+
+        foreach (ShipDesign design in shipDesigns)
+        {
+            usedMaterials.UnionWith(design.Recipe.Inputs.Keys);
+        }
+
+        if (usedMaterials.Any(materialId => compatibility.Get(materialId) is null))
+        {
+            throw new ArgumentException(
+                "The material compatibility mapping does not cover every material used by economy setup.",
+                nameof(compatibility));
         }
     }
 }

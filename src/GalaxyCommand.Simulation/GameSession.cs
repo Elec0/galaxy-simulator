@@ -69,6 +69,13 @@ public sealed class GameSession : IGameplayCommandHandler
     public EntityId? ResolveEntity(ShipId shipId) =>
         _runtime.ResolveEntity(shipId);
 
+    internal InventoryCommitBatchResult CommitInventoryMutations(
+        IEnumerable<InventoryMutationProposal> proposals)
+    {
+        EnsureHealthy();
+        return _runtime.CommitInventoryMutations(proposals);
+    }
+
     /// <summary>
     /// Removes one live entity through deterministic cross-owner cleanup and
     /// returns the prior receipt when the same removal is repeated.
@@ -189,7 +196,8 @@ public sealed class GameSession : IGameplayCommandHandler
             value.Economy,
             _random.CaptureCheckpoint(),
             facts,
-            _commands.CaptureCheckpoint());
+            _commands.CaptureCheckpoint(),
+            value.InventoryCommit);
         return CheckpointResult<GameSessionCheckpoint>.Success(checkpoint);
     }
 
@@ -198,7 +206,34 @@ public sealed class GameSession : IGameplayCommandHandler
     /// only after all owner and cross-owner invariants succeed.
     /// </summary>
     internal static CheckpointResult<GameSession> RestoreCheckpoint(
-        GameSessionCheckpoint checkpoint)
+        GameSessionCheckpoint checkpoint) =>
+        RestoreCheckpointCore(checkpoint, definitions: null);
+
+    internal static CheckpointResult<GameSession> RestoreCheckpoint(
+        GameSessionCheckpoint checkpoint,
+        PhysicalDefinitionCatalog definitions)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        return RestoreCheckpointCore(checkpoint, definitions);
+    }
+
+    internal static CheckpointResult<GameSession> RestoreCheckpoint(
+        GameSessionCheckpoint checkpoint,
+        PhysicalDefinitionCatalog definitions,
+        MaterialInventoryCompatibilityMap materialCompatibility)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        ArgumentNullException.ThrowIfNull(materialCompatibility);
+        return RestoreCheckpointCore(
+            checkpoint,
+            definitions,
+            materialCompatibility);
+    }
+
+    private static CheckpointResult<GameSession> RestoreCheckpointCore(
+        GameSessionCheckpoint checkpoint,
+        PhysicalDefinitionCatalog? definitions,
+        MaterialInventoryCompatibilityMap? materialCompatibility = null)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         if (checkpoint.Random is null)
@@ -245,11 +280,22 @@ public sealed class GameSession : IGameplayCommandHandler
             checkpoint.Orders,
             checkpoint.Lifecycle,
             checkpoint.Relationships,
-            checkpoint.Economy);
-        CheckpointResult<ActorOrderRuntimeCoordinator> runtime =
-            ActorOrderRuntimeCoordinator.RestoreCheckpoint(
+            checkpoint.Economy,
+            checkpoint.InventoryCommit);
+        CheckpointResult<ActorOrderRuntimeCoordinator> runtime = definitions is null
+            ? ActorOrderRuntimeCoordinator.RestoreCheckpoint(
                 runtimeCheckpoint,
-                facts.Value!);
+                facts.Value!)
+            : materialCompatibility is not null
+                ? ActorOrderRuntimeCoordinator.RestoreCheckpoint(
+                    runtimeCheckpoint,
+                    facts.Value!,
+                    definitions,
+                    materialCompatibility)
+            : ActorOrderRuntimeCoordinator.RestoreCheckpoint(
+                runtimeCheckpoint,
+                facts.Value!,
+                definitions);
         if (!runtime.IsSuccess)
         {
             return CheckpointResult<GameSession>.Rejected(runtime.Failure!);

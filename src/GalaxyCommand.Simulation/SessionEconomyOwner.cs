@@ -49,9 +49,32 @@ internal sealed class SessionEconomyOwner
         _lifecycleInventories = lifecycle.Inventories;
         _navigation = setup.Navigation;
 
+        Dictionary<InventoryId, EconomyFacilitySetup>? facilitiesByInventory =
+            setup.MaterialCompatibility is null
+                ? null
+                : setup.Facilities.ToDictionary(facility => facility.InventoryId);
         foreach (InitialInventorySetup inventorySetup in setup.Inventories)
         {
-            var inventory = new Inventory(inventorySetup.InventoryId, inventorySetup.Capacity);
+            Inventory inventory;
+            if (setup.MaterialCompatibility is { } compatibility)
+            {
+                EconomyFacilitySetup facility =
+                    facilitiesByInventory![inventorySetup.InventoryId];
+                inventory = new Inventory(
+                    inventorySetup.InventoryId,
+                    new InventoryCustody(
+                        new InventoryOwnerReference.Facility(facility.FacilityId),
+                        facility.ControllingPrincipalId!.Value),
+                    inventorySetup.Capacity,
+                    compatibility);
+            }
+            else
+            {
+                inventory = new Inventory(
+                    inventorySetup.InventoryId,
+                    inventorySetup.Capacity);
+            }
+
             foreach ((MaterialId materialId, Quantity quantity) in inventorySetup.StoredMaterials)
             {
                 inventory.Add(materialId, quantity);

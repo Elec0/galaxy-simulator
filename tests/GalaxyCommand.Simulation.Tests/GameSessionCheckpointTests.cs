@@ -1,9 +1,104 @@
+using GalaxyCommand.Content;
 using GalaxyCommand.Simulation;
 
 namespace GalaxyCommand.Simulation.Tests;
 
 public sealed class GameSessionCheckpointTests
 {
+    [Fact]
+    public void GeneralizedInventoryCommitRoundTripsThroughSessionOwner()
+    {
+        PhysicalDefinition ore = new(
+            QualifiedContentKey.Create("core", "cargo", "ore"),
+            PhysicalHoldingKind.Fungible,
+            new Quantity(1));
+        GameSession session = CreateSession();
+        var proposal = new StoreFungibleInventoryProposal(
+            new InventoryOperationKey(InventoryOperationSourceKind.Explicit, 1),
+            GameSessionTestFixture.CargoInventory,
+            ore,
+            new Quantity(3));
+        InventoryCommitDisposition applied = Assert.Single(
+            session.CommitInventoryMutations([proposal]).Outcomes);
+
+        CheckpointResult<GameSessionCheckpoint> capture = session.CaptureCheckpoint();
+        Assert.True(capture.IsSuccess, capture.Failure?.Message);
+        GameSessionCheckpoint checkpoint = capture.Value!;
+        CheckpointResult<GameSession> catalogFree =
+            GameSession.RestoreCheckpoint(checkpoint);
+        CheckpointResult<GameSession> compatible = GameSession.RestoreCheckpoint(
+            checkpoint,
+            new PhysicalDefinitionCatalog([ore]));
+
+        Assert.True(applied.WasApplied);
+        Assert.NotNull(checkpoint.InventoryCommit);
+        Assert.False(catalogFree.IsSuccess);
+        Assert.True(compatible.IsSuccess);
+        InventoryCommitDisposition replayed = Assert.Single(
+            compatible.Value!.CommitInventoryMutations([proposal]).Outcomes);
+        Assert.False(replayed.WasApplied);
+        Assert.Equal(applied.Outcome, replayed.Outcome);
+    }
+
+    [Fact]
+    public void MappedEconomyRoundTripsFacilityAndShipInventories()
+    {
+        MaterialId materialId = new(1);
+        PhysicalDefinition ore = new(
+            QualifiedContentKey.Create("core", "cargo", "ore"),
+            PhysicalHoldingKind.Fungible,
+            new Quantity(1));
+        var compatibility = new MaterialInventoryCompatibilityMap([
+            new KeyValuePair<MaterialId, PhysicalDefinition>(materialId, ore),
+        ]);
+        var catalog = new PhysicalDefinitionCatalog([ore]);
+        GameSession session = CreateEconomySession(compatibility);
+        session.CommitInventoryMutations([
+            new StoreFungibleInventoryProposal(
+                new InventoryOperationKey(
+                    InventoryOperationSourceKind.Explicit,
+                    1),
+                GameSessionTestFixture.CargoInventory,
+                ore,
+                new Quantity(3)),
+        ]);
+
+        GameSessionCheckpoint checkpoint = Capture(session);
+        CheckpointResult<GameSession> restored = GameSession.RestoreCheckpoint(
+            checkpoint,
+            catalog,
+            compatibility);
+
+        Assert.True(restored.IsSuccess, restored.Failure?.Message);
+        InventoryCheckpoint[] inventories = checkpoint.Lifecycle.Inventories.Inventories
+            .Cast<InventoryCheckpoint>()
+            .ToArray();
+        Assert.All(inventories, inventory => Assert.NotNull(inventory.Custody));
+        Assert.All(inventories, inventory => Assert.Empty(inventory.StoredMaterials));
+        Assert.Equal(
+            new Quantity(3),
+            Assert.Single(inventories.Single(inventory =>
+                inventory.Id == GameSessionTestFixture.CargoInventory).FungibleHoldings).Quantity);
+        Assert.Equal(
+            new Quantity(5),
+            Assert.Single(inventories.Single(inventory =>
+                inventory.Id == new InventoryId(2)).FungibleHoldings).Quantity);
+        InventoryCheckpoint[] roundTripped = Capture(restored.Value!)
+            .Lifecycle.Inventories.Inventories
+            .Cast<InventoryCheckpoint>()
+            .ToArray();
+        Assert.Equal(inventories.Length, roundTripped.Length);
+        for (int index = 0; index < inventories.Length; index++)
+        {
+            Assert.Equal(inventories[index].Id, roundTripped[index].Id);
+            Assert.Equal(inventories[index].Custody, roundTripped[index].Custody);
+            Assert.Equal(inventories[index].Capacity, roundTripped[index].Capacity);
+            Assert.Equal(
+                inventories[index].FungibleHoldings,
+                roundTripped[index].FungibleHoldings);
+        }
+    }
+
     [Fact]
     public void RestoredSessionContinuesPendingMovementLikeUninterruptedSession()
     {
@@ -299,7 +394,8 @@ public sealed class GameSessionCheckpointTests
                 new ChebyshevLocalTravelTimeEstimator(100)));
     }
 
-    private static GameSession CreateEconomySession()
+    private static GameSession CreateEconomySession(
+        MaterialInventoryCompatibilityMap? materialCompatibility = null)
     {
         var navigation = new DirectLocalNavigationPlanner(
             new ChebyshevLocalTravelTimeEstimator(100));
@@ -311,12 +407,19 @@ public sealed class GameSessionCheckpointTests
             [new InitialInventorySetup(
                 facilityInventoryId,
                 new Quantity(20),
-                [])],
+                materialCompatibility is null
+                    ? []
+                    : [new KeyValuePair<MaterialId, Quantity>(
+                        new MaterialId(1),
+                        new Quantity(5))])],
             [new EconomyFacilitySetup(
                 facilityId,
                 facilityInventoryId,
                 locationId,
-                position)],
+                position,
+                materialCompatibility is null
+                    ? null
+                    : GameSessionTestFixture.Principal)],
             [],
             [new ConstructionFacilitySetup(facilityId, new Throughput(1))],
             [GameSessionTestFixture.Design],
@@ -333,7 +436,8 @@ public sealed class GameSessionCheckpointTests
             new TransportTiming(
                 SimulationDuration.Zero,
                 new TransferRate(1),
-                new TransferRate(1)));
+                new TransferRate(1)),
+            materialCompatibility);
         var setup = new GameSessionSetup(
             [new StarSystem(GameSessionTestFixture.System, "Test System")],
             [new InitialShipSetup(

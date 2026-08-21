@@ -346,7 +346,8 @@ internal sealed record GameSessionRuntimeCheckpoint(
     ShipOrderCoordinatorCheckpoint Orders,
     EntityLifecycleCheckpoint Lifecycle,
     RelationshipCheckpoint Relationships,
-    SessionEconomyCheckpoint? Economy);
+    SessionEconomyCheckpoint? Economy,
+    InventoryCommitOwnerCheckpoint? InventoryCommit = null);
 
 internal sealed record GameSessionCheckpoint(
     SimulationEngineCheckpoint<GameEvent> Engine,
@@ -360,7 +361,8 @@ internal sealed record GameSessionCheckpoint(
     SessionEconomyCheckpoint? Economy,
     DeterministicRandomCheckpoint? Random,
     GameFactStoreCheckpoint Facts,
-    CommandAdmissionCheckpoint CommandAdmission);
+    CommandAdmissionCheckpoint CommandAdmission,
+    InventoryCommitOwnerCheckpoint? InventoryCommit = null);
 
 internal sealed record RelationshipPrincipalCheckpoint(
     PrincipalId Id,

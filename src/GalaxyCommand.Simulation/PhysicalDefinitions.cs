@@ -101,3 +101,53 @@ public sealed class PhysicalDefinitionCatalog
         return _byKey.GetValueOrDefault(key);
     }
 }
+
+/// <summary>
+/// Explicit one-to-one bridge from legacy material identities to compatible
+/// fungible definitions. Unit capacity is required to preserve legacy behavior.
+/// </summary>
+public sealed class MaterialInventoryCompatibilityMap
+{
+    private readonly ReadOnlyDictionary<MaterialId, PhysicalDefinition> _byMaterial;
+
+    public MaterialInventoryCompatibilityMap(
+        IEnumerable<KeyValuePair<MaterialId, PhysicalDefinition>> mappings)
+    {
+        ArgumentNullException.ThrowIfNull(mappings);
+        var byMaterial = new SortedDictionary<MaterialId, PhysicalDefinition>(
+            EntityIdComparer<MaterialId>.Instance);
+        var definitionKeys = new HashSet<QualifiedContentKey>();
+        foreach ((MaterialId materialId, PhysicalDefinition definition) in mappings)
+        {
+            ArgumentOutOfRangeException.ThrowIfZero(materialId.Value);
+            ArgumentNullException.ThrowIfNull(definition);
+            if (definition.HoldingKind != PhysicalHoldingKind.Fungible
+                || definition.CapacityCost != new Quantity(1))
+            {
+                throw new ArgumentException(
+                    $"Legacy material {materialId} requires a fungible one-unit-capacity definition.",
+                    nameof(mappings));
+            }
+
+            if (!byMaterial.TryAdd(materialId, definition)
+                || !definitionKeys.Add(definition.Key))
+            {
+                throw new ArgumentException(
+                    "Material compatibility mappings must be one-to-one.",
+                    nameof(mappings));
+            }
+        }
+
+        _byMaterial = new ReadOnlyDictionary<MaterialId, PhysicalDefinition>(byMaterial);
+    }
+
+    public IReadOnlyDictionary<MaterialId, PhysicalDefinition> Mappings => _byMaterial;
+
+    public PhysicalDefinition? Get(MaterialId materialId) =>
+        _byMaterial.GetValueOrDefault(materialId);
+
+    internal PhysicalDefinition GetRequired(MaterialId materialId) =>
+        Get(materialId)
+        ?? throw new InvalidOperationException(
+            $"Material {materialId} has no compatible physical definition.");
+}
