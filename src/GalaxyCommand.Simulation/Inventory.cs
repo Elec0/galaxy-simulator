@@ -36,29 +36,51 @@ public sealed record CapacityReservation(
 /// <summary>
 /// Capacity-limited storage with explicit material reservations.
 /// </summary>
-public sealed class Inventory
+public sealed partial class Inventory
 {
     private readonly Dictionary<MaterialId, Quantity> _stored = [];
     private readonly Dictionary<MaterialId, Quantity> _reservedByMaterial = [];
     private readonly Dictionary<ReservationId, Reservation> _reservations = [];
     private readonly Dictionary<CapacityReservationId, CapacityReservation> _capacityReservations = [];
 
+    /// <summary>
+    /// Creates a material-compatibility inventory without generalized custody
+    /// metadata. Existing production and transport callers use this boundary
+    /// until their explicit migration.
+    /// </summary>
     public Inventory(InventoryId id, Quantity capacity)
     {
         Id = id;
         Capacity = capacity;
     }
 
+    /// <summary>
+    /// Creates a generalized physical inventory with explicit custody and a
+    /// controlling principal.
+    /// </summary>
+    public Inventory(
+        InventoryId id,
+        InventoryCustody custody,
+        Quantity capacity)
+        : this(id, capacity)
+    {
+        ArgumentNullException.ThrowIfNull(custody);
+        Custody = custody;
+    }
+
     public InventoryId Id { get; }
 
     public Quantity Capacity { get; }
+
+    public InventoryCustody? Custody { get; }
 
     public Quantity TotalStored { get; private set; }
 
     public Quantity ReservedCapacity { get; private set; }
 
     internal bool HasCommitments =>
-        _reservations.Count > 0 || _capacityReservations.Count > 0;
+        _reservations.Count > 0 || _capacityReservations.Count > 0 ||
+        _physicalReservations.Count > 0;
 
     /// <summary>
     /// Captures stored material and explicit commitments in stable identity
@@ -67,6 +89,7 @@ public sealed class Inventory
     internal InventoryCheckpoint CaptureCheckpoint() =>
         new(
             Id,
+            Custody,
             Capacity,
             _stored
                 .OrderBy(entry => entry.Key.Value)
@@ -74,15 +97,50 @@ public sealed class Inventory
                     entry.Key,
                     entry.Value)),
             _reservations.Values.OrderBy(reservation => reservation.Id.Value),
-            _capacityReservations.Values.OrderBy(reservation => reservation.Id.Value));
+            _capacityReservations.Values.OrderBy(reservation => reservation.Id.Value),
+            _fungibleStored
+                .OrderBy(entry => entry.Key.ToString(), StringComparer.Ordinal)
+                .Select(entry => new InventoryFungibleCheckpoint(
+                    entry.Key,
+                    entry.Value)),
+            _discreteItems.Values
+                .OrderBy(instance => instance.Id.Value)
+                .Select(instance => new InventoryDiscreteItemCheckpoint(
+                    instance.Id,
+                    instance.DefinitionKey)),
+            _physicalReservations.Values.OrderBy(
+                reservation => reservation.Id.Value));
 
     /// <summary>
-    /// Validates and directly restores one inventory without calling mutation
-    /// APIs that would reinterpret saved state as new material movement.
+    /// Validates and privately restores one inventory without allocating new
+    /// identities or publishing intermediate state.
     /// </summary>
     internal static CheckpointResult<Inventory> RestoreCheckpoint(
         InventoryCheckpoint checkpoint,
+        string path = "$.checkpoint.inventories") =>
+        RestoreCheckpointCore(checkpoint, definitions: null, path);
+
+    /// <summary>
+    /// Restores generalized holdings by resolving every saved qualified key
+    /// through the compatible immutable definition catalog.
+    /// </summary>
+    internal static CheckpointResult<Inventory> RestoreCheckpoint(
+        InventoryCheckpoint checkpoint,
+        PhysicalDefinitionCatalog definitions,
         string path = "$.checkpoint.inventories")
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        return RestoreCheckpointCore(checkpoint, definitions, path);
+    }
+
+    /// <summary>
+    /// Restores the compatibility and generalized state through one validation
+    /// path while making the content catalog optional only for legacy state.
+    /// </summary>
+    private static CheckpointResult<Inventory> RestoreCheckpointCore(
+        InventoryCheckpoint checkpoint,
+        PhysicalDefinitionCatalog? definitions,
+        string path)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -180,7 +238,9 @@ public sealed class Inventory
                 "Stored material and reserved capacity exceed inventory capacity.");
         }
 
-        var restored = new Inventory(checkpoint.Id, checkpoint.Capacity);
+        Inventory restored = checkpoint.Custody is null
+            ? new Inventory(checkpoint.Id, checkpoint.Capacity)
+            : new Inventory(checkpoint.Id, checkpoint.Custody, checkpoint.Capacity);
         // Direct assignment preserves the saved commitments without emitting
         // new reserve, transfer, or consumption operations during load.
         foreach ((MaterialId materialId, Quantity quantity) in stored)
@@ -208,11 +268,21 @@ public sealed class Inventory
 
         restored.TotalStored = new Quantity((ulong)totalStored);
         restored.ReservedCapacity = new Quantity((ulong)reservedCapacity);
+        CheckpointValidationFailure? physicalFailure = RestorePhysicalState(
+            restored,
+            checkpoint,
+            definitions,
+            path);
+        if (physicalFailure is not null)
+        {
+            return CheckpointResult<Inventory>.Rejected(physicalFailure);
+        }
+
         return CheckpointResult<Inventory>.Success(restored);
     }
 
     public Quantity RemainingCapacity =>
-        new(Capacity.Units - TotalStored.Units - ReservedCapacity.Units);
+        new(Capacity.Units - UsedCapacity.Units - ReservedCapacity.Units);
 
     public Quantity Stored(MaterialId materialId) =>
         _stored.GetValueOrDefault(materialId, Quantity.Zero);
@@ -303,7 +373,8 @@ public sealed class Inventory
         Quantity quantity,
         ReservationOwner owner)
     {
-        if (_reservations.ContainsKey(reservationId))
+        if (_reservations.ContainsKey(reservationId) ||
+            _physicalReservations.ContainsKey(reservationId))
         {
             throw new InvalidOperationException($"Duplicate reservation {reservationId}.");
         }
@@ -551,7 +622,7 @@ public sealed class Inventory
 /// <summary>
 /// World ownership of all physical inventories.
 /// </summary>
-public sealed class InventoryRegistry
+public sealed partial class InventoryRegistry
 {
     private readonly Dictionary<InventoryId, Inventory> _inventories = [];
 
@@ -581,7 +652,24 @@ public sealed class InventoryRegistry
     /// material or replaying reservation operations.
     /// </summary>
     internal static CheckpointResult<InventoryRegistry> RestoreCheckpoint(
-        InventoryRegistryCheckpoint checkpoint)
+        InventoryRegistryCheckpoint checkpoint) =>
+        RestoreCheckpointCore(checkpoint, definitions: null);
+
+    /// <summary>
+    /// Restores every inventory against one compatible immutable definition
+    /// catalog before publishing the registry.
+    /// </summary>
+    internal static CheckpointResult<InventoryRegistry> RestoreCheckpoint(
+        InventoryRegistryCheckpoint checkpoint,
+        PhysicalDefinitionCatalog definitions)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        return RestoreCheckpointCore(checkpoint, definitions);
+    }
+
+    private static CheckpointResult<InventoryRegistry> RestoreCheckpointCore(
+        InventoryRegistryCheckpoint checkpoint,
+        PhysicalDefinitionCatalog? definitions)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         var restored = new InventoryRegistry();
@@ -604,9 +692,14 @@ public sealed class InventoryRegistry
                         "Inventory identities must be unique."));
             }
 
-            CheckpointResult<Inventory> result = Inventory.RestoreCheckpoint(
-                inventory,
-                $"$.checkpoint.inventories[{index}]");
+            CheckpointResult<Inventory> result = definitions is null
+                ? Inventory.RestoreCheckpoint(
+                    inventory,
+                    $"$.checkpoint.inventories[{index}]")
+                : Inventory.RestoreCheckpoint(
+                    inventory,
+                    definitions,
+                    $"$.checkpoint.inventories[{index}]");
             if (!result.IsSuccess)
             {
                 return CheckpointResult<InventoryRegistry>.Rejected(

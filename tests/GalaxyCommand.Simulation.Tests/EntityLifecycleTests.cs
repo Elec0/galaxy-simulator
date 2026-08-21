@@ -110,6 +110,54 @@ public sealed class EntityLifecycleTests
     }
 
     [Fact]
+    public void ConstructionMaterializationAssignsEntityCargoCustody()
+    {
+        var policy = new ShipMaterializationPolicy(
+            new FacilityId(1),
+            GameSessionTestFixture.Principal,
+            GameSessionTestFixture.Position(0, 0),
+            GameSessionTestFixture.PlayerController,
+            InitialShipOrderPolicy.NoInitialOrder,
+            [GameSessionTestFixture.Design]);
+        var owner = new EntityLifecycleOwner(
+            new SpatialMovement(),
+            new ActorControlRegistry(),
+            new ShipOrderCoordinator(),
+            [policy]);
+        var process = new ConstructionProcess(
+            policy.FacilityId,
+            new InventoryId(99),
+            new Throughput(1));
+        process.Enqueue(
+            new ConstructionIdSequences(),
+            GameSessionTestFixture.Design);
+        var constructionInventory = new Inventory(
+            process.InventoryId,
+            new Quantity(10));
+        SimulationTime completedAt = Assert.IsType<SimulationTime>(
+            process.StartPrepared(constructionInventory, SimulationTime.Zero));
+        var key = new EventKey(
+            completedAt,
+            EventPhase.PhysicalCompletion,
+            CreationSequence: 1);
+        ConstructionMaterializationEffect effect = Assert.IsType<ConstructionMaterializationEffect>(
+            process.CompleteActive(completedAt, key));
+
+        ConstructionMaterializationCommit commit = owner.MaterializeConstruction(
+            process,
+            effect,
+            completedAt);
+
+        var materialized = Assert.IsType<ConstructionEntityMaterializationResult.Materialized>(
+            commit.Result);
+        Assert.Equal(
+            new InventoryCustody(
+                new InventoryOwnerReference.SessionEntity(materialized.EntityId),
+                policy.PrincipalId),
+            owner.Inventories.Get(materialized.CargoInventoryId)!.Custody);
+    }
+
+    [Fact]
     public void RemovalUnpublishesCompleteEntityAndCancelsScheduledArrival()
     {
         GameSession session = GameSessionTestFixture.Create();

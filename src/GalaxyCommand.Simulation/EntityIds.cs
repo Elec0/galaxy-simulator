@@ -106,6 +106,17 @@ public readonly record struct MaterialId : IEntityId<MaterialId>
     public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }
 
+/// <summary>
+/// Stable session-scoped identity of one discrete physical item instance.
+/// </summary>
+public readonly record struct ItemInstanceId : IEntityId<ItemInstanceId>
+{
+    public ItemInstanceId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }
+    public ulong Value { get; }
+    public static ItemInstanceId Create(ulong value) => new(value);
+    public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
 public readonly record struct ShipId : IEntityId<ShipId>
 {
     public ShipId(ulong value) { ArgumentOutOfRangeException.ThrowIfZero(value); Value = value; }

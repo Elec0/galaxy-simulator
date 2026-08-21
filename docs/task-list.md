@@ -55,9 +55,52 @@ and pickup range policy.
 
 ## Near-term work
 
-No task is currently promoted to near-term work. `TASK-048`, `TASK-068`,
-`TASK-069`, `TASK-071`, `TASK-073`, and `TASK-075` remain in the near-term
-parking-lot horizon until the project owner promotes one of them.
+- [ ] **TASK-069: Implement generalized inventory and cargo**
+  - Implement the accepted physical-definition, fungible-holding, discrete-item,
+    custody, integer-capacity, reservation, atomic-transfer, and explicit
+    destruction-disposition contracts from completed `TASK-041`.
+  - Add immutable presentation snapshots, complete checkpoints and restore,
+    material-ledger compatibility, stable typed outcomes, and deterministic
+    proposal ordering with single-thread and worker-layout proof.
+  - Preserve existing production and transport behavior until their callers
+    migrate through the explicit compatibility boundary. Build on completed
+    `TASK-063`; coordinate production content admission with `TASK-048`, saved
+    content references with `TASK-037`, and equipment items with `TASK-068`.
+  - Implementation is underway with the immutable physical-definition catalog,
+    session-scoped discrete-item identity, and custody references for all
+    session entities plus non-entity facilities. Existing material inventories
+    retain their custody-free compatibility constructor and checkpoint path.
+    Custody-aware inventories now aggregate fungible holdings, retain discrete
+    instances, enforce shared checked capacity, and reserve fungible quantities,
+    exact instances, or incoming capacity through stable typed outcomes in
+    memory. Atomic transfers now preserve fungible quantities and discrete
+    identity while consuming exact source and incoming-capacity reservations.
+    Inventory removal now requires explicit destruction or complete transfer to
+    an existing destination and rejects live commitments without mutation.
+    Locale-neutral presentation snapshots now expose immutable, stably ordered
+    custody, capacity, holding, instance, and reservation summaries.
+    Catalog-aware checkpoints now restore custody, holdings, instances, and all
+    generalized reservation subjects from exact qualified references without
+    saving definition bodies. A deterministic commit owner now canonically
+    orders storage, discrete-instance creation, and reservation proposals by
+    caller-supplied operation key; rejects duplicate keys; allocates identities
+    only for accepted commits; and checkpoints exact receipts plus allocator
+    exhaustion without saving definition bodies. The same boundary now admits
+    atomic transfers and explicit inventory removal, preserving replay after
+    holdings move or the removed inventory no longer exists. Owner-checked
+    reservation release now uses the same deterministic admission and durable
+    replay contract. Lifecycle setup and construction materialization now give
+    every ship cargo inventory explicit entity and principal custody, and
+    restore rejects disagreement with the live ship. Facility material callers
+    remain on the compatibility facade because current setup supplies neither
+    a facility controlling principal nor the exact `MaterialId` to qualified
+    definition mapping owned with `TASK-048` and `TASK-037`; selecting those
+    inputs remains an owner decision.
+  - Context: [Generalized inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md) · [Authoritative save boundary](authoritative-save-boundary.md) · [Concurrency and performance](concurrency-and-performance.md)
+
+`TASK-069` is the current near-term implementation. `TASK-048`, `TASK-068`,
+`TASK-071`, `TASK-073`, and `TASK-075` remain in the near-term parking-lot
+horizon until the project owner promotes one of them.
 
 ## Future parking lot
 
@@ -116,19 +159,6 @@ the project-level **Near-term work** section above.
     and the application surface with `TASK-049`. Do not invent either missing
     entity domain inside sensor implementation.
   - Context: [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Presentation snapshots](presentation-snapshots.md) · [Concurrency and performance](concurrency-and-performance.md)
-
-- [ ] **TASK-069: Implement generalized inventory and cargo**
-  - Implement the accepted physical-definition, fungible-holding, discrete-item,
-    custody, integer-capacity, reservation, atomic-transfer, and explicit
-    destruction-disposition contracts from completed `TASK-041`.
-  - Add immutable presentation snapshots, complete checkpoints and restore,
-    material-ledger compatibility, stable typed outcomes, and deterministic
-    proposal ordering with single-thread and worker-layout proof.
-  - Preserve existing production and transport behavior until their callers
-    migrate through the explicit compatibility boundary. Build on completed
-    `TASK-063`; coordinate production content admission with `TASK-048`, saved
-    content references with `TASK-037`, and equipment items with `TASK-068`.
-  - Context: [Generalized inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md) · [Authoritative save boundary](authoritative-save-boundary.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-068: Define equipment, ship slots, installation, and removal**
   - Define which generalized physical items can become equipment and how ship

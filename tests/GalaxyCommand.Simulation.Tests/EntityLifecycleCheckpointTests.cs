@@ -32,6 +32,12 @@ public sealed class EntityLifecycleCheckpointTests
             restored.GetRequiredShip(GameSessionTestFixture.Ship).DesignId);
         Assert.NotNull(restored.Inventories.Get(GameSessionTestFixture.CargoInventory));
         Assert.NotNull(restored.Inventories.Get(new InventoryId(5)));
+        Assert.Equal(
+            new InventoryCustody(
+                new InventoryOwnerReference.SessionEntity(
+                    GameSessionTestFixture.Entity),
+                GameSessionTestFixture.Principal),
+            restored.Inventories.Get(GameSessionTestFixture.CargoInventory)!.Custody);
 
         EntityLifecycleCheckpoint recaptured = restored.CaptureCheckpoint();
         Assert.Equal<ulong?>(2, recaptured.EntityIds.NextValue);
@@ -186,6 +192,45 @@ public sealed class EntityLifecycleCheckpointTests
             [LiveShip()],
             [],
             []);
+
+        CheckpointResult<EntityLifecycleOwner> result = Restore(checkpoint);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.lifecycle.liveShips[0].cargoInventoryId",
+            result.Failure?.Path);
+    }
+
+    [Fact]
+    public void RestoreRejectsLiveShipWhoseCargoCustodyDisagrees()
+    {
+        EntityLifecycleOwner original = CreateOwner(
+            out _,
+            out _,
+            out _);
+        original.RegisterSetup([InitialShip()]);
+        EntityLifecycleCheckpoint captured = original.CaptureCheckpoint();
+        InventoryCheckpoint inventory = Assert.Single(captured.Inventories.Inventories)!;
+        var mismatched = new InventoryCheckpoint(
+            inventory.Id,
+            new InventoryCustody(
+                new InventoryOwnerReference.SessionEntity(new EntityId(99)),
+                GameSessionTestFixture.Principal),
+            inventory.Capacity,
+            inventory.StoredMaterials,
+            inventory.Reservations,
+            inventory.CapacityReservations,
+            inventory.FungibleHoldings,
+            inventory.DiscreteItems,
+            inventory.PhysicalReservations);
+        var checkpoint = new EntityLifecycleCheckpoint(
+            captured.EntityIds,
+            captured.ShipIds,
+            captured.InventoryIds,
+            new InventoryRegistryCheckpoint([mismatched]),
+            captured.LiveShips,
+            captured.MaterializationReceipts,
+            captured.RemovalReceipts);
 
         CheckpointResult<EntityLifecycleOwner> result = Restore(checkpoint);
 

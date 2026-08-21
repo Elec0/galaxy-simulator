@@ -573,7 +573,12 @@ internal sealed class EntityLifecycleOwner
 
         foreach (PreparedSetupShip ship in prepared)
         {
-            _inventories.Add(new Inventory(ship.CargoInventoryId, ship.CargoCapacity));
+            _inventories.Add(new Inventory(
+                ship.CargoInventoryId,
+                new InventoryCustody(
+                    new InventoryOwnerReference.SessionEntity(ship.EntityId),
+                    ship.PrincipalId),
+                ship.CargoCapacity));
             _ships.ApplyAdd(new GameSessionShip(
                 ship.ShipId,
                 ship.PrincipalId,
@@ -657,11 +662,22 @@ internal sealed class EntityLifecycleOwner
                     "A cargo inventory cannot belong to more than one live ship.");
             }
 
-            if (!inventories.Contains(ship.CargoInventoryId))
+            Inventory? cargo = inventories.Get(ship.CargoInventoryId);
+            if (cargo is null)
             {
                 return new CheckpointValidationFailure(
                     $"{path}[{index}].cargoInventoryId",
                     "A live ship cargo inventory is missing.");
+            }
+
+            var expectedCustody = new InventoryCustody(
+                new InventoryOwnerReference.SessionEntity(ship.EntityId),
+                ship.PrincipalId);
+            if (cargo.Custody != expectedCustody)
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}].cargoInventoryId",
+                    "A live ship cargo inventory disagrees with its entity and principal custody.");
             }
 
             ships.ApplyAdd(new GameSessionShip(
@@ -960,7 +976,12 @@ internal sealed class EntityLifecycleOwner
                 "Prepared materialization identifiers changed before commit.");
         }
 
-        _inventories.Add(new Inventory(inventoryId, design!.CargoCapacity));
+        _inventories.Add(new Inventory(
+            inventoryId,
+            new InventoryCustody(
+                new InventoryOwnerReference.SessionEntity(entityId),
+                policy!.PrincipalId),
+            design!.CargoCapacity));
         _ships.ApplyAdd(new GameSessionShip(
             shipId,
             policy!.PrincipalId,
