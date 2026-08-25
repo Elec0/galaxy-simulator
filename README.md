@@ -20,6 +20,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Deterministic randomness and stream ownership](docs/deterministic-randomness.md)
 - [Semantic game facts](docs/semantic-game-facts.md)
 - [Presentation snapshots](docs/presentation-snapshots.md)
+- [Application shell and map experience](docs/application-shell-and-map-experience.md)
 - [Entity lifecycle and explicit spawning](docs/entity-lifecycle.md)
 - [Authoritative save boundary](docs/authoritative-save-boundary.md)
 - [Save format, versioning, and migration](docs/save-format-and-migration.md)

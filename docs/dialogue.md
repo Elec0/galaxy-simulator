@@ -391,8 +391,9 @@ evaluation requires focused agreement tests before it is enabled.
   evaluation.
 - `TASK-017` owns fact-, time-, threshold-, and location-triggered scripted
   initiation and long-running scripted behavior.
-- `TASK-045` and `TASK-049` own the shared localization service and reusable
-  application presentation behavior.
+- `TASK-045` and completed `TASK-049` define the shared localization service
+  and reusable application presentation behavior. `TASK-077` implements the
+  application surfaces.
 - `TASK-057` owns authoritative station identity and lifecycle. Dialogue does
   not create a competing station model.
 - `TASK-062` owns any future simulated person, captain, crew member, or

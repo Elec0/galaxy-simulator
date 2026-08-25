@@ -222,11 +222,15 @@ This task does not decide:
   defined by completed `TASK-020` and implemented by `TASK-073`.
 - Player-facing notification wording, accessibility behavior, localization,
   grouping, priorities, or cross-save history.
-- Camera controls, map scaling, visual effects, or a physical coordinate unit.
+- Camera behavior, map hierarchy, scaling, and presentation-only galaxy layout
+  are now defined by completed `TASK-049`. Visual effects and a physical
+  coordinate unit remain deferred.
 - Runtime connector availability, access, or Phase 1 navigation migration.
 - Save serialization, replay, telemetry, disk-backed fact archives, or any
   multiplayer or replication behavior.
 
 Those decisions remain with their owning tasks. In particular, `TASK-011`
-defines lifecycle and later generic entity selection, `TASK-032` defines
-economy facts, and `TASK-014` defines the authoritative save boundary.
+defines lifecycle, completed `TASK-049` defines generic selection and the
+application surface, `TASK-032` defines economy facts, and `TASK-014` defines
+the authoritative save boundary. `TASK-077` implements the accepted
+application contract.

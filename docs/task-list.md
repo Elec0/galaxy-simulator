@@ -36,6 +36,10 @@ session ownership, checkpoint integration, retirement, and focused proof.
 `TASK-050` completed the player-facing save-slot, autosave, external-edit, and
 local-preference design. `TASK-067` retains the required save-envelope display
 name implementation; cross-device synchronization remains out of scope.
+`TASK-049` completed the application-shell and minimal-map design, including
+public static topology and presentation-only galaxy coordinates. `TASK-077`
+retains its implementation, while future nonpublic topology and connector
+discovery remain `TASK-076`.
 `TASK-041` completed the generalized inventory and cargo design while
 preserving the existing material contracts until an explicit compatible
 migration is implemented. `TASK-069` completed that implementation. `TASK-068`
@@ -225,19 +229,6 @@ the project-level **Near-term work** section above.
     the static session-creation boundary used by `TASK-037`.
   - Context: [Gameplay content and static new-game composition](gameplay-content.md) · [Gameplay integration](gameplay-integration.md) · [Initial roadmap](roadmap.md) · [Save format and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
 
-- [ ] **TASK-049: Define the application shell and map experience**
-  - Define new-game, load-game, active-session, leave-session, and fatal-startup
-    flows for the local desktop application without making Godot an
-    authoritative simulation owner.
-  - Define the galaxy and system view hierarchy, camera and zoom behavior,
-    generic entity selection and inspection, overlays, notification surfaces,
-    and stale or removed entity handling needed by the minimal map application.
-  - Build on the immutable presentation boundary from `TASK-010`; coordinate
-    time controls with `TASK-038`, information visibility with completed
-    `TASK-020` and its implementation in `TASK-073`, localization and
-    accessibility with `TASK-045`, and recovery with `TASK-040`.
-  - Context: [Player experience](player-experience.md) · [Technical direction](technical-direction.md) · [Presentation snapshots](presentation-snapshots.md) · [Initial roadmap](roadmap.md)
-
 - [ ] **TASK-053: Define autonomous ship work selection**
   - Define how non-player ships discover, evaluate, select, and stop ordinary
     work through the same commands and order lifecycle used by player intent.
@@ -275,6 +266,23 @@ the project-level **Near-term work** section above.
     and all authoritative checkpoint state. Coordinate discovery and stale-file
     revision tokens with the application implementation of `TASK-050`.
   - Context: [Save slots, autosave, and local preferences](save-slots-and-local-preferences.md) · [Save format and migration](save-format-and-migration.md)
+
+- [ ] **TASK-077: Implement the desktop application shell and minimal map**
+  - Implement the accepted `TASK-049` application contract in the Godot client:
+    validated new-game and load admission, active-session and leave flows,
+    safe failure states, public-static galaxy topology, system maps, local
+    camera state, generic selection and inspection, overlays, and activity
+    presentation.
+  - Replace the hard-coded demonstration-session lifecycle without making
+    Godot an authoritative simulation owner. Consume only immutable
+    presentation snapshots, semantic facts, validated content, and approved
+    save interfaces; retain selection, focus, camera, and feed state locally.
+  - Begin after `TASK-048` provides production static new-game composition,
+    `TASK-037` provides saved-content compatibility, `TASK-038` provides
+    pacing checkpoints, and `TASK-073` provides fog-of-war presentation
+    records. Consume `TASK-040` recovery outcomes and `TASK-061` accessibility
+    behavior without redefining either contract.
+  - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Presentation snapshots](presentation-snapshots.md) · [Gameplay content](gameplay-content.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Time and pacing](time-and-pacing.md)
 
 - [ ] **TASK-017: Design deterministic scripted events**
   - Define time-, location-, threshold-, and fact-based triggers.
@@ -540,7 +548,37 @@ the project-level **Near-term work** section above.
     collision policy before this task is promoted and approved.
   - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
+- [ ] **TASK-076: Define nonpublic galaxy topology and connector discovery**
+  - Define which system and connector identities, names, presentation
+    positions, and route relationships can be nonpublic; how the player
+    discovers, refreshes, retains, or loses that information; and which
+    observations persist across saves.
+  - Define observer-scoped topology snapshots, map behavior for unknown or
+    stale topology, semantic facts, restore behavior, and deterministic
+    disclosure without leaking hidden systems or connections through entity
+    coverage, presentation layout, route previews, or local map history.
+  - Build on the public-static-topology baseline in `TASK-049`; coordinate
+    player observation with completed `TASK-020` and its `TASK-073`
+    implementation, scenario content with `TASK-048`, and saved-content
+    compatibility with `TASK-037`. Do not change the initial public map until
+    this task is promoted and accepted.
+  - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
+
 ## Completed foundations
+
+- [x] **TASK-049: Define the application shell and map experience**
+  - Defined local desktop startup, new-game, load, active-session,
+    leave-session, recovery handoff, and fatal-startup flows without assigning
+    simulation authority to Godot.
+  - Defined public static galaxy topology with authored presentation-only
+    coordinates; galaxy and system map hierarchy; local pan, zoom, and camera
+    lifetime; generic entity selection and inspection; overlays; activity; and
+    stale, confirmed-missing, and removed-entity handling.
+  - `TASK-077` implements the application contract. `TASK-076` retains future
+    nonpublic topology and connector discovery; `TASK-048`, `TASK-037`,
+    `TASK-038`, `TASK-040`, `TASK-073`, and `TASK-061` retain their respective
+    dependencies and domain contracts.
+  - Context: [Application shell and map experience](application-shell-and-map-experience.md)
 
 - [x] **TASK-069: Implement generalized inventory and cargo**
   - Implemented qualified physical definitions, fungible holdings, stable

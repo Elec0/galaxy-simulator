@@ -248,8 +248,9 @@ The accepted initial design excludes:
 - extrapolated or last-known moving-ship contacts;
 - communications networks or information propagation delays;
 - automatic forgetting or an unbounded observation history;
-- undiscovered topology, resources, wrecks, hazards, and unspecified future
-  entity categories; and
+- undiscovered topology and connector discovery, which are separately owned by
+  `TASK-076`; resources, wrecks, hazards, and unspecified future entity
+  categories; and
 - reduced-detail simulation for unobserved systems.
 
 Each deferred feature requires a concrete gameplay need and an owning task. It
