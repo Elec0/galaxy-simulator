@@ -47,16 +47,33 @@ public sealed class ApplicationPacingControllerTests
     }
 
     [Fact]
-    public void IncreasingSpeedFromPauseStartsAtOneAndReplacesRememberedSpeed()
+    public void IncreasingSpeedWhilePausedAdjustsTheRememberedSpeedWithoutUnpausing()
+    {
+        var pacing = new ApplicationPacingController([1d, 2d, 5d]);
+        pacing.SelectSpeed(2d);
+        pacing.Pause();
+
+        pacing.IncreaseSpeed();
+
+        Assert.True(pacing.IsPaused);
+        Assert.Equal(5d, pacing.SelectedSpeedMultiplier);
+        pacing.Unpause();
+        Assert.Equal(5d, pacing.SelectedSpeedMultiplier);
+    }
+
+    [Fact]
+    public void DecreasingSpeedWhilePausedAdjustsTheRememberedSpeedWithoutUnpausing()
     {
         var pacing = new ApplicationPacingController([1d, 2d, 5d]);
         pacing.SelectSpeed(5d);
         pacing.Pause();
 
-        pacing.IncreaseSpeed();
+        pacing.DecreaseSpeed();
 
-        Assert.False(pacing.IsPaused);
-        Assert.Equal(1d, pacing.SelectedSpeedMultiplier);
+        Assert.True(pacing.IsPaused);
+        Assert.Equal(2d, pacing.SelectedSpeedMultiplier);
+        pacing.Unpause();
+        Assert.Equal(2d, pacing.SelectedSpeedMultiplier);
     }
 
     [Fact]

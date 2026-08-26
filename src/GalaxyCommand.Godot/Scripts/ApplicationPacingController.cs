@@ -78,20 +78,25 @@ public sealed class ApplicationPacingController
     }
 
     /// <summary>
-    /// Moves one effective speed step upward, starting at 1x when invoked
-    /// while paused.
+    /// Moves one running-speed step upward. When paused, it changes the
+    /// remembered speed without resuming local advancement.
     /// </summary>
     public void IncreaseSpeed()
     {
+        int index = Array.IndexOf(_runningSpeedMultipliers, SelectedSpeedMultiplier);
         if (IsPaused)
         {
-            OverrideAutomaticDialoguePause();
-            SelectedSpeedMultiplier = _runningSpeedMultipliers[0];
-            IsPaused = false;
+            if (index < _runningSpeedMultipliers.Length - 1)
+            {
+                // A relative speed adjustment is an explicit player override,
+                // but pause remains active until the player resumes directly.
+                OverrideAutomaticDialoguePause();
+                SelectedSpeedMultiplier = _runningSpeedMultipliers[index + 1];
+            }
+
             return;
         }
 
-        int index = Array.IndexOf(_runningSpeedMultipliers, SelectedSpeedMultiplier);
         if (index < _runningSpeedMultipliers.Length - 1)
         {
             SelectedSpeedMultiplier = _runningSpeedMultipliers[index + 1];
@@ -99,17 +104,25 @@ public sealed class ApplicationPacingController
     }
 
     /// <summary>
-    /// Moves one effective speed step downward, where moving below 1x pauses
-    /// local advancement and retains 1x as the remembered running speed.
+    /// Moves one running-speed step downward. When paused, it changes the
+    /// remembered speed without resuming local advancement.
     /// </summary>
     public void DecreaseSpeed()
     {
+        int index = Array.IndexOf(_runningSpeedMultipliers, SelectedSpeedMultiplier);
         if (IsPaused)
         {
+            if (index > 0)
+            {
+                // A relative speed adjustment is an explicit player override,
+                // but pause remains active until the player resumes directly.
+                OverrideAutomaticDialoguePause();
+                SelectedSpeedMultiplier = _runningSpeedMultipliers[index - 1];
+            }
+
             return;
         }
 
-        int index = Array.IndexOf(_runningSpeedMultipliers, SelectedSpeedMultiplier);
         if (index == 0)
         {
             Pause();

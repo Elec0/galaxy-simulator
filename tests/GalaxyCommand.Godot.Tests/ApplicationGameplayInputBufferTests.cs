@@ -62,17 +62,17 @@ public sealed class ApplicationInputBufferTests
     }
 
     [Fact]
-    public void CapturedIncreaseSpeedActionStartsPausedPacingAtOne()
+    public void CapturedIncreaseSpeedActionAdjustsPausedPacingWithoutUnpausing()
     {
         var pacing = new ApplicationPacingController([1d, 2d, 5d]);
-        pacing.SelectSpeed(5d);
+        pacing.SelectSpeed(2d);
         pacing.Pause();
         var action = new ApplicationPacingAction.IncreaseSpeed();
 
         action.Apply(pacing);
 
-        Assert.False(pacing.IsPaused);
-        Assert.Equal(1d, pacing.SelectedSpeedMultiplier);
+        Assert.True(pacing.IsPaused);
+        Assert.Equal(5d, pacing.SelectedSpeedMultiplier);
     }
 
     [Fact]

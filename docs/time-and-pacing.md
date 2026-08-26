@@ -4,7 +4,9 @@
 
 ## Decision status
 
-**Decision status:** Accepted by the project owner on 2026-08-06.
+**Decision status:** Accepted by the project owner on 2026-08-06 and revised
+on 2026-08-25: Faster and Slower adjust the remembered speed while paused
+rather than resuming the simulation.
 
 `TASK-013` defines the local single-player pause, speed, and input-timing
 contract. `TASK-038` owns implementation when the application is ready to
@@ -23,9 +25,9 @@ Computer performance determines how quickly simulation work can be calculated. I
 ## Control model at a glance
 
 The application changes pacing only between completed simulation timestamp
-cycles. Pause remembers a running speed, while speed-step input treats pause as
-the position below `1x`. Response-required dialogue may acquire a temporary
-automatic pause according to the player's preference.
+cycles. Pause remembers a running speed; Faster and Slower adjust that
+remembered speed without resuming. Response-required dialogue may acquire a
+temporary automatic pause according to the player's preference.
 
 ```mermaid
 flowchart LR
@@ -37,11 +39,11 @@ flowchart LR
 
     running -->|"Direct pause"| paused
     paused -->|"Direct unpause restores speed"| running
-    paused -->|"Increase speed"| one
-    one -->|"Decrease speed"| paused
+    paused -->|"Faster or Slower adjusts remembered speed"| paused
+    one -->|"Slower while running"| paused
     dialogue -->|"Preference enabled"| paused
     dialogue -.->|"Preference disabled"| unchanged
-    paused -->|"Player override"| running
+    paused -->|"Direct resume or preset"| running
 ```
 
 The diagram shows pacing transitions, not simulation authority. Dialogue and
@@ -59,19 +61,21 @@ through `TASK-024`. The current proposal is documented in
 
 Pause is separate from the selected running speed. A direct pause action
 remembers the current running speed, and a direct unpause action restores it.
-Changing speed operates on an ordered effective-speed ladder in which pause is
-the lowest step:
+Changing speed operates on an ordered running-speed ladder:
 
-- Increasing speed while paused starts the simulation at `1x` and makes `1x`
-  the newly selected running speed.
-- Decreasing from `1x` pauses and remembers `1x`.
-- Decreasing while already paused has no effect.
+- Increasing speed while paused selects the next configured running speed and
+  remains paused.
+- Decreasing speed while paused selects the previous configured running speed
+  and remains paused.
+- Increasing at the highest configured speed or decreasing at `1x` while
+  paused has no effect.
+- Decreasing from `1x` while running pauses and remembers `1x`.
 - Selecting a specific speed preset while paused starts the simulation at that
   preset and makes it the selected running speed.
 
 Therefore, pausing at a higher speed and directly unpausing returns to that
-higher speed, while increasing speed from pause begins at `1x` rather than at
-the previously selected speed.
+higher speed. While paused, Faster and Slower revise that remembered speed for
+a later direct unpause; selecting a preset remains an explicit resume action.
 
 A speed change takes effect before the next simulation advancement and never
 within a timestamp cycle. Pause and speed controls are local application
@@ -88,11 +92,10 @@ steps. Pause is an implicit application state and is not a numeric entry in the
 configured ladder.
 
 Each configured multiplier must be positive, finite, unique, and strictly
-increasing. `1x` is required as the first running step so increasing speed from
-pause retains the accepted pause-to-`1x` behavior. Invalid configuration fails
-with a clear validation error rather than being silently sorted or corrected.
-The application loads and validates the complete ladder before starting a
-session.
+increasing. `1x` is required as the first running step so a slower adjustment
+while paused has a defined minimum. Invalid configuration fails with a clear
+validation error rather than being silently sorted or corrected. The application
+loads and validates the complete ladder before starting a session.
 
 The initial default ladder is `1x`, `2x`, `5x`, `10x`, and `30x`. Runtime speed
 state identifies the selected multiplier rather than a fixed ordinal such as
@@ -154,11 +157,13 @@ that is already open.
 
 If the game was running, automatic dialogue pause remembers the selected speed.
 Closing the dialogue restores that speed only while the dialogue's automatic
-pause remains active. The player may manually unpause, increase speed, or
-select a preset while the dialogue remains open; doing so overrides the
-automatic pause, and closing the dialogue then leaves the player's chosen
-speed unchanged. If the game was already paused when dialogue opened, or the
-player manually pauses during the dialogue, closing it leaves the game paused.
+pause remains active. The player may manually unpause, adjust the remembered
+speed with Faster or Slower, or select a preset while the dialogue remains
+open; doing so overrides the automatic pause. A Faster or Slower adjustment
+keeps the game paused, while selecting a preset resumes it. Closing the dialogue
+then leaves the player's chosen state unchanged. If the game was already paused
+when dialogue opened, or the player manually pauses during the dialogue,
+closing it leaves the game paused.
 
 Multiple screens belonging to one continuous conversation retain one automatic
 pause without resuming between screens. [Dialogue state and presentation](dialogue.md)
