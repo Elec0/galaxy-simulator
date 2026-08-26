@@ -59,9 +59,25 @@ and pickup range policy.
 
 ## Near-term work
 
-`TASK-048`, `TASK-068`,
-`TASK-071`, `TASK-073`, and `TASK-075` remain in the near-term parking-lot
-horizon until the project owner promotes one of them.
+- [ ] **TASK-038: Implement application pause, speed, and input timing**
+  - Started the client-side pacing controller, FIFO application-input boundary,
+    response-required dialogue pause handoff, and temporary bundled
+    line-oriented speed-ladder file: fixed-rate advancement is replaced,
+    captured pacing actions and map commands drain in one order at the next
+    completed timestamp boundary before further advancement, the Godot client
+    presents local pause, step, and dynamically generated preset controls, and
+    dialogue may acquire only its own temporary local pause.
+  - Replace fixed real-time advancement with the accepted pacing state and
+    completed-timestamp control checkpoints.
+  - Load and validate the mod-configurable speed ladder, preserve local player
+    pacing preferences, and drain buffered input deterministically before
+    further advancement.
+  - Integrate response-required dialogue automatic pause using the accepted
+    classification and continuity contract from completed `TASK-016`.
+  - Context: [Time and pacing](time-and-pacing.md)
+
+`TASK-048`, `TASK-068`, `TASK-071`, `TASK-073`, and `TASK-075` remain in the
+near-term parking-lot horizon until the project owner promotes one of them.
 
 ## Future parking lot
 
@@ -175,16 +191,6 @@ the project-level **Near-term work** section above.
     the shared actor-order lifecycle from `TASK-006` and the client-owned
     selection contract in `TASK-010`.
   - Context: [Presentation snapshots](presentation-snapshots.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
-
-- [ ] **TASK-038: Implement application pause, speed, and input timing**
-  - Replace fixed real-time advancement with the accepted pacing state and
-    completed-timestamp control checkpoints.
-  - Load and validate the mod-configurable speed ladder, preserve local player
-    pacing preferences, and drain buffered input deterministically before
-    further advancement.
-  - Integrate response-required dialogue automatic pause using the accepted
-    classification and continuity contract from completed `TASK-016`.
-  - Context: [Time and pacing](time-and-pacing.md)
 
 - [ ] **TASK-065: Implement dialogue state and presentation**
   - Implement the accepted authored-definition, validation, authoritative

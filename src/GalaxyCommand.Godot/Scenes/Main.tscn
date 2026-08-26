@@ -43,7 +43,7 @@ text = "FOUNDATION VIEW  •  AUTHORITATIVE SIMULATION CONNECTED"
 
 [node name="StatusPanel" type="PanelContainer" parent="Interface" unique_id=1753963765]
 offset_left = 28.0
-offset_top = 614.0
+offset_top = 560.0
 offset_right = 1252.0
 offset_bottom = 692.0
 
@@ -54,7 +54,37 @@ theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 12
 
-[node name="Status" type="Label" parent="Interface/StatusPanel/Margin" unique_id=1438274183]
+[node name="Content" type="VBoxContainer" parent="Interface/StatusPanel/Margin" unique_id=1147546782]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PacingControls" type="HBoxContainer" parent="Interface/StatusPanel/Margin/Content" unique_id=1232158142]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="State" type="Label" parent="Interface/StatusPanel/Margin/Content/PacingControls" unique_id=1741443859]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "PACE"
+
+[node name="PauseOrResume" type="Button" parent="Interface/StatusPanel/Margin/Content/PacingControls" unique_id=1249998084]
+layout_mode = 2
+text = "Pause"
+
+[node name="Slower" type="Button" parent="Interface/StatusPanel/Margin/Content/PacingControls" unique_id=1389743538]
+layout_mode = 2
+text = "Slower"
+
+[node name="Faster" type="Button" parent="Interface/StatusPanel/Margin/Content/PacingControls" unique_id=1882481342]
+layout_mode = 2
+text = "Faster"
+
+[node name="Presets" type="HBoxContainer" parent="Interface/StatusPanel/Margin/Content/PacingControls" unique_id=1975971093]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Status" type="Label" parent="Interface/StatusPanel/Margin/Content" unique_id=1438274183]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.82, 0.9, 1)
 theme_override_font_sizes/font_size = 14

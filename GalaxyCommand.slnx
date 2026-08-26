@@ -4,6 +4,7 @@
   <Project Path="src/GalaxyCommand.Simulation/GalaxyCommand.Simulation.csproj" />
   <Project Path="src/GalaxyCommand.Godot/GalaxyCommand.Godot.csproj" />
   <Project Path="tests/GalaxyCommand.Simulation.Tests/GalaxyCommand.Simulation.Tests.csproj" />
+  <Project Path="tests/GalaxyCommand.Godot.Tests/GalaxyCommand.Godot.Tests.csproj" />
   <Project Path="tests/GalaxyCommand.Content.Tests/GalaxyCommand.Content.Tests.csproj" />
   <Project Path="benchmarks/GalaxyCommand.Benchmarks/GalaxyCommand.Benchmarks.csproj" />
 </Solution>
