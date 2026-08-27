@@ -55,7 +55,8 @@ fact-disclosure, dialogue, save, and deterministic-commit design. `TASK-073`
 retains its implementation without adding a general NPC knowledge model.
 `TASK-074` completed the deployable-entity, inventory, lifecycle, and sensor
 handoff contract. `TASK-075` separately retains the deferred numeric deployment
-and pickup range policy.
+and pickup range policy. `TASK-064` completed the event-responsive simulation
+pacing design; `TASK-038` retains implementation.
 
 ## Near-term work
 
@@ -74,6 +75,11 @@ and pickup range policy.
     further advancement.
   - Integrate response-required dialogue automatic pause using the accepted
     classification and continuity contract from completed `TASK-016`.
+  - Implement the accepted event-responsive category policies, disclosure-safe
+    evaluation, strongest-response batching, manual override, five-second
+    sliding grace windows, explanations, and local-preference behavior from
+    completed `TASK-064`. Coordinate typed combat-start notices with
+    `TASK-046` rather than inventing combat semantics here.
   - Context: [Time and pacing](time-and-pacing.md)
 
 `TASK-048`, `TASK-068`, `TASK-071`, `TASK-073`, and `TASK-075` remain in the
@@ -151,25 +157,6 @@ the project-level **Near-term work** section above.
     `TASK-046`, ship progression with `TASK-056`, station capabilities with
     `TASK-057`, and repair behavior with `TASK-058`.
   - Context: [Gameplay content](gameplay-content.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md) · [Concurrency and performance](concurrency-and-performance.md)
-
-- [ ] **TASK-064: Design event-responsive simulation pacing**
-  - Define how authoritative or presentation events can request a local pacing
-    response without becoming simulation owners or interrupting an in-progress
-    timestamp cycle.
-  - Establish the trigger categories, player-configurable policy, priority and
-    conflict behavior, acknowledgement and override semantics, and visible
-    explanation required for event-driven speed changes. Include the desired
-    examples of reducing to `1x` when a new dialogue event arrives and pausing
-    when offscreen combat begins.
-  - Decide how event delivery, knowledge or visibility, repeated events,
-    dismissal, save or load, and multiple simultaneous requests interact with
-    the player-controlled pacing state. Preserve local single-player ownership,
-    deterministic simulation outcomes, and the completed-timestamp checkpoint
-    boundary.
-  - Coordinate response-required dialogue with `TASK-016`, player fog-of-war
-    and offscreen-event visibility with completed `TASK-020`, semantic event
-    consumption with `TASK-008`, and pacing implementation with `TASK-038`.
-  - Context: [Time and pacing](time-and-pacing.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md)
 
 - [ ] **TASK-032: Define semantic economy facts**
   - Define gameplay-facing production, construction, and logistics lifecycle
@@ -571,6 +558,24 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-064: Design event-responsive simulation pacing**
+  - Defined local per-category Ignore, Pause, and configured-speed-cap actions;
+    caps never accelerate or resume the simulation. Informational dialogue
+    defaults to Ignore, while response-required dialogue retains its existing
+    preference and temporary pause contract.
+  - Defined disclosure-safe offscreen combat pacing: combat-start initially
+    pauses only when a player-owned asset is involved and outside the local
+    current view, while the combat domain retains exact start semantics.
+  - Defined strongest-response boundary batching, one-shot general responses,
+    full manual override, visible explanations, and five-second local monotonic
+    sliding grace windows keyed by category and stable subject.
+  - Kept policies in device-local preferences and grace windows and explanation
+    history out of checkpoints and saves. Loading does not replay historical
+    notices for pacing.
+  - Implementation remains `TASK-038`; typed combat integration coordinates
+    with `TASK-046`.
+  - Context: [Time and pacing](time-and-pacing.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Save slots, autosave, and local preferences](save-slots-and-local-preferences.md)
 
 - [x] **TASK-049: Define the application shell and map experience**
   - Defined local desktop startup, new-game, load, active-session,

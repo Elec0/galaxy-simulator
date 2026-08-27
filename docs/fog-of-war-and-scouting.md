@@ -143,8 +143,9 @@ or something else.
 ## Facts, notifications, and offscreen events
 
 Authoritative semantic facts remain complete and are not changed by
-fog-of-war. Player delivery is narrower. An event may reach the player's
-presentation when at least one of these is true at its commit boundary:
+fog-of-war. Disclosure to player presentation is narrower. An event may reach
+the player's presentation when at least one of these is true at its commit
+boundary:
 
 - the event is explicitly public;
 - it concerns a player-owned asset; or
@@ -157,9 +158,12 @@ reveals current state but does not replay every unseen event that occurred in
 the area. Domains that need a newly observed historical consequence must expose
 it through the current observed state or an explicit discovery outcome.
 
-This boundary allows `TASK-064` to react only to delivered offscreen events.
-Hidden combat or other activity cannot request a player-facing pacing change
-merely because the authoritative simulation processed it.
+Disclosure means the application is authorized to receive the typed event
+notice. It does not assert that a notification was rendered or that the player
+saw, opened, or acknowledged it. This boundary allows `TASK-064` to react only
+to disclosed offscreen event notices. Hidden combat or other activity cannot
+request a player-facing pacing change merely because the authoritative
+simulation processed it.
 
 ## Dialogue conditions and disclosure
 
