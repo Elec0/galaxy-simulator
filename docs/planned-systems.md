@@ -50,7 +50,7 @@ implementation.
 | Localization and text layout | Resolve stable presentation keys into locale-sensitive wording, formatting, pluralization, fonts, right-to-left layout, and expansion-safe UI. | Completed `TASK-045`; see [internationalization and localization](internationalization-and-localization.md). |
 | Accessibility | Define accessible input and presentation behavior without placing accessibility settings in authoritative simulation state. | [Internationalization and localization](internationalization-and-localization.md) establishes the text and layout baseline; comprehensive modes and acceptance criteria belong to `TASK-061`. |
 | Visual effects and final visual style | Clarify state, movement, conflict, and feedback while preserving the simulation-first 2D presentation direction. | Explicitly deferred by [vision](vision.md), [roadmap](roadmap.md), and [presentation snapshots](presentation-snapshots.md). |
-| Audio and music | Provide non-authoritative sound, alert, ambience, and music behavior if the final presentation requires it. | Inventory deferral beyond the current roadmap. No simulation contract is implied. |
+| Audio and music | Provide non-authoritative sound, alert, ambience, and music behavior as a supplement to visual presentation. | `TASK-078` designs and `TASK-079` implements the initial audio foundation now required by `TASK-061`; `TASK-080` owns later optional accessibility audio cues. None implies simulation authority. |
 | Local player preferences | Retain presentation, accessibility, pacing, and other local settings while separating them from authoritative game state. | Completed `TASK-050` defines persistence and reset; coordinate consumers with `TASK-038`, completed `TASK-045`, and `TASK-061`. The [authoritative save boundary](authoritative-save-boundary.md) excludes purely local settings. |
 
 ## Content, authoring, and compatibility
@@ -194,9 +194,11 @@ The review added separate tasks rather than widening accepted owners:
 | Cross-platform and version reproducibility | `TASK-060` | The architecture promises reproducibility but explicitly leaves its compatibility envelope unresolved. |
 
 Collision and avoidance, originally retained as an inventory-only deferral,
-are now tracked separately by `TASK-072`. The review retains the following as
-inventory-only deferrals: final visual style, audio, mod distribution, full
-replay and telemetry, hazards, formation geometry, reduced-detail inactive
+are now tracked separately by `TASK-072`. Initial supplemental audio and later
+accessibility audio cues are now tracked by `TASK-078`, `TASK-079`, and
+`TASK-080`. The review retains the following as inventory-only deferrals:
+final visual style, mod distribution, full replay and telemetry, hazards,
+formation geometry, reduced-detail inactive
 simulation, detailed sensors, crew and population, salvage and wreck recovery,
 law and policing, membership hierarchies, autonomous diplomacy, narrative
 campaigns, and technology or research. These areas are optional,
