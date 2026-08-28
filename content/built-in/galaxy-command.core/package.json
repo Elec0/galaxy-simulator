@@ -1,0 +1,16 @@
+{
+  "format": "galaxy-command-content-package",
+  "schemaVersion": 1,
+  "packageId": "galaxy-command.core",
+  "dependencies": [],
+  "documents": [
+    {
+      "path": "definitions.json",
+      "kind": "definitions"
+    },
+    {
+      "path": "minimal.json",
+      "kind": "scenario"
+    }
+  ]
+}

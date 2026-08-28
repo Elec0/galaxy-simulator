@@ -14,9 +14,9 @@ This document completes the design work in `TASK-045`. It defines locale and
 resource ownership, fallback, message formatting, authored-content
 localization, text layout, font coverage, and the localization-related
 accessibility baseline. It does not add translations or implement the Godot
-application service. Completed `TASK-063`, completed `TASK-049`, and future
-`TASK-048`, `TASK-077`, and `TASK-050` consume these decisions for content
-validation, built-in content loading, the application shell, and local
+application service. Completed `TASK-063`, `TASK-049`, `TASK-048`, and `TASK-050`,
+plus future `TASK-077`, consume these decisions for content validation,
+built-in content loading, the application shell, and local
 preference storage.
 
 Comprehensive accessibility design is separately owned by `TASK-061`.

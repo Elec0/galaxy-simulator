@@ -8,4 +8,12 @@
   <ItemGroup>
     <ProjectReference Include="../GalaxyCommand.Simulation/GalaxyCommand.Simulation.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="../../content/built-in/**/*">
+      <Link>BuiltInContent/%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

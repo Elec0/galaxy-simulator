@@ -1,0 +1,39 @@
+{
+  "format": "galaxy-command-content-scenario",
+  "schemaVersion": 1,
+  "id": "minimal",
+  "fallback": "Minimal New Game",
+  "references": [
+    "galaxy-command.core/principal/player",
+    "galaxy-command.core/ship-design/starter-ship",
+    "galaxy-command.core/standing-policy/default-standing"
+  ],
+  "values": {
+    "playerPrincipal": "galaxy-command.core/principal/player",
+    "standingPolicy": "galaxy-command.core/standing-policy/default-standing",
+    "galaxyLayout": [
+      {
+        "system": "initial-system",
+        "x": 0,
+        "y": 0
+      }
+    ],
+    "systems": [
+      {
+        "id": "initial-system",
+        "fallback": "Initial System"
+      }
+    ],
+    "ships": [
+      {
+        "id": "starter-ship",
+        "principal": "galaxy-command.core/principal/player",
+        "design": "galaxy-command.core/ship-design/starter-ship",
+        "system": "initial-system",
+        "x": 0,
+        "y": 100,
+        "controllerSource": "local-player"
+      }
+    ]
+  }
+}

@@ -22,9 +22,8 @@ a tracked design task, or an explicit deferral. Localization boundaries are now
 established before broader player-facing game work. `TASK-061` separately owns
 comprehensive accessibility design. `TASK-063` completed the format-neutral
 models, shared production validation path, immutable catalogs, and headless
-validator. `TASK-048` remains the next content
-integration dependency and retains built-in content plus static new-game
-integration. `TASK-015` established the initial ship-only NPC boundary.
+validator. `TASK-048` completed built-in content and the minimal static new-game
+composition path. `TASK-015` established the initial ship-only NPC boundary.
 `TASK-042` and `TASK-053` may now design NPC decision quality and autonomous
 work selection without introducing person-level state. `TASK-016` completed
 the dialogue definition, authority, participant, condition, choice, memory,
@@ -94,7 +93,7 @@ pacing design; `TASK-038` retains implementation.
     pacing-only file.
   - Context: [Time and pacing](time-and-pacing.md)
 
-`TASK-048`, `TASK-068`, `TASK-071`, `TASK-073`, and `TASK-075` remain in the
+`TASK-068`, `TASK-071`, `TASK-073`, and `TASK-075` remain in the
 near-term parking-lot horizon until the project owner promotes one of them.
 
 ## Future parking lot
@@ -221,19 +220,6 @@ the project-level **Near-term work** section above.
     read boundary and player-only fog-of-war accepted by completed `TASK-020`,
     and coordinate faction objectives and order generation with `TASK-026`.
 
-- [ ] **TASK-048: Integrate built-in content and static new-game composition**
-  - Build on the format-neutral models, physical-format adapter, production
-    validation path, resolved catalogs, and headless validator completed by
-    `TASK-063`.
-  - Move built-in definitions and the minimal static new-game scenario through
-    the disk-backed production path. Retain direct neutral-model builders only
-    for focused tests; package and scenario coverage cannot bypass production
-    validation or catalog construction.
-  - Do not implement content-version compatibility or saved-reference migration;
-    consume the resolved catalog and qualified references from `TASK-063` at
-    the static session-creation boundary used by `TASK-037`.
-  - Context: [Gameplay content and static new-game composition](gameplay-content.md) · [Gameplay integration](gameplay-integration.md) · [Initial roadmap](roadmap.md) · [Save format and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
-
 - [ ] **TASK-053: Define autonomous ship work selection**
   - Define how non-player ships discover, evaluate, select, and stop ordinary
     work through the same commands and order lifecycle used by player intent.
@@ -282,8 +268,9 @@ the project-level **Near-term work** section above.
     Godot an authoritative simulation owner. Consume only immutable
     presentation snapshots, semantic facts, validated content, and approved
     save interfaces; retain selection, focus, camera, and feed state locally.
-  - Begin after `TASK-048` provides production static new-game composition,
-    `TASK-037` provides saved-content compatibility, `TASK-038` provides
+  - Build on the production static new-game composition completed by
+    `TASK-048`; begin after `TASK-037` provides saved-content compatibility,
+    `TASK-038` provides
     pacing checkpoints, and `TASK-073` provides fog-of-war presentation
     records. Consume `TASK-040` recovery outcomes and `TASK-061` accessibility
     behavior without redefining either contract.
@@ -460,7 +447,7 @@ the project-level **Near-term work** section above.
     select or compose without changing their content identities or silently
     manufacturing incompatible definitions.
   - Begin only after `TASK-023` establishes the static content and new-game
-    composition design, `TASK-048` implements that shared boundary, and
+    composition design, completed `TASK-048` implements that shared boundary, and
     completed `TASK-066` provides the deterministic-randomness foundation designed by
     completed `TASK-021`. Procedural generation is intentionally deferred until
     later gameplay and world-shape requirements provide concrete constraints.
@@ -564,7 +551,7 @@ the project-level **Near-term work** section above.
     coverage, presentation layout, route previews, or local map history.
   - Build on the public-static-topology baseline in `TASK-049`; coordinate
     player observation with completed `TASK-020` and its `TASK-073`
-    implementation, scenario content with `TASK-048`, and saved-content
+    implementation, scenario content completed by `TASK-048`, and saved-content
     compatibility with `TASK-037`. Do not change the initial public map until
     this task is promoted and accepted.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
@@ -598,10 +585,28 @@ the project-level **Near-term work** section above.
     lifetime; generic entity selection and inspection; overlays; activity; and
     stale, confirmed-missing, and removed-entity handling.
   - `TASK-077` implements the application contract. `TASK-076` retains future
-    nonpublic topology and connector discovery; `TASK-048`, `TASK-037`,
-    `TASK-038`, `TASK-040`, `TASK-073`, and `TASK-061` retain their respective
-    dependencies and domain contracts.
+    nonpublic topology and connector discovery; completed `TASK-048` supplies
+    static new-game composition, while `TASK-037`, `TASK-038`, `TASK-040`,
+    `TASK-073`, and `TASK-061` retain their respective dependencies and domain
+    contracts.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md)
+
+- [x] **TASK-048: Integrate built-in content and static new-game composition**
+  - Added an ordinary built-in `galaxy-command.core` disk package containing
+    the approved player principal, standing policy, starter ship design, and
+    minimal one-system, one-ship static scenario.
+  - Added an all-or-nothing static new-game loader that uses the production
+    adapters, validation, reference resolution, canonical catalogs, and stable
+    scenario-local identity ordering before publishing `GameSessionSetup`.
+  - Kept the random root and fact-retention policy caller-owned, retained the
+    resolved content set beside the composed setup for `TASK-037`, and rejected
+    malformed scenario mappings without publishing content or setup.
+  - Replaced the Godot client's hard-coded starting definitions and instances
+    with the shipped package path. Three focused tests, the full 580-test suite,
+    Release build, scoped formatting, and a Godot headless startup smoke pass.
+  - Content-version compatibility and saved-reference migration remain
+    `TASK-037`; procedural generation remains `TASK-047`.
+  - Context: [Gameplay content and static new-game composition](gameplay-content.md) · [Gameplay integration](gameplay-integration.md) · [Save format and migration](save-format-and-migration.md)
 
 - [x] **TASK-069: Implement generalized inventory and cargo**
   - Implemented qualified physical definitions, fungible holdings, stable
@@ -617,8 +622,8 @@ the project-level **Near-term work** section above.
     proved identical holdings, commitments, allocator states, outcomes, facts,
     receipts, and restore behavior across single-thread and parallel
     worker-buffer layouts with varied batch sizes.
-  - Content admission remains `TASK-048`, saved-reference compatibility remains
-    `TASK-037`, and installed equipment remains `TASK-068`.
+  - Content admission was completed by `TASK-048`; saved-reference compatibility
+    remains `TASK-037`, and installed equipment remains `TASK-068`.
   - Context: [Generalized inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md) · [Authoritative save boundary](authoritative-save-boundary.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [x] **TASK-074: Define sensor deployables and their placement lifecycle**
@@ -778,8 +783,9 @@ the project-level **Near-term work** section above.
     document order and worker counts with 27 focused tests. The full 395-test
     suite, Release build, formatting verification, Godot headless build, and all
     four canonical benchmark digests pass.
-  - Built-in content and static new-game integration remain `TASK-048`; catalog
-    compatibility and saved-reference migration remain `TASK-037`.
+  - Built-in content and static new-game integration were completed by
+    `TASK-048`; catalog compatibility and saved-reference migration remain
+    `TASK-037`.
   - Context: [Gameplay content and static new-game composition](gameplay-content.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [x] **TASK-015: Decide the initial meaning and scope of individual NPCs**
@@ -838,9 +844,9 @@ the project-level **Near-term work** section above.
     without making wording simulation authority or save data.
   - Format-neutral models, production validation, catalogs, and headless
     validation were completed by `TASK-063`; built-in content and static
-    new-game integration remain `TASK-048`; catalog compatibility and
-    saved-reference migration remain `TASK-037`; procedural new-game generation
-    remains `TASK-047`.
+    new-game integration were completed by `TASK-048`; catalog compatibility
+    and saved-reference migration remain `TASK-037`; procedural new-game
+    generation remains `TASK-047`.
   - Context: [Gameplay content and static new-game composition](gameplay-content.md)
 
 - [x] **TASK-022: Select save format, versioning, and migration strategy**
@@ -854,10 +860,9 @@ the project-level **Near-term work** section above.
     synchronization, one explicit backup, portable validated slot identifiers,
     symbolic-link rejection, and cleanup that preserves the prior committed
     primary across pre-publication failures. The full 368-test suite passes.
-  - `TASK-063` now supplies resolved content catalogs. General saved sessions
-    remain unavailable until `TASK-048` integrates the static new-game
-    composition and `TASK-037` adds catalog compatibility and saved-reference
-    migration.
+  - `TASK-063` supplies resolved content catalogs and `TASK-048` supplies static
+    new-game composition. General saved sessions remain unavailable until
+    `TASK-037` adds catalog compatibility and saved-reference migration.
   - Context: [Save format, versioning, and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
 
 - [x] **TASK-034: Integrate clean-session economy and transport with entity lifecycle**

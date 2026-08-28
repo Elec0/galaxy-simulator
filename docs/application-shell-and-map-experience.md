@@ -87,8 +87,8 @@ The layout has these constraints:
 Authors retain responsibility for making their layout legible. If authored
 positions overlap, the renderer may disambiguate the draw and hit order using
 stable system identity, but it must not relocate systems or create a different
-topology. `TASK-048` owns the content-model, adapter, validation, and
-production new-game integration required to consume this scenario data.
+topology. Completed `TASK-048` supplies the content-model, adapter, validation,
+and production new-game integration required to consume this scenario data.
 
 ## Application lifecycle
 
@@ -117,7 +117,7 @@ stateDiagram-v2
 
 The home screen lists only static scenarios that reached the production
 content-validation and catalog-resolution boundary. Starting one delegates to
-the `TASK-048` static new-game composition path; it must not construct the
+the completed `TASK-048` static new-game composition path; it must not construct the
 hard-coded Godot demonstration session or use direct test builders.
 
 The shell creates a live session only after the selected scenario has completed
@@ -307,8 +307,8 @@ immutable presentation boundary and add focused proof for:
 10. localized and layout-safe shell text without localized values becoming
     simulation input.
 
-`TASK-048` implements validated static scenario layout consumption and
-production new-game composition. `TASK-037` supplies compatible saved-content
+Completed `TASK-048` implements validated static scenario layout consumption
+and production new-game composition. `TASK-037` supplies compatible saved-content
 resolution, `TASK-040` supplies recovery outcomes, `TASK-038` supplies pacing
 checkpoints, `TASK-073` supplies fog-of-war presentation records, and `TASK-061`
 supplies comprehensive accessibility behavior. `TASK-077` must not absorb

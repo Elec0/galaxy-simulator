@@ -1,0 +1,38 @@
+{
+  "format": "galaxy-command-content-definitions",
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "kind": "principal",
+      "id": "player",
+      "fallback": "Player",
+      "references": [],
+      "values": {}
+    },
+    {
+      "kind": "ship-design",
+      "id": "starter-ship",
+      "fallback": "Starter Ship",
+      "references": [],
+      "values": {
+        "cargoCapacity": 100,
+        "requiredWork": 1
+      }
+    },
+    {
+      "kind": "standing-policy",
+      "id": "default-standing",
+      "fallback": "Default Standing",
+      "references": [],
+      "values": {
+        "minimum": -100,
+        "maximum": 100,
+        "initial": 0,
+        "adversarialThreshold": -50,
+        "neutralThreshold": 0,
+        "favorableThreshold": 50,
+        "alliedThreshold": 90
+      }
+    }
+  ]
+}

@@ -2,6 +2,7 @@ using GalaxyCommand.Simulation;
 using Godot;
 using System.Globalization;
 using CryptographicRandomNumberGenerator = System.Security.Cryptography.RandomNumberGenerator;
+using SystemEnvironment = System.Environment;
 
 namespace GalaxyCommand.GodotClient;
 
@@ -10,20 +11,9 @@ public partial class Main : Node
 	private const int MaximumFactCountPerRefresh = 64;
 	private const int MaximumRecentFacts = 32;
 	private const string PacingSpeedLadderResourcePath = "res://pacing-speeds.txt";
-	private static readonly SystemId InitialSystemId = new(1);
-	private static readonly EntityId InitialEntityId = new(1);
-	private static readonly ShipId InitialShipId = new(1);
-	private static readonly InventoryId InitialCargoInventoryId = new(1);
-	private static readonly PrincipalId InitialPrincipalId = new(1);
-	private static readonly ShipDesign InitialShipDesign = new(
-		new ConstructionDesignId(1),
-		"Starter Ship",
-		new ConstructionRecipe([], new Work(1)),
-		new Quantity(100));
 
-	private readonly CommandSource _player = new(
-		CommandSourceKind.Player,
-		new CommandSourceId("local-player"));
+	private CommandSource _player = null!;
+	private PrincipalId _playerPrincipalId;
 	private GameSession _session = null!;
 	private GalaxyMap _map = null!;
 	private Label _status = null!;
@@ -42,7 +32,7 @@ public partial class Main : Node
 	{
 		_pacing = PacingSpeedLadderFile.Load(
 			ProjectSettings.GlobalizePath(PacingSpeedLadderResourcePath));
-		_session = CreateSession();
+		(_session, _playerPrincipalId, _player) = CreateSession();
 		_map = GetNode<GalaxyMap>("GalaxyMap");
 		_status = GetNode<Label>("Interface/StatusPanel/Margin/Content/Status");
 		_pacingState = GetNode<Label>(
@@ -70,51 +60,51 @@ public partial class Main : Node
 		AdvanceTo(target);
 	}
 
-	private static GameSession CreateSession()
+	/// <summary>
+	/// Loads one complete built-in setup and returns the composed player
+	/// identities with the session so the client never assumes runtime IDs.
+	/// </summary>
+	private static (GameSession Session, PrincipalId PlayerPrincipalId, CommandSource PlayerSource) CreateSession()
 	{
-		var position = new SystemPosition(
-			InitialSystemId,
-			new SpatialPosition(
-				new SpatialCoordinate(0),
-				new SpatialCoordinate(0)));
-		var setup = new GameSessionSetup(
-			[new StarSystem(InitialSystemId, "Initial System")],
-			[
-				new InitialShipSetup(
-					InitialEntityId,
-					InitialShipId,
-					InitialCargoInventoryId,
-					InitialPrincipalId,
-					InitialShipDesign,
-					position,
-					new ActorController(ActorControllerKind.Player, new CommandSourceId("local-player"))),
-			],
-			new RelationshipSetup(
-				[
-					new PrincipalDefinition(
-						InitialPrincipalId,
-						new PrincipalContentId("player"),
-						"Player"),
-				],
-				InitialPrincipalId,
-				new StandingPolicy(
-					new StandingPolicyId("default-standing"),
-					new StandingValue(-100),
-					new StandingValue(100),
-					new StandingValue(0),
-					new StandingValue(-50),
-					new StandingValue(0),
-					new StandingValue(50),
-					new StandingValue(90)),
-				[]),
+		// Runtime output carries the same ordinary package directory used by
+		// headless validation, so built-in content has no privileged bypass.
+		string builtInContentDirectory = Path.Combine(
+			AppContext.BaseDirectory,
+			"BuiltInContent");
+		StaticNewGameLoadResult loaded = BuiltInNewGame.Load(
+			builtInContentDirectory,
 			// Resolve entropy in the application shell before constructing authority.
 			RandomRootSeed.FromBytes(
 				CryptographicRandomNumberGenerator.GetBytes(RandomRootSeed.ByteCount)),
-			factRetentionCapacity: 1024);
-		return new GameSession(
-			setup,
+			factRetentionCapacity: 1024,
+			maximumDegreeOfParallelism: Math.Max(1, SystemEnvironment.ProcessorCount));
+		if (!loaded.IsSuccess)
+		{
+			string failures = string.Join(
+				SystemEnvironment.NewLine,
+				loaded.Diagnostics.Select(diagnostic =>
+					$"{diagnostic.Kind} {diagnostic.Source} {diagnostic.Path}: {diagnostic.Message}"));
+			throw new InvalidOperationException(
+				$"Built-in static new-game content was rejected.{SystemEnvironment.NewLine}{failures}");
+		}
+
+		GameSessionSetup setup = loaded.Setup!;
+		PrincipalId playerPrincipalId = setup.Relationships.PlayerPrincipalId;
+		CommandSourceId playerSourceId = setup.Ships
+			.Where(ship => ship.PrincipalId == playerPrincipalId)
+			.Select(ship => ship.BaseController)
+			.Where(controller => controller.Kind == ActorControllerKind.Player)
+			.Select(controller => controller.Id)
+			.Distinct()
+			.Single();
+		var session = new GameSession(
+			loaded.Setup!,
 			new DirectLocalNavigationPlanner(
 				new ChebyshevLocalTravelTimeEstimator(millisecondsPerMapUnit: 10)));
+		return (
+			session,
+			playerPrincipalId,
+			new CommandSource(CommandSourceKind.Player, playerSourceId));
 	}
 
 	private void OnSelectionChanged()
@@ -257,7 +247,7 @@ public partial class Main : Node
 		RefreshPacingControls();
 		_presentation = _session.CapturePresentation(
 			new GamePresentationRequest(
-				InitialPrincipalId,
+				_playerPrincipalId,
 				_map.SelectedShipIds,
 				_map.FocusedShipId,
 				_factCursor,
