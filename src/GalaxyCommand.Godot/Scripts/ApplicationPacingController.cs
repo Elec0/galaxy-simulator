@@ -152,6 +152,40 @@ public sealed class ApplicationPacingController
     }
 
     /// <summary>
+    /// Applies a one-shot event-responsive pause without creating restoration
+    /// ownership or presenting it as a direct player action.
+    /// </summary>
+    internal bool ApplyEventPause()
+    {
+        bool changed = !IsPaused;
+        IsPaused = true;
+        return changed;
+    }
+
+    /// <summary>
+    /// Applies a one-shot event-responsive running-speed ceiling. A ceiling
+    /// cannot resume pause or accelerate an already slower running state.
+    /// </summary>
+    internal bool ApplyEventSpeedCap(double multiplier)
+    {
+        if (!_runningSpeedMultipliers.Contains(multiplier))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(multiplier),
+                multiplier,
+                "The event pacing cap is not present in the configured speed ladder.");
+        }
+
+        if (!IsPaused && SelectedSpeedMultiplier > multiplier)
+        {
+            SelectedSpeedMultiplier = multiplier;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Offers a response-required dialogue opening to local pacing. The caller
     /// supplies the already-classified dialogue event and the persisted player
     /// preference; this controller owns neither.

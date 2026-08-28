@@ -68,6 +68,13 @@ pacing design; `TASK-038` retains implementation.
     completed timestamp boundary before further advancement, the Godot client
     presents local pause, step, and dynamically generated preset controls, and
     dialogue may acquire only its own temporary local pause.
+  - Implemented the domain-neutral event-responsive core from completed
+    `TASK-064`: stable category and subject identities, initial informational
+    dialogue and player-asset offscreen-combat defaults, player-policy
+    resolution with unavailable-cap warnings and safe fallback, strongest-action
+    boundary batching, one-shot pause and speed caps, explainable dispositions,
+    and bounded five-second monotonic sliding grace windows with explicit reset.
+    Invalid batches cannot partially consume grace state.
   - Replace fixed real-time advancement with the accepted pacing state and
     completed-timestamp control checkpoints.
   - Load and validate the mod-configurable speed ladder, preserve local player
@@ -75,11 +82,16 @@ pacing design; `TASK-038` retains implementation.
     further advancement.
   - Integrate response-required dialogue automatic pause using the accepted
     classification and continuity contract from completed `TASK-016`.
-  - Implement the accepted event-responsive category policies, disclosure-safe
-    evaluation, strongest-response batching, manual override, five-second
-    sliding grace windows, explanations, and local-preference behavior from
-    completed `TASK-064`. Coordinate typed combat-start notices with
-    `TASK-046` rather than inventing combat semantics here.
+  - Complete the accepted event-responsive integration by routing
+    disclosure-safe typed notices through the implemented evaluator, presenting
+    its explanations and configuration warnings, and consuming persisted local
+    policy overrides. Coordinate typed combat-start notices with `TASK-046`
+    rather than inventing combat semantics here.
+  - Wire live event adapters only after their owners provide typed disclosures:
+    informational dialogue remains with `TASK-065` and combat start remains with
+    `TASK-046`. Integrate persisted pacing overrides through the shared
+    device-local preference store owned by completed `TASK-050`, not a separate
+    pacing-only file.
   - Context: [Time and pacing](time-and-pacing.md)
 
 `TASK-048`, `TASK-068`, `TASK-071`, `TASK-073`, and `TASK-075` remain in the
