@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Sensor deployables](sensor-deployables.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Sensor deployables](sensor-deployables.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Accessibility](accessibility.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -19,8 +19,10 @@ The shared content-validation foundation is now implemented.
 `TASK-043`, `TASK-044`, and `TASK-045` are complete. The planned-system
 inventory and scope-gap review give every identified system an accepted owner,
 a tracked design task, or an explicit deferral. Localization boundaries are now
-established before broader player-facing game work. `TASK-061` separately owns
-comprehensive accessibility design. `TASK-063` completed the format-neutral
+established before broader player-facing game work. `TASK-061` is now promoted
+and has started comprehensive accessibility design by recording the inherited
+constraints and owner decisions needed before its behavioral contract can be
+accepted. `TASK-063` completed the format-neutral
 models, shared production validation path, immutable catalogs, and headless
 validator. `TASK-048` remains the next content
 integration dependency and retains built-in content plus static new-game
@@ -59,6 +61,30 @@ and pickup range policy. `TASK-064` completed the event-responsive simulation
 pacing design; `TASK-038` retains implementation.
 
 ## Near-term work
+
+- [ ] **TASK-061: Define comprehensive accessibility behavior**
+  - Accepted the initial Windows and macOS, platform screen-reader, semantic
+    map-list, keyboard and mouse, controller, remapping-safety, focus,
+    contrast, text-scale, reflow, supplemental-audio, first-launch, settings,
+    and Xbox Accessibility Guidelines baselines.
+  - Accepted protanopia, deuteranopia, and tritanopia modes; an in-game-only
+    brightness boundary; the Windows and macOS evidence matrix using NVDA and
+    VoiceOver; and project-owner final acceptance backed by automated,
+    independent manual, and relevant-user or specialist evidence.
+  - Complete the remaining detailed focus, semantic map-list, setting
+    interaction, and executable acceptance contracts without expanding the
+    approved scope.
+  - Define input remapping, keyboard and controller equivalence, focus
+    navigation, assistive-technology and screen-reader behavior, contrast and
+    non-color cues, reduced motion and flashing, captions, audio cues, and
+    supported text-scale behavior.
+  - Establish platform capability boundaries, user-visible modes, interactions
+    between settings, and acceptance evidence without making accessibility
+    preferences authoritative simulation or save state.
+  - Build on the localized text, layout, semantic-label, and expansion baseline
+    from `TASK-045`; coordinate application controls with `TASK-049` and local
+    preference storage with `TASK-050`.
+  - Context: [Accessibility](accessibility.md) · [Internationalization and localization](internationalization-and-localization.md) · [Player experience](player-experience.md) · [Presentation snapshots](presentation-snapshots.md)
 
 - [ ] **TASK-038: Implement application pause, speed, and input timing**
   - Started the client-side pacing controller, FIFO application-input boundary,
@@ -108,6 +134,41 @@ in the **Near term** parking-lot section remains deferred; it is not promoted to
 the project-level **Near-term work** section above.
 
 ### Near term
+
+- [ ] **TASK-078: Define the initial supplemental audio presentation**
+  - Define the non-authoritative audio categories, visible-event mapping,
+    mixing and mute behavior, content ownership, lifecycle, and device-local
+    volume preferences for the initial Windows and macOS application.
+  - Keep audio supplemental to visible presentation without adding simulation,
+    snapshot, checkpoint, or save authority. Coordinate application integration
+    with `TASK-077`, local preferences with completed `TASK-050`, and the
+    accessibility boundary with `TASK-061`.
+  - `TASK-079` implements the accepted foundation. `TASK-080` separately owns
+    optional accessibility audio cues after that implementation exists.
+  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Save slots and local preferences](save-slots-and-local-preferences.md)
+
+- [ ] **TASK-079: Implement the initial supplemental audio presentation**
+  - Implement the accepted `TASK-078` categories, visible-event mapping,
+    mixing, mute, content, lifecycle, and device-local preference contracts for
+    Windows and macOS.
+  - Verify that audio remains supplemental to visible presentation and does not
+    enter simulation, snapshots, checkpoints, or saves.
+  - Coordinate application integration with `TASK-077` and preference storage
+    with completed `TASK-050`. Do not absorb the optional accessibility cue
+    decisions retained by `TASK-080`.
+  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Save slots and local preferences](save-slots-and-local-preferences.md)
+
+- [ ] **TASK-080: Define supplemental accessibility audio cues**
+  - After `TASK-079` provides the initial audio foundation, decide which visual
+    events benefit from optional supplemental audio cues and whether each cue
+    uses tones, speech, or another approved presentation.
+  - Define settings, redundant visible equivalents, priority, interruption,
+    overlap, and acceptance evidence without turning a cue into authoritative
+    state or the sole carrier of gameplay information.
+  - Coordinate screen-reader output with `TASK-061` and future event owners so
+    cues do not duplicate, mask, or disclose information unavailable through
+    the accepted presentation boundary.
+  - Context: [Accessibility](accessibility.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md)
 
 - [ ] **TASK-075: Define deployable deployment and pickup ranges**
   - Define the bounded numeric range and policy source for authorized ships to
@@ -245,19 +306,6 @@ the project-level **Near-term work** section above.
     completed `TASK-020`, and coordinate faction objectives with `TASK-026`
     and bounded competence with `TASK-042`.
   - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
-
-- [ ] **TASK-061: Define comprehensive accessibility behavior**
-  - Define input remapping, keyboard and controller equivalence, focus
-    navigation, assistive-technology and screen-reader behavior, contrast and
-    non-color cues, reduced motion and flashing, captions, audio cues, and
-    supported text-scale behavior.
-  - Establish platform capability boundaries, user-visible modes, interactions
-    between settings, and acceptance evidence without making accessibility
-    preferences authoritative simulation or save state.
-  - Build on the localized text, layout, semantic-label, and expansion baseline
-    from `TASK-045`; coordinate application controls with `TASK-049` and local
-    preference storage with `TASK-050`.
-  - Context: [Internationalization and localization](internationalization-and-localization.md) · [Player experience](player-experience.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ### Mid term
 

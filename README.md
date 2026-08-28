@@ -28,6 +28,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Gameplay content and static new-game composition](docs/gameplay-content.md)
 - [Generalized inventory and cargo](docs/inventory-and-cargo.md)
 - [Internationalization and localization](docs/internationalization-and-localization.md)
+- [Accessibility](docs/accessibility.md)
 - [Planned game-system inventory](docs/planned-systems.md)
 - [Concurrency and performance architecture](docs/concurrency-and-performance.md)
 - [Scale targets and benchmark architecture](docs/scale-and-benchmark-targets.md)
