@@ -11,79 +11,26 @@ address immediately. Link to the relevant design document instead of copying
 large design notes into the task. Move completed tasks to the completed section
 rather than deleting them.
 
-## Current focus
+## Project status summary
 
-`TASK-023` is complete. The project now has an accepted gameplay-content,
-static-scenario, stable-identity, validation, and trust-boundary design.
-The shared content-validation foundation is now implemented.
-`TASK-043`, `TASK-044`, and `TASK-045` are complete. The planned-system
-inventory and scope-gap review give every identified system an accepted owner,
-a tracked design task, or an explicit deferral. Localization boundaries are now
-established before broader player-facing game work. `TASK-061` is now promoted
-and has started comprehensive accessibility design by recording the inherited
-constraints and owner decisions needed before its behavioral contract can be
-accepted. `TASK-063` completed the format-neutral
-models, shared production validation path, immutable catalogs, and headless
-validator. `TASK-048` completed built-in content and the minimal static new-game
-composition path. `TASK-015` established the initial ship-only NPC boundary.
-`TASK-042` and `TASK-053` may now design NPC decision quality and autonomous
-work selection without introducing person-level state. `TASK-016` completed
-the dialogue definition, authority, participant, condition, choice, memory,
-continuity, consequence, pacing, save, and presentation design. `TASK-065`
-retains dialogue implementation. `TASK-021` completed the deterministic random
-root, derived-value, owned-stream, commit, save, and compatibility design.
-`TASK-066` completed the shared deterministic-randomness implementation,
-session ownership, checkpoint integration, retirement, and focused proof.
-`TASK-050` completed the player-facing save-slot, autosave, external-edit, and
-local-preference design. `TASK-067` retains the required save-envelope display
-name implementation; cross-device synchronization remains out of scope.
-`TASK-049` completed the application-shell and minimal-map design, including
-public static topology and presentation-only galaxy coordinates. `TASK-077`
-retains its implementation, while future nonpublic topology and connector
-discovery remain `TASK-076`.
-`TASK-041` completed the generalized inventory and cargo design while
-preserving the existing material contracts until an explicit compatible
-migration is implemented. `TASK-069` completed that implementation. `TASK-068`
-separately owns equipment and ship-slot design. Trade uses the single unified
-currency Credits; `TASK-055` retains its balance, pricing, and settlement
-design. `TASK-019` completed the moving-ship proximity, swept-crossing,
-interaction-timing, reevaluation, following, interception, fixed-step,
-connector-transit, and deterministic-ordering design. `TASK-071` retains its
-implementation; `TASK-072` separately owns ship geometry, physical collision,
-and avoidance. `TASK-020` completed the player-facing fog-of-war, live sensor
-coverage, transient-contact, persistent-discovery, stale-observation,
-fact-disclosure, dialogue, save, and deterministic-commit design. `TASK-073`
-retains its implementation without adding a general NPC knowledge model.
-`TASK-074` completed the deployable-entity, inventory, lifecycle, and sensor
-handoff contract. `TASK-075` separately retains the deferred numeric deployment
-and pickup range policy. `TASK-064` completed the event-responsive simulation
-pacing design; `TASK-038` retains implementation.
+This section is a compact map of completed foundations and the task that owns
+each remaining decision or implementation. The task entries below remain the
+source of detailed scope and acceptance criteria.
+
+| Area | Completed foundation | Remaining ownership |
+| --- | --- | --- |
+| Project scope, content, and accessibility | `TASK-023`, `TASK-043`, `TASK-044`, `TASK-045`, `TASK-048`, `TASK-061`, and `TASK-063` completed the content, static-scenario, validation, scope-review, localization, comprehensive accessibility, and built-in new-game foundations. | `TASK-083` provides the development-only Godot visual preview. `TASK-077` implements the full accessibility application contract; `TASK-078` through `TASK-080` own audio, and `TASK-081` and `TASK-082` retain deferred motion and photosensitivity design. |
+| NPCs | `TASK-015` established the ship-only NPC boundary. | `TASK-042` designs NPC decision quality and `TASK-053` autonomous work selection; neither introduces person-level state. |
+| Dialogue and randomness | `TASK-016` completed dialogue design. `TASK-021` and `TASK-066` completed deterministic-randomness design and implementation. | `TASK-065` implements dialogue. |
+| Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
+| Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` owns equipment and ship slots. `TASK-055` owns trade balance, pricing, and settlement design. |
+| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. | `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, and `TASK-075` owns deployment and pickup ranges. |
+| Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
+
+## Current focus
+This section is to put work that is currently being performed. Once the work is finished the task should be moved to Completed, and an entry should be added to the Project Status summary above.
 
 ## Near-term work
-
-- [ ] **TASK-061: Define comprehensive accessibility behavior**
-  - Accepted the initial Windows and macOS, platform screen-reader, semantic
-    map-list, keyboard and mouse, controller, remapping-safety, focus,
-    contrast, text-scale, reflow, supplemental-audio, first-launch, settings,
-    and Xbox Accessibility Guidelines baselines.
-  - Accepted protanopia, deuteranopia, and tritanopia modes; an in-game-only
-    brightness boundary; the Windows and macOS evidence matrix using NVDA and
-    VoiceOver; and project-owner final acceptance backed by automated,
-    independent manual, and relevant-user or specialist evidence.
-  - Complete the remaining detailed focus, semantic map-list, setting
-    interaction, and executable acceptance contracts without expanding the
-    approved scope.
-  - Define input remapping, keyboard and controller equivalence, focus
-    navigation, assistive-technology and screen-reader behavior, contrast and
-    non-color cues, reduced motion and flashing, captions, audio cues, and
-    supported text-scale behavior.
-  - Establish platform capability boundaries, user-visible modes, interactions
-    between settings, and acceptance evidence without making accessibility
-    preferences authoritative simulation or save state.
-  - Build on the localized text, layout, semantic-label, and expansion baseline
-    from `TASK-045`; coordinate application controls with `TASK-049` and local
-    preference storage with `TASK-050`.
-  - Context: [Accessibility](accessibility.md) · [Internationalization and localization](internationalization-and-localization.md) · [Player experience](player-experience.md) · [Presentation snapshots](presentation-snapshots.md)
 
 - [ ] **TASK-038: Implement application pause, speed, and input timing**
   - Started the client-side pacing controller, FIFO application-input boundary,
@@ -115,7 +62,7 @@ pacing design; `TASK-038` retains implementation.
   - Wire live event adapters only after their owners provide typed disclosures:
     informational dialogue remains with `TASK-065` and combat start remains with
     `TASK-046`. Integrate persisted pacing overrides through the shared
-    device-local preference store owned by completed `TASK-050`, not a separate
+    device-local preference store completed by `TASK-084`, not a separate
     pacing-only file.
   - Context: [Time and pacing](time-and-pacing.md)
 
@@ -134,40 +81,25 @@ the project-level **Near-term work** section above.
 
 ### Near term
 
-- [ ] **TASK-078: Define the initial supplemental audio presentation**
-  - Define the non-authoritative audio categories, visible-event mapping,
-    mixing and mute behavior, content ownership, lifecycle, and device-local
-    volume preferences for the initial Windows and macOS application.
-  - Keep audio supplemental to visible presentation without adding simulation,
-    snapshot, checkpoint, or save authority. Coordinate application integration
-    with `TASK-077`, local preferences with completed `TASK-050`, and the
-    accessibility boundary with `TASK-061`.
-  - `TASK-079` implements the accepted foundation. `TASK-080` separately owns
-    optional accessibility audio cues after that implementation exists.
-  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Save slots and local preferences](save-slots-and-local-preferences.md)
-
-- [ ] **TASK-079: Implement the initial supplemental audio presentation**
-  - Implement the accepted `TASK-078` categories, visible-event mapping,
-    mixing, mute, content, lifecycle, and device-local preference contracts for
-    Windows and macOS.
-  - Verify that audio remains supplemental to visible presentation and does not
-    enter simulation, snapshots, checkpoints, or saves.
-  - Coordinate application integration with `TASK-077` and preference storage
-    with completed `TASK-050`. Do not absorb the optional accessibility cue
-    decisions retained by `TASK-080`.
-  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Save slots and local preferences](save-slots-and-local-preferences.md)
-
-- [ ] **TASK-080: Define supplemental accessibility audio cues**
-  - After `TASK-079` provides the initial audio foundation, decide which visual
-    events benefit from optional supplemental audio cues and whether each cue
-    uses tones, speech, or another approved presentation.
-  - Define settings, redundant visible equivalents, priority, interruption,
-    overlap, and acceptance evidence without turning a cue into authoritative
-    state or the sole carrier of gameplay information.
-  - Coordinate screen-reader output with `TASK-061` and future event owners so
-    cues do not duplicate, mask, or disclose information unavailable through
-    the accepted presentation boundary.
-  - Context: [Accessibility](accessibility.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md)
+- [ ] **TASK-083: Build a development-only Godot visual preview and scenario**
+  - Add a clearly identified development-only static scenario with enough
+    authored public topology, layout, and presentable ship state to exercise a
+    galaxy view, connectors, system view, selection, movement, and activity.
+    It is not shipped product content and does not introduce gameplay mechanics.
+  - Add a Godot visual preview that consumes the validated scenario layout,
+    immutable presentation snapshots, and observer-visible semantic facts to
+    render galaxy and system views with local pan, cursor-centred zoom,
+    selection, focused inspection, current-order routes, and a bounded activity
+    surface.
+  - Keep the preview explicitly separate from the full desktop application:
+    do not add save/load, recovery, fog-of-war observation states, final
+    accessibility/settings surfaces, audio, or a second simulation authority.
+    Do not bypass content validation or read mutable simulation domains
+    directly.
+  - Begin after `TASK-038` reaches its accepted pacing checkpoint. Build on
+    completed `TASK-010`, `TASK-048`, and `TASK-049`; it supplies visual
+    iteration evidence without changing the later `TASK-077` contract.
+  - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Presentation snapshots](presentation-snapshots.md) · [Gameplay content](gameplay-content.md) · [Time and pacing](time-and-pacing.md)
 
 - [ ] **TASK-075: Define deployable deployment and pickup ranges**
   - Define the bounded numeric range and policy source for authorized ships to
@@ -316,6 +248,11 @@ the project-level **Near-term work** section above.
     Godot an authoritative simulation owner. Consume only immutable
     presentation snapshots, semantic facts, validated content, and approved
     save interfaces; retain selection, focus, camera, and feed state locally.
+  - Implement the accepted `TASK-061` standard-surface semantics, focus,
+    semantic map list, remapping safety, visual modes, settings, and evidence
+    hooks as part of the application rather than redefining their behavior.
+    Do not absorb audio from `TASK-078` through `TASK-080`, reduced-motion
+    design from `TASK-081`, or photosensitivity design from `TASK-082`.
   - Build on the production static new-game composition completed by
     `TASK-048`; begin after `TASK-037` provides saved-content compatibility,
     `TASK-038` provides
@@ -323,6 +260,41 @@ the project-level **Near-term work** section above.
     records. Consume `TASK-040` recovery outcomes and `TASK-061` accessibility
     behavior without redefining either contract.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Presentation snapshots](presentation-snapshots.md) · [Gameplay content](gameplay-content.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Time and pacing](time-and-pacing.md)
+
+- [ ] **TASK-078: Define the initial supplemental audio presentation**
+  - Define the non-authoritative audio categories, visible-event mapping,
+    mixing and mute behavior, content ownership, lifecycle, and device-local
+    volume preferences for the initial Windows and macOS application.
+  - Keep audio supplemental to visible presentation without adding simulation,
+    snapshot, checkpoint, or save authority. Coordinate application integration
+    with `TASK-077`, local preferences with completed `TASK-050`, and the
+    accessibility boundary with `TASK-061`.
+  - `TASK-079` implements the accepted foundation. `TASK-080` separately owns
+    optional accessibility audio cues after that implementation exists.
+  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Save slots and local preferences](save-slots-and-local-preferences.md)
+
+- [ ] **TASK-079: Implement the initial supplemental audio presentation**
+  - Implement the accepted `TASK-078` categories, visible-event mapping,
+    mixing, mute, content, lifecycle, and device-local preference contracts for
+    Windows and macOS.
+  - Verify that audio remains supplemental to visible presentation and does not
+    enter simulation, snapshots, checkpoints, or saves.
+  - Coordinate application integration with `TASK-077` and preference storage
+    with completed `TASK-050`. Do not absorb the optional accessibility cue
+    decisions retained by `TASK-080`.
+  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Save slots and local preferences](save-slots-and-local-preferences.md)
+
+- [ ] **TASK-080: Define supplemental accessibility audio cues**
+  - After `TASK-079` provides the initial audio foundation, decide which visual
+    events benefit from optional supplemental audio cues and whether each cue
+    uses tones, speech, or another approved presentation.
+  - Define settings, redundant visible equivalents, priority, interruption,
+    overlap, and acceptance evidence without turning a cue into authoritative
+    state or the sole carrier of gameplay information.
+  - Coordinate screen-reader output with `TASK-061` and future event owners so
+    cues do not duplicate, mask, or disclose information unavailable through
+    the accepted presentation boundary.
+  - Context: [Accessibility](accessibility.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md)
 
 - [ ] **TASK-017: Design deterministic scripted events**
   - Define time-, location-, threshold-, and fact-based triggers.
@@ -479,6 +451,30 @@ the project-level **Near-term work** section above.
 
 ### Far term
 
+- [ ] **TASK-081: Define reduced-motion behavior for concrete visual effects**
+  - After an owning application or visual-effects task proposes motion,
+    animation, automatic camera movement, or scrolling presentation, inventory
+    those effects and define which stop, simplify, or remain when reduced
+    motion is enabled.
+  - Define the device-local preference, immediate application behavior,
+    interaction with pacing and focus, and XAG 117 acceptance evidence without
+    changing simulation time or authoritative outcomes.
+  - Complete before any affected visual effect is accepted for release. Keep
+    implementation with the task that owns each effect rather than creating a
+    second presentation owner.
+  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Time and pacing](time-and-pacing.md)
+
+- [ ] **TASK-082: Define flashing and photosensitivity safeguards**
+  - Before an owning task introduces blinking, flashing, strobing, or rapid
+    high-contrast changes, inventory the proposed effects and define safe
+    defaults, prohibited behavior, any player-facing controls, and XAG 118
+    acceptance evidence.
+  - Keep the safeguards device-local and presentation-only. They must not
+    change simulation timing, semantic facts, authoritative state, or saves.
+  - Complete before any affected effect is accepted for release, with
+    implementation remaining in the task that owns that effect.
+  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md)
+
 - [ ] **TASK-027: Evaluate a broader entity storage model**
   - Reconsider ECS or another indexed model only when concrete query or scale
     evidence justifies it.
@@ -606,6 +602,39 @@ the project-level **Near-term work** section above.
 
 ## Completed foundations
 
+- [x] **TASK-084: Implement the shared device-local preference store**
+  - Implemented a versioned device-local JSON store that keeps typed pacing
+    preferences and opaque presentation, localization, or accessibility
+    categories outside saves, checkpoints, content identity, and authoritative
+    simulation state.
+  - Added default-on-missing behavior, safe fallback for unreadable, invalid,
+    incomplete, and unsupported stores, a non-sensitive reset diagnostic, and
+    explicit pacing, category, and reset-all operations. Ordinary writes never
+    replace a store that cannot first be read safely.
+  - Established schema version 1. There is no previously shipped schema to
+    migrate; later versions must add an explicit in-memory migration before
+    becoming supported.
+  - `TASK-038` consumes the typed pacing section, while `TASK-077` and later
+    presentation owners may use opaque categories without creating a second
+    local-preference file.
+  - Context: [Save slots and local preferences](save-slots-and-local-preferences.md) · [Time and pacing](time-and-pacing.md) · [Accessibility](accessibility.md)
+
+- [x] **TASK-061: Define comprehensive accessibility behavior**
+  - Defined the Windows and macOS platform, NVDA and VoiceOver, semantic
+    control, focus, semantic map-list, keyboard and mouse, controller,
+    remapping-safety, visual-mode, scaling, reflow, onboarding, settings, and
+    device-local preference contracts.
+  - Defined default, high-contrast dark, high-contrast light, protanopia,
+    deuteranopia, and tritanopia behavior; bounded in-game brightness; editable
+    presets; safe visual-setting reversion; and non-color cues.
+  - Accepted the Xbox Accessibility Guidelines baseline, executable platform
+    matrix, contrast thresholds, automated and independent manual evidence,
+    relevant-user or specialist review, and project-owner final acceptance.
+  - `TASK-077` implements the application contract. `TASK-078` through
+    `TASK-080` own audio, `TASK-081` retains reduced-motion design, and
+    `TASK-082` retains flashing and photosensitivity design.
+  - Context: [Accessibility](accessibility.md) · [Internationalization and localization](internationalization-and-localization.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Save slots and local preferences](save-slots-and-local-preferences.md)
+
 - [x] **TASK-064: Design event-responsive simulation pacing**
   - Defined local per-category Ignore, Pause, and configured-speed-cap actions;
     caps never accelerate or resume the simulation. Informational dialogue
@@ -634,9 +663,9 @@ the project-level **Near-term work** section above.
     stale, confirmed-missing, and removed-entity handling.
   - `TASK-077` implements the application contract. `TASK-076` retains future
     nonpublic topology and connector discovery; completed `TASK-048` supplies
-    static new-game composition, while `TASK-037`, `TASK-038`, `TASK-040`,
-    `TASK-073`, and `TASK-061` retain their respective dependencies and domain
-    contracts.
+    static new-game composition, while `TASK-037`, `TASK-038`, `TASK-040`, and
+    `TASK-073` retain their respective dependencies. Completed `TASK-061`
+    supplies the accessibility contract.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md)
 
 - [x] **TASK-048: Integrate built-in content and static new-game composition**
@@ -754,9 +783,9 @@ the project-level **Near-term work** section above.
     migration, safe default use and explicit reset after invalid or unsupported
     data, category reset, and reset-all. Preferences remain outside saves and
     authoritative state.
-  - `TASK-040` retains failed-load recovery, `TASK-038` pacing behavior,
-    `TASK-061` accessibility behavior, and `TASK-067` save-envelope display
-    names.
+  - `TASK-040` retains failed-load recovery, `TASK-038` pacing behavior, and
+    `TASK-067` save-envelope display names. Completed `TASK-061` defines the
+    accessibility preferences consumed through this store.
   - Context: [Save slots, autosave, and local preferences](save-slots-and-local-preferences.md) · [Save format and migration](save-format-and-migration.md) · [Time and pacing](time-and-pacing.md)
 
 - [x] **TASK-066: Implement deterministic random foundations**
@@ -854,8 +883,9 @@ the project-level **Near-term work** section above.
     preferences outside deterministic simulation, snapshots, content identity,
     and authoritative saves. Preserved invariant authored fallbacks for
     headless inspection.
-  - Established the localization-related accessibility baseline and assigned
-    comprehensive accessibility modes and acceptance criteria to `TASK-061`.
+  - Established the localization-related accessibility baseline; completed
+    `TASK-061` subsequently defined comprehensive accessibility modes and
+    acceptance criteria.
   - Context: [Internationalization and localization](internationalization-and-localization.md)
 
 - [x] **TASK-043: Review gameplay systems for scope gaps**

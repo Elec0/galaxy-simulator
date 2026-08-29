@@ -30,6 +30,8 @@
              Link="ApplicationInputBuffer.cs" />
     <Compile Include="../../src/GalaxyCommand.Godot/Scripts/ApplicationPacingViewState.cs"
              Link="ApplicationPacingViewState.cs" />
+    <Compile Include="../../src/GalaxyCommand.Godot/Scripts/DeviceLocalPreferenceStore.cs"
+             Link="DeviceLocalPreferenceStore.cs" />
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>
