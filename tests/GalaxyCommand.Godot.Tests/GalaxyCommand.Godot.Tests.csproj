@@ -32,6 +32,8 @@
              Link="ApplicationPacingViewState.cs" />
     <Compile Include="../../src/GalaxyCommand.Godot/Scripts/DeviceLocalPreferenceStore.cs"
              Link="DeviceLocalPreferenceStore.cs" />
+    <Compile Include="../../src/GalaxyCommand.Godot/Scripts/ApplicationPacingPreferences.cs"
+             Link="ApplicationPacingPreferences.cs" />
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

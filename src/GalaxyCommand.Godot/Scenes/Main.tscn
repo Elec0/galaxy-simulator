@@ -84,6 +84,11 @@ text = "Faster"
 layout_mode = 2
 theme_override_constants/separation = 4
 
+[node name="PacingConfiguration" type="Label" parent="Interface/StatusPanel/Margin/Content" unique_id=1131062164]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.79, 0.37, 1)
+theme_override_font_sizes/font_size = 14
+
 [node name="Status" type="Label" parent="Interface/StatusPanel/Margin/Content" unique_id=1438274183]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.82, 0.9, 1)

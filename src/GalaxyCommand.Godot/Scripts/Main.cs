@@ -11,6 +11,7 @@ public partial class Main : Node
 	private const int MaximumFactCountPerRefresh = 64;
 	private const int MaximumRecentFacts = 32;
 	private const string PacingSpeedLadderResourcePath = "res://pacing-speeds.txt";
+	private const string DeviceLocalPreferenceDirectoryResourcePath = "user://preferences";
 
 	private CommandSource _player = null!;
 	private PrincipalId _playerPrincipalId;
@@ -18,10 +19,12 @@ public partial class Main : Node
 	private GalaxyMap _map = null!;
 	private Label _status = null!;
 	private Label _pacingState = null!;
+	private Label _pacingConfiguration = null!;
 	private Button _pauseOrResume = null!;
 	private HBoxContainer _pacingPresets = null!;
 	private readonly List<GameFactEnvelope> _recentFacts = [];
 	private ApplicationPacingController _pacing = null!;
+	private ApplicationPacingPreferenceState _pacingPreferences = null!;
 	private readonly ApplicationInputBuffer _input = new();
 	private GameFactSequence? _factCursor;
 	private bool _factHistoryTruncated;
@@ -32,11 +35,17 @@ public partial class Main : Node
 	{
 		_pacing = PacingSpeedLadderFile.Load(
 			ProjectSettings.GlobalizePath(PacingSpeedLadderResourcePath));
+		_pacingPreferences = ApplicationPacingPreferences.Load(
+			new DeviceLocalPreferenceStore(ProjectSettings.GlobalizePath(
+				DeviceLocalPreferenceDirectoryResourcePath)),
+			_pacing);
 		(_session, _playerPrincipalId, _player) = CreateSession();
 		_map = GetNode<GalaxyMap>("GalaxyMap");
 		_status = GetNode<Label>("Interface/StatusPanel/Margin/Content/Status");
 		_pacingState = GetNode<Label>(
 			"Interface/StatusPanel/Margin/Content/PacingControls/State");
+		_pacingConfiguration = GetNode<Label>(
+			"Interface/StatusPanel/Margin/Content/PacingConfiguration");
 		_pauseOrResume = GetNode<Button>(
 			"Interface/StatusPanel/Margin/Content/PacingControls/PauseOrResume");
 		_pacingPresets = GetNode<HBoxContainer>(
@@ -225,6 +234,9 @@ public partial class Main : Node
 			? $"PACE PAUSED | SELECTED {multiplier}x"
 			: $"PACE {multiplier}x";
 		_pauseOrResume.Text = pacing.IsPaused ? "Resume" : "Pause";
+		_pacingConfiguration.Text = ApplicationPacingPreferences.DescribeConfigurationWarning(
+			_pacingPreferences);
+		_pacingConfiguration.Visible = !string.IsNullOrEmpty(_pacingConfiguration.Text);
 	}
 
 	/// <summary>

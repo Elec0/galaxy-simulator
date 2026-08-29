@@ -47,11 +47,17 @@ This section is to put work that is currently being performed. Once the work is 
     boundary batching, one-shot pause and speed caps, explainable dispositions,
     and bounded five-second monotonic sliding grace windows with explicit reset.
     Invalid batches cannot partially consume grace state.
+  - Started consuming persisted local pacing choices through the shared
+    `TASK-084` store: client startup resolves the response-required-dialogue
+    preference and event-policy overrides against the validated speed ladder,
+    retains unavailable requested caps in storage while safely using defaults
+    for this launch, and displays a local configuration diagnostic. The
+    preference document remains outside authoritative session and save state.
   - Replace fixed real-time advancement with the accepted pacing state and
     completed-timestamp control checkpoints.
-  - Load and validate the mod-configurable speed ladder, preserve local player
-    pacing preferences, and drain buffered input deterministically before
-    further advancement.
+  - Retain player-facing controls that write or explicitly reset device-local
+    pacing choices with `TASK-077`, which owns the complete settings surface;
+    startup already loads and validates the shared local preferences.
   - Integrate response-required dialogue automatic pause using the accepted
     classification and continuity contract from completed `TASK-016`.
   - Complete the accepted event-responsive integration by routing
