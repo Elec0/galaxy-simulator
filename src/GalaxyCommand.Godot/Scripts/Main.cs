@@ -1,5 +1,6 @@
 using GalaxyCommand.Simulation;
 using Godot;
+using System.Diagnostics;
 using System.Globalization;
 using CryptographicRandomNumberGenerator = System.Security.Cryptography.RandomNumberGenerator;
 using SystemEnvironment = System.Environment;
@@ -20,12 +21,15 @@ public partial class Main : Node
 	private Label _status = null!;
 	private Label _pacingState = null!;
 	private Label _pacingConfiguration = null!;
+	private Label _pacingExplanation = null!;
 	private Button _pauseOrResume = null!;
 	private HBoxContainer _pacingPresets = null!;
 	private readonly List<GameFactEnvelope> _recentFacts = [];
 	private ApplicationPacingController _pacing = null!;
 	private ApplicationPacingPreferenceState _pacingPreferences = null!;
+	private ApplicationEventPacingInbox _eventPacingInbox = null!;
 	private readonly ApplicationInputBuffer _input = new();
+	private readonly Stopwatch _monotonicClock = Stopwatch.StartNew();
 	private GameFactSequence? _factCursor;
 	private bool _factHistoryTruncated;
 	private GamePresentationSnapshot _presentation = null!;
@@ -39,6 +43,10 @@ public partial class Main : Node
 			new DeviceLocalPreferenceStore(ProjectSettings.GlobalizePath(
 				DeviceLocalPreferenceDirectoryResourcePath)),
 			_pacing);
+		_eventPacingInbox = new ApplicationEventPacingInbox(
+			new ApplicationEventPacingController(
+				_pacing,
+				_pacingPreferences.EventPacing.Policies));
 		(_session, _playerPrincipalId, _player) = CreateSession();
 		_map = GetNode<GalaxyMap>("GalaxyMap");
 		_status = GetNode<Label>("Interface/StatusPanel/Margin/Content/Status");
@@ -46,6 +54,8 @@ public partial class Main : Node
 			"Interface/StatusPanel/Margin/Content/PacingControls/State");
 		_pacingConfiguration = GetNode<Label>(
 			"Interface/StatusPanel/Margin/Content/PacingConfiguration");
+		_pacingExplanation = GetNode<Label>(
+			"Interface/StatusPanel/Margin/Content/PacingExplanation");
 		_pauseOrResume = GetNode<Button>(
 			"Interface/StatusPanel/Margin/Content/PacingControls/PauseOrResume");
 		_pacingPresets = GetNode<HBoxContainer>(
@@ -60,6 +70,9 @@ public partial class Main : Node
 
 	public override void _Process(double delta)
 	{
+		// Event responses run first so manual pacing input captured for this same
+		// completed checkpoint retains the accepted full-override behavior.
+		ApplyPendingEventPacing();
 		// The prior frame ended at a completed timestamp, so drained gameplay
 		// commands share one authoritative admission time and pacing stays local.
 		DrainBufferedInput();
@@ -67,6 +80,23 @@ public partial class Main : Node
 			_session.CurrentTime,
 			TimeSpan.FromSeconds(delta));
 		AdvanceTo(target);
+	}
+
+	/// <summary>
+	/// Applies all disclosure-approved event notices pending at this completed
+	/// boundary and retains only the latest disposable explanation for display.
+	/// </summary>
+	private void ApplyPendingEventPacing()
+	{
+		ApplicationEventPacingBatchResult? result =
+			_eventPacingInbox.ApplyPendingAtBoundary(_monotonicClock.Elapsed);
+		if (result is null)
+		{
+			return;
+		}
+
+		_pacingExplanation.Text = ApplicationEventPacingExplanation.Describe(result);
+		_pacingExplanation.Visible = true;
 	}
 
 	/// <summary>

@@ -47,7 +47,11 @@ This section is to put work that is currently being performed. Once the work is 
     boundary batching, one-shot pause and speed caps, explainable dispositions,
     and bounded five-second monotonic sliding grace windows with explicit reset.
     Invalid batches cannot partially consume grace state.
-  - Started consuming persisted local pacing choices through the shared
+  - Added the application-side event-pacing boundary: already-disclosed typed
+    notices queue in capture order, drain as one completed-boundary batch before
+    same-checkpoint manual pacing input, and retain the latest disposable local
+    explanation including contributed, suppressed, and ignored outcomes.
+  - Consumes persisted local pacing choices through the shared
     `TASK-084` store: client startup resolves the response-required-dialogue
     preference and event-policy overrides against the validated speed ladder,
     retains unavailable requested caps in storage while safely using defaults
@@ -60,16 +64,14 @@ This section is to put work that is currently being performed. Once the work is 
     startup already loads and validates the shared local preferences.
   - Integrate response-required dialogue automatic pause using the accepted
     classification and continuity contract from completed `TASK-016`.
-  - Complete the accepted event-responsive integration by routing
-    disclosure-safe typed notices through the implemented evaluator, presenting
-    its explanations and configuration warnings, and consuming persisted local
-    policy overrides. Coordinate typed combat-start notices with `TASK-046`
-    rather than inventing combat semantics here.
+  - Complete the live event-responsive integration by routing owner-provided
+    disclosure-safe typed notices through the application boundary. Coordinate
+    typed combat-start notices with `TASK-046` rather than inventing combat
+    semantics here.
   - Wire live event adapters only after their owners provide typed disclosures:
     informational dialogue remains with `TASK-065` and combat start remains with
-    `TASK-046`. Integrate persisted pacing overrides through the shared
-    device-local preference store completed by `TASK-084`, not a separate
-    pacing-only file.
+    `TASK-046`. Keep persisted pacing overrides in the shared device-local
+    preference store completed by `TASK-084`, not a separate pacing-only file.
   - Context: [Time and pacing](time-and-pacing.md)
 
 `TASK-068`, `TASK-071`, `TASK-073`, and `TASK-075` remain in the
@@ -607,6 +609,12 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-085: Reconcile the built-in starter-ship position acceptance**
+  - Restored the built-in `minimal` scenario's starter ship to system position
+    `(0, 0)`, matching the production-pipeline acceptance test.
+  - Retained the existing content-validation and static new-game loading path.
+  - Context: [Gameplay content](gameplay-content.md)
 
 - [x] **TASK-084: Implement the shared device-local preference store**
   - Implemented a versioned device-local JSON store that keeps typed pacing

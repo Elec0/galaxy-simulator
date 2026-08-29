@@ -24,6 +24,10 @@
              Link="ApplicationPacingController.cs" />
     <Compile Include="../../src/GalaxyCommand.Godot/Scripts/ApplicationEventPacingController.cs"
              Link="ApplicationEventPacingController.cs" />
+    <Compile Include="../../src/GalaxyCommand.Godot/Scripts/ApplicationEventPacingInbox.cs"
+             Link="ApplicationEventPacingInbox.cs" />
+    <Compile Include="../../src/GalaxyCommand.Godot/Scripts/ApplicationEventPacingExplanation.cs"
+             Link="ApplicationEventPacingExplanation.cs" />
     <Compile Include="../../src/GalaxyCommand.Godot/Scripts/PacingSpeedLadderFile.cs"
              Link="PacingSpeedLadderFile.cs" />
     <Compile Include="../../src/GalaxyCommand.Godot/Scripts/ApplicationInputBuffer.cs"
