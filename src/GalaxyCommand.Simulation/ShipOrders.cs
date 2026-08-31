@@ -1332,14 +1332,14 @@ internal sealed class ShipOrderCoordinator
     private sealed class ActorOrders
     {
         internal ActorOrders()
-            : this(new WorkSet(), @override: null)
+            : this(new WorkSet(), overrideOrders: null)
         {
         }
 
-        internal ActorOrders(WorkSet @base, WorkSet? @override)
+        internal ActorOrders(WorkSet baseOrders, WorkSet? overrideOrders)
         {
-            Base = @base;
-            Override = @override;
+            Base = baseOrders;
+            Override = overrideOrders;
         }
 
         internal WorkSet Base { get; }

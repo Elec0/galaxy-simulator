@@ -1,3 +1,4 @@
+using GalaxyCommand.Content;
 using GalaxyCommand.Simulation;
 using Godot;
 using System.Diagnostics;
@@ -13,6 +14,7 @@ public partial class Main : Node
 	private const int MaximumRecentFacts = 32;
 	private const string PacingSpeedLadderResourcePath = "res://pacing-speeds.txt";
 	private const string DeviceLocalPreferenceDirectoryResourcePath = "user://preferences";
+	private const string DevelopmentContentDirectoryName = "DevelopmentContent";
 
 	private CommandSource _player = null!;
 	private PrincipalId _playerPrincipalId;
@@ -22,6 +24,9 @@ public partial class Main : Node
 	private Label _pacingState = null!;
 	private Label _pacingConfiguration = null!;
 	private Label _pacingExplanation = null!;
+	private Label _view = null!;
+	private Label _inspector = null!;
+	private Label _activity = null!;
 	private Button _pauseOrResume = null!;
 	private HBoxContainer _pacingPresets = null!;
 	private readonly List<GameFactEnvelope> _recentFacts = [];
@@ -47,8 +52,12 @@ public partial class Main : Node
 			new ApplicationEventPacingController(
 				_pacing,
 				_pacingPreferences.EventPacing.Policies));
-		(_session, _playerPrincipalId, _player) = CreateSession();
+		(GameSession session, PrincipalId playerPrincipalId, CommandSource player, IReadOnlyList<StaticGalaxyLayoutEntry> galaxyLayout) = CreateSession();
+		_session = session;
+		_playerPrincipalId = playerPrincipalId;
+		_player = player;
 		_map = GetNode<GalaxyMap>("GalaxyMap");
+		_map.ConfigureGalaxyLayout(galaxyLayout);
 		_status = GetNode<Label>("Interface/StatusPanel/Margin/Content/Status");
 		_pacingState = GetNode<Label>(
 			"Interface/StatusPanel/Margin/Content/PacingControls/State");
@@ -56,16 +65,20 @@ public partial class Main : Node
 			"Interface/StatusPanel/Margin/Content/PacingConfiguration");
 		_pacingExplanation = GetNode<Label>(
 			"Interface/StatusPanel/Margin/Content/PacingExplanation");
+		_view = GetNode<Label>("Interface/Header/Content/View");
+		_inspector = GetNode<Label>("Interface/StatusPanel/Margin/Content/Inspector");
+		_activity = GetNode<Label>("Interface/StatusPanel/Margin/Content/Activity");
 		_pauseOrResume = GetNode<Button>(
 			"Interface/StatusPanel/Margin/Content/PacingControls/PauseOrResume");
 		_pacingPresets = GetNode<HBoxContainer>(
 			"Interface/StatusPanel/Margin/Content/PacingControls/Presets");
 		ConfigurePacingControls();
 		_map.SelectionChanged += OnSelectionChanged;
+		_map.ViewChanged += RefreshPresentation;
 		_map.DestinationRequested += OnDestinationRequested;
 		_map.CancelRequested += OnCancelRequested;
 		AdvanceTo(SimulationTime.Zero);
-		GD.Print("Galaxy Command clean spatial session ready.");
+		GD.Print("Galaxy Command development visual preview ready.");
 	}
 
 	public override void _Process(double delta)
@@ -100,18 +113,26 @@ public partial class Main : Node
 	}
 
 	/// <summary>
-	/// Loads one complete built-in setup and returns the composed player
-	/// identities with the session so the client never assumes runtime IDs.
+	/// Loads the development-only validated preview scenario and returns composed
+	/// runtime identities with presentation layout, so the client never assumes
+	/// IDs or bypasses the production content pipeline.
 	/// </summary>
-	private static (GameSession Session, PrincipalId PlayerPrincipalId, CommandSource PlayerSource) CreateSession()
+	private static (
+		GameSession Session,
+		PrincipalId PlayerPrincipalId,
+		CommandSource PlayerSource,
+		IReadOnlyList<StaticGalaxyLayoutEntry> GalaxyLayout) CreateSession()
 	{
-		// Runtime output carries the same ordinary package directory used by
-		// headless validation, so built-in content has no privileged bypass.
-		string builtInContentDirectory = Path.Combine(
+		// The development package is copied for local runs but excluded from
+		// published output, while still receiving ordinary production validation.
+		string developmentPackageDirectory = Path.Combine(
 			AppContext.BaseDirectory,
-			"BuiltInContent");
-		StaticNewGameLoadResult loaded = BuiltInNewGame.Load(
-			builtInContentDirectory,
+			DevelopmentContentDirectoryName,
+			"galaxy-command.preview");
+		StaticNewGameLoadResult loaded = StaticNewGameLoader.Load(
+			[developmentPackageDirectory],
+			PackageId.Create("galaxy-command.preview"),
+			LocalContentId.Create("visual-preview"),
 			// Resolve entropy in the application shell before constructing authority.
 			RandomRootSeed.FromBytes(
 				CryptographicRandomNumberGenerator.GetBytes(RandomRootSeed.ByteCount)),
@@ -124,7 +145,7 @@ public partial class Main : Node
 				loaded.Diagnostics.Select(diagnostic =>
 					$"{diagnostic.Kind} {diagnostic.Source} {diagnostic.Path}: {diagnostic.Message}"));
 			throw new InvalidOperationException(
-				$"Built-in static new-game content was rejected.{SystemEnvironment.NewLine}{failures}");
+				$"Development preview content was rejected.{SystemEnvironment.NewLine}{failures}");
 		}
 
 		GameSessionSetup setup = loaded.Setup!;
@@ -138,12 +159,14 @@ public partial class Main : Node
 			.Single();
 		var session = new GameSession(
 			loaded.Setup!,
-			new DirectLocalNavigationPlanner(
+			new HierarchicalNavigationPlanner(
+				setup.ConnectorTopology,
 				new ChebyshevLocalTravelTimeEstimator(millisecondsPerMapUnit: 10)));
 		return (
 			session,
 			playerPrincipalId,
-			new CommandSource(CommandSourceKind.Player, playerSourceId));
+			new CommandSource(CommandSourceKind.Player, playerSourceId),
+			loaded.GalaxyLayout!);
 	}
 
 	private void OnSelectionChanged()
@@ -228,6 +251,18 @@ public partial class Main : Node
 	/// </summary>
 	private void ConfigurePacingControls()
 	{
+		GetNode<Button>("Interface/Header/Content/ViewControls/Galaxy")
+			.Pressed += () =>
+			{
+				_map.ShowGalaxy();
+				RefreshPresentation();
+			};
+		GetNode<Button>("Interface/Header/Content/ViewControls/Recenter")
+			.Pressed += () =>
+			{
+				_map.Recenter();
+				RefreshPresentation();
+			};
 		_pauseOrResume.Pressed += () => _input.EnqueuePacing(
 			_pacing.IsPaused
 				? new ApplicationPacingAction.Unpause()
@@ -317,9 +352,12 @@ public partial class Main : Node
 		string facts = _factHistoryTruncated
 			? "FACT HISTORY INCOMPLETE"
 			: $"FACTS {_recentFacts.Count}";
+		_view.Text = $"DEVELOPMENT VISUAL PREVIEW | {_map.ViewDescription}";
+		_inspector.Text = DescribeInspector(selected);
+		_activity.Text = DescribeActivity();
 
 		_status.Text =
-			$"SIM {FormatTime(snapshot.Time)}   |   SHIPS {snapshot.Ships.Count}   |   " +
+			$"SIM {FormatTime(snapshot.Time)}   |   {_map.ViewDescription}   |   SHIPS {snapshot.Ships.Count}   |   " +
 			$"{control}   |   {queue}   |   {_lastCommandStatus}   |   " +
 			$"{order}   |   {motion}   |   {facts}";
 	}
@@ -341,6 +379,48 @@ public partial class Main : Node
 		{
 			_recentFacts.RemoveRange(0, _recentFacts.Count - MaximumRecentFacts);
 		}
+	}
+
+	/// <summary>
+	/// Describes only the focused ship record already permitted by the immutable
+	/// presentation capture; the preview does not inspect simulation owners.
+	/// </summary>
+	private static string DescribeInspector(GameShipSnapshot? ship)
+	{
+		if (ship is null)
+		{
+			return "INSPECTOR | Select a ship in a system view";
+		}
+
+		string spatial = ship.Position is { } position
+			? $"at {position.SystemId} ({position.Position.X}, {position.Position.Y})"
+			: ship.Transit is { } transit
+				? $"in transit C{transit.ConnectionId.Value} until {FormatTime(transit.ArrivesAt)}"
+				: "spatial state unavailable";
+		string order = ship.CurrentOrder is { } current
+			? $"{current.Status} {DescribeDestination(current.Destination)}"
+			: "no current order";
+		return $"INSPECTOR | S{ship.Id.Value} | {spatial} | {order}";
+	}
+
+	/// <summary>
+	/// Renders the bounded locally retained semantic feed in source sequence
+	/// order without converting it into authority, save data, or a pacing rule.
+	/// </summary>
+	private string DescribeActivity()
+	{
+		if (_factHistoryTruncated)
+		{
+			return "ACTIVITY | Earlier retained facts are unavailable";
+		}
+
+		string[] recent = _recentFacts
+			.TakeLast(4)
+			.Select(fact => $"#{fact.Sequence.Value} {fact.Fact.GetType().Name}")
+			.ToArray();
+		return recent.Length == 0
+			? "ACTIVITY | No disclosed facts yet"
+			: $"ACTIVITY | {string.Join("  •  ", recent)}";
 	}
 
 	private static string DescribeResult(GameplayCommandRecord record) =>

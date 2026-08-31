@@ -169,9 +169,15 @@ public static class StaticNewGameLoader
     {
         galaxyLayout = Array.AsReadOnly(Array.Empty<StaticGalaxyLayoutEntry>());
         string source = $"{scenario.PackageId}/scenario/{scenario.Id}";
+        bool declaresConnectorTopology =
+            scenario.Values.Properties.ContainsKey("connectorEndpoints")
+            || scenario.Values.Properties.ContainsKey("transitConnections");
+        string[] scenarioProperties = declaresConnectorTopology
+            ? ["connectorEndpoints", "galaxyLayout", "playerPrincipal", "ships", "standingPolicy", "systems", "transitConnections"]
+            : ["galaxyLayout", "playerPrincipal", "ships", "standingPolicy", "systems"];
         if (!TryObjectProperties(
                 scenario.Values,
-                ["galaxyLayout", "playerPrincipal", "ships", "standingPolicy", "systems"],
+                scenarioProperties,
                 source,
                 "$scenario.values",
                 diagnostics))
@@ -219,6 +225,9 @@ public static class StaticNewGameLoader
             source,
             systems,
             diagnostics);
+        ConnectorTopology? connectorTopology = declaresConnectorTopology
+            ? ComposeConnectorTopology(scenario.Values, source, systems, diagnostics)
+            : new ConnectorTopology([], []);
         List<InitialShipSetup> ships = ComposeShips(
             scenario.Values,
             source,
@@ -226,7 +235,7 @@ public static class StaticNewGameLoader
             principals,
             designs,
             diagnostics);
-        if (standingPolicy is null || diagnostics.Count > 0)
+        if (standingPolicy is null || connectorTopology is null || diagnostics.Count > 0)
         {
             return null;
         }
@@ -236,6 +245,7 @@ public static class StaticNewGameLoader
             return new GameSessionSetup(
                 systems.Values,
                 ships,
+                connectorTopology,
                 new RelationshipSetup(
                     principals.Values,
                     principals[playerKey!].Id,
@@ -488,6 +498,205 @@ public static class StaticNewGameLoader
 
         return Array.AsReadOnly(
             entries.Values.OrderBy(entry => entry.SystemId.Value).ToArray());
+    }
+
+    /// <summary>
+    /// Composes optional authored connector topology into the existing
+    /// simulation-owned topology model. Both arrays are required together so a
+    /// scenario cannot silently expose endpoint positions without their
+    /// declared traversal contract.
+    /// </summary>
+    private static ConnectorTopology? ComposeConnectorTopology(
+        ContentObjectValue scenario,
+        string source,
+        IReadOnlyDictionary<string, StarSystem> systems,
+        List<ContentDiagnostic> diagnostics)
+    {
+        Dictionary<string, ConnectorEndpoint> endpoints = ComposeConnectorEndpoints(
+            scenario,
+            source,
+            systems,
+            diagnostics);
+        List<TransitConnection> connections = ComposeTransitConnections(
+            scenario,
+            source,
+            endpoints,
+            diagnostics);
+        if (diagnostics.Count > 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return new ConnectorTopology(endpoints.Values, connections);
+        }
+        catch (ArgumentException)
+        {
+            diagnostics.Add(Diagnostic(
+                source,
+                "$scenario.values.transitConnections",
+                "The connector topology contains an invalid endpoint or connection relationship."));
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Assigns connector endpoint IDs from stable authored identity order and
+    /// binds every endpoint to one declared system-local position.
+    /// </summary>
+    private static Dictionary<string, ConnectorEndpoint> ComposeConnectorEndpoints(
+        ContentObjectValue scenario,
+        string source,
+        IReadOnlyDictionary<string, StarSystem> systems,
+        List<ContentDiagnostic> diagnostics)
+    {
+        if (!TryArray(
+                scenario,
+                "connectorEndpoints",
+                source,
+                "$scenario.values.connectorEndpoints",
+                diagnostics,
+                out ContentArrayValue? array))
+        {
+            return new Dictionary<string, ConnectorEndpoint>(StringComparer.Ordinal);
+        }
+
+        var entries = new SortedDictionary<string, (ContentObjectValue Value, string Path)>(StringComparer.Ordinal);
+        for (int index = 0; index < array!.Items.Count; index++)
+        {
+            string path = $"$scenario.values.connectorEndpoints[{index}]";
+            if (array.Items[index] is not ContentObjectValue item
+                || !TryObjectProperties(item, ["id", "system", "x", "y"], source, path, diagnostics)
+                || !TryString(item, "id", source, $"{path}.id", diagnostics, out string? id))
+            {
+                continue;
+            }
+
+            if (!entries.TryAdd(id!, (item, path)))
+            {
+                diagnostics.Add(Diagnostic(source, $"{path}.id", "Connector endpoint identities must be unique."));
+            }
+        }
+
+        var endpoints = new Dictionary<string, ConnectorEndpoint>(StringComparer.Ordinal);
+        int runtimeId = 1;
+        foreach ((string id, (ContentObjectValue item, string path)) in entries)
+        {
+            if (!TryString(item, "system", source, $"{path}.system", diagnostics, out string? systemId)
+                || !systems.TryGetValue(systemId!, out StarSystem? system)
+                || !TryInt64(item, "x", source, $"{path}.x", diagnostics, out long x)
+                || !TryInt64(item, "y", source, $"{path}.y", diagnostics, out long y))
+            {
+                if (systemId is not null && !systems.ContainsKey(systemId))
+                {
+                    diagnostics.Add(Diagnostic(source, $"{path}.system", "The connector endpoint references an unknown scenario system."));
+                }
+
+                runtimeId++;
+                continue;
+            }
+
+            endpoints.Add(
+                id,
+                new ConnectorEndpoint(
+                    new ConnectorEndpointId(checked((uint)runtimeId)),
+                    new SystemPosition(
+                        system!.Id,
+                        new SpatialPosition(new SpatialCoordinate(x), new SpatialCoordinate(y)))));
+            runtimeId++;
+        }
+
+        return endpoints;
+    }
+
+    /// <summary>
+    /// Assigns directed transit connection IDs from stable authored identity
+    /// order and rejects unknown endpoints or non-positive durations before
+    /// the authoritative topology is published.
+    /// </summary>
+    private static List<TransitConnection> ComposeTransitConnections(
+        ContentObjectValue scenario,
+        string source,
+        Dictionary<string, ConnectorEndpoint> endpoints,
+        List<ContentDiagnostic> diagnostics)
+    {
+        if (!TryArray(
+                scenario,
+                "transitConnections",
+                source,
+                "$scenario.values.transitConnections",
+                diagnostics,
+                out ContentArrayValue? array))
+        {
+            return [];
+        }
+
+        var entries = new SortedDictionary<string, (ContentObjectValue Value, string Path)>(StringComparer.Ordinal);
+        for (int index = 0; index < array!.Items.Count; index++)
+        {
+            string path = $"$scenario.values.transitConnections[{index}]";
+            if (array.Items[index] is not ContentObjectValue item
+                || !TryObjectProperties(
+                    item,
+                    ["destinationEndpoint", "durationMilliseconds", "id", "sourceEndpoint"],
+                    source,
+                    path,
+                    diagnostics)
+                || !TryString(item, "id", source, $"{path}.id", diagnostics, out string? id))
+            {
+                continue;
+            }
+
+            if (!entries.TryAdd(id!, (item, path)))
+            {
+                diagnostics.Add(Diagnostic(source, $"{path}.id", "Transit connection identities must be unique."));
+            }
+        }
+
+        List<TransitConnection> connections = [];
+        int runtimeId = 1;
+        foreach ((string _, (ContentObjectValue item, string path)) in entries)
+        {
+            if (!TryString(item, "sourceEndpoint", source, $"{path}.sourceEndpoint", diagnostics, out string? sourceId)
+                || !TryString(item, "destinationEndpoint", source, $"{path}.destinationEndpoint", diagnostics, out string? destinationId)
+                || !TryInt64(item, "durationMilliseconds", source, $"{path}.durationMilliseconds", diagnostics, out long durationMilliseconds))
+            {
+                runtimeId++;
+                continue;
+            }
+
+            if (!endpoints.TryGetValue(sourceId!, out ConnectorEndpoint? sourceEndpoint))
+            {
+                diagnostics.Add(Diagnostic(source, $"{path}.sourceEndpoint", "The transit connection references an unknown connector endpoint."));
+            }
+
+            if (!endpoints.TryGetValue(destinationId!, out ConnectorEndpoint? destinationEndpoint))
+            {
+                diagnostics.Add(Diagnostic(source, $"{path}.destinationEndpoint", "The transit connection references an unknown connector endpoint."));
+            }
+
+            if (durationMilliseconds <= 0)
+            {
+                diagnostics.Add(Diagnostic(source, $"{path}.durationMilliseconds", "The transit duration must be positive."));
+            }
+
+            if (sourceEndpoint is null || destinationEndpoint is null || durationMilliseconds <= 0)
+            {
+                runtimeId++;
+                continue;
+            }
+
+            connections.Add(
+                new TransitConnection(
+                    new TransitConnectionId(checked((uint)runtimeId)),
+                    sourceEndpoint.Id,
+                    destinationEndpoint.Id,
+                    new SimulationDuration(checked((ulong)durationMilliseconds))));
+            runtimeId++;
+        }
+
+        return connections;
     }
 
     /// <summary>Assigns ship, entity, and cargo IDs from scenario-local string identity order.</summary>

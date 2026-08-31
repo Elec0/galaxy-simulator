@@ -78,6 +78,39 @@ public sealed class StaticNewGameLoaderTests
     }
 
     [Fact]
+    public void DevelopmentPreviewScenarioComposesCanonicalConnectorTopology()
+    {
+        string packageDirectory = Path.Combine(
+            FindRepositoryRoot(),
+            "content",
+            "development",
+            "galaxy-command.preview");
+
+        StaticNewGameLoadResult result = StaticNewGameLoader.Load(
+            [packageDirectory],
+            PackageId.Create("galaxy-command.preview"),
+            LocalContentId.Create("visual-preview"),
+            RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]),
+            factRetentionCapacity: 1024,
+            maximumDegreeOfParallelism: 2);
+
+        Assert.True(result.IsSuccess);
+        GameSessionSetup setup = Assert.IsType<GameSessionSetup>(result.Setup);
+        Assert.Equal(3, setup.Systems.Count);
+        Assert.Equal(4, setup.ConnectorTopology.Endpoints.Count);
+        Assert.Equal(4, setup.ConnectorTopology.Connections.Count);
+        Assert.Equal(
+            [1u, 2u, 3u, 4u],
+            setup.ConnectorTopology.Endpoints.Select(endpoint => endpoint.Id.Value));
+        Assert.Equal(
+            [1u, 2u, 3u, 4u],
+            setup.ConnectorTopology.Connections.Select(connection => connection.Id.Value));
+        Assert.All(
+            setup.ConnectorTopology.Connections,
+            connection => Assert.True(connection.Duration.Milliseconds > 0));
+    }
+
+    [Fact]
     public void InvalidBuiltInScenarioPublishesNeitherContentNorSetup()
     {
         string temporaryRoot = Path.Combine(

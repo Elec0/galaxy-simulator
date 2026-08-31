@@ -94,6 +94,35 @@ authority. Once validation creates a session, authoritative owners hold the
 resulting mutable state. Loading a save restores those owners directly and does
 not rerun the starting scenario.
 
+### Authored connector topology
+
+A static scenario may additionally declare its public connector topology with
+the paired `connectorEndpoints` and `transitConnections` arrays. A scenario
+that declares either array must declare both. Scenarios that declare neither
+retain an empty connector topology.
+
+Each `connectorEndpoints` entry has `id`, `system`, `x`, and `y`. The endpoint
+identity is scenario-local, its system must be declared by the same scenario,
+and its coordinates are exact integer system-local positions. Each
+`transitConnections` entry has `id`, `sourceEndpoint`, `destinationEndpoint`,
+and positive integer `durationMilliseconds`. Both endpoint references must
+resolve in the same validated scenario and must belong to different systems.
+
+Connections are directed. A bidirectional connector is authored as two
+explicit connection entries, one in each direction. The loader assigns compact
+runtime endpoint and connection identities by stable ordinal authored ID,
+constructs the existing immutable `ConnectorTopology`, and rejects the entire
+scenario if any entry is malformed, unresolved, duplicated, non-positive, or
+otherwise violates topology invariants. The authored strings and loader-assigned
+numeric IDs are separate from display names, save compatibility, and render
+ordering.
+
+Connector endpoints and connections become immutable records in the
+presentation-safe world snapshot. The accompanying `galaxyLayout` remains
+separate presentation-only scenario data: it locates declared systems in the
+galaxy view but does not enter simulation authority, checkpoints, saves, or
+`GamePresentationSnapshot`.
+
 Procedural new-game generation is separate `TASK-047` work. A future generator
 must produce the same format-neutral new-game composition and pass the same
 validation and session-creation boundary as a static scenario.

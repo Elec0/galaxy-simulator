@@ -1,0 +1,118 @@
+{
+  "format": "galaxy-command-content-scenario",
+  "schemaVersion": 1,
+  "id": "visual-preview",
+  "fallback": "Development Visual Preview",
+  "references": [
+    "galaxy-command.preview/principal/player",
+    "galaxy-command.preview/ship-design/preview-courier",
+    "galaxy-command.preview/standing-policy/default-standing"
+  ],
+  "values": {
+    "playerPrincipal": "galaxy-command.preview/principal/player",
+    "standingPolicy": "galaxy-command.preview/standing-policy/default-standing",
+    "galaxyLayout": [
+      {
+        "system": "aster",
+        "x": -260,
+        "y": -90
+      },
+      {
+        "system": "borealis",
+        "x": 0,
+        "y": 110
+      },
+      {
+        "system": "cinder",
+        "x": 280,
+        "y": -70
+      }
+    ],
+    "systems": [
+      {
+        "id": "aster",
+        "fallback": "Aster"
+      },
+      {
+        "id": "borealis",
+        "fallback": "Borealis"
+      },
+      {
+        "id": "cinder",
+        "fallback": "Cinder"
+      }
+    ],
+    "connectorEndpoints": [
+      {
+        "id": "aster-east",
+        "system": "aster",
+        "x": 220,
+        "y": 0
+      },
+      {
+        "id": "borealis-west",
+        "system": "borealis",
+        "x": -220,
+        "y": 0
+      },
+      {
+        "id": "borealis-south",
+        "system": "borealis",
+        "x": 0,
+        "y": 180
+      },
+      {
+        "id": "cinder-north",
+        "system": "cinder",
+        "x": 0,
+        "y": -180
+      }
+    ],
+    "transitConnections": [
+      {
+        "id": "aster-to-borealis",
+        "sourceEndpoint": "aster-east",
+        "destinationEndpoint": "borealis-west",
+        "durationMilliseconds": 3000
+      },
+      {
+        "id": "borealis-to-aster",
+        "sourceEndpoint": "borealis-west",
+        "destinationEndpoint": "aster-east",
+        "durationMilliseconds": 3000
+      },
+      {
+        "id": "borealis-to-cinder",
+        "sourceEndpoint": "borealis-south",
+        "destinationEndpoint": "cinder-north",
+        "durationMilliseconds": 3000
+      },
+      {
+        "id": "cinder-to-borealis",
+        "sourceEndpoint": "cinder-north",
+        "destinationEndpoint": "borealis-south",
+        "durationMilliseconds": 3000
+      }
+    ],
+    "ships": [
+      {
+        "id": "courier",
+        "principal": "galaxy-command.preview/principal/player",
+        "design": "galaxy-command.preview/ship-design/preview-courier",
+        "system": "aster",
+        "x": -100,
+        "y": -40,
+        "controllerSource": "preview-player"
+      },
+      {
+        "id": "scout",
+        "principal": "galaxy-command.preview/principal/player",
+        "design": "galaxy-command.preview/ship-design/preview-courier",
+        "system": "borealis",
+        "x": 30,
+        "y": 70,
+        "controllerSource": "preview-player"
+      }
+    ]
+  }
+}

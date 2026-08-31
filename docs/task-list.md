@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Sensor deployables](sensor-deployables.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Accessibility](accessibility.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Sensor deployables](sensor-deployables.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Accessibility](accessibility.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Group and fleet commands](group-and-fleet-commands.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -19,7 +19,7 @@ source of detailed scope and acceptance criteria.
 
 | Area | Completed foundation | Remaining ownership |
 | --- | --- | --- |
-| Project scope, content, and accessibility | `TASK-023`, `TASK-043`, `TASK-044`, `TASK-045`, `TASK-048`, `TASK-061`, and `TASK-063` completed the content, static-scenario, validation, scope-review, localization, comprehensive accessibility, and built-in new-game foundations. | `TASK-083` provides the development-only Godot visual preview. `TASK-077` implements the full accessibility application contract; `TASK-078` through `TASK-080` own audio, and `TASK-081` and `TASK-082` retain deferred motion and photosensitivity design. |
+| Project scope, content, and accessibility | `TASK-023`, `TASK-043`, `TASK-044`, `TASK-045`, `TASK-048`, `TASK-061`, `TASK-063`, and `TASK-083` completed the content, static-scenario, validation, scope-review, localization, comprehensive accessibility, built-in new-game, and development-preview foundations. | `TASK-077` implements the full accessibility application contract; `TASK-078` through `TASK-080` own audio, and `TASK-081` and `TASK-082` retain deferred motion and photosensitivity design. |
 | NPCs | `TASK-015` established the ship-only NPC boundary. | `TASK-042` designs NPC decision quality and `TASK-053` autonomous work selection; neither introduces person-level state. |
 | Dialogue and randomness | `TASK-016` completed dialogue design. `TASK-021` and `TASK-066` completed deterministic-randomness design and implementation. | `TASK-065` implements dialogue. |
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
@@ -29,6 +29,17 @@ source of detailed scope and acceptance criteria.
 
 ## Current focus
 This section is to put work that is currently being performed. Once the work is finished the task should be moved to Completed, and an entry should be added to the Project Status summary above.
+
+- [ ] **TASK-033: Define selection sets and group or fleet commands**
+  - Began the owner-decision brief for an authoritative multi-ship command
+    contract. It preserves the client-owned selection boundary from `TASK-010`
+    and the per-actor order lifecycle from `TASK-006`; existing Godot controls
+    remain focused-ship-only until the owner accepts a command contract.
+  - Resolve the target model, command vocabulary, controller eligibility,
+    membership ordering, acceptance transaction, group and member order
+    ownership, cancellation, failure, semantic facts, and any persistent-state
+    handoff before implementation.
+  - Context: [Group and fleet commands](group-and-fleet-commands.md) · [Presentation snapshots](presentation-snapshots.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
 ## Near-term work
 
@@ -86,28 +97,6 @@ prerequisites and desired behavior are sufficiently defined.
 The parking-lot horizons organize deferred work by likely sequencing. A task
 in the **Near term** parking-lot section remains deferred; it is not promoted to
 the project-level **Near-term work** section above.
-
-### Near term
-
-- [ ] **TASK-083: Build a development-only Godot visual preview and scenario**
-  - Add a clearly identified development-only static scenario with enough
-    authored public topology, layout, and presentable ship state to exercise a
-    galaxy view, connectors, system view, selection, movement, and activity.
-    It is not shipped product content and does not introduce gameplay mechanics.
-  - Add a Godot visual preview that consumes the validated scenario layout,
-    immutable presentation snapshots, and observer-visible semantic facts to
-    render galaxy and system views with local pan, cursor-centred zoom,
-    selection, focused inspection, current-order routes, and a bounded activity
-    surface.
-  - Keep the preview explicitly separate from the full desktop application:
-    do not add save/load, recovery, fog-of-war observation states, final
-    accessibility/settings surfaces, audio, or a second simulation authority.
-    Do not bypass content validation or read mutable simulation domains
-    directly.
-  - Begin after `TASK-038` reaches its accepted pacing checkpoint. Build on
-    completed `TASK-010`, `TASK-048`, and `TASK-049`; it supplies visual
-    iteration evidence without changing the later `TASK-077` contract.
-  - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Presentation snapshots](presentation-snapshots.md) · [Gameplay content](gameplay-content.md) · [Time and pacing](time-and-pacing.md)
 
 - [ ] **TASK-075: Define deployable deployment and pickup ranges**
   - Define the bounded numeric range and policy source for authorized ships to
@@ -178,18 +167,6 @@ the project-level **Near-term work** section above.
   - Preserve typed causes, deterministic proposal ordering, bounded retention,
     and the existing distinction between facts and internal effects.
   - Context: [Semantic game facts](semantic-game-facts.md) · [Runtime orchestration](runtime-orchestration.md)
-
-- [ ] **TASK-033: Define selection sets and group or fleet commands**
-  - Define whether a command targets a transient presentation selection, a
-    persistent group, or both, without conflating either with simulation
-    authority.
-  - Define deterministic membership ordering, controller eligibility, command
-    acceptance, atomic versus partial outcomes, order ownership, cancellation,
-    failure, and semantic facts for multi-ship intent.
-  - Begin after `TASK-011` establishes entity lifecycle and identity. Build on
-    the shared actor-order lifecycle from `TASK-006` and the client-owned
-    selection contract in `TASK-010`.
-  - Context: [Presentation snapshots](presentation-snapshots.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
 - [ ] **TASK-065: Implement dialogue state and presentation**
   - Implement the accepted authored-definition, validation, authoritative
@@ -609,6 +586,21 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-083: Build a development-only Godot visual preview and scenario**
+  - Added validated optional `connectorEndpoints` and `transitConnections`
+    scenario data, plus a three-system development-only package excluded from
+    publish output.
+  - Implemented separate local galaxy and system views with pan,
+    cursor-centred zoom, selection, inspection, local movement routes, and a
+    bounded observer-visible activity feed. The preview consumes immutable
+    presentation snapshots and validated layout without adding a second
+    simulation authority, save/load, recovery, final accessibility/settings,
+    audio, or fog-of-war behavior.
+  - Added focused coordinate-transform and loader proof. Simulation and
+    Godot-side suites, Godot build, content validation, headless startup, and
+    project-owner interactive visual review passed.
+  - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Presentation snapshots](presentation-snapshots.md) · [Gameplay content](gameplay-content.md) · [Time and pacing](time-and-pacing.md)
 
 - [x] **TASK-085: Reconcile the built-in starter-ship position acceptance**
   - Restored the built-in `minimal` scenario's starter ship to system position
