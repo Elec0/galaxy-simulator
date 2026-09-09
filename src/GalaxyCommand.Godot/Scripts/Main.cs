@@ -177,35 +177,48 @@ public partial class Main : Node
 		RefreshPresentation();
 	}
 
+	/// <summary>
+	/// Captures the current local selection as one buffered move command. A
+	/// multi-selection replaces work as a group, while append stays focused-ship-only.
+	/// </summary>
 	private void OnDestinationRequested(
 		SystemPosition destination,
 		OrderPlacement placement)
 	{
-		if (_map.FocusedShipId is not { } shipId)
+		GameplayCommand? command = MapSelectionCommandFactory.CreateMove(
+			_map.SelectedShipIds,
+			_map.FocusedShipId,
+			destination,
+			placement);
+		if (command is null)
 		{
 			return;
 		}
 
 		_input.EnqueueGameplay(
 			_player,
-			new MoveShipCommand(
-				shipId,
-				new NavigationDestination.Position(destination),
-				placement));
-		_lastCommandStatus = "Move order queued";
+			command);
+		_lastCommandStatus = command is MoveShipGroupCommand
+			? "Group move order queued"
+			: "Move order queued";
 		RefreshPresentation();
 	}
 
+	/// <summary>
+	/// Captures the current local selection as one buffered current-order
+	/// cancellation, leaving idle members to authoritative group-cancel handling.
+	/// </summary>
 	private void OnCancelRequested(ShipId shipId)
 	{
 		ShipOrderSnapshot? current = _presentation.Selection.FocusedShip is { } focused
 			&& focused.Id == shipId
 				? focused.CurrentOrder
 				: null;
-		if (current is null
-			|| current.Status is ShipOrderStatus.Completed
-				or ShipOrderStatus.Cancelled
-				or ShipOrderStatus.Failed)
+		GameplayCommand? command = MapSelectionCommandFactory.CreateCancel(
+			_map.SelectedShipIds,
+			shipId,
+			current);
+		if (command is null)
 		{
 			_lastCommandStatus = "No active order to cancel";
 			RefreshPresentation();
@@ -214,8 +227,10 @@ public partial class Main : Node
 
 		_input.EnqueueGameplay(
 			_player,
-			new CancelShipOrderCommand(shipId, current.Id));
-		_lastCommandStatus = "Cancel order queued";
+			command);
+		_lastCommandStatus = command is CancelShipGroupCommand
+			? "Group cancel order queued"
+			: "Cancel order queued";
 		RefreshPresentation();
 	}
 

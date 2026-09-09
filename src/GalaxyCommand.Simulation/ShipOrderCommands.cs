@@ -32,6 +32,68 @@ public sealed record MoveShipCommand : GameplayCommand
     public OrderPlacement Placement { get; }
 }
 
+/// <summary>
+/// One-shot request to replace current move work for an explicit ship snapshot.
+/// It never creates a durable group, fleet, membership record, or group order.
+/// </summary>
+public sealed record MoveShipGroupCommand : GameplayCommand
+{
+    public const string CommandKind = "ship.move-group";
+
+    /// <summary>
+    /// Captures and canonicalizes nonzero, unique selected ships with one
+    /// system-local formation center.
+    /// </summary>
+    public MoveShipGroupCommand(
+        IEnumerable<ShipId> shipIds,
+        SystemPosition destination)
+        : base(CommandKind)
+    {
+        ShipIds = CanonicalizeShipIds(shipIds);
+        Destination = destination;
+    }
+
+    /// <summary>
+    /// Gets the ascending explicit member identities captured at submission.
+    /// </summary>
+    public IReadOnlyList<ShipId> ShipIds { get; }
+
+    /// <summary>
+    /// Gets the system-local formation center for this one-shot command.
+    /// </summary>
+    public SystemPosition Destination { get; }
+
+    /// <summary>
+    /// Sorts an explicit selection and rejects values that cannot identify one
+    /// deterministic one-shot group-command member.
+    /// </summary>
+    internal static IReadOnlyList<ShipId> CanonicalizeShipIds(IEnumerable<ShipId> shipIds)
+    {
+        ArgumentNullException.ThrowIfNull(shipIds);
+        ShipId[] canonicalIds = shipIds.ToArray();
+        if (canonicalIds.Length == 0)
+        {
+            throw new ArgumentException(
+                "A group command needs at least one ship.",
+                nameof(shipIds));
+        }
+
+        Array.Sort(canonicalIds, static (left, right) => left.Value.CompareTo(right.Value));
+        for (int index = 0; index < canonicalIds.Length; index++)
+        {
+            if (canonicalIds[index].Value == 0
+                || (index > 0 && canonicalIds[index] == canonicalIds[index - 1]))
+            {
+                throw new ArgumentException(
+                    "A group command needs unique nonzero ship identities.",
+                    nameof(shipIds));
+            }
+        }
+
+        return Array.AsReadOnly(canonicalIds);
+    }
+}
+
 public sealed record CancelShipOrderCommand : GameplayCommand
 {
     public const string CommandKind = "ship.cancel-order";
@@ -48,6 +110,30 @@ public sealed record CancelShipOrderCommand : GameplayCommand
     public ShipId ShipId { get; }
 
     public ShipOrderId OrderId { get; }
+}
+
+/// <summary>
+/// One-shot request to cancel the current order of an explicit ship snapshot.
+/// It does not name or recover a prior group command or order.
+/// </summary>
+public sealed record CancelShipGroupCommand : GameplayCommand
+{
+    public const string CommandKind = "ship.cancel-group-current";
+
+    /// <summary>
+    /// Captures and canonicalizes nonzero, unique selected ships whose current
+    /// orders may be cancelled at one command boundary.
+    /// </summary>
+    public CancelShipGroupCommand(IEnumerable<ShipId> shipIds)
+        : base(CommandKind)
+    {
+        ShipIds = MoveShipGroupCommand.CanonicalizeShipIds(shipIds);
+    }
+
+    /// <summary>
+    /// Gets the ascending explicit member identities captured at submission.
+    /// </summary>
+    public IReadOnlyList<ShipId> ShipIds { get; }
 }
 
 public sealed record BeginScriptedOverrideCommand : GameplayCommand

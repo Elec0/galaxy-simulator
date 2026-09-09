@@ -48,6 +48,8 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     private readonly ShipOrderCoordinator _orders;
     private readonly WorldTopology _worldTopology;
     private readonly ISpatialNavigationPlanner _navigation;
+    private readonly BasicGroupMoveFormationResolver _groupMoveFormationResolver =
+        new BasicGroupMoveFormationResolver();
     private readonly EntityLifecycleOwner _lifecycle;
     private readonly InventoryCommitOwner _inventoryCommit;
     private readonly SessionEconomyOwner? _economy;
@@ -677,7 +679,9 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         return envelope.Command switch
         {
             MoveShipCommand move => HandleMove(envelope.Source, move),
+            MoveShipGroupCommand groupMove => HandleGroupMove(envelope.Source, groupMove),
             CancelShipOrderCommand cancel => HandleCancel(envelope.Source, cancel),
+            CancelShipGroupCommand groupCancel => HandleGroupCancel(envelope.Source, groupCancel),
             BeginScriptedOverrideCommand begin =>
                 HandleBeginOverride(envelope.Source, begin),
             EndScriptedOverrideCommand end =>
@@ -1192,6 +1196,10 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             _ => throw new ArgumentOutOfRangeException(nameof(transportEvent)),
         };
 
+    /// <summary>
+    /// Evaluates and commits one ordinary move through the per-ship order
+    /// lifecycle, buffering all resulting semantic facts for command commit.
+    /// </summary>
     private GameplayCommandHandlingResult HandleMove(
         CommandSource source,
         MoveShipCommand command)
@@ -1207,6 +1215,60 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         MoveOrderProposal proposal = evaluation.Proposal
             ?? throw new InvalidOperationException(
                 "Accepted move-order evaluation produced no proposal.");
+        CommitMove(proposal, transitions, factProposals);
+        AddOrderTransitionProposals(transitions, factProposals);
+        return new GameplayCommandHandlingResult(
+            CommandResult.Accepted(),
+            factProposals);
+    }
+
+    /// <summary>
+    /// Commits one group move only after every member has passed the shared
+    /// stable-state preflight, preserving all-or-nothing replacement behavior.
+    /// </summary>
+    private GameplayCommandHandlingResult HandleGroupMove(
+        CommandSource source,
+        MoveShipGroupCommand command)
+    {
+        GroupMoveOrderEvaluation evaluation = EvaluateGroupMove(source, command);
+        if (evaluation.Rejection is { } rejection)
+        {
+            return new GameplayCommandHandlingResult(rejection);
+        }
+
+        var transitions = new List<ShipOrderTransition>();
+        var factProposals = new List<GameFactProposal>();
+        IReadOnlyList<MoveOrderProposal> proposals = evaluation.Proposals
+            ?? throw new InvalidOperationException(
+                "Accepted group move evaluation produced no proposals.");
+
+        // Commit only after every member has read the same state. Evaluating
+        // during this loop would turn a rejected one-shot command into a
+        // partial replacement of earlier members' work.
+        foreach (MoveOrderProposal proposal in proposals)
+        {
+            CommitMove(proposal, transitions, factProposals);
+        }
+
+        AddOrderTransitionProposals(transitions, factProposals);
+        return new GameplayCommandHandlingResult(
+            CommandResult.Accepted(),
+            factProposals);
+    }
+
+    /// <summary>
+    /// Applies an already-preflighted move proposal and buffers its domain
+    /// effects. It must not revalidate controller or route state because a
+    /// group command commits all members against one earlier stable view.
+    /// </summary>
+    private void CommitMove(
+        MoveOrderProposal proposal,
+        List<ShipOrderTransition> transitions,
+        List<GameFactProposal> factProposals)
+    {
+        ArgumentNullException.ThrowIfNull(proposal);
+        ArgumentNullException.ThrowIfNull(transitions);
+        ArgumentNullException.ThrowIfNull(factProposals);
         ShipOrder order = _orders.Create(proposal.Source, proposal.Destination);
         switch (proposal.Placement)
         {
@@ -1260,13 +1322,12 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                 throw new InvalidOperationException(
                     $"Unsupported order placement {proposal.Placement}.");
         }
-
-        AddOrderTransitionProposals(transitions, factProposals);
-        return new GameplayCommandHandlingResult(
-            CommandResult.Accepted(),
-            factProposals);
     }
 
+    /// <summary>
+    /// Evaluates and commits one ordinary order cancellation through the
+    /// per-ship lifecycle, including active-motion materialization when needed.
+    /// </summary>
     private GameplayCommandHandlingResult HandleCancel(
         CommandSource source,
         CancelShipOrderCommand command)
@@ -1282,6 +1343,55 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         CancelOrderProposal proposal = evaluation.Proposal
             ?? throw new InvalidOperationException(
                 "Accepted cancel-order evaluation produced no proposal.");
+        CommitCancellation(proposal, transitions, factProposals);
+        AddOrderTransitionProposals(transitions, factProposals);
+        return new GameplayCommandHandlingResult(
+            CommandResult.Accepted(),
+            factProposals);
+    }
+
+    /// <summary>
+    /// Cancels every eligible selected current order after shared preflight;
+    /// idle selected members remain deliberate no-ops.
+    /// </summary>
+    private GameplayCommandHandlingResult HandleGroupCancel(
+        CommandSource source,
+        CancelShipGroupCommand command)
+    {
+        GroupCancelOrderEvaluation evaluation = EvaluateGroupCancel(source, command);
+        if (evaluation.Rejection is { } rejection)
+        {
+            return new GameplayCommandHandlingResult(rejection);
+        }
+
+        var transitions = new List<ShipOrderTransition>();
+        var factProposals = new List<GameFactProposal>();
+        IReadOnlyList<CancelOrderProposal> proposals = evaluation.Proposals
+            ?? throw new InvalidOperationException(
+                "Accepted group cancellation evaluation produced no proposals.");
+        foreach (CancelOrderProposal proposal in proposals)
+        {
+            CommitCancellation(proposal, transitions, factProposals);
+        }
+
+        AddOrderTransitionProposals(transitions, factProposals);
+        return new GameplayCommandHandlingResult(
+            CommandResult.Accepted(),
+            factProposals);
+    }
+
+    /// <summary>
+    /// Cancels an already-resolved current or queued order, buffering its
+    /// physical and lifecycle effects. Group cancellation supplies only active
+    /// proposals, while individual cancellation may also supply queued work.
+    /// </summary>
+    private void CommitCancellation(
+        CancelOrderProposal proposal,
+        List<ShipOrderTransition> transitions,
+        List<GameFactProposal> factProposals)
+    {
+        ArgumentNullException.ThrowIfNull(transitions);
+        ArgumentNullException.ThrowIfNull(factProposals);
         if (proposal.WasActive)
         {
             EndActiveLocalMotion(
@@ -1308,11 +1418,6 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                 transitions,
                 factProposals);
         }
-
-        AddOrderTransitionProposals(transitions, factProposals);
-        return new GameplayCommandHandlingResult(
-            CommandResult.Accepted(),
-            factProposals);
     }
 
     private MoveOrderEvaluation EvaluateMove(
@@ -1371,6 +1476,55 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             null);
     }
 
+    /// <summary>
+    /// Resolves every group member before mutation so a stale, uncontrolled, or
+    /// unreachable member rejects the complete one-shot move.
+    /// </summary>
+    private GroupMoveOrderEvaluation EvaluateGroupMove(
+        CommandSource source,
+        MoveShipGroupCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(command);
+        IReadOnlyList<SystemPosition> destinations = _groupMoveFormationResolver.Resolve(
+            command.ShipIds,
+            command.Destination);
+        if (destinations.Count != command.ShipIds.Count)
+        {
+            return new GroupMoveOrderEvaluation(
+                null,
+                CommandResult.Rejected(
+                    CommandRejectionCodes.InvalidIntent,
+                    "The group formation resolver did not return one destination per ship."));
+        }
+
+        var proposals = new List<MoveOrderProposal>(command.ShipIds.Count);
+        for (int index = 0; index < command.ShipIds.Count; index++)
+        {
+            MoveOrderEvaluation member = EvaluateMove(
+                source,
+                new MoveShipCommand(
+                    command.ShipIds[index],
+                    new NavigationDestination.Position(destinations[index]),
+                    OrderPlacement.ReplaceAll));
+            if (member.Rejection is { } rejection)
+            {
+                return new GroupMoveOrderEvaluation(
+                    null,
+                    CommandResult.Rejected(
+                        rejection.RejectionCode
+                            ?? CommandRejectionCodes.InvalidState,
+                        $"Group move rejected for ship {command.ShipIds[index]}: {rejection.Reason}"));
+            }
+
+            proposals.Add(member.Proposal
+                ?? throw new InvalidOperationException(
+                    "Accepted group move member evaluation produced no proposal."));
+        }
+
+        return new GroupMoveOrderEvaluation(proposals, null);
+    }
+
     private CancelOrderEvaluation EvaluateCancel(
         CommandSource source,
         CancelShipOrderCommand command)
@@ -1395,6 +1549,40 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                 command.OrderId,
                 _orders.IsActive(command.ShipId, command.OrderId)),
             null);
+    }
+
+    /// <summary>
+    /// Validates every selected ship before collecting its current order. Idle
+    /// members deliberately contribute no proposal after the shared admission
+    /// succeeds, so they are no-ops rather than partial cancellation failures.
+    /// </summary>
+    private GroupCancelOrderEvaluation EvaluateGroupCancel(
+        CommandSource source,
+        CancelShipGroupCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(command);
+        var proposals = new List<CancelOrderProposal>();
+        foreach (ShipId shipId in command.ShipIds)
+        {
+            if (RejectIneligible(shipId, source) is { } rejection)
+            {
+                return new GroupCancelOrderEvaluation(
+                    null,
+                    CommandResult.Rejected(
+                        rejection.RejectionCode
+                            ?? CommandRejectionCodes.InvalidState,
+                        $"Group cancellation rejected for ship {shipId}: {rejection.Reason}"));
+            }
+
+            ShipOrder? active = _orders.GetActive(shipId);
+            if (active is not null)
+            {
+                proposals.Add(new CancelOrderProposal(shipId, active.Id, WasActive: true));
+            }
+        }
+
+        return new GroupCancelOrderEvaluation(proposals, null);
     }
 
     private GameplayCommandHandlingResult HandleBeginOverride(
@@ -1987,6 +2175,10 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         MoveOrderProposal? Proposal,
         CommandResult? Rejection);
 
+    private sealed record GroupMoveOrderEvaluation(
+        IReadOnlyList<MoveOrderProposal>? Proposals,
+        CommandResult? Rejection);
+
     private readonly record struct CancelOrderProposal(
         ShipId ShipId,
         ShipOrderId OrderId,
@@ -1994,6 +2186,10 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
 
     private sealed record CancelOrderEvaluation(
         CancelOrderProposal? Proposal,
+        CommandResult? Rejection);
+
+    private sealed record GroupCancelOrderEvaluation(
+        IReadOnlyList<CancelOrderProposal>? Proposals,
         CommandResult? Rejection);
 
     private sealed record BeginOverrideProposal(

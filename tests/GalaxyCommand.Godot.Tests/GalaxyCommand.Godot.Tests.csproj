@@ -40,6 +40,8 @@
              Link="ApplicationPacingPreferences.cs" />
     <Compile Include="../../src/GalaxyCommand.Godot/Scripts/SystemMapCoordinateTransform.cs"
              Link="SystemMapCoordinateTransform.cs" />
+    <Compile Include="../../src/GalaxyCommand.Godot/Scripts/MapSelectionCommandFactory.cs"
+             Link="MapSelectionCommandFactory.cs" />
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

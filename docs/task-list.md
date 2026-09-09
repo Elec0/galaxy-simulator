@@ -23,23 +23,13 @@ source of detailed scope and acceptance criteria.
 | NPCs | `TASK-015` established the ship-only NPC boundary. | `TASK-042` designs NPC decision quality and `TASK-053` autonomous work selection; neither introduces person-level state. |
 | Dialogue and randomness | `TASK-016` completed dialogue design. `TASK-021` and `TASK-066` completed deterministic-randomness design and implementation. | `TASK-065` implements dialogue. |
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
+| One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` owns equipment and ship slots. `TASK-055` owns trade balance, pricing, and settlement design. |
 | Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. | `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, and `TASK-075` owns deployment and pickup ranges. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 
 ## Current focus
 This section is to put work that is currently being performed. Once the work is finished the task should be moved to Completed, and an entry should be added to the Project Status summary above.
-
-- [ ] **TASK-033: Define selection sets and group or fleet commands**
-  - Began the owner-decision brief for an authoritative multi-ship command
-    contract. It preserves the client-owned selection boundary from `TASK-010`
-    and the per-actor order lifecycle from `TASK-006`; existing Godot controls
-    remain focused-ship-only until the owner accepts a command contract.
-  - Resolve the target model, command vocabulary, controller eligibility,
-    membership ordering, acceptance transaction, group and member order
-    ownership, cancellation, failure, semantic facts, and any persistent-state
-    handoff before implementation.
-  - Context: [Group and fleet commands](group-and-fleet-commands.md) · [Presentation snapshots](presentation-snapshots.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
 ## Near-term work
 
@@ -211,6 +201,16 @@ the project-level **Near-term work** section above.
   - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
 ### Mid term
+
+- [ ] **TASK-086: Define persistent groups and fleet lifecycle**
+  - Define any durable group or fleet identity, membership creation and edit
+    authority, membership revisions, order correlation, cancellation,
+    replacement, member loss, snapshots, checkpoints, saves, and semantic facts
+    without reusing client-local selection as authoritative state.
+  - Build on completed `TASK-033` one-shot commands and `TASK-006` per-ship
+    order ownership. Do not introduce a second order queue, networking,
+    replication, remote authority, prediction, or rollback behavior.
+  - Context: [Group and fleet commands](group-and-fleet-commands.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Presentation snapshots](presentation-snapshots.md)
 
 - [ ] **TASK-067: Add player-visible save names to the strict save envelope**
   - Extend the versioned `TASK-022` save envelope with the non-authoritative,
@@ -586,6 +586,21 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-033: Define selection sets and group or fleet commands**
+  - Implemented `MoveShipGroupCommand` and `CancelShipGroupCommand` with
+    explicit canonical selection snapshots, exact active-controller eligibility,
+    all-or-nothing preflight, deterministic ascending commit, and ordinary
+    independent per-ship order ownership.
+  - Added a replaceable basic resolver: a single ship moves to the selected
+    point; otherwise ascending ship IDs occupy a 100-unit clockwise ring from
+    east. Existing command outcomes and per-ship facts explain every result;
+    no group identity, group order, or history exists.
+  - Godot now snapshots local multi-selection for replacement move and
+    current-order cancellation, while Shift-append remains focused-ship-only.
+    Focused simulation and client tests plus the Godot build passed. `TASK-086`
+    owns any future persistent group or fleet lifecycle.
+  - Context: [Group and fleet commands](group-and-fleet-commands.md) · [Presentation snapshots](presentation-snapshots.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
 
 - [x] **TASK-083: Build a development-only Godot visual preview and scenario**
   - Added validated optional `connectorEndpoints` and `transitConnections`
