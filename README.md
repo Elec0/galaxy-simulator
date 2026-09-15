@@ -11,6 +11,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Simulation architecture](docs/simulation-architecture.md)
 - [Runtime orchestration and domain ownership](docs/runtime-orchestration.md)
 - [Navigation and spatial architecture](docs/navigation-architecture.md)
+- [Authoritative system-local coordinate scale](docs/system-local-coordinate-scale.md)
 - [Moving-ship interaction architecture](docs/moving-ship-interactions.md)
 - [Actor control and order lifecycle](docs/actor-control-and-orders.md)
 - [Individual NPC scope](docs/individual-npc-scope.md)

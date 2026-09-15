@@ -25,11 +25,29 @@ source of detailed scope and acceptance criteria.
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` owns equipment and ship slots. `TASK-055` owns trade balance, pricing, and settlement design. |
-| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. | `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, and `TASK-075` owns deployment and pickup ranges. |
+| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. | `TASK-087` defines the shared system-local coordinate scale. `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-075` owns deployment and pickup ranges, and `TASK-088` retains late-term spatial authoring guidance. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 
 ## Current focus
 This section is to put work that is currently being performed. Once the work is finished the task should be moved to Completed, and an entry should be added to the Project Status summary above.
+
+- [ ] **TASK-087: Define authoritative system-local coordinate scale**
+  - Determine and document what one `SpatialCoordinate` unit means for
+    gameplay, including whether it has a physical-world conversion and how a
+    distance of `1` or `100` should be understood by players and content
+    authors.
+  - Define the relationship among coordinate distance, travel time and speed,
+    ship geometry, interaction and sensor ranges, collision and avoidance, and
+    formation spacing. State the required precision, bounds, scenario-authoring
+    conventions, presentation labels, and compatibility treatment for existing
+    authored coordinates.
+  - Build on the signed integer coordinate boundary completed by `TASK-005` and
+    the provisional 100-unit formation radius completed by `TASK-033`. Do not
+    alter authoritative coordinates, movement timing, or the formation resolver
+    until the scale contract is accepted; coordinate dependent implementation
+    with `TASK-071`, `TASK-072`, `TASK-073`, and `TASK-075`.
+  - Design started in [Authoritative system-local coordinate scale](system-local-coordinate-scale.md).
+  - Context: [Navigation architecture](navigation-architecture.md) · [Group and fleet commands](group-and-fleet-commands.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 ## Near-term work
 
@@ -459,6 +477,20 @@ the project-level **Near-term work** section above.
   - Complete before any affected effect is accepted for release, with
     implementation remaining in the task that owns that effect.
   - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md)
+
+- [ ] **TASK-088: Define late-term system-local coordinate authoring guidance**
+  - After the coordinate-scale contract and its principal gameplay consumers
+    are established, document representative placement patterns and examples
+    for ships, stations, connector endpoints, resource sites, and later spatial
+    content.
+  - Help authors choose believable and numerically safe separations without
+    adding warnings for implausible but otherwise valid arrangements or
+    changing strict format, reference, conversion, and coordinate-envelope
+    validation.
+  - Build on `TASK-087` and measured experience from `TASK-071`, `TASK-072`,
+    `TASK-073`, and `TASK-075`; do not block those tasks on late-term authoring
+    guidance.
+  - Context: [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Gameplay content](gameplay-content.md)
 
 - [ ] **TASK-027: Evaluate a broader entity storage model**
   - Reconsider ECS or another indexed model only when concrete query or scale
