@@ -25,29 +25,14 @@ source of detailed scope and acceptance criteria.
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` owns equipment and ship slots. `TASK-055` owns trade balance, pricing, and settlement design. |
-| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. | `TASK-087` defines the shared system-local coordinate scale. `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-075` owns deployment and pickup ranges, and `TASK-088` retains late-term spatial authoring guidance. |
+| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design. | `TASK-089` defines thrust and short-move kinematics. `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-075` owns deployment and pickup ranges, and `TASK-088` retains late-term spatial authoring guidance. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 
 ## Current focus
+
 This section is to put work that is currently being performed. Once the work is finished the task should be moved to Completed, and an entry should be added to the Project Status summary above.
 
-- [ ] **TASK-087: Define authoritative system-local coordinate scale**
-  - Determine and document what one `SpatialCoordinate` unit means for
-    gameplay, including whether it has a physical-world conversion and how a
-    distance of `1` or `100` should be understood by players and content
-    authors.
-  - Define the relationship among coordinate distance, travel time and speed,
-    ship geometry, interaction and sensor ranges, collision and avoidance, and
-    formation spacing. State the required precision, bounds, scenario-authoring
-    conventions, presentation labels, and compatibility treatment for existing
-    authored coordinates.
-  - Build on the signed integer coordinate boundary completed by `TASK-005` and
-    the provisional 100-unit formation radius completed by `TASK-033`. Do not
-    alter authoritative coordinates, movement timing, or the formation resolver
-    until the scale contract is accepted; coordinate dependent implementation
-    with `TASK-071`, `TASK-072`, `TASK-073`, and `TASK-075`.
-  - Design started in [Authoritative system-local coordinate scale](system-local-coordinate-scale.md).
-  - Context: [Navigation architecture](navigation-architecture.md) · [Group and fleet commands](group-and-fleet-commands.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Concurrency and performance](concurrency-and-performance.md)
+No task is currently promoted.
 
 ## Near-term work
 
@@ -93,7 +78,7 @@ This section is to put work that is currently being performed. Once the work is 
     preference store completed by `TASK-084`, not a separate pacing-only file.
   - Context: [Time and pacing](time-and-pacing.md)
 
-`TASK-068`, `TASK-071`, `TASK-073`, and `TASK-075` remain in the
+`TASK-068`, `TASK-071`, `TASK-073`, `TASK-075`, and `TASK-089` remain in the
 near-term parking-lot horizon until the project owner promotes one of them.
 
 ## Future parking lot
@@ -131,6 +116,21 @@ the project-level **Near-term work** section above.
     and avoidance with `TASK-072`, rather than inventing placeholder policy
     here.
   - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+
+- [ ] **TASK-089: Define ship thrust, maneuver kinematics, and short moves**
+  - Define authoritative ship mass, thrust, acceleration, deceleration, maximum
+    sub-cruise speed, heading, and mass-dependent turn-rate capabilities,
+    including zero-distance heading changes and very short movement.
+  - Define deterministic turn and thrust profiles, destination approach,
+    instantaneous cruise dropout into maximum sub-cruise speed, moving-spool
+    eligibility comparison, interruption, facts, snapshots, checkpoints, saves,
+    and scheduled versus fine-grained execution boundaries.
+  - Build on the meter scale, Euclidean range rule, coordinate envelope,
+    separate cruise and maneuver speeds, and moving-spool contract in
+    `TASK-087`. Coordinate collision and avoidance with `TASK-072`, combat with
+    `TASK-046`, and future equipment capability contributions with `TASK-068`.
+    Do not change movement behavior until this design is promoted and accepted.
+  - Context: [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
   - Implement the accepted `TASK-020` contracts for player-owned ship,
@@ -618,6 +618,19 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-087: Define authoritative system-local coordinate scale**
+  - Confirmed one-meter integer coordinates, Euclidean range checks, the
+    inclusive `±2^50`-meter per-axis envelope, wide checked arithmetic, exact
+    unit-aware authoring, adaptive player-facing distance units, and migration
+    expectations.
+  - Confirmed analytic scheduled cruise with temporary local fixed-step
+    encounters, moving spool, separate cruise and sub-cruise speeds, exact
+    transition timing, and deterministic ownership boundaries.
+  - Implementation remains with `TASK-071`, `TASK-072`, `TASK-073`,
+    `TASK-075`, and `TASK-089`; `TASK-088` retains late-term spatial authoring
+    guidance.
+  - Context: [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [x] **TASK-033: Define selection sets and group or fleet commands**
   - Implemented `MoveShipGroupCommand` and `CancelShipGroupCommand` with

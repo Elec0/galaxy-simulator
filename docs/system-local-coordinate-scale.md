@@ -4,16 +4,13 @@
 
 ## Decision status
 
-**Decision status:** Draft for project-owner discussion.
+**Decision status:** Confirmed by the project owner on 2026-09-15.
 
-`TASK-087` is a design task. This draft identifies the current constraints and
-the questions that must be answered before it can establish a scale contract.
-It does not approve numeric values or authorize changes to coordinates,
-movement timing, formation spacing, authored content, checkpoints, or saves.
-Owner directions recorded as decisions in progress remain unapproved and do
-not authorize downstream design or implementation work. A decision labeled
-**Chosen** is an accepted input to this draft, but does not by itself complete
-`TASK-087` or authorize downstream work.
+`TASK-087` is a completed design task. This document establishes the accepted
+system-local coordinate-scale contract. It does not itself implement or
+authorize changes to coordinates, movement timing, formation spacing, authored
+content, checkpoints, or saves. Those changes remain with their tracked owning
+tasks.
 
 ## Purpose and boundary
 
@@ -24,7 +21,7 @@ scenario composition, and presentation. That ambiguity now blocks coherent
 choices for ship geometry, travel speed, interaction ranges, sensors,
 collision and avoidance, and content authoring.
 
-This design must define:
+This design defines:
 
 - what one authoritative system-local coordinate unit means;
 - how coordinate distance relates to simulated travel time and ship speed;
@@ -101,18 +98,22 @@ flowchart LR
     scale --> compatibility
 ```
 
-## Chosen motion-resolution design
+## Motion-resolution design
 
-**Chosen by the project owner on 2026-09-14:** Galaxy Command uses a hybrid
+Galaxy Command uses a hybrid
 event-driven and locally stepped simulation. Ordinary travel remains analytic
 and scheduled. A gameplay event may promote only the affected ships into a
 temporary high-resolution activity. Ships have distinct cruise and encounter
 maneuver speeds. Cruise entry uses the moving-spool transition defined below;
-exact capability values and eligibility tolerances remain unresolved.
+the initial defaults are 1 kilometer per second cruise speed, 300 meters per
+second maximum sub-cruise speed, and a 10-second ship-specific spool.
 
 ```mermaid
 flowchart LR
+    spool["Moving spool at maneuver speed"]
     cruise["Cruising on one analytic motion segment"]
+    dropout["Exact instantaneous dropout"]
+    approach["Sub-cruise thrust-profile approach"]
     arrival["One scheduled arrival"]
     stable["Stable destination state"]
     trigger["Predicted encounter or avoidance trigger"]
@@ -122,9 +123,10 @@ flowchart LR
     exit["Stable exit condition"]
     reschedule["Create new scheduled cruise segments"]
 
-    cruise -->|"uninterrupted"| arrival --> stable
+    spool --> cruise
+    cruise -->|"destination approach"| dropout --> approach --> arrival --> stable
     cruise --> trigger --> materialize --> invalidate --> activity --> exit --> reschedule
-    reschedule --> cruise
+    reschedule --> spool
 ```
 
 Fine-grained cost applies only to ships currently participating in an active
@@ -136,6 +138,10 @@ the player observes it or because the application renders it.
 - A ship first aligns with its outbound course, then enters an authoritative
   moving-spool state. It continues straight at encounter maneuver speed while
   the spool progresses.
+- The initial spool-entry heading tolerance is 5 degrees. Once spooling begins,
+  a committed course change is not tolerated and resets the spool completely.
+  The numeric tolerance is versioned tuning and may change without weakening
+  the stable rule.
 - Spool duration is ship-specific authoritative capability state. Future
   equipment may modify it through the installed-capability boundary owned by
   `TASK-068`; no equipment modifier is required by this task.
@@ -144,8 +150,14 @@ the player observes it or because the application renders it.
   generation and eligibility, and begins the analytic cruise segment.
 - Any committed change that makes the ship ineligible for its current spool
   invalidates the scheduled completion and resets spool progress completely.
-  Partial progress is not retained. Exact heading tolerance, course-stability,
-  encounter, and destination-distance eligibility rules remain unanswered.
+  Partial progress is not retained. A committed attack hit is one explicit
+  interruption that cancels the spool.
+- There is no fixed minimum journey distance for cruise. Before spooling, the
+  planner compares the deterministic arrival time of the complete
+  spool-and-cruise plan with the applicable sub-cruise thrust profile and uses
+  cruise only when it arrives sooner. With the initial constant-speed defaults,
+  the ship covers 3 kilometers during the 10-second moving spool, but that
+  derived distance is not a permanent eligibility threshold.
 - Authoritative proximity, combat, or avoidance conditions activate
   fine-grained participation. Presentation state and player attention never do.
 - Swept-path prediction identifies the exact encounter-entry time. The
@@ -156,6 +168,10 @@ the player observes it or because the application renders it.
   active for the same ship.
 - A cruising ship whose scheduled segment will enter an active encounter must
   be forecast as an outside participant and added at the exact applicable time.
+- Cruise dropout is instantaneous at its exact authoritative trigger. The ship
+  materializes there with its current heading and defaults to its maximum
+  sub-cruise speed. `TASK-089` defines the later thrust profile, destination
+  approach, and any resulting acceleration or deceleration behavior.
 - A departing participant returns to scheduled motion only with a safe new
   course that remains eligible for ordinary encounter prediction. Leaving an
   activity cannot cause a following interaction to be skipped.
@@ -231,84 +247,91 @@ removed.
 
 ### Meaning and player mental model
 
-1. **Decision in progress:** One `SpatialCoordinate` unit is exactly one meter.
+1. One `SpatialCoordinate` unit is exactly one meter.
    Signed 64-bit storage has a theoretical magnitude of about 975 light-years,
    but the smaller validated coordinate envelope in question 21 is the
    authoritative limit.
-2. **Decision in progress:** Store authoritative distances as integer meters
+2. Store authoritative distances as integer meters
    and present them using the standard conversion appropriate to their scale.
    A distance near one astronomical unit, for example, is not displayed as a
    large number of meters.
-3. **Decision in progress:** Use these initial scale anchors:
+3. Use these initial scale anchors:
    - Small ship: approximately 20 meters long
    - Medium ship: approximately 100 meters long
    - Large ship: approximately 400 meters long
    - Extra-large ship: approximately 1,000 meters long
    - Short interaction range: approximately 2 to 5 kilometers
 
-   Representative local-journey and populated-system extents remain
-   unanswered.
-4. **Decision in progress:** Player-facing surfaces should present distances,
-   not raw coordinates. Which views need exact values rather than approximate
-   labels remains unanswered.
+   A populated system averages approximately 600 to 1,000 kilometers in
+   diameter. A typical local-journey distance is not a useful design anchor and
+   is removed from this design.
+4. Player-facing surfaces normally show approximate
+   distances using the adaptive units from question 31. Below 1 kilometer, show
+   the complete whole-meter value because all digits remain useful. Raw
+   coordinates remain limited to diagnostics.
 
 ### Geometry and distance
 
-5. **Decision in progress:** Euclidean distance defines ordinary spatial
+5. Euclidean distance defines ordinary spatial
    range.
-6. **Decision in progress:** Travel-time distance does not need to use or be
+6. Travel-time distance does not need to use or be
    normalized to the interaction-range distance norm. Travel-time distance may
    remain implicit to the player for the most part.
-7. **Decision in progress:** An authoritative position represents a point until
+7. An authoritative position represents a point until
    `TASK-072` introduces geometry.
-8. **Decision in progress:** Ship dimensions and later collision geometry use
+8. Ship dimensions and later collision geometry use
    the same integer coordinate unit as positions.
-9. **Decision in progress:** Continue using the existing rounding rules, with
+9. Continue using the existing rounding rules, with
    their existing owners. This task does not centralize rounding under a new
    owner.
 
 ### Travel time and speed
 
-10. **Chosen in part:** Normal cruising uses analytic scheduled motion, while
-    authoritative gameplay conditions may promote affected ships into the
-    temporary fine-grained activity defined above. It remains unanswered
-    whether cruise duration is expressed primarily as distance plus ship speed
-    or through a policy that maps coordinate distance directly to duration.
-11. What is the initial reference speed for a ship, and what should a distance
-    of `1` and `100` cost in simulated time at that speed?
-12. **Chosen by the project owner on 2026-09-14:** Ships have distinct
+10. Normal cruising uses analytic
+    scheduled motion, and cruise duration is planned cruise-path distance
+    divided by the ship's cruise speed. The current direct analytic segment has
+    a Euclidean path length. Authoritative gameplay conditions may still promote
+    affected ships into the temporary fine-grained activity above.
+11. The initial base cruise speed is 1 kilometer per
+    simulated second. The initial default maximum sub-cruise speed is 300 meters
+    per simulated second, subject to later ship-type variation. The initial
+    ship-specific moving-spool duration is 10 simulated seconds. At the base
+    cruise speed, distances of 1 and 100 meters take 1 and 100 simulated
+    milliseconds respectively, before any spool or turning time.
+12. Ships have distinct
     authoritative cruise and encounter maneuver speeds. Cruise entry uses a
     ship-specific moving spool: the ship travels straight at maneuver speed,
     enters cruise at the exact scheduled completion time, and loses all spool
     progress if eligibility is interrupted. Future equipment may modify spool
-    duration through `TASK-068`. Initial speed and spool-duration values, their
-    base capability sources, and exact spool-eligibility rules remain
-    unanswered.
-13. **Decision in progress:** Connector traversal durations remain independent
+    duration through `TASK-068`. The initial defaults and cruise-eligibility
+    comparison are defined above; `TASK-089` owns their later thrust-profile
+    integration and base capability-source design.
+13. Connector traversal durations remain independent
     authored times. They do not derive from the system-local coordinate scale.
-14. **Decision in progress:** Authoritative movement needs heading and turn
-    rates so turning can affect motion. The exact turning model and its effect
-    on zero-distance moves, minimum positive durations, very short moves, and
-    duration calculation remain unanswered. Existing rounding ownership from
+14. Authoritative movement needs heading and a
+    mass-dependent turn rate. A zero-distance move may change heading without
+    translating the ship. Near-term `TASK-089` defines the exact mass and thrust
+    relationship, turning model, acceleration, deceleration, destination
+    approach, and very-short-move profile. Existing rounding ownership from
     question 9 remains unchanged.
-15. **Decision in progress:** The current Chebyshev travel-time policy is only
+15. The current Chebyshev travel-time policy is only
     the current implementation. It does not constrain the accepted scale and
     movement contract.
 
 ### Precision, bounds, and numerical safety
 
-16. **Decision in progress:** The smallest authoritative spatial unit and
+16. The smallest authoritative spatial unit and
     gameplay-relevant separation is one meter.
-17. **Decision in progress:** Each authored or commanded coordinate component
+17. Each authored or commanded coordinate component
     is limited to the inclusive `±2^50` meter envelope defined in question 21.
-18. **Decision in progress:** A system has no semantic rectangular, circular,
+18. A system has no semantic rectangular, circular,
     or authored boundary. Positions are unbounded except for the common numeric
     envelope applied independently to each axis.
-19. **Decision in progress:** The origin has no gameplay significance. It is
+19. The origin has no gameplay significance. It is
     only a system-local coordinate reference.
-20. **Decision in progress:** Negative coordinates remain ordinary valid
+20. Negative coordinates remain ordinary valid
     positions in every system, subject to the common envelope.
-21. **Decision in progress:** Limit each coordinate component to the inclusive
+21. Limit each coordinate component to the inclusive
     range from `-2^50` through `+2^50` meters. One axis therefore reaches about
     7,526 AU or 0.119 light-years in either direction. The longest Euclidean
     distance between opposite corners of the permitted two-dimensional square
@@ -327,31 +350,47 @@ removed.
 
 ### Ranges, geometry, and formation consumers
 
-24. **Decision in progress:** Replace the temporary 100-unit group ring when
-    the accepted coordinate-scale contract is implemented. Its replacement
-    spacing remains unanswered.
-25. **Decision in progress:** Formation spacing is center-to-center distance.
-26. **Decision in progress:** Defer minimum separation and clearance policy to
+24. Keep the initial group ring at a 100-meter
+    center-to-center radius for now. Later formation design may replace it.
+25. Formation spacing is center-to-center distance.
+26. Defer minimum separation and clearance policy to
     `TASK-072`.
-27. **Decision in progress:** `TASK-071`, `TASK-073`, and `TASK-075` may proceed
+27. `TASK-071`, `TASK-073`, and `TASK-075` may proceed
     once the common unit, Euclidean range rule, precision, numeric envelope,
     arithmetic, and rounding ownership rules are accepted. They do not need to
     wait for every domain-specific numeric range.
 
 ### Authoring and presentation
 
-28. **Decision in progress:** Authoritative positions remain full integer-meter
-    values internally. Authoring must accept coordinates expressed in an
-    appropriate supported unit such as meters or kilometers and convert them
-    exactly to integer meters at the content boundary. The authoring syntax and
-    complete supported-unit vocabulary remain unanswered.
-29. **Decision in progress:** Defer detailed placement guidance for ships,
+28. Authoritative positions
+    remain full integer-meter values internally. Author positions with one
+    structured value carrying `x`, `y`, and one shared unit:
+
+    ```json
+    {
+      "position": {
+        "x": "125.5",
+        "y": "-40",
+        "unit": "km"
+      }
+    }
+    ```
+
+    Use invariant decimal strings without exponent notation so conversion does
+    not pass through binary floating point. Initially support `m`, `km`, `AU`,
+    and `ly`, using their standard exact meter conversions. Both axes use the
+    same unit. Conversion must produce an exact whole-meter integer inside the
+    `±2^50` envelope; otherwise validation rejects the position rather than
+    rounding it. Canonical content identity and authoritative state use only the
+    converted integer meters, so equivalent authored units produce equivalent
+    spatial meaning.
+29. Defer detailed placement guidance for ships,
     stations, connector endpoints, resource sites, and later hazards to
     late-term `TASK-088`.
-30. **Decision in progress:** Content tools do not warn about implausible but
+30. Content tools do not warn about implausible but
     otherwise valid spatial arrangements. Strict format, reference, exact unit
     conversion, and `±2^50` envelope validation still apply.
-31. **Chosen by the project owner on 2026-09-14:** Use an adaptive localized
+31. Use an adaptive localized
     display with at most three significant digits and omit unnecessary trailing
     zeroes:
     - Less than 1 kilometer: meters, rounded to the nearest meter
@@ -363,39 +402,39 @@ removed.
     `m`, `km`, `AU`, and `ly` as localized unit resources. Presentation
     rounding does not feed authoritative state; diagnostics may show the exact
     integer-meter value.
-32. **Decision in progress:** Defer scale bars, range rings, grid spacing, and
+32. Defer scale bars, range rings, grid spacing, and
     related zoom-overlay choices. They are presentation-layer decisions and do
     not block the authoritative scale contract.
 
 ### Compatibility and rollout
 
-33. **Decision in progress:** Numerically migrate existing content to the
+33. Numerically migrate existing content to the
     meter-based scale rather than reinterpreting its current coordinate values.
-34. **Decision in progress:** All currently checked-in scenarios are disposable
+34. All currently checked-in scenarios are disposable
     development fixtures. They may be revised without a content-compatibility
     promise.
-35. **Decision in progress:** Increment every scenario, runtime-policy,
+35. Increment every scenario, runtime-policy,
     checkpoint, or save version whose represented semantics change. The
     implementation plan must inventory the affected version boundaries rather
     than changing a meaning under an existing version.
-36. **Decision in progress:** There are no existing player saves requiring
+36. There are no existing player saves requiring
     compatibility. Migration behavior for nonexistent prior saves is therefore
     irrelevant to this change, although newly written state must use the
     applicable updated versions.
-37. **Decision in progress:** Mod scale compatibility is outside the current
+37. Mod scale compatibility is outside the current
     design because there are no supported external mods requiring migration.
-38. **Decision in progress:** Revise existing scenarios and benchmark baselines
+38. Revise existing scenarios and benchmark baselines
     so their relative spatial proportions remain the same after conversion to
     the meter-based scale. Recalculate affected canonical digests intentionally.
 
-## Design completion criteria
+## Confirmed design criteria
 
-`TASK-087` is ready for owner approval only when the resulting proposal:
+The confirmed `TASK-087` design:
 
 - answers the scale, metric, timing, precision, bounds, authoring,
   presentation, and compatibility questions above;
 - gives concrete examples for distances of `1` and `100`, a typical ship, a
-  short-range interaction, and a representative local journey;
+  short-range interaction, and a representative populated-system extent;
 - identifies which existing provisional behaviors remain, change, or require
   migration;
 - leaves domain-specific numeric outcomes with their tracked owners while
@@ -405,6 +444,6 @@ removed.
 - includes a verification and migration plan before any implementation task is
   promoted.
 
-Until that approval, the current signed integer coordinate model, registered
-travel-time policy, authored coordinates, and basic formation resolver remain
-unchanged.
+Until their owning implementation tasks are separately promoted, the current
+signed integer coordinate model, registered travel-time policy, authored
+coordinates, and basic formation resolver remain unchanged.
