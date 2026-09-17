@@ -1,6 +1,6 @@
 # Authoritative system-local coordinate scale
 
-[Project index](../README.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Group and fleet commands](group-and-fleet-commands.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Concurrency and performance](concurrency-and-performance.md) · [Project task list](task-list.md)
+[Project index](../README.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Ship maneuver kinematics](ship-maneuver-kinematics.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Group and fleet commands](group-and-fleet-commands.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Concurrency and performance](concurrency-and-performance.md) · [Project task list](task-list.md)
 
 ## Decision status
 
@@ -170,7 +170,7 @@ the player observes it or because the application renders it.
   be forecast as an outside participant and added at the exact applicable time.
 - Cruise dropout is instantaneous at its exact authoritative trigger. The ship
   materializes there with its current heading and defaults to its maximum
-  sub-cruise speed. `TASK-089` defines the later thrust profile, destination
+  sub-cruise speed. Completed `TASK-089` defines the thrust profile, destination
   approach, and any resulting acceleration or deceleration behavior.
 - A departing participant returns to scheduled motion only with a safe new
   course that remains eligible for ordinary encounter prediction. Leaving an
@@ -304,13 +304,13 @@ removed.
     enters cruise at the exact scheduled completion time, and loses all spool
     progress if eligibility is interrupted. Future equipment may modify spool
     duration through `TASK-068`. The initial defaults and cruise-eligibility
-    comparison are defined above; `TASK-089` owns their later thrust-profile
+    comparison are defined above; completed `TASK-089` owns their thrust-profile
     integration and base capability-source design.
 13. Connector traversal durations remain independent
     authored times. They do not derive from the system-local coordinate scale.
 14. Authoritative movement needs heading and a
-    mass-dependent turn rate. A zero-distance move may change heading without
-    translating the ship. Near-term `TASK-089` defines the exact mass and thrust
+    ship-specific turn rate. A zero-distance move may change heading without
+    translating the ship. Completed `TASK-089` defines the exact mass and thrust
     relationship, turning model, acceleration, deceleration, destination
     approach, and very-short-move profile. Existing rounding ownership from
     question 9 remains unchanged.

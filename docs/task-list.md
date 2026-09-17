@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Sensor deployables](sensor-deployables.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Accessibility](accessibility.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Group and fleet commands](group-and-fleet-commands.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Sensor deployables](sensor-deployables.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Accessibility](accessibility.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Group and fleet commands](group-and-fleet-commands.md) · [Ship maneuver kinematics](ship-maneuver-kinematics.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -25,7 +25,7 @@ source of detailed scope and acceptance criteria.
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` owns equipment and ship slots. `TASK-055` owns trade balance, pricing, and settlement design. |
-| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design. | `TASK-089` defines thrust and short-move kinematics. `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-075` owns deployment and pickup ranges, and `TASK-088` retains late-term spatial authoring guidance. |
+| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, and `TASK-089` completed ship thrust and maneuver-kinematics design. | `TASK-090` implements ship maneuver kinematics, `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-075` owns deployment and pickup ranges, and `TASK-088` retains late-term spatial authoring guidance. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 
 ## Current focus
@@ -78,7 +78,7 @@ No task is currently promoted.
     preference store completed by `TASK-084`, not a separate pacing-only file.
   - Context: [Time and pacing](time-and-pacing.md)
 
-`TASK-068`, `TASK-071`, `TASK-073`, `TASK-075`, and `TASK-089` remain in the
+`TASK-068`, `TASK-071`, `TASK-073`, `TASK-075`, and `TASK-090` remain in the
 near-term parking-lot horizon until the project owner promotes one of them.
 
 ## Future parking lot
@@ -117,20 +117,24 @@ the project-level **Near-term work** section above.
     here.
   - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
-- [ ] **TASK-089: Define ship thrust, maneuver kinematics, and short moves**
-  - Define authoritative ship mass, thrust, acceleration, deceleration, maximum
-    sub-cruise speed, heading, and mass-dependent turn-rate capabilities,
-    including zero-distance heading changes and very short movement.
-  - Define deterministic turn and thrust profiles, destination approach,
-    instantaneous cruise dropout into maximum sub-cruise speed, moving-spool
-    eligibility comparison, interruption, facts, snapshots, checkpoints, saves,
-    and scheduled versus fine-grained execution boundaries.
-  - Build on the meter scale, Euclidean range rule, coordinate envelope,
-    separate cruise and maneuver speeds, and moving-spool contract in
-    `TASK-087`. Coordinate collision and avoidance with `TASK-072`, combat with
-    `TASK-046`, and future equipment capability contributions with `TASK-068`.
-    Do not change movement behavior until this design is promoted and accepted.
-  - Context: [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
+- [ ] **TASK-090: Implement ship thrust, maneuver kinematics, and short moves**
+  - Implement the accepted `TASK-089` authored maneuver-capability schema,
+    fixed-point units, mass scaling, derived directional acceleration,
+    equipment-contribution boundary, heading and velocity state, and strict
+    validation without adding physical force or fuel simulation.
+  - Replace constant local travel with the accepted deterministic analytic
+    maneuver planner, piecewise-constant phases, passive drag, short-move and
+    waypoint behavior, arrival tolerances, moving-spool and cruise comparison,
+    planned and forced dropout, interruption, and generation invalidation.
+  - Integrate commands, orders, immutable snapshots, semantic facts,
+    checkpoints, saves, content and behavior compatibility, and bounded
+    promotion into domain-owned fine-grained interactions. Retain the
+    single-thread reference path and prove identical results across supported
+    worker, partition, and batch layouts.
+  - Coordinate installed equipment with `TASK-068`, moving interactions with
+    `TASK-071`, collision and avoidance with `TASK-072`, combat with `TASK-046`,
+    and docking with `TASK-051` without absorbing their outcome policies.
+  - Context: [Ship thrust, maneuver kinematics, and short moves](ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
   - Implement the accepted `TASK-020` contracts for player-owned ship,
@@ -619,6 +623,20 @@ the project-level **Near-term work** section above.
 
 ## Completed foundations
 
+- [x] **TASK-089: Define ship thrust, maneuver kinematics, and short moves**
+  - Confirmed authored mass, acceleration, speed caps, turn rate, spool duration,
+    optional passive deceleration, fixed-point units, mass scaling, derived
+    primary and precision acceleration, and open-ended typed equipment
+    contributions without cargo mass, fuel, or damage-driven mass changes.
+  - Confirmed clockwise degree-based heading, independent turning and velocity,
+    analytic piecewise-constant maneuver phases, passive drag, fastest-arrival
+    and shortest-path policies, fly-through waypoints, short triangular moves,
+    exact arrival tolerances, and planned or forced cruise braking.
+  - Confirmed deterministic interaction transitions, same-time ordering,
+    persistence, observer-safe presentation, compatibility, test, and benchmark
+    contracts. Implementation remains `TASK-090`.
+  - Context: [Ship thrust, maneuver kinematics, and short moves](ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
+
 - [x] **TASK-087: Define authoritative system-local coordinate scale**
   - Confirmed one-meter integer coordinates, Euclidean range checks, the
     inclusive `±2^50`-meter per-axis envelope, wide checked arithmetic, exact
@@ -628,7 +646,7 @@ the project-level **Near-term work** section above.
     encounters, moving spool, separate cruise and sub-cruise speeds, exact
     transition timing, and deterministic ownership boundaries.
   - Implementation remains with `TASK-071`, `TASK-072`, `TASK-073`,
-    `TASK-075`, and `TASK-089`; `TASK-088` retains late-term spatial authoring
+    `TASK-075`, and `TASK-090`; `TASK-088` retains late-term spatial authoring
     guidance.
   - Context: [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
 

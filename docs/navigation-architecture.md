@@ -1,6 +1,6 @@
 # Navigation and spatial architecture
 
-[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Concurrency and performance](concurrency-and-performance.md) · [Player experience](player-experience.md) · [Gameplay integration](gameplay-integration.md) · [Project task list](task-list.md)
+[Project index](../README.md) · [Simulation architecture](simulation-architecture.md) · [Ship maneuver kinematics](ship-maneuver-kinematics.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Concurrency and performance](concurrency-and-performance.md) · [Player experience](player-experience.md) · [Gameplay integration](gameplay-integration.md) · [Project task list](task-list.md)
 
 ## Purpose
 
