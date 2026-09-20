@@ -34,12 +34,45 @@ public sealed record GameShipSnapshot(
     ConstructionDesignId DesignId,
     InventoryId CargoInventoryId,
     Quantity CargoCapacity,
+    ShipManeuverCapabilityRevision ManeuverCapabilityRevision,
     ShipSpatialSnapshotState SpatialState,
+    ShipVelocity Velocity,
+    ShipHeading Heading,
     ActorControlSnapshot Control,
     ShipOrderSnapshot? CurrentOrder,
     IReadOnlyList<ShipOrderSnapshot> QueuedOrders,
     IReadOnlyList<ShipOrderSnapshot> SuspendedOrders)
 {
+    public GameShipSnapshot(
+        EntityId entityId,
+        ShipId id,
+        PrincipalId principalId,
+        ConstructionDesignId designId,
+        InventoryId cargoInventoryId,
+        Quantity cargoCapacity,
+        ShipSpatialSnapshotState spatialState,
+        ActorControlSnapshot control,
+        ShipOrderSnapshot? currentOrder,
+        IReadOnlyList<ShipOrderSnapshot> queuedOrders,
+        IReadOnlyList<ShipOrderSnapshot> suspendedOrders)
+        : this(
+            entityId,
+            id,
+            principalId,
+            designId,
+            cargoInventoryId,
+            cargoCapacity,
+            ShipManeuverCapabilityRevision.Initial,
+            spatialState,
+            ShipVelocity.Zero,
+            ShipHeading.Zero,
+            control,
+            currentOrder,
+            queuedOrders,
+            suspendedOrders)
+    {
+    }
+
     public SystemPosition? Position =>
         SpatialState switch
         {
@@ -47,6 +80,8 @@ public sealed record GameShipSnapshot(
                 atPosition.Position,
             ShipSpatialSnapshotState.LocalMotion localMotion =>
                 localMotion.CurrentPosition,
+            ShipSpatialSnapshotState.AnalyticManeuver maneuver =>
+                maneuver.CurrentState.Position,
             ShipSpatialSnapshotState.ConnectorTransit => null,
             _ => throw new InvalidOperationException(
                 $"Unsupported spatial snapshot state {SpatialState.GetType().Name}."),
@@ -54,6 +89,9 @@ public sealed record GameShipSnapshot(
 
     public LocalMotionSnapshot? Motion =>
         (SpatialState as ShipSpatialSnapshotState.LocalMotion)?.Motion;
+
+    public TerminalManeuverSnapshot? Maneuver =>
+        (SpatialState as ShipSpatialSnapshotState.AnalyticManeuver)?.Maneuver;
 
     public ConnectorTransitSnapshot? Transit =>
         (SpatialState as ShipSpatialSnapshotState.ConnectorTransit)?.Transit;

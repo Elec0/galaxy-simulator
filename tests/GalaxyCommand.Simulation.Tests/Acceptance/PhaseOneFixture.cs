@@ -83,7 +83,15 @@ internal static class PhaseOneFixture
                     components,
                     config.ShipyardComponentInput)],
                 config.ShipyardWork),
-            config.FreighterCargoCapacity);
+            config.FreighterCargoCapacity,
+            new ShipManeuverCapability(
+                baseMassKilograms: 10_000,
+                ManeuverAcceleration.ParseMetersPerSecondSquared("10"),
+                customPassiveDeceleration: null,
+                ManeuverSpeed.ParseMetersPerSecond("300"),
+                ManeuverSpeed.ParseMetersPerSecond("1000"),
+                ManeuverTurnRate.ParseDegreesPerSecond("45"),
+                new SimulationDuration(10_000)));
         var shipyard = new Shipyard(
             shipyardFacility,
             organization,

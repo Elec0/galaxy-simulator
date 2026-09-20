@@ -5,6 +5,45 @@ namespace GalaxyCommand.Simulation.Tests;
 public sealed class SpatialMovementTests
 {
     [Fact]
+    public void AddedActorCapturesCanonicalHeadingAndZeroVelocity()
+    {
+        var movement = new SpatialMovement();
+        var shipId = new ShipId(4);
+        var heading = new ShipHeading(90_000);
+
+        movement.Add(shipId, Position(10, -20), heading);
+
+        ShipSpatialSnapshot snapshot = Assert.Single(
+            movement.CaptureSnapshot(SimulationTime.Zero));
+        Assert.Equal(heading, snapshot.Heading);
+        Assert.Equal(ShipVelocity.Zero, snapshot.Velocity);
+    }
+
+    [Fact]
+    public void CompatibilityMotionRoundsVelocityAndPreservesHeading()
+    {
+        var movement = new SpatialMovement();
+        var shipId = new ShipId(4);
+        var heading = new ShipHeading(270_000);
+        SystemPosition origin = Position(0, 0);
+        movement.Add(shipId, origin, heading);
+
+        _ = movement.CommitStartOrReplace(
+            shipId,
+            new TravelLeg.Local(
+                origin,
+                Position(1, -1),
+                new SimulationDuration(128)),
+            SimulationTime.Zero,
+            static movementEvent => movementEvent);
+
+        ShipSpatialSnapshot snapshot = Assert.Single(
+            movement.CaptureSnapshot(SimulationTime.Zero));
+        Assert.Equal(heading, snapshot.Heading);
+        Assert.Equal(new ShipVelocity(7_813, -7_813), snapshot.Velocity);
+    }
+
+    [Fact]
     public void MotionCommitReturnsFutureEventWithoutAllocatingAgendaSequence()
     {
         var movement = new SpatialMovement();
@@ -56,6 +95,40 @@ public sealed class SpatialMovementTests
     }
 
     [Fact]
+    public void ConnectorStartUsesInclusiveEuclideanArrivalTolerance()
+    {
+        var shipId = new ShipId(1);
+        var connectionId = new TransitConnectionId(1);
+        SystemPosition connectorOrigin = Position(100, 0);
+        var leg = new TravelLeg.Connector(
+            connectionId,
+            connectorOrigin,
+            Position(new SystemId(2), 0, 0),
+            new SimulationDuration(50));
+        var accepted = new SpatialMovement();
+        accepted.Add(shipId, Position(99, 0));
+        var outside = new SpatialMovement();
+        outside.Add(shipId, Position(99, 1));
+
+        ConnectorTransitCommit<SpatialMovementEvent> commit =
+            accepted.CommitStartConnector(
+                shipId,
+                leg,
+                SimulationTime.Zero,
+                static movementEvent => movementEvent);
+
+        Assert.Equal(connectorOrigin, commit.Transit.Source);
+        Assert.IsType<ShipSpatialState.ConnectorTransit>(
+            accepted.GetState(shipId));
+        Assert.Throws<InvalidOperationException>(() =>
+            outside.CommitStartConnector(
+                shipId,
+                leg,
+                SimulationTime.Zero,
+                static movementEvent => movementEvent));
+    }
+
+    [Fact]
     public void ScheduledLocalMotionInterpolatesAndCompletesAuthoritatively()
     {
         var fixture = new MovementFixture();
@@ -70,6 +143,7 @@ public sealed class SpatialMovementTests
         ShipSpatialSnapshot halfway = Assert.Single(
             fixture.Movement.CaptureSnapshot(fixture.Engine.CurrentTime));
         Assert.Equal(Position(50, 25), halfway.Position);
+        Assert.Equal(new ShipVelocity(1_000_000, 500_000), halfway.Velocity);
         Assert.Equal(motion.Id, halfway.Motion?.Id);
         Assert.Equal(new SimulationTime(100), halfway.Motion?.ArrivesAt);
 
@@ -83,6 +157,10 @@ public sealed class SpatialMovementTests
             fixture.Runtime.Dispositions);
         Assert.Null(Assert.Single(
             fixture.Movement.CaptureSnapshot(fixture.Engine.CurrentTime)).Motion);
+        Assert.Equal(
+            ShipVelocity.Zero,
+            Assert.Single(fixture.Movement.CaptureSnapshot(
+                fixture.Engine.CurrentTime)).Velocity);
     }
 
     [Fact]
@@ -100,6 +178,10 @@ public sealed class SpatialMovementTests
         var cancelled = Assert.IsType<ShipSpatialState.AtPosition>(
             fixture.Movement.GetState(fixture.ShipId));
         Assert.Equal(Position(40, 16), cancelled.Position);
+        Assert.Equal(
+            new ShipVelocity(1_000_000, 400_000),
+            Assert.Single(fixture.Movement.CaptureSnapshot(
+                fixture.Engine.CurrentTime)).Velocity);
 
         fixture.Engine.RunUntil(new SimulationTime(100));
 
@@ -383,6 +465,8 @@ public sealed class SpatialMovementTests
                 new SpatialActorCheckpoint(
                     shipId,
                     generation,
+                    ShipVelocity.Zero,
+                    new ShipHeading(315_000),
                     new ShipSpatialStateCheckpoint.ConnectorTransit(
                         transitId,
                         generation,
@@ -404,6 +488,10 @@ public sealed class SpatialMovementTests
             restoration.Value!.GetState(shipId));
         Assert.Equal(transitId, state.Transit.Id);
         Assert.Equal(completionKey, state.Transit.CompletionEventKey);
+        ShipSpatialSnapshot snapshot = Assert.Single(
+            restoration.Value.CaptureSnapshot(new SimulationTime(50)));
+        Assert.Equal(ShipVelocity.Zero, snapshot.Velocity);
+        Assert.Equal(new ShipHeading(315_000), snapshot.Heading);
         var pending = Assert.IsType<PendingMovementCompletion.Emergence>(
             restoration.Value.GetPendingCompletion(shipId));
         Assert.Equal(transitId, pending.TransitId);
@@ -479,6 +567,8 @@ public sealed class SpatialMovementTests
                 new SpatialActorCheckpoint(
                     new ShipId(1),
                     generation,
+                    ShipVelocity.Zero,
+                    ShipHeading.Zero,
                     new ShipSpatialStateCheckpoint.LocalMotion(
                         new MotionId(1),
                         generation,
@@ -513,10 +603,14 @@ public sealed class SpatialMovementTests
                 new SpatialActorCheckpoint(
                     new ShipId(2),
                     new EventGeneration(0),
+                    ShipVelocity.Zero,
+                    ShipHeading.Zero,
                     new ShipSpatialStateCheckpoint.AtPosition(Position(20, 0))),
                 new SpatialActorCheckpoint(
                     new ShipId(1),
                     new EventGeneration(0),
+                    ShipVelocity.Zero,
+                    ShipHeading.Zero,
                     new ShipSpatialStateCheckpoint.AtPosition(Position(10, 0))),
             ]);
 

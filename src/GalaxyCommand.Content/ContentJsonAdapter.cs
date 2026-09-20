@@ -10,7 +10,8 @@ namespace GalaxyCommand.Content;
 public static partial class ContentJsonAdapter
 {
     private const string PackageFormat = "galaxy-command-content-package";
-    private const int CurrentSchemaVersion = 1;
+    private const int CurrentPackageSchemaVersion = 1;
+    private const int CurrentDocumentSchemaVersion = 2;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     /// <summary>
@@ -87,7 +88,7 @@ public static partial class ContentJsonAdapter
         {
             writer.WriteStartObject();
             writer.WriteString("format", PackageFormat);
-            writer.WriteNumber("schemaVersion", CurrentSchemaVersion);
+            writer.WriteNumber("schemaVersion", CurrentPackageSchemaVersion);
             writer.WriteString("packageId", package.PackageId.Value);
             writer.WriteStartArray("dependencies");
             foreach (PackageId dependency in package.Dependencies)
@@ -229,7 +230,7 @@ public static partial class ContentJsonAdapter
             return Reject(ContentDiagnosticKind.WrongFormat, source, "$.format", "The document format discriminator is not a content package.");
         }
 
-        if (!schemaVersion.TryGetInt32(out int version) || version != CurrentSchemaVersion)
+        if (!schemaVersion.TryGetInt32(out int version) || version != CurrentPackageSchemaVersion)
         {
             return Reject(ContentDiagnosticKind.UnsupportedSchemaVersion, source, "$.schemaVersion", "The package schema version is unsupported.");
         }

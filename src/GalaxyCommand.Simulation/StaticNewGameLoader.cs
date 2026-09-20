@@ -325,14 +325,17 @@ public static class StaticNewGameLoader
         {
             QualifiedContentKey key = keys[index];
             if (!catalog.Definitions.TryGetValue(key, out ContentDefinitionSource? definition)
-                || !TryObjectProperties(
+                || !TryShipDesignProperties(
                     definition?.Values,
-                    ["cargoCapacity", "requiredWork"],
                     key.ToString(),
-                    "$definition.values",
                     diagnostics)
                 || !TryUInt64(definition!.Values, "cargoCapacity", key.ToString(), "$definition.values.cargoCapacity", diagnostics, out ulong capacity)
                 || !TryUInt64(definition.Values, "requiredWork", key.ToString(), "$definition.values.requiredWork", diagnostics, out ulong work)
+                || !TryComposeManeuverCapability(
+                    definition.Values,
+                    key.ToString(),
+                    diagnostics,
+                    out ShipManeuverCapability? maneuverCapability)
                 || capacity == 0
                 || work == 0)
             {
@@ -345,10 +348,125 @@ public static class StaticNewGameLoader
                     new ConstructionDesignId(checked((uint)index + 1)),
                     definition.InvariantFallback,
                     new ConstructionRecipe([], new Work(work)),
-                    new Quantity(capacity)));
+                    new Quantity(capacity),
+                    maneuverCapability!));
         }
 
         return designs;
+    }
+
+    /// <summary>
+    /// Enforces the complete ship-design vocabulary while allowing only the
+    /// explicitly optional custom passive-deceleration field to be absent.
+    /// </summary>
+    private static bool TryShipDesignProperties(
+        ContentObjectValue? value,
+        string source,
+        List<ContentDiagnostic> diagnostics)
+    {
+        string[] required =
+        [
+            "baseAccelerationMetersPerSecondSquared",
+            "baseMassKilograms",
+            "cargoCapacity",
+            "cruiseSpeedMetersPerSecond",
+            "maximumSubCruiseSpeedMetersPerSecond",
+            "movingSpoolDurationMilliseconds",
+            "requiredWork",
+            "turnRateDegreesPerSecond",
+        ];
+        string[] properties = value?.Properties.ContainsKey(
+            "customPassiveDecelerationMetersPerSecondSquared") == true
+            ? [.. required, "customPassiveDecelerationMetersPerSecondSquared"]
+            : required;
+        return TryObjectProperties(
+            value,
+            properties,
+            source,
+            "$definition.values",
+            diagnostics);
+    }
+
+    /// <summary>
+    /// Resolves one ship's authored maneuver fields without binary floating
+    /// point and publishes no partial capability after a diagnostic.
+    /// </summary>
+    private static bool TryComposeManeuverCapability(
+        ContentObjectValue values,
+        string source,
+        List<ContentDiagnostic> diagnostics,
+        out ShipManeuverCapability? capability)
+    {
+        if (!TryPositiveUInt64(
+                values,
+                "baseMassKilograms",
+                source,
+                "$definition.values.baseMassKilograms",
+                diagnostics,
+                out ulong baseMassKilograms)
+            || !TryPositiveUInt64(
+                values,
+                "movingSpoolDurationMilliseconds",
+                source,
+                "$definition.values.movingSpoolDurationMilliseconds",
+                diagnostics,
+                out ulong movingSpoolDurationMilliseconds)
+            || !TryManeuverAcceleration(
+                values,
+                "baseAccelerationMetersPerSecondSquared",
+                source,
+                diagnostics,
+                out ManeuverAcceleration baseAcceleration)
+            || !TryManeuverSpeed(
+                values,
+                "maximumSubCruiseSpeedMetersPerSecond",
+                source,
+                diagnostics,
+                out ManeuverSpeed maximumSubCruiseSpeed)
+            || !TryManeuverSpeed(
+                values,
+                "cruiseSpeedMetersPerSecond",
+                source,
+                diagnostics,
+                out ManeuverSpeed cruiseSpeed)
+            || !TryManeuverTurnRate(
+                values,
+                "turnRateDegreesPerSecond",
+                source,
+                diagnostics,
+                out ManeuverTurnRate turnRate))
+        {
+            capability = null;
+            return false;
+        }
+
+        ManeuverAcceleration? customPassiveDeceleration = null;
+        if (values.Properties.ContainsKey(
+                "customPassiveDecelerationMetersPerSecondSquared"))
+        {
+            if (!TryManeuverAcceleration(
+                    values,
+                    "customPassiveDecelerationMetersPerSecondSquared",
+                    source,
+                    diagnostics,
+                    out ManeuverAcceleration authoredCustomPassiveDeceleration))
+            {
+                capability = null;
+                return false;
+            }
+
+            customPassiveDeceleration = authoredCustomPassiveDeceleration;
+        }
+
+        capability = new ShipManeuverCapability(
+            baseMassKilograms,
+            baseAcceleration,
+            customPassiveDeceleration,
+            maximumSubCruiseSpeed,
+            cruiseSpeed,
+            turnRate,
+            new SimulationDuration(movingSpoolDurationMilliseconds));
+        return true;
     }
 
     /// <summary>Builds the single selected standing policy from validated exact integers.</summary>
@@ -717,8 +835,12 @@ public static class StaticNewGameLoader
         for (int index = 0; index < array!.Items.Count; index++)
         {
             string path = $"$scenario.values.ships[{index}]";
+            string[] properties = array.Items[index] is ContentObjectValue candidate
+                && candidate.Properties.ContainsKey("headingDegrees")
+                ? ["controllerSource", "design", "headingDegrees", "id", "principal", "system", "x", "y"]
+                : ["controllerSource", "design", "id", "principal", "system", "x", "y"];
             if (array.Items[index] is not ContentObjectValue item
-                || !TryObjectProperties(item, ["controllerSource", "design", "id", "principal", "system", "x", "y"], source, path, diagnostics)
+                || !TryObjectProperties(item, properties, source, path, diagnostics)
                 || !TryString(item, "id", source, $"{path}.id", diagnostics, out string? id))
             {
                 continue;
@@ -752,6 +874,20 @@ public static class StaticNewGameLoader
             }
 
             uint id = checked((uint)runtimeId);
+            ShipHeading heading = ShipHeading.Zero;
+            if (item.Properties.ContainsKey("headingDegrees")
+                && !TryShipHeading(
+                    item,
+                    "headingDegrees",
+                    source,
+                    $"{path}.headingDegrees",
+                    diagnostics,
+                    out heading))
+            {
+                runtimeId++;
+                continue;
+            }
+
             ships.Add(
                 new InitialShipSetup(
                     new EntityId(id),
@@ -762,7 +898,8 @@ public static class StaticNewGameLoader
                     new SystemPosition(
                         system!.Id,
                         new SpatialPosition(new SpatialCoordinate(x), new SpatialCoordinate(y))),
-                    new ActorController(ActorControllerKind.Player, new CommandSourceId(controllerSource!))));
+                    new ActorController(ActorControllerKind.Player, new CommandSourceId(controllerSource!)),
+                    heading));
             runtimeId++;
         }
 
@@ -772,6 +909,35 @@ public static class StaticNewGameLoader
         }
 
         return ships;
+    }
+
+    /// <summary>Reads one optional exact scenario heading and canonicalizes 360 degrees.</summary>
+    private static bool TryShipHeading(
+        ContentObjectValue owner,
+        string name,
+        string source,
+        string path,
+        List<ContentDiagnostic> diagnostics,
+        out ShipHeading value)
+    {
+        if (TryString(owner, name, source, path, diagnostics, out string? authored))
+        {
+            try
+            {
+                value = ShipHeading.ParseDegrees(authored!);
+                return true;
+            }
+            catch (FormatException)
+            {
+                diagnostics.Add(Diagnostic(
+                    source,
+                    path,
+                    "The property must be an invariant decimal from 0 through 360 with at most three fractional digits."));
+            }
+        }
+
+        value = default;
+        return false;
     }
 
     /// <summary>Checks that an object has exactly the approved property set.</summary>
@@ -841,6 +1007,108 @@ public static class StaticNewGameLoader
         return false;
     }
 
+    /// <summary>Reads one positive exact fixed-point acceleration string.</summary>
+    private static bool TryManeuverAcceleration(
+        ContentObjectValue owner,
+        string name,
+        string source,
+        List<ContentDiagnostic> diagnostics,
+        out ManeuverAcceleration value)
+    {
+        if (TryString(
+                owner,
+                name,
+                source,
+                $"$definition.values.{name}",
+                diagnostics,
+                out string? authored))
+        {
+            try
+            {
+                value = ManeuverAcceleration.ParseMetersPerSecondSquared(authored!);
+                return true;
+            }
+            catch (FormatException)
+            {
+                diagnostics.Add(Diagnostic(
+                    source,
+                    $"$definition.values.{name}",
+                    "The property must be a positive invariant decimal with at most three fractional digits."));
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    /// <summary>Reads one positive exact fixed-point speed string.</summary>
+    private static bool TryManeuverSpeed(
+        ContentObjectValue owner,
+        string name,
+        string source,
+        List<ContentDiagnostic> diagnostics,
+        out ManeuverSpeed value)
+    {
+        if (TryString(
+                owner,
+                name,
+                source,
+                $"$definition.values.{name}",
+                diagnostics,
+                out string? authored))
+        {
+            try
+            {
+                value = ManeuverSpeed.ParseMetersPerSecond(authored!);
+                return true;
+            }
+            catch (FormatException)
+            {
+                diagnostics.Add(Diagnostic(
+                    source,
+                    $"$definition.values.{name}",
+                    "The property must be a positive invariant decimal with at most three fractional digits."));
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    /// <summary>Reads one positive exact fixed-point turn-rate string.</summary>
+    private static bool TryManeuverTurnRate(
+        ContentObjectValue owner,
+        string name,
+        string source,
+        List<ContentDiagnostic> diagnostics,
+        out ManeuverTurnRate value)
+    {
+        if (TryString(
+                owner,
+                name,
+                source,
+                $"$definition.values.{name}",
+                diagnostics,
+                out string? authored))
+        {
+            try
+            {
+                value = ManeuverTurnRate.ParseDegreesPerSecond(authored!);
+                return true;
+            }
+            catch (FormatException)
+            {
+                diagnostics.Add(Diagnostic(
+                    source,
+                    $"$definition.values.{name}",
+                    "The property must be a positive invariant decimal with at most three fractional digits."));
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
     /// <summary>Reads one exact integral Int64 authored number.</summary>
     private static bool TryInt64(
         ContentObjectValue owner,
@@ -907,6 +1175,29 @@ public static class StaticNewGameLoader
 
         diagnostics.Add(Diagnostic(source, path, "The property must be an exact unsigned 64-bit integer."));
         value = 0;
+        return false;
+    }
+
+    /// <summary>Reads one exact positive UInt64 authored number.</summary>
+    private static bool TryPositiveUInt64(
+        ContentObjectValue owner,
+        string name,
+        string source,
+        string path,
+        List<ContentDiagnostic> diagnostics,
+        out ulong value)
+    {
+        if (!TryUInt64(owner, name, source, path, diagnostics, out value))
+        {
+            return false;
+        }
+
+        if (value > 0)
+        {
+            return true;
+        }
+
+        diagnostics.Add(Diagnostic(source, path, "The property must be positive."));
         return false;
     }
 

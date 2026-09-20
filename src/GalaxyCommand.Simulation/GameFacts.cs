@@ -417,6 +417,10 @@ public sealed record CommandRejectedFact : GameFact
 
 public sealed record ShipOrderTransitionFact : GameFact
 {
+    /// <summary>
+    /// Captures one lifecycle transition together with the immutable terminal
+    /// destination and optional final-heading intent of its order.
+    /// </summary>
     public ShipOrderTransitionFact(
         ShipId shipId,
         ShipOrderId orderId,
@@ -424,7 +428,8 @@ public sealed record ShipOrderTransitionFact : GameFact
         NavigationDestination destination,
         ShipOrderStatus? previousStatus,
         ShipOrderStatus nextStatus,
-        ShipOrderReason reason)
+        ShipOrderReason reason,
+        ShipHeading? requestedHeading = null)
     {
         ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
         ArgumentOutOfRangeException.ThrowIfZero(orderId.Value);
@@ -458,6 +463,7 @@ public sealed record ShipOrderTransitionFact : GameFact
         OrderId = orderId;
         Source = source;
         Destination = destination;
+        RequestedHeading = requestedHeading;
         PreviousStatus = previousStatus;
         NextStatus = nextStatus;
         Reason = reason;
@@ -470,6 +476,8 @@ public sealed record ShipOrderTransitionFact : GameFact
     public CommandSource Source { get; }
 
     public NavigationDestination Destination { get; }
+
+    public ShipHeading? RequestedHeading { get; }
 
     public ShipOrderStatus? PreviousStatus { get; }
 
@@ -567,6 +575,131 @@ public sealed record ShipLocalMotionEndedFact : GameFact
     public LocalMotionEndReason Reason { get; }
 
     public ShipOrderId? OrderId { get; }
+}
+
+/// <summary>
+/// Semantic arrival at one queued local waypoint while the same maneuver
+/// continues toward its admitted next destination.
+/// </summary>
+public sealed record ShipWaypointArrivedFact : GameFact
+{
+    public ShipWaypointArrivedFact(
+        ShipId shipId,
+        MotionId motionId,
+        SystemPosition waypoint,
+        SystemPosition reachedPosition,
+        SimulationTime arrivedAt,
+        ShipOrderId orderId)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(motionId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(waypoint.SystemId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(reachedPosition.SystemId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(orderId.Value);
+        if (waypoint.SystemId != reachedPosition.SystemId)
+        {
+            throw new ArgumentException(
+                "A reached waypoint position must remain in the waypoint system.",
+                nameof(reachedPosition));
+        }
+
+        ShipId = shipId;
+        MotionId = motionId;
+        Waypoint = waypoint;
+        ReachedPosition = reachedPosition;
+        ArrivedAt = arrivedAt;
+        OrderId = orderId;
+    }
+
+    public ShipId ShipId { get; }
+
+    public MotionId MotionId { get; }
+
+    public SystemPosition Waypoint { get; }
+
+    public SystemPosition ReachedPosition { get; }
+
+    public SimulationTime ArrivedAt { get; }
+
+    public ShipOrderId OrderId { get; }
+}
+
+/// <summary>
+/// Semantic record of a moving spool completing and cruise velocity becoming
+/// authoritative at the shared phase boundary.
+/// </summary>
+public sealed record ShipCruiseEnteredFact : GameFact
+{
+    public ShipCruiseEnteredFact(
+        ShipId shipId,
+        MotionId motionId,
+        SystemPosition position,
+        ShipVelocity velocity,
+        SimulationTime enteredAt,
+        ShipOrderId orderId)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(motionId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(position.SystemId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(orderId.Value);
+        ShipId = shipId;
+        MotionId = motionId;
+        Position = position;
+        Velocity = velocity;
+        EnteredAt = enteredAt;
+        OrderId = orderId;
+    }
+
+    public ShipId ShipId { get; }
+
+    public MotionId MotionId { get; }
+
+    public SystemPosition Position { get; }
+
+    public ShipVelocity Velocity { get; }
+
+    public SimulationTime EnteredAt { get; }
+
+    public ShipOrderId OrderId { get; }
+}
+
+/// <summary>
+/// Semantic record of planned cruise travel ending and maximum sub-cruise
+/// velocity becoming authoritative at the shared phase boundary.
+/// </summary>
+public sealed record ShipCruiseDroppedOutFact : GameFact
+{
+    public ShipCruiseDroppedOutFact(
+        ShipId shipId,
+        MotionId motionId,
+        SystemPosition position,
+        ShipVelocity velocity,
+        SimulationTime droppedOutAt,
+        ShipOrderId orderId)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(motionId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(position.SystemId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(orderId.Value);
+        ShipId = shipId;
+        MotionId = motionId;
+        Position = position;
+        Velocity = velocity;
+        DroppedOutAt = droppedOutAt;
+        OrderId = orderId;
+    }
+
+    public ShipId ShipId { get; }
+
+    public MotionId MotionId { get; }
+
+    public SystemPosition Position { get; }
+
+    public ShipVelocity Velocity { get; }
+
+    public SimulationTime DroppedOutAt { get; }
+
+    public ShipOrderId OrderId { get; }
 }
 
 public sealed record ShipConnectorTransitStartedFact : GameFact
@@ -693,6 +826,8 @@ internal enum GameFactCommitCategory
 {
     CommandOutcome,
     PhysicalWorkEnded,
+    PhysicalWaypoint,
+    PhysicalCruiseTransition,
     OrderTransition,
     PhysicalWorkStarted,
     EntityLifecycle,

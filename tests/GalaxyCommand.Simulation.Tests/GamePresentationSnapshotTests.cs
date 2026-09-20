@@ -106,6 +106,33 @@ public sealed class GamePresentationSnapshotTests
     }
 
     [Fact]
+    public void SelectedFactProjectionIncludesCruiseTransitions()
+    {
+        GameSession session = GameSessionTestFixture.Create();
+        SubmitMove(session, GameSessionTestFixture.Ship, 100_000, 0);
+        TerminalManeuverSnapshot accelerating = Assert.IsType<TerminalManeuverSnapshot>(
+            Assert.Single(session.CaptureSnapshot().Ships).Maneuver);
+        session.AdvanceTo(accelerating.NextBoundary!.Timestamp);
+        TerminalManeuverSnapshot spooling = Assert.IsType<TerminalManeuverSnapshot>(
+            Assert.Single(session.CaptureSnapshot().Ships).Maneuver);
+        session.AdvanceTo(spooling.NextBoundary!.Timestamp);
+
+        GamePresentationSnapshot presentation = session.CapturePresentation(
+            new GamePresentationRequest(
+                GameSessionTestFixture.Principal,
+                [GameSessionTestFixture.Ship],
+                GameSessionTestFixture.Ship,
+                factCursor: null,
+                maximumFactCount: 16));
+
+        ShipCruiseEnteredFact entered = Assert.IsType<ShipCruiseEnteredFact>(
+            Assert.Single(
+                presentation.SelectedShipFacts,
+                envelope => envelope.Fact is ShipCruiseEnteredFact).Fact);
+        Assert.Equal(GameSessionTestFixture.Ship, entered.ShipId);
+    }
+
+    [Fact]
     public void PresentationPropagatesFactLimitAndCursorGap()
     {
         GameSession session = GameSessionTestFixture.Create(

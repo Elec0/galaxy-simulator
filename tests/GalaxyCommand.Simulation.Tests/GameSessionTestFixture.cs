@@ -33,11 +33,21 @@ internal static class GameSessionTestFixture
         StandingPolicy,
         []);
 
+    internal static ShipManeuverCapability ManeuverCapability { get; } = new(
+        baseMassKilograms: 10_000,
+        ManeuverAcceleration.ParseMetersPerSecondSquared("10"),
+        customPassiveDeceleration: null,
+        ManeuverSpeed.ParseMetersPerSecond("300"),
+        ManeuverSpeed.ParseMetersPerSecond("1000"),
+        ManeuverTurnRate.ParseDegreesPerSecond("45"),
+        new SimulationDuration(10_000));
+
     internal static ShipDesign Design { get; } = new(
         new ConstructionDesignId(1),
         "Test Ship",
         new ConstructionRecipe([], new Work(1)),
-        new Quantity(10));
+        new Quantity(10),
+        ManeuverCapability);
 
     internal static CommandSource Player { get; } = new(
         CommandSourceKind.Player,
@@ -51,7 +61,8 @@ internal static class GameSessionTestFixture
         ActorController? baseController = null,
         ISpatialNavigationPlanner? navigation = null,
         int factRetentionCapacity = 256,
-        RandomRootSeed? randomRootSeed = null)
+        RandomRootSeed? randomRootSeed = null,
+        ShipHeading? heading = null)
     {
         var setup = new GameSessionSetup(
             [new StarSystem(System, "Test System")],
@@ -63,7 +74,8 @@ internal static class GameSessionTestFixture
                     Principal,
                     Design,
                     Position(0, 0),
-                    baseController ?? PlayerController),
+                    baseController ?? PlayerController,
+                    heading),
             ],
             Relationships,
             randomRootSeed ?? RootSeed,
@@ -83,6 +95,75 @@ internal static class GameSessionTestFixture
             new SpatialPosition(
                 new SpatialCoordinate(x),
                 new SpatialCoordinate(y)));
+
+    /// <summary>
+    /// Drains exactly the movement active at entry, including every internal
+    /// analytic boundary, without consuming a subsequently started leg.
+    /// </summary>
+    internal static void AdvanceCurrentMovement(
+        GameSession session,
+        ShipId? shipId = null)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ShipId selected = shipId ?? Ship;
+        GameShipSnapshot ship = session.CaptureSnapshot().Ships.Single(
+            candidate => candidate.Id == selected);
+        switch (ship.SpatialState)
+        {
+            case ShipSpatialSnapshotState.AnalyticManeuver analytic:
+                MotionId motionId = analytic.Maneuver.MotionId;
+                int remainingBoundaryLimit = 32;
+                while (session.CaptureSnapshot().Ships.Single(
+                           candidate => candidate.Id == selected).Maneuver
+                       is { MotionId: var currentMotionId } maneuver
+                       && currentMotionId == motionId)
+                {
+                    if (remainingBoundaryLimit-- == 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"Maneuver {motionId} exceeded the test boundary limit.");
+                    }
+
+                    session.AdvanceTo(maneuver.NextBoundary!.Timestamp);
+                }
+
+                break;
+            case ShipSpatialSnapshotState.LocalMotion local:
+                session.AdvanceTo(local.Motion.ArrivesAt);
+                break;
+            case ShipSpatialSnapshotState.ConnectorTransit transit:
+                session.AdvanceTo(transit.Transit.ArrivesAt);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Ship {selected} has no active movement.");
+        }
+    }
+
+    /// <summary>
+    /// Advances bounded movement legs until the selected ship's current order
+    /// reaches a terminal status, with a guard against accidental cycles.
+    /// </summary>
+    internal static void AdvanceUntilOrderTerminal(
+        GameSession session,
+        ShipId? shipId = null)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ShipId selected = shipId ?? Ship;
+        int remainingMovementLimit = 32;
+        while (session.CaptureSnapshot().Ships.Single(
+                   candidate => candidate.Id == selected).CurrentOrder
+               is { Status: ShipOrderStatus.Active or ShipOrderStatus.Waiting })
+        {
+            if (remainingMovementLimit-- == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Ship {selected} exceeded the test movement limit.");
+            }
+
+            AdvanceCurrentMovement(session, selected);
+        }
+    }
 
     internal sealed class FixedTravelTimeEstimator : ILocalTravelTimeEstimator
     {

@@ -134,8 +134,9 @@ future behavior.
 | --- | --- | --- | --- |
 | `spatial.many-quiet` | Many systems with modest independent ship populations | Broad iteration, scheduled movement, snapshots | Available with a benchmark fixture |
 | `spatial.one-crowded` | Most active ships moving and receiving orders in one system | Dense owner workload and order churn | Available with a benchmark fixture |
+| `maneuver.repeated-replanning` | One ship alternates long-route goals after bounded time advances | Exact materialization, schedule invalidation, forced dropout, replacement facts | Available with a benchmark fixture |
 | `spatial.several-crowded` | Several systems with concentrated activity | Cross-owner batching without assuming one thread per system | Available with a benchmark fixture |
-| `navigation.connector-volume` | Repeated deterministic multi-system plans and transits | Planner, topology reads, agenda volume | Available with a benchmark fixture |
+| `navigation.connector-volume` | Repeated deterministic multi-system plans and transits across a 1,000,000-millisecond window | Planner, analytic connector approaches, topology reads, and agenda volume | Available with a benchmark fixture |
 | `facts.retention-and-read` | Sustained fact production with current and lagging cursors | Bounded storage, allocation, cursor gaps | Available with a benchmark fixture |
 | `economy.logistics-volume` | Many facilities, inventories, offers, demands, and freighters | Matching, reservation, and retry work | Requires a scalable Phase 1 fixture and benefits from `TASK-009` boundaries |
 | `mixed.reference` | Accepted reference combination of spatial, economic, faction, and script work | Player-facing whole-galaxy throughput | Added incrementally as those systems become authoritative |
@@ -326,9 +327,9 @@ The delivery sequence is:
    contract, with fast correctness coverage in normal tests and explicit
    opt-in for heavy scenarios.
 2. Capture `spatial.many-quiet`, `spatial.one-crowded`,
-   `navigation.connector-volume`, and `facts.retention-and-read` single-thread
-   baselines. Keep the small Phase 1 economy scenario in the normal
-   whole-simulation acceptance suite instead.
+   `maneuver.repeated-replanning`, `navigation.connector-volume`, and
+   `facts.retention-and-read` single-thread baselines. Keep the small Phase 1
+   economy scenario in the normal whole-simulation acceptance suite instead.
 3. Record the first measurements and identify nonlinear behavior without
    changing architecture to hide it.
 4. Begin `TASK-009` using the accepted shapes and measurements.

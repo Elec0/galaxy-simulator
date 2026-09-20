@@ -162,7 +162,16 @@ internal static class RuntimePolicyManifest
                                 input.Key,
                                 input.Value)).ToArray()),
                     design.Recipe.RequiredWork,
-                    design.CargoCapacity))
+                    design.CargoCapacity,
+                    new ShipManeuverCapabilityCheckpoint(
+                        ShipManeuverCapability.CurrentBehaviorVersion,
+                        design.ManeuverCapability.BaseMassKilograms,
+                        design.ManeuverCapability.BaseAcceleration,
+                        design.ManeuverCapability.CustomPassiveDeceleration,
+                        design.ManeuverCapability.MaximumSubCruiseSpeed,
+                        design.ManeuverCapability.CruiseSpeed,
+                        design.ManeuverCapability.TurnRate,
+                        design.ManeuverCapability.MovingSpoolDuration)))
                 .ToArray()));
 
     /// <summary>
@@ -332,7 +341,20 @@ internal static class RuntimePolicyManifest
                     "The ship design identity is missing or duplicated.");
             }
 
-            if (string.IsNullOrWhiteSpace(design.Name) || design.Inputs is null)
+            if (design.ManeuverCapability is not null
+                && design.ManeuverCapability.BehaviorVersion
+                    != ShipManeuverCapability.CurrentBehaviorVersion)
+            {
+                return RejectedDesigns(
+                    $"{designPath}.maneuverCapability.behaviorVersion",
+                    "The maneuver behavior version is unavailable.");
+            }
+
+            if (string.IsNullOrWhiteSpace(design.Name)
+                || design.Inputs is null
+                || !TryResolveManeuverCapability(
+                    design.ManeuverCapability,
+                    out ShipManeuverCapability? maneuverCapability))
             {
                 return RejectedDesigns(designPath, "The ship design definition is incomplete.");
             }
@@ -355,12 +377,46 @@ internal static class RuntimePolicyManifest
                 design.Id,
                 design.Name,
                 new ConstructionRecipe(inputs, design.RequiredWork),
-                design.CargoCapacity));
+                design.CargoCapacity,
+                maneuverCapability!));
         }
 
         designs.Sort((left, right) => left.Id.Value.CompareTo(right.Id.Value));
         return CheckpointResult<IReadOnlyList<ShipDesign>>.Success(
             new ReadOnlyCollection<ShipDesign>(designs));
+    }
+
+    /// <summary>
+    /// Reconstructs maneuver capability only when every fixed-point magnitude
+    /// and authored whole-unit value remains positive.
+    /// </summary>
+    private static bool TryResolveManeuverCapability(
+        ShipManeuverCapabilityCheckpoint? checkpoint,
+        out ShipManeuverCapability? capability)
+    {
+        if (checkpoint is null
+            || checkpoint.BaseMassKilograms == 0
+            || checkpoint.BaseAcceleration.MillimetersPerSecondSquared == 0
+            || checkpoint.CustomPassiveDeceleration is ManeuverAcceleration custom
+                && custom.MillimetersPerSecondSquared == 0
+            || checkpoint.MaximumSubCruiseSpeed.MillimetersPerSecond == 0
+            || checkpoint.CruiseSpeed.MillimetersPerSecond == 0
+            || checkpoint.TurnRate.MillidegreesPerSecond == 0
+            || checkpoint.MovingSpoolDuration == SimulationDuration.Zero)
+        {
+            capability = null;
+            return false;
+        }
+
+        capability = new ShipManeuverCapability(
+            checkpoint.BaseMassKilograms,
+            checkpoint.BaseAcceleration,
+            checkpoint.CustomPassiveDeceleration,
+            checkpoint.MaximumSubCruiseSpeed,
+            checkpoint.CruiseSpeed,
+            checkpoint.TurnRate,
+            checkpoint.MovingSpoolDuration);
+        return true;
     }
 
     private static CheckpointResult<T> Rejected<T>(string path, string message)

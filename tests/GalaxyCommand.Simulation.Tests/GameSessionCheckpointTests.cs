@@ -102,7 +102,7 @@ public sealed class GameSessionCheckpointTests
     [Fact]
     public void RestoredSessionContinuesPendingMovementLikeUninterruptedSession()
     {
-        GameSession uninterrupted = CreateSession();
+        GameSession uninterrupted = CreateSession(new ShipHeading(225_000));
         GameplayCommandRecord first = uninterrupted.SubmitCommand(
             GameSessionTestFixture.Player,
             new MoveShipCommand(
@@ -131,7 +131,13 @@ public sealed class GameSessionCheckpointTests
         Assert.Equal(expectedShip.DesignId, actualShip.DesignId);
         Assert.Equal(expectedShip.CargoInventoryId, actualShip.CargoInventoryId);
         Assert.Equal(expectedShip.CargoCapacity, actualShip.CargoCapacity);
+        Assert.Equal(
+            expectedShip.ManeuverCapabilityRevision,
+            actualShip.ManeuverCapabilityRevision);
         Assert.Equal(expectedShip.SpatialState, actualShip.SpatialState);
+        Assert.Equal(expectedShip.Velocity, actualShip.Velocity);
+        Assert.Equal(expectedShip.Heading, actualShip.Heading);
+        Assert.Equal(new ShipHeading(225_000), actualShip.Heading);
         Assert.Equal(expectedShip.Control, actualShip.Control);
         Assert.Equal(expectedShip.CurrentOrder, actualShip.CurrentOrder);
         Assert.Equal(expectedShip.QueuedOrders, actualShip.QueuedOrders);
@@ -154,8 +160,32 @@ public sealed class GameSessionCheckpointTests
         Assert.Equal(
             first.Envelope.Sequence.Value + 1,
             next.Envelope.Sequence.Value);
-        Assert.Single(restored.EventRecords);
+        Assert.Empty(restored.EventRecords);
         Assert.Single(restored.CommandRecords);
+    }
+
+    [Fact]
+    public void RestoreRejectsCapabilityRevisionNotReproducedByBaseDesign()
+    {
+        GameSessionCheckpoint checkpoint = Capture(CreateSession());
+        EntityLifecycleShipCheckpoint ship = Assert.IsType<EntityLifecycleShipCheckpoint>(
+            Assert.Single(checkpoint.Lifecycle.LiveShips));
+        var lifecycle = new EntityLifecycleCheckpoint(
+            checkpoint.Lifecycle.EntityIds,
+            checkpoint.Lifecycle.ShipIds,
+            checkpoint.Lifecycle.InventoryIds,
+            checkpoint.Lifecycle.Inventories,
+            [ship with { ManeuverCapabilityRevision = new ShipManeuverCapabilityRevision(1) }],
+            checkpoint.Lifecycle.MaterializationReceipts,
+            checkpoint.Lifecycle.RemovalReceipts);
+
+        CheckpointResult<GameSession> result = GameSession.RestoreCheckpoint(
+            checkpoint with { Lifecycle = lifecycle });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(
+            "$.checkpoint.lifecycle.liveShips[0].maneuverCapabilityRevision",
+            result.Failure!.Path);
     }
 
     [Fact]
@@ -222,18 +252,20 @@ public sealed class GameSessionCheckpointTests
         GameSessionCheckpoint checkpoint = Capture(session);
         ScheduledEvent<GameEvent> pending = checkpoint.Engine.Agenda.PendingEvents[0];
         var movement = Assert.IsType<GameEvent.SpatialMovement>(pending.Payload);
-        var arrive = Assert.IsType<SpatialMovementEvent.Arrive>(movement.Event);
+        var maneuver = Assert.IsType<SpatialMovementEvent.Maneuver>(movement.Event);
         var corruptEvent = new ScheduledEvent<GameEvent>(
-            pending.Key with { CreationSequence = pending.Key.CreationSequence + 1 },
+            pending.Key with
+            {
+                CreationSequence = checkpoint.Engine.Agenda.NextCreationSequence,
+            },
             pending.Generation,
-            new GameEvent.SpatialMovement(new SpatialMovementEvent.Arrive(
+            new GameEvent.SpatialMovement(new SpatialMovementEvent.Maneuver(
                 new ShipId(99),
-                arrive.MotionId,
-                arrive.Generation)));
+                maneuver.Event)));
         var agenda = new EventAgendaCheckpoint<GameEvent>(
             checkpoint.Engine.Agenda.CurrentTime,
             checkpoint.Engine.Agenda.NextCreationSequence + 1,
-            [pending, corruptEvent]);
+            checkpoint.Engine.Agenda.PendingEvents.Append(corruptEvent));
         var engine = new SimulationEngineCheckpoint<GameEvent>(
             checkpoint.Engine.IsInitialized,
             checkpoint.Engine.AccruedThrough,
@@ -243,7 +275,9 @@ public sealed class GameSessionCheckpointTests
             checkpoint with { Engine = engine });
 
         Assert.False(result.IsSuccess);
-        Assert.Equal("$.checkpoint.engine.agenda.pendingEvents[1].payload", result.Failure!.Path);
+        Assert.Equal(
+            $"$.checkpoint.engine.agenda.pendingEvents[{checkpoint.Engine.Agenda.PendingEvents.Count}].payload",
+            result.Failure!.Path);
     }
 
     [Fact]
@@ -365,7 +399,7 @@ public sealed class GameSessionCheckpointTests
     private static GameSessionCheckpoint Capture(GameSession session) =>
         Assert.IsType<GameSessionCheckpoint>(session.CaptureCheckpoint().Value);
 
-    private static GameSession CreateSession()
+    private static GameSession CreateSession(ShipHeading? heading = null)
     {
         var setup = new GameSessionSetup(
             [new StarSystem(GameSessionTestFixture.System, "Test System")],
@@ -376,7 +410,8 @@ public sealed class GameSessionCheckpointTests
                 GameSessionTestFixture.Principal,
                 GameSessionTestFixture.Design,
                 GameSessionTestFixture.Position(0, 0),
-                GameSessionTestFixture.PlayerController)],
+                GameSessionTestFixture.PlayerController,
+                heading)],
             new ConnectorTopology([], []),
             [new ShipMaterializationPolicy(
                 new FacilityId(1),

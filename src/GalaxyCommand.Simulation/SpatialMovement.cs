@@ -3,8 +3,9 @@ using System.Collections.ObjectModel;
 namespace GalaxyCommand.Simulation;
 
 /// <summary>
-/// Authoritative physical state for system-local motion and connector transit.
-/// Attachment is added with its future owning subsystem.
+/// Authoritative physical state for system-local compatibility motion, analytic
+/// maneuvering, and connector transit. Attachment is added with its future
+/// owning subsystem.
 /// </summary>
 public abstract record ShipSpatialState
 {
@@ -32,6 +33,30 @@ public abstract record ShipSpatialState
         }
 
         public LocalMotionSegment Motion { get; }
+    }
+
+    public sealed record AnalyticManeuver : ShipSpatialState
+    {
+        public AnalyticManeuver(
+            ScheduledTerminalManeuver maneuver,
+            ManeuverObjective objective)
+        {
+            ArgumentNullException.ThrowIfNull(maneuver);
+            if (!Enum.IsDefined(objective))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(objective),
+                    objective,
+                    "Unknown maneuver objective.");
+            }
+
+            Maneuver = maneuver;
+            Objective = objective;
+        }
+
+        public ScheduledTerminalManeuver Maneuver { get; }
+
+        public ManeuverObjective Objective { get; }
     }
 
     public sealed record ConnectorTransit : ShipSpatialState
@@ -249,6 +274,22 @@ public abstract record SpatialMovementEvent
 
         public ConnectorTransitId TransitId { get; }
     }
+
+    public sealed record Maneuver : SpatialMovementEvent
+    {
+        public Maneuver(
+            ShipId shipId,
+            ManeuverScheduleEvent maneuverEvent)
+            : base(
+                shipId,
+                maneuverEvent?.Generation
+                    ?? throw new ArgumentNullException(nameof(maneuverEvent)))
+        {
+            Event = maneuverEvent;
+        }
+
+        public ManeuverScheduleEvent Event { get; }
+    }
 }
 
 public sealed record LocalMotionSnapshot(
@@ -270,6 +311,15 @@ public sealed record ConnectorTransitSnapshot(
     SimulationTime ArrivesAt,
     EventKey? CompletionEventKey);
 
+public sealed record TerminalManeuverSnapshot(
+    MotionId MotionId,
+    EventGeneration Generation,
+    BoundedTerminalPlanKind PlanKind,
+    ManeuverObjective Objective,
+    int CurrentPhaseIndex,
+    ManeuverScheduledPhase? CurrentPhase,
+    ManeuverBoundaryDiagnostic? NextBoundary);
+
 /// <summary>
 /// Result of committing one local-motion transition. Future work is returned
 /// as an agenda proposal so event sequence allocation remains agenda-owned.
@@ -286,6 +336,31 @@ public sealed record ConnectorTransitCommit<TEvent>(
     ConnectorTransitSegment Transit,
     AgendaEventProposal<TEvent> EventProposal);
 
+/// <summary>
+/// Result of committing one analytic terminal maneuver. The authoritative
+/// schedule is owned immediately, while its future boundaries remain proposals
+/// until the agenda owner allocates keys.
+/// </summary>
+public sealed record TerminalManeuverCommit<TEvent>(
+    ScheduledTerminalManeuver Maneuver,
+    IReadOnlyList<AgendaEventProposal<TEvent>> EventProposals);
+
+/// <summary>
+/// Atomic movement-owner receipt for an invalidated analytic maneuver and its
+/// committed replacement. The consuming domain retains reason ownership and
+/// uses this exact receipt when buffering semantic facts after physical state
+/// has committed.
+/// </summary>
+public sealed record TerminalManeuverReplacement<TEvent, TReason>(
+    MotionId InterruptedMotionId,
+    ManeuverObjective InterruptedObjective,
+    int InterruptedPhaseIndex,
+    ManeuverPhaseKind InterruptedPhaseKind,
+    TReason Reason,
+    ManeuverInterruption Interruption,
+    TerminalManeuverCommit<TEvent> Commit)
+    where TReason : struct, Enum;
+
 public abstract record ShipSpatialSnapshotState
 {
     private ShipSpatialSnapshotState()
@@ -298,14 +373,31 @@ public abstract record ShipSpatialSnapshotState
         SystemPosition CurrentPosition,
         LocalMotionSnapshot Motion) : ShipSpatialSnapshotState;
 
+    public sealed record AnalyticManeuver(
+        ShipKinematicState CurrentState,
+        TerminalManeuverSnapshot Maneuver) : ShipSpatialSnapshotState;
+
     public sealed record ConnectorTransit(
         ConnectorTransitSnapshot Transit) : ShipSpatialSnapshotState;
 }
 
 public sealed record ShipSpatialSnapshot(
     ShipId ShipId,
+    ShipVelocity Velocity,
+    ShipHeading Heading,
     ShipSpatialSnapshotState State)
 {
+    public ShipSpatialSnapshot(
+        ShipId shipId,
+        ShipSpatialSnapshotState state)
+        : this(
+            shipId,
+            ShipVelocity.Zero,
+            ShipHeading.Zero,
+            state)
+    {
+    }
+
     public SystemPosition? Position =>
         State switch
         {
@@ -313,6 +405,8 @@ public sealed record ShipSpatialSnapshot(
                 atPosition.Position,
             ShipSpatialSnapshotState.LocalMotion localMotion =>
                 localMotion.CurrentPosition,
+            ShipSpatialSnapshotState.AnalyticManeuver maneuver =>
+                maneuver.CurrentState.Position,
             ShipSpatialSnapshotState.ConnectorTransit => null,
             _ => throw new InvalidOperationException(
                 $"Unsupported spatial snapshot state {State.GetType().Name}."),
@@ -321,13 +415,16 @@ public sealed record ShipSpatialSnapshot(
     public LocalMotionSnapshot? Motion =>
         (State as ShipSpatialSnapshotState.LocalMotion)?.Motion;
 
+    public TerminalManeuverSnapshot? Maneuver =>
+        (State as ShipSpatialSnapshotState.AnalyticManeuver)?.Maneuver;
+
     public ConnectorTransitSnapshot? Transit =>
         (State as ShipSpatialSnapshotState.ConnectorTransit)?.Transit;
 }
 
 /// <summary>
-/// Authoritative owner of ship spatial state for scheduled local movement and
-/// connector traversal.
+/// Authoritative owner of ship spatial state for compatibility movement,
+/// analytic maneuvering, and connector traversal.
 /// </summary>
 public sealed class SpatialMovement
 {
@@ -364,6 +461,8 @@ public sealed class SpatialMovement
         foreach ((ShipId shipId, ActorState actor) in _actors)
         {
             ShipSpatialStateCheckpoint state;
+            ShipVelocity checkpointVelocity = actor.Velocity;
+            ShipHeading checkpointHeading = actor.Heading;
             switch (actor.State)
             {
                 case ShipSpatialState.AtPosition atPosition:
@@ -403,6 +502,48 @@ public sealed class SpatialMovement
                         motion.ArrivesAt,
                         motion.CompletionEventKey);
                     break;
+                case ShipSpatialState.AnalyticManeuver active:
+                    ScheduledTerminalManeuver maneuver = active.Maneuver;
+                    ManeuverScheduledPhase? currentPhase = maneuver.CurrentPhase;
+                    if (maneuver.Generation != actor.Generation
+                        || !WasAllocated(motionIds, maneuver.MotionId.Value)
+                        || maneuver.IsComplete
+                        || maneuver.IsInvalidated
+                        || currentPhase is not { } phase
+                        || currentTime < phase.StartsAt
+                        || currentTime >= phase.EndsAt
+                        || maneuver.PendingEvents is not { Count: > 0 } pending
+                        || pending.Count
+                            != maneuver.Plan.Phases.Count
+                                - maneuver.CurrentPhaseIndex)
+                    {
+                        return CaptureRejected(
+                            shipId,
+                            "maneuver",
+                            "An active analytic maneuver has invalid identity, generation, phase, timing, or pending-event state.");
+                    }
+
+                    ShipKinematicState current = maneuver.Plan.StateAt(
+                        currentTime);
+                    if (!IsValidPosition(current.Position))
+                    {
+                        return CaptureRejected(
+                            shipId,
+                            "maneuver.position",
+                            "An active analytic maneuver has an invalid current position.");
+                    }
+
+                    checkpointVelocity = current.Velocity;
+                    checkpointHeading = current.Heading;
+                    state = new ShipSpatialStateCheckpoint.AnalyticManeuver(
+                        maneuver.MotionId,
+                        maneuver.Generation,
+                        maneuver.Plan,
+                        active.Objective,
+                        maneuver.CurrentPhaseIndex,
+                        maneuver.WaypointPhaseIndices,
+                        pending.Select(static item => item.EventKey));
+                    break;
                 case ShipSpatialState.ConnectorTransit traversing:
                     ConnectorTransitSegment transit = traversing.Transit;
                     if (transit.Generation != actor.Generation ||
@@ -439,6 +580,8 @@ public sealed class SpatialMovement
             actors.Add(new SpatialActorCheckpoint(
                 shipId,
                 actor.Generation,
+                checkpointVelocity,
+                checkpointHeading,
                 state));
         }
 
@@ -510,17 +653,26 @@ public sealed class SpatialMovement
             // agenda work retains its original comparison boundary.
             restored._actors.Add(
                 actor.ShipId,
-                new ActorState(actor.Generation, state!));
+                new ActorState(
+                    actor.Generation,
+                    state!,
+                    actor.Velocity,
+                    actor.Heading));
         }
 
         return CheckpointResult<SpatialMovement>.Success(restored);
     }
 
-    public void Add(ShipId shipId, SystemPosition position)
+    public void Add(
+        ShipId shipId,
+        SystemPosition position,
+        ShipHeading? heading = null)
     {
         ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
         ArgumentOutOfRangeException.ThrowIfZero(position.SystemId.Value);
-        if (!_actors.TryAdd(shipId, new ActorState(position)))
+        if (!_actors.TryAdd(
+                shipId,
+                new ActorState(position, heading ?? ShipHeading.Zero)))
         {
             throw new InvalidOperationException($"Duplicate spatial actor {shipId}.");
         }
@@ -539,6 +691,34 @@ public sealed class SpatialMovement
         {
             ShipSpatialState.AtPosition atPosition => atPosition.Position,
             ShipSpatialState.Moving moving => moving.Motion.PositionAt(time),
+            ShipSpatialState.AnalyticManeuver maneuver =>
+                maneuver.Maneuver.Plan.StateAt(time).Position,
+            ShipSpatialState.ConnectorTransit => null,
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Evaluates one actor's complete system-local kinematic state without
+    /// mutating its analytic cursor. Connector transit has no local state.
+    /// </summary>
+    public ShipKinematicState? KinematicStateAt(
+        ShipId shipId,
+        SimulationTime time)
+    {
+        ActorState? actor = _actors.GetValueOrDefault(shipId);
+        return actor?.State switch
+        {
+            ShipSpatialState.AtPosition atPosition => new ShipKinematicState(
+                atPosition.Position,
+                actor.Velocity,
+                actor.Heading),
+            ShipSpatialState.Moving moving => new ShipKinematicState(
+                moving.Motion.PositionAt(time),
+                actor.Velocity,
+                actor.Heading),
+            ShipSpatialState.AnalyticManeuver maneuver =>
+                maneuver.Maneuver.Plan.StateAt(time),
             ShipSpatialState.ConnectorTransit => null,
             _ => null,
         };
@@ -572,10 +752,12 @@ public sealed class SpatialMovement
             || leg.Origin == leg.Destination)
         {
             actor.Generation = generation;
+            actor.Velocity = ShipVelocity.Zero;
             actor.State = new ShipSpatialState.AtPosition(leg.Destination);
             return new LocalMotionCommit<TEvent>(null, null);
         }
 
+        ShipVelocity velocity = CompatibilityVelocity(leg);
         SimulationTime arrivesAt = now.Add(leg.Duration);
         var motion = new LocalMotionSegment(
             _motionIds.Allocate(),
@@ -589,6 +771,7 @@ public sealed class SpatialMovement
             motion.Id,
             motion.Generation));
         actor.Generation = generation;
+        actor.Velocity = velocity;
         actor.State = new ShipSpatialState.Moving(motion);
         return new LocalMotionCommit<TEvent>(
             motion,
@@ -606,6 +789,182 @@ public sealed class SpatialMovement
     }
 
     /// <summary>
+    /// Commits an already selected analytic maneuver from the actor's exact
+    /// stationary-owner state. The new schedule becomes authoritative before
+    /// its proposals receive agenda keys; callers must bind the committed keys
+    /// before capture, replacement, or removal.
+    /// </summary>
+    public TerminalManeuverCommit<TEvent> CommitStartTerminalManeuver<TEvent>(
+        ShipId shipId,
+        ExecutableBoundedTerminalManeuverPlan plan,
+        ManeuverObjective objective,
+        SimulationTime now,
+        Func<SpatialMovementEvent, TEvent> wrapEvent,
+        IEnumerable<int>? waypointPhaseIndices = null)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(wrapEvent);
+        ValidateObjective(objective);
+        ActorState actor = GetRequiredActor(shipId);
+        if (actor.State is not ShipSpatialState.AtPosition atPosition)
+        {
+            throw new InvalidOperationException(
+                $"Ship {shipId} must be at a system position before starting an analytic maneuver.");
+        }
+
+        var current = new ShipKinematicState(
+            atPosition.Position,
+            actor.Velocity,
+            actor.Heading);
+        ValidatePlanStart(plan, now, current);
+
+        var maneuver = new ScheduledTerminalManeuver(
+            _motionIds.Allocate(),
+            actor.Generation,
+            plan,
+            waypointPhaseIndices);
+        IReadOnlyList<AgendaEventProposal<TEvent>> proposals =
+            maneuver.CreateRemainingEventProposals(
+                shipId,
+                maneuverEvent => wrapEvent(
+                    new SpatialMovementEvent.Maneuver(
+                        shipId,
+                        maneuverEvent)));
+        actor.Velocity = current.Velocity;
+        actor.Heading = current.Heading;
+        actor.State = new ShipSpatialState.AnalyticManeuver(
+            maneuver,
+            objective);
+        return new TerminalManeuverCommit<TEvent>(maneuver, proposals);
+    }
+
+    /// <summary>
+    /// Materializes and invalidates the actor's active analytic schedule, then
+    /// commits an already selected replacement from that exact state. The
+    /// consuming owner supplies the typed semantic reason and receives the
+    /// interrupted motion and phase identity for later fact commit. A failed
+    /// cancellation leaves ownership, identity allocation, and actor state
+    /// unchanged.
+    /// </summary>
+    public AgendaCancellationCheck TryReplaceTerminalManeuver<TEvent, TReason>(
+        ShipId shipId,
+        ExecutableBoundedTerminalManeuverPlan replacementPlan,
+        ManeuverObjective objective,
+        TReason reason,
+        SimulationTime now,
+        EventAgenda<TEvent> agenda,
+        Func<SpatialMovementEvent, TEvent> wrapEvent,
+        out TerminalManeuverReplacement<TEvent, TReason>? replacement)
+        where TReason : struct, Enum
+    {
+        ArgumentNullException.ThrowIfNull(replacementPlan);
+        ArgumentNullException.ThrowIfNull(agenda);
+        ArgumentNullException.ThrowIfNull(wrapEvent);
+        ValidateObjective(objective);
+        if (!Enum.IsDefined(reason))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(reason),
+                reason,
+                "Unknown maneuver-interruption reason.");
+        }
+
+        replacement = null;
+        ActorState actor = GetRequiredActor(shipId);
+        var active = actor.State as ShipSpatialState.AnalyticManeuver
+            ?? throw new InvalidOperationException(
+                $"Ship {shipId} has no analytic maneuver to replace.");
+        ManeuverScheduledPhase interruptedPhase = active.Maneuver.CurrentPhase
+            ?? throw new InvalidOperationException(
+                $"Ship {shipId} has no active maneuver phase to replace.");
+        int interruptedPhaseIndex = active.Maneuver.CurrentPhaseIndex;
+        ShipKinematicState expectedStart = active.Maneuver.Plan.StateAt(now);
+        ValidatePlanStart(replacementPlan, now, expectedStart);
+
+        AgendaCancellationCheck cancellation = active.Maneuver.TryInterrupt(
+            now,
+            agenda,
+            maneuverEvent => wrapEvent(
+                new SpatialMovementEvent.Maneuver(shipId, maneuverEvent)),
+            out ManeuverInterruption? interruption);
+        if (cancellation != AgendaCancellationCheck.Matches)
+        {
+            return cancellation;
+        }
+
+        var maneuver = new ScheduledTerminalManeuver(
+            _motionIds.Allocate(),
+            interruption!.NextGeneration,
+            replacementPlan);
+        IReadOnlyList<AgendaEventProposal<TEvent>> proposals =
+            maneuver.CreateRemainingEventProposals(
+                shipId,
+                maneuverEvent => wrapEvent(
+                    new SpatialMovementEvent.Maneuver(
+                        shipId,
+                        maneuverEvent)));
+        actor.Generation = interruption.NextGeneration;
+        actor.Velocity = interruption.MaterializedState.Velocity;
+        actor.Heading = interruption.MaterializedState.Heading;
+        actor.State = new ShipSpatialState.AnalyticManeuver(
+            maneuver,
+            objective);
+        var commit = new TerminalManeuverCommit<TEvent>(maneuver, proposals);
+        replacement = new TerminalManeuverReplacement<TEvent, TReason>(
+            active.Maneuver.MotionId,
+            active.Objective,
+            interruptedPhaseIndex,
+            interruptedPhase.Kind,
+            reason,
+            interruption,
+            commit);
+        return AgendaCancellationCheck.Matches;
+    }
+
+    /// <summary>
+    /// Materializes an active analytic maneuver at the agenda's current time,
+    /// atomically cancels all later boundaries, and leaves the actor at that
+    /// exact position with the next generation. Cancellation mismatch changes
+    /// neither owner.
+    /// </summary>
+    public AgendaCancellationCheck TryInterruptTerminalManeuver<TEvent>(
+        ShipId shipId,
+        SimulationTime now,
+        EventAgenda<TEvent> agenda,
+        Func<SpatialMovementEvent, TEvent> wrapEvent,
+        out ManeuverInterruption? interruption)
+    {
+        ArgumentNullException.ThrowIfNull(agenda);
+        ArgumentNullException.ThrowIfNull(wrapEvent);
+        interruption = null;
+        ActorState actor = GetRequiredActor(shipId);
+        var active = actor.State as ShipSpatialState.AnalyticManeuver
+            ?? throw new InvalidOperationException(
+                $"Ship {shipId} has no analytic maneuver to interrupt.");
+        AgendaCancellationCheck cancellation = active.Maneuver.TryInterrupt(
+            now,
+            agenda,
+            maneuverEvent => wrapEvent(
+                new SpatialMovementEvent.Maneuver(shipId, maneuverEvent)),
+            out ManeuverInterruption? materialized);
+        if (cancellation != AgendaCancellationCheck.Matches)
+        {
+            return cancellation;
+        }
+
+        ManeuverInterruption result = materialized
+            ?? throw new InvalidOperationException(
+                "A successful maneuver interruption produced no materialized state.");
+        actor.Generation = result.NextGeneration;
+        actor.Velocity = result.MaterializedState.Velocity;
+        actor.Heading = result.MaterializedState.Heading;
+        actor.State = new ShipSpatialState.AtPosition(
+            result.MaterializedState.Position);
+        interruption = result;
+        return AgendaCancellationCheck.Matches;
+    }
+
+    /// <summary>
     /// Authoritative commit for one validated connector traversal.
     /// </summary>
     public ConnectorTransitCommit<TEvent> CommitStartConnector<TEvent>(
@@ -619,10 +978,12 @@ public sealed class SpatialMovement
 
         ActorState actor = GetRequiredActor(shipId);
         if (actor.State is not ShipSpatialState.AtPosition atPosition
-            || atPosition.Position != leg.Origin)
+            || !ManeuverArrival.IsPositionWithinArrivalTolerance(
+                atPosition.Position,
+                leg.Origin))
         {
             throw new InvalidOperationException(
-                $"Ship {shipId} is not at connector origin {leg.Origin}.");
+                $"Ship {shipId} is not within arrival tolerance of connector origin {leg.Origin}.");
         }
 
         SimulationTime arrivesAt = now.Add(leg.Duration);
@@ -638,6 +999,7 @@ public sealed class SpatialMovement
             shipId,
             transit.Id,
             transit.Generation));
+        actor.Velocity = ShipVelocity.Zero;
         actor.State = new ShipSpatialState.ConnectorTransit(transit);
         return new ConnectorTransitCommit<TEvent>(
             transit,
@@ -691,6 +1053,22 @@ public sealed class SpatialMovement
     }
 
     /// <summary>
+    /// Binds every key allocated for the active analytic maneuver after the
+    /// agenda owner commits its complete proposal set.
+    /// </summary>
+    internal void BindTerminalManeuverEvents(
+        ShipId shipId,
+        IReadOnlyList<EventKey> eventKeys)
+    {
+        ArgumentNullException.ThrowIfNull(eventKeys);
+        ActorState actor = GetRequiredActor(shipId);
+        var active = actor.State as ShipSpatialState.AnalyticManeuver
+            ?? throw new InvalidOperationException(
+                $"Ship {shipId} has no analytic maneuver to bind.");
+        active.Maneuver.BindPendingEventKeys(eventKeys);
+    }
+
+    /// <summary>
     /// Returns the exact scheduled completion associated with an active actor,
     /// or null when the actor is stationary.
     /// </summary>
@@ -709,6 +1087,8 @@ public sealed class SpatialMovement
                 transit.Transit.Id,
                 transit.Transit.Generation,
                 GetRequiredCompletionEventKey(transit.Transit)),
+            ShipSpatialState.AnalyticManeuver => throw new InvalidOperationException(
+                "Analytic maneuvers own multiple pending boundaries."),
             ShipSpatialState.AtPosition => null,
             _ => throw new InvalidOperationException(
                 $"Unsupported spatial state {actor.State.GetType().Name}."),
@@ -763,6 +1143,7 @@ public sealed class SpatialMovement
                     && moving.Motion.ArrivesAt == now:
                 actor.State = new ShipSpatialState.AtPosition(
                     moving.Motion.Destination);
+                actor.Velocity = ShipVelocity.Zero;
                 return ScheduledEventDisposition.Applied;
             case SpatialMovementEvent.Emerge emerge
                 when actor.State is ShipSpatialState.ConnectorTransit traversing
@@ -770,6 +1151,34 @@ public sealed class SpatialMovement
                     && traversing.Transit.ArrivesAt == now:
                 actor.State = new ShipSpatialState.AtPosition(
                     traversing.Transit.Destination);
+                actor.Velocity = ShipVelocity.Zero;
+                return ScheduledEventDisposition.Applied;
+            case SpatialMovementEvent.Maneuver maneuverEvent
+                when actor.State is ShipSpatialState.AnalyticManeuver active
+                    && active.Maneuver.MotionId
+                        == maneuverEvent.Event.MotionId:
+                ScheduledEventDisposition disposition =
+                    active.Maneuver.HandleEvent(
+                        maneuverEvent.Event,
+                        scheduledGeneration,
+                        now,
+                        out ShipKinematicState? materialized);
+                if (disposition != ScheduledEventDisposition.Applied)
+                {
+                    return disposition;
+                }
+
+                ShipKinematicState state = materialized
+                    ?? throw new InvalidOperationException(
+                        "Applied maneuver event produced no kinematic state.");
+                actor.Velocity = state.Velocity;
+                actor.Heading = state.Heading;
+                if (active.Maneuver.IsComplete)
+                {
+                    actor.State = new ShipSpatialState.AtPosition(
+                        state.Position);
+                }
+
                 return ScheduledEventDisposition.Applied;
             default:
                 return ScheduledEventDisposition.IgnoredStateMismatch;
@@ -786,6 +1195,8 @@ public sealed class SpatialMovement
                 case ShipSpatialState.AtPosition atPosition:
                     snapshots.Add(new ShipSpatialSnapshot(
                         shipId,
+                        actor.Velocity,
+                        actor.Heading,
                         new ShipSpatialSnapshotState.AtPosition(
                             atPosition.Position)));
                     break;
@@ -793,6 +1204,8 @@ public sealed class SpatialMovement
                     LocalMotionSegment motion = moving.Motion;
                     snapshots.Add(new ShipSpatialSnapshot(
                         shipId,
+                        actor.Velocity,
+                        actor.Heading,
                         new ShipSpatialSnapshotState.LocalMotion(
                             motion.PositionAt(now),
                             new LocalMotionSnapshot(
@@ -804,10 +1217,30 @@ public sealed class SpatialMovement
                                 motion.ArrivesAt,
                                 motion.CompletionEventKey))));
                     break;
+                case ShipSpatialState.AnalyticManeuver active:
+                    ScheduledTerminalManeuver maneuver = active.Maneuver;
+                    ShipKinematicState current = maneuver.Plan.StateAt(now);
+                    snapshots.Add(new ShipSpatialSnapshot(
+                        shipId,
+                        current.Velocity,
+                        current.Heading,
+                        new ShipSpatialSnapshotState.AnalyticManeuver(
+                            current,
+                            new TerminalManeuverSnapshot(
+                                maneuver.MotionId,
+                                maneuver.Generation,
+                                maneuver.Plan.Kind,
+                                active.Objective,
+                                maneuver.CurrentPhaseIndex,
+                                maneuver.CurrentPhase,
+                                maneuver.NextBoundary))));
+                    break;
                 case ShipSpatialState.ConnectorTransit traversing:
                     ConnectorTransitSegment transit = traversing.Transit;
                     snapshots.Add(new ShipSpatialSnapshot(
                         shipId,
+                        actor.Velocity,
+                        actor.Heading,
                         new ShipSpatialSnapshotState.ConnectorTransit(
                             new ConnectorTransitSnapshot(
                                 transit.Id,
@@ -831,6 +1264,47 @@ public sealed class SpatialMovement
     private ActorState GetRequiredActor(ShipId shipId) =>
         _actors.GetValueOrDefault(shipId)
         ?? throw new KeyNotFoundException($"Unknown spatial actor {shipId}.");
+
+    /// <summary>
+    /// Gives the compatibility segment an exact fixed-point velocity at its
+    /// boundary, using nearest-unit rounding with half units away from zero.
+    /// </summary>
+    private static ShipVelocity CompatibilityVelocity(TravelLeg.Local leg) =>
+        new(
+            CompatibilityVelocityComponent(
+                leg.Destination.Position.X.Units,
+                leg.Origin.Position.X.Units,
+                leg.Duration.Milliseconds),
+            CompatibilityVelocityComponent(
+                leg.Destination.Position.Y.Units,
+                leg.Origin.Position.Y.Units,
+                leg.Duration.Milliseconds));
+
+    private static long CompatibilityVelocityComponent(
+        long destinationMeters,
+        long originMeters,
+        ulong durationMilliseconds)
+    {
+        Int128 deltaMeters = (Int128)destinationMeters - originMeters;
+        bool negative = deltaMeters < 0;
+        UInt128 numerator = (UInt128)(negative ? -deltaMeters : deltaMeters)
+            * 1_000_000u;
+        UInt128 quotient = numerator / durationMilliseconds;
+        UInt128 remainder = numerator % durationMilliseconds;
+        if (remainder * 2 >= durationMilliseconds)
+        {
+            quotient++;
+        }
+
+        if (quotient > long.MaxValue)
+        {
+            throw new OverflowException(
+                "The compatibility motion velocity exceeds signed fixed-point range.");
+        }
+
+        long magnitude = (long)quotient;
+        return negative ? -magnitude : magnitude;
+    }
 
     private static SystemPosition MaterializeForChange(
         ActorState actor,
@@ -916,6 +1390,34 @@ public sealed class SpatialMovement
         ?? throw new InvalidOperationException(
             $"Active connector transit {transit.Id} has no scheduled completion event.");
 
+    private static void ValidateObjective(ManeuverObjective objective)
+    {
+        if (!Enum.IsDefined(objective))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(objective),
+                objective,
+                "Unknown maneuver objective.");
+        }
+    }
+
+    /// <summary>
+    /// Requires a selected plan to begin at the commit boundary from the
+    /// actor's exact authoritative kinematic state before identity allocation
+    /// or schedule mutation occurs.
+    /// </summary>
+    private static void ValidatePlanStart(
+        ExecutableBoundedTerminalManeuverPlan plan,
+        SimulationTime now,
+        ShipKinematicState expected)
+    {
+        if (plan.StartsAt != now || plan.StateAt(now) != expected)
+        {
+            throw new InvalidOperationException(
+                "The analytic maneuver plan does not begin from the actor's exact current state and time.");
+        }
+    }
+
     private static SystemPosition CurrentPosition(
         ActorState actor,
         SimulationTime now) =>
@@ -986,6 +1488,69 @@ public sealed class SpatialMovement
                     CompletionEventKey = motion.CompletionEventKey,
                 };
                 restored = new ShipSpatialState.Moving(restoredMotion);
+                return null;
+            case ShipSpatialStateCheckpoint.AnalyticManeuver maneuver:
+                if (maneuver.Id.Value == 0
+                    || !WasAllocated(checkpoint.MotionIds, maneuver.Id.Value)
+                    || maneuver.Generation != actor.Generation
+                    || maneuver.Plan is null
+                    || !Enum.IsDefined(maneuver.Objective)
+                    || maneuver.CurrentPhaseIndex < 0
+                    || maneuver.CurrentPhaseIndex >= maneuver.Plan.Phases.Count
+                    || maneuver.PendingEventKeys.Count
+                        != maneuver.Plan.Phases.Count
+                            - maneuver.CurrentPhaseIndex)
+                {
+                    return new CheckpointValidationFailure(
+                        path,
+                        "An active analytic maneuver has invalid identity, generation, objective, phase, allocator, or pending-key data.");
+                }
+
+                ManeuverScheduledPhase phase =
+                    maneuver.Plan.Phases[maneuver.CurrentPhaseIndex];
+                if (currentTime < phase.StartsAt || currentTime >= phase.EndsAt)
+                {
+                    return new CheckpointValidationFailure(
+                        path,
+                        "An active analytic maneuver is outside its current phase time range.");
+                }
+
+                ShipKinematicState current;
+                ScheduledTerminalManeuver restoredManeuver;
+                try
+                {
+                    current = maneuver.Plan.StateAt(currentTime);
+                    restoredManeuver = ScheduledTerminalManeuver.RestoreActive(
+                        maneuver.Id,
+                        maneuver.Generation,
+                        maneuver.Plan,
+                        maneuver.CurrentPhaseIndex,
+                        maneuver.WaypointPhaseIndices);
+                    restoredManeuver.BindPendingEventKeys(
+                        maneuver.PendingEventKeys);
+                }
+                catch (Exception exception)
+                    when (exception is ArgumentException
+                        or InvalidOperationException
+                        or OverflowException)
+                {
+                    return new CheckpointValidationFailure(
+                        path,
+                        $"An active analytic maneuver cannot be reconstructed: {exception.Message}");
+                }
+
+                if (!IsValidPosition(current.Position)
+                    || actor.Velocity != current.Velocity
+                    || actor.Heading != current.Heading)
+                {
+                    return new CheckpointValidationFailure(
+                        path,
+                        "An active analytic maneuver does not reproduce its saved kinematic state.");
+                }
+
+                restored = new ShipSpatialState.AnalyticManeuver(
+                    restoredManeuver,
+                    maneuver.Objective);
                 return null;
             case ShipSpatialStateCheckpoint.ConnectorTransit transit:
                 if (transit.Id.Value == 0 ||
@@ -1064,20 +1629,29 @@ public sealed class SpatialMovement
 
     private sealed class ActorState
     {
-        public ActorState(SystemPosition position)
+        public ActorState(SystemPosition position, ShipHeading heading)
         {
             State = new ShipSpatialState.AtPosition(position);
+            Heading = heading;
         }
 
         public ActorState(
             EventGeneration generation,
-            ShipSpatialState state)
+            ShipSpatialState state,
+            ShipVelocity velocity,
+            ShipHeading heading)
         {
             Generation = generation;
             State = state;
+            Velocity = velocity;
+            Heading = heading;
         }
 
         public EventGeneration Generation { get; set; } = new(0);
+
+        public ShipVelocity Velocity { get; set; }
+
+        public ShipHeading Heading { get; set; }
 
         public ShipSpatialState State { get; set; }
     }

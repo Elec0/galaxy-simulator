@@ -169,7 +169,7 @@ public sealed class EntityLifecycleTests
                 OrderPlacement.ReplaceAll));
         Assert.Equal(CommandResultStatus.Accepted, move.Result.Status);
         GameShipSnapshot moving = Assert.Single(session.CaptureSnapshot().Ships);
-        Assert.NotNull(moving.Motion?.CompletionEventKey);
+        Assert.NotNull(moving.Maneuver?.NextBoundary?.EventKey);
         var request = new EntityRemovalRequest(
             GameSessionTestFixture.Entity,
             EntityRemovalReason.Despawned,

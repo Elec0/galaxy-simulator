@@ -1,6 +1,6 @@
 {
   "format": "galaxy-command-content-definitions",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "definitions": [
     {
       "kind": "principal",
@@ -15,8 +15,14 @@
       "fallback": "Preview Courier",
       "references": [],
       "values": {
+        "baseAccelerationMetersPerSecondSquared": "10",
+        "baseMassKilograms": 10000,
         "cargoCapacity": 100,
-        "requiredWork": 1
+        "cruiseSpeedMetersPerSecond": "1000",
+        "maximumSubCruiseSpeedMetersPerSecond": "300",
+        "movingSpoolDurationMilliseconds": 10000,
+        "requiredWork": 1,
+        "turnRateDegreesPerSecond": "45"
       }
     },
     {

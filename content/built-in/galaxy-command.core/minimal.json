@@ -1,6 +1,6 @@
 {
   "format": "galaxy-command-content-scenario",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "minimal",
   "fallback": "Minimal New Game",
   "references": [

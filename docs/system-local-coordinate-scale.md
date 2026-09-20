@@ -112,7 +112,7 @@ second maximum sub-cruise speed, and a 10-second ship-specific spool.
 flowchart LR
     spool["Moving spool at maneuver speed"]
     cruise["Cruising on one analytic motion segment"]
-    dropout["Exact instantaneous dropout"]
+    dropout["Planned instantaneous dropout"]
     approach["Sub-cruise thrust-profile approach"]
     arrival["One scheduled arrival"]
     stable["Stable destination state"]
@@ -168,10 +168,12 @@ the player observes it or because the application renders it.
   active for the same ship.
 - A cruising ship whose scheduled segment will enter an active encounter must
   be forecast as an outside participant and added at the exact applicable time.
-- Cruise dropout is instantaneous at its exact authoritative trigger. The ship
-  materializes there with its current heading and defaults to its maximum
-  sub-cruise speed. Completed `TASK-089` defines the thrust profile, destination
-  approach, and any resulting acceleration or deceleration behavior.
+- Planned destination-approach dropout is instantaneous at its exact
+  authoritative trigger. The ship materializes there with its current heading
+  and maximum sub-cruise speed. An unplanned interaction dropout preserves
+  cruise velocity and immediately brakes toward maximum sub-cruise speed at
+  twice the effective primary-acceleration magnitude. Completed `TASK-089`
+  defines the remaining destination-approach behavior.
 - A departing participant returns to scheduled motion only with a safe new
   course that remains eligible for ordinary encounter prediction. Leaving an
   activity cannot cause a following interaction to be skipped.

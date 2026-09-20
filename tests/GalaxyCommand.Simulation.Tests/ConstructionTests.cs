@@ -14,7 +14,8 @@ public sealed class ConstructionTests
             ids.Allocate(),
             "Freighter",
             recipe,
-            new Quantity(5));
+            new Quantity(5),
+            GameSessionTestFixture.ManeuverCapability);
         var catalog = new ConstructionDesignCatalog();
 
         catalog.Add(first);

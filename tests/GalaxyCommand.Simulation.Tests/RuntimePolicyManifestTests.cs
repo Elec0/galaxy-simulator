@@ -38,6 +38,9 @@ public sealed class RuntimePolicyManifestTests
         Assert.Equal(
             materialization.AllowedDesigns.Single().Value.CargoCapacity,
             restored.AllowedDesigns.Single().Value.CargoCapacity);
+        Assert.Equal(
+            materialization.AllowedDesigns.Single().Value.ManeuverCapability,
+            restored.AllowedDesigns.Single().Value.ManeuverCapability);
         var planned = Assert.IsType<NavigationPlanResult.Planned>(
             policies.Navigation.Plan(new NavigationRequest(
                 new ShipId(1),
@@ -180,6 +183,37 @@ public sealed class RuntimePolicyManifestTests
                 .Failure!.Path);
     }
 
+    [Fact]
+    public void ResolveRejectsUnknownManeuverBehaviorVersion()
+    {
+        RuntimePolicyManifestCheckpoint checkpoint = Manifest();
+        MaterializationPolicyCheckpoint policy = Assert.IsType<MaterializationPolicyCheckpoint>(
+            Assert.Single(checkpoint.MaterializationPolicies));
+        ShipDesignPolicyCheckpoint design = Assert.IsType<ShipDesignPolicyCheckpoint>(
+            Assert.Single(policy.AllowedDesigns));
+        ShipManeuverCapabilityCheckpoint capability =
+            Assert.IsType<ShipManeuverCapabilityCheckpoint>(design.ManeuverCapability);
+        RuntimePolicyManifestCheckpoint invalid = Copy(
+            checkpoint,
+            policy with
+            {
+                AllowedDesigns =
+                [
+                    design with
+                    {
+                        ManeuverCapability = capability with { BehaviorVersion = 2 },
+                    },
+                ],
+            });
+
+        CheckpointResult<ResolvedRuntimePolicies> result =
+            RuntimePolicyManifest.Resolve(invalid, Topology(), [Principal]);
+
+        Assert.Equal(
+            "$.checkpoint.runtimePolicies.materializationPolicies[0].allowedDesigns[0].maneuverCapability.behaviorVersion",
+            result.Failure!.Path);
+    }
+
     private static RuntimePolicyManifestCheckpoint Manifest() =>
         Assert.IsType<RuntimePolicyManifestCheckpoint>(RuntimePolicyManifest.Capture(
             Topology(),
@@ -205,7 +239,8 @@ public sealed class RuntimePolicyManifestTests
                 new ConstructionRecipe(
                     [new KeyValuePair<MaterialId, Quantity>(new MaterialId(1), new Quantity(2))],
                     new Work(3)),
-                new Quantity(4)),
+                new Quantity(4),
+                GameSessionTestFixture.ManeuverCapability),
         ]);
 
     private static WorldTopology Topology() => new(

@@ -91,11 +91,11 @@ public sealed class GameFactTests
         GameSession session = GameSessionTestFixture.Create();
         SubmitMove(session, 100, 0);
 
-        session.AdvanceTo(new SimulationTime(100));
+        GameSessionTestFixture.AdvanceUntilOrderTerminal(session);
 
         GameFactEnvelope[] facts = ReadAll(session);
         Assert.Equal(5, facts.Length);
-        GameEventRecord movementEvent = Assert.Single(session.EventRecords);
+        GameEventRecord movementEvent = session.EventRecords[^1];
         var endedEnvelope = facts[3];
         var completedEnvelope = facts[4];
         var cause = Assert.IsType<ScheduledEventFactCause>(
@@ -111,7 +111,7 @@ public sealed class GameFactTests
         var ended = Assert.IsType<ShipLocalMotionEndedFact>(
             endedEnvelope.Fact);
         Assert.Equal(LocalMotionEndReason.Arrived, ended.Reason);
-        Assert.Equal(new SimulationTime(100), ended.EndedAt);
+        Assert.Equal(movementEvent.Timestamp, ended.EndedAt);
         Assert.Equal(
             GameSessionTestFixture.Position(100, 0),
             ended.FinalPosition);
@@ -130,7 +130,9 @@ public sealed class GameFactTests
     {
         GameSession session = GameSessionTestFixture.Create();
         SubmitMove(session, 100, 0);
-        session.AdvanceTo(new SimulationTime(25));
+        session.AdvanceTo(new SimulationTime(1_000));
+        SystemPosition materialized = Assert.IsType<SystemPosition>(
+            Assert.Single(session.CaptureSnapshot().Ships).Position);
 
         session.SubmitCommand(
             GameSessionTestFixture.Player,
@@ -144,9 +146,7 @@ public sealed class GameFactTests
         var ended = Assert.IsType<ShipLocalMotionEndedFact>(
             facts[4].Fact);
         Assert.Equal(LocalMotionEndReason.CancelledByCommand, ended.Reason);
-        Assert.Equal(
-            GameSessionTestFixture.Position(25, 0),
-            ended.FinalPosition);
+        Assert.Equal(materialized, ended.FinalPosition);
         var cancelled = Assert.IsType<ShipOrderTransitionFact>(
             facts[5].Fact);
         Assert.Equal(ShipOrderStatus.Active, cancelled.PreviousStatus);
@@ -161,7 +161,9 @@ public sealed class GameFactTests
     {
         GameSession session = GameSessionTestFixture.Create();
         SubmitMove(session, 100, 0);
-        session.AdvanceTo(new SimulationTime(50));
+        session.AdvanceTo(new SimulationTime(1_000));
+        SystemPosition materialized = Assert.IsType<SystemPosition>(
+            Assert.Single(session.CaptureSnapshot().Ships).Position);
 
         SubmitMove(session, 50, 100);
 
@@ -178,9 +180,7 @@ public sealed class GameFactTests
                 Assert.Equal(
                     LocalMotionEndReason.ReplacedByCommand,
                     ended.Reason);
-                Assert.Equal(
-                    GameSessionTestFixture.Position(50, 0),
-                    ended.FinalPosition);
+                Assert.Equal(materialized, ended.FinalPosition);
             },
             fact =>
             {
@@ -204,9 +204,7 @@ public sealed class GameFactTests
                 var started = Assert.IsType<ShipLocalMotionStartedFact>(
                     fact.Fact);
                 Assert.Equal(new ShipOrderId(2), started.OrderId);
-                Assert.Equal(
-                    GameSessionTestFixture.Position(50, 0),
-                    started.Motion.Origin);
+                Assert.Equal(materialized, started.Motion.Origin);
             });
     }
 
@@ -288,20 +286,18 @@ public sealed class GameFactTests
     }
 
     [Fact]
-    public void IgnoredStaleEventEmitsNoSemanticFact()
+    public void CancelledManeuverBoundariesEmitNoEventOrSemanticFact()
     {
         GameSession session = GameSessionTestFixture.Create();
         SubmitMove(session, 100, 0);
-        session.AdvanceTo(new SimulationTime(50));
+        session.AdvanceTo(new SimulationTime(1_000));
         SubmitMove(session, 50, 100);
-        GameFactEnvelope[] beforeStaleEvent = ReadAll(session);
+        GameFactEnvelope[] beforeCancelledBoundary = ReadAll(session);
 
-        session.AdvanceTo(new SimulationTime(100));
+        session.AdvanceTo(new SimulationTime(4_000));
 
-        Assert.Equal(beforeStaleEvent, ReadAll(session));
-        Assert.Equal(
-            ScheduledEventDisposition.IgnoredStaleGeneration,
-            Assert.Single(session.EventRecords).Disposition);
+        Assert.Equal(beforeCancelledBoundary, ReadAll(session));
+        Assert.Empty(session.EventRecords);
     }
 
     [Fact]

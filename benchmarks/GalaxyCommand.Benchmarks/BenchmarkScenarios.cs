@@ -24,6 +24,8 @@ internal static class BenchmarkScenarioFactory
             BenchmarkPresets.NavigationConnectorVolume =>
                 new ConnectorNavigationBenchmarkScenario(),
             BenchmarkPresets.FactsRetentionAndRead => new FactBenchmarkScenario(),
+            BenchmarkPresets.ManeuverRepeatedReplanning =>
+                new ManeuverRepeatedReplanningBenchmarkScenario(),
             _ => throw new BenchmarkUsageException(
                 $"Unsupported benchmark base preset '{basePreset}'."),
         };
@@ -187,6 +189,78 @@ internal sealed class FactBenchmarkScenario : IBenchmarkScenario
     }
 }
 
+/// <summary>
+/// Measures exact maneuver materialization, schedule invalidation, and
+/// replacement after simulation time has advanced between each command.
+/// </summary>
+internal sealed class ManeuverRepeatedReplanningBenchmarkScenario
+    : IBenchmarkScenario
+{
+    /// <summary>
+    /// Alternates one ship between distant goals and advances to each replan
+    /// timestamp before submitting the next replacement. The final advance is
+    /// bounded by validated configuration rather than workload completion.
+    /// </summary>
+    public ScenarioCorrectnessResult Run(
+        ResolvedBenchmarkScenario configuration)
+    {
+        int replanCount = configuration.GetInt32(
+            BenchmarkParameterNames.ReplanCount);
+        ulong interval = configuration.GetUInt64(
+            BenchmarkParameterNames.ReplanIntervalMilliseconds);
+        long distance = configuration.Get(
+            BenchmarkParameterNames.DestinationDistance);
+        SimulationDuration routeDuration = new(
+            configuration.GetUInt64(
+                BenchmarkParameterNames.TravelDurationMilliseconds));
+        InitialShipSetup ship = RequireSingleShip(
+            ScenarioSetup.CreateShips(1, 1));
+        var session = new GameSession(
+            new GameSessionSetup(
+                ScenarioSetup.CreateSystems(1),
+                [ship],
+                ScenarioSetup.Relationships,
+                ScenarioSetup.RootSeed,
+                configuration.GetInt32(
+                    BenchmarkParameterNames.FactRetentionCapacity)),
+            new DirectLocalNavigationPlanner(
+                new FixedTravelTimeEstimator(routeDuration)));
+
+        for (int index = 0; index < replanCount; index++)
+        {
+            long destinationX = (index & 1) == 0 ? distance : -distance;
+            GameplayCommandRecord command = session.SubmitCommand(
+                ScenarioSetup.AutonomousSource,
+                new MoveShipCommand(
+                    ship.Id,
+                    new NavigationDestination.Position(
+                        ScenarioSetup.Position(1, destinationX, 0)),
+                    OrderPlacement.ReplaceAll));
+            ScenarioSetup.RequireAccepted(command, configuration.Id);
+            if (index + 1 < replanCount)
+            {
+                session.AdvanceTo(new SimulationTime(
+                    checked((ulong)(index + 1) * interval)));
+            }
+        }
+
+        session.AdvanceTo(new SimulationTime(configuration.GetUInt64(
+            BenchmarkParameterNames.SimulatedDurationMilliseconds)));
+        return ScenarioResult.Create(session, configuration);
+    }
+
+    /// <summary>
+    /// Fails benchmark setup explicitly if the fixed one-ship workload drifts
+    /// from its intended shape.
+    /// </summary>
+    private static InitialShipSetup RequireSingleShip(
+        InitialShipSetup[] ships) =>
+        ships.Length == 1
+            ? ships[0]
+            : throw new InvalidOperationException(
+                "Repeated-replanning benchmark setup did not create exactly one ship.");
+}
+
 internal sealed class FixedTravelTimeEstimator : ILocalTravelTimeEstimator
 {
     private readonly SimulationDuration _duration;
@@ -222,7 +296,15 @@ internal static class ScenarioSetup
         new ConstructionDesignId(1),
         "Benchmark Ship",
         new ConstructionRecipe([], new Work(1)),
-        new Quantity(100));
+        new Quantity(100),
+        new ShipManeuverCapability(
+            baseMassKilograms: 10_000,
+            ManeuverAcceleration.ParseMetersPerSecondSquared("10"),
+            customPassiveDeceleration: null,
+            ManeuverSpeed.ParseMetersPerSecond("300"),
+            ManeuverSpeed.ParseMetersPerSecond("1000"),
+            ManeuverTurnRate.ParseDegreesPerSecond("45"),
+            new SimulationDuration(10_000)));
 
     internal static CommandSource AutonomousSource { get; } =
         new(CommandSourceKind.Autonomous, BenchmarkSourceId);
@@ -351,6 +433,10 @@ internal static class ScenarioResult
                 ("systems", snapshot.Systems.Count)));
     }
 
+    /// <summary>
+    /// Adds every authoritative and order-relevant snapshot field in stable
+    /// identity order so correctness hashes cover each supported motion mode.
+    /// </summary>
     private static void AddSnapshot(
         DeterministicDigest digest,
         GameSnapshot snapshot)
@@ -391,6 +477,20 @@ internal static class ScenarioResult
                     AddPosition(digest, motion.CurrentPosition);
                     digest.Add(motion.Motion.Id.Value);
                     digest.Add(motion.Motion.ArrivesAt.Milliseconds);
+                    break;
+                case ShipSpatialSnapshotState.AnalyticManeuver maneuver:
+                    AddPosition(digest, maneuver.CurrentState.Position);
+                    digest.Add(maneuver.CurrentState.Velocity.MillimetersPerSecondX);
+                    digest.Add(maneuver.CurrentState.Velocity.MillimetersPerSecondY);
+                    digest.Add(maneuver.CurrentState.Heading.Millidegrees);
+                    digest.Add(maneuver.Maneuver.MotionId.Value);
+                    digest.Add(maneuver.Maneuver.Generation.Value);
+                    digest.Add((ulong)maneuver.Maneuver.PlanKind);
+                    digest.Add((ulong)maneuver.Maneuver.Objective);
+                    digest.Add((ulong)maneuver.Maneuver.CurrentPhaseIndex);
+                    digest.Add(
+                        maneuver.Maneuver.NextBoundary?.Timestamp.Milliseconds
+                        ?? 0);
                     break;
                 case ShipSpatialSnapshotState.ConnectorTransit transit:
                     digest.Add(transit.Transit.Id.Value);

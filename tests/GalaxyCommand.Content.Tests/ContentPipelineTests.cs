@@ -189,9 +189,9 @@ public sealed class ContentPipelineTests : IDisposable
             ',',
             definitions.Select(definition =>
                 $"{{\"kind\":\"{definition.Kind}\",\"id\":\"{definition.Id}\",\"fallback\":\"{definition.Fallback}\",\"references\":{definition.References},\"values\":{{}}}}"));
-        return $"{{\"format\":\"galaxy-command-content-definitions\",\"schemaVersion\":1,\"definitions\":[{entries}]}}";
+        return $"{{\"format\":\"galaxy-command-content-definitions\",\"schemaVersion\":2,\"definitions\":[{entries}]}}";
     }
 
     private static string Scenario(string id, string reference) =>
-        $"{{\"format\":\"galaxy-command-content-scenario\",\"schemaVersion\":1,\"id\":\"{id}\",\"fallback\":\"Minimal\",\"references\":[\"{reference}\"],\"values\":{{}}}}";
+        $"{{\"format\":\"galaxy-command-content-scenario\",\"schemaVersion\":2,\"id\":\"{id}\",\"fallback\":\"Minimal\",\"references\":[\"{reference}\"],\"values\":{{}}}}";
 }

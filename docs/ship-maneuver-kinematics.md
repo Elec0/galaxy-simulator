@@ -54,8 +54,11 @@ This design builds on the following constraints from completed `TASK-087`:
   at maneuver speed. A committed course change or attack hit resets the spool.
 - Cruise is selected only when the complete spool-and-cruise plan arrives
   sooner than the applicable sub-cruise plan.
-- Cruise dropout is instantaneous. At dropout, the ship retains its current
-  heading and begins sub-cruise movement at its maximum sub-cruise speed.
+- Planned destination-approach dropout is instantaneous. At that boundary, the
+  ship retains its current heading and begins sub-cruise movement at its
+  maximum sub-cruise speed. An unplanned interaction dropout instead retains
+  cruise velocity and brakes toward maximum sub-cruise speed at twice the
+  effective primary-acceleration magnitude.
 - A zero-distance move may change heading without translating the ship.
 - Existing coordinate-envelope, checked-arithmetic, and rounding ownership
   remain in force.
@@ -174,10 +177,12 @@ Braking uses the following model:
    avoids counting two deceleration systems at once.
 4. When every terminal-arrival tolerance is satisfied, commit velocity to
    exactly zero so passive drag cannot leave an indefinitely shrinking drift.
-5. Plan cruise dropout early enough to fit the complete turn and braking
-   maneuver after dropout. An unplanned interaction dropout retains maximum
-   sub-cruise speed and begins the strongest currently valid braking maneuver;
-   it never removes velocity instantaneously.
+5. Plan destination-approach dropout early enough to fit the complete turn and
+   braking maneuver after dropout. An unplanned interaction dropout retains
+   cruise velocity and immediately begins a dedicated braking phase toward
+   maximum sub-cruise speed at twice the effective primary-acceleration
+   magnitude. It never removes velocity instantaneously. After reaching the
+   sub-cruise cap, ordinary maneuver planning owns any remaining braking.
 
 ```mermaid
 flowchart LR
@@ -207,6 +212,11 @@ authorize implementation.
    ship state and an optional scenario or materialization input, not a property
    shared by every instance of a design. Physical thrust and torque are not
    authored because the simplified model consumes acceleration limits directly.
+   The initial built-in starter ship and development preview courier each
+   author a 10,000-kilogram base mass, 10 meters per second squared base
+   acceleration, no custom passive deceleration, 300 meters per second maximum
+   sub-cruise speed, 1,000 meters per second cruise speed, 45 degrees per second
+   turn rate, and 10,000-millisecond moving spool.
 3. Author mass as positive whole kilograms and durations as
    positive whole milliseconds. Author speeds in meters per second,
    accelerations in meters per second squared, and angular values in degrees or
@@ -239,11 +249,18 @@ authorize implementation.
    primary acceleration uses 100 percent of the effective value. Reverse and
    lateral precision acceleration use 10 percent. Treat 10 percent as a
    versioned maneuver-policy constant rather than a per-design field.
+   Percentage and mass-scaling calculations retain an exact rational value only
+   within capability resolution. Publish each derived acceleration immediately
+   afterward as whole millimeters per second squared by rounding to the nearest
+   unit; an exact half-unit tie rounds upward because these rates are
+   nonnegative.
 8. Rotation does not consume translational acceleration budget.
    Simultaneous forward and precision translation share one elliptical budget:
    normalized forward use squared plus normalized precision use squared may not
    exceed one. The precision vector itself has one magnitude limit, preventing
-   diagonal thrust from receiving a free increase.
+   diagonal thrust from receiving a free increase. In ship-relative axes,
+   positive lateral precision points right, clockwise from the ship's forward
+   heading.
 9. Equipment may modify any maneuver property, including mass.
    `TASK-068` supplies typed contributions addressed by stable maneuver
    capability keys. For each key, sum flat deltas and basis-point modifiers in
@@ -285,7 +302,13 @@ authorize implementation.
     translation evaluate independently. Translation uses the shared envelope
     from question 8 relative to the heading at that instant; the piecewise
     planner splits a segment whenever changing heading changes the selected
-    acceleration vector.
+    acceleration vector. Project heading-relative thrust into system-local axes
+    with deterministic fixed-point CORDIC. Use a Q2.62 direction vector and a
+    fixed nanodegree arctangent table, preserve exact cardinal axes, and publish
+    acceleration components with normal signed rounding. Resolve a nonzero
+    system-local displacement back to its canonical millidegree course through
+    inverse CORDIC vectoring and normal angular rounding; a zero displacement
+    has no course heading.
 16. A maneuver consists of a deterministic sequence selected from
     turn, accelerate, capped-speed travel, coast under passive drag, active
     brake, and terminal settle phases. Each phase has constant acceleration and
@@ -317,15 +340,23 @@ authorize implementation.
     targets zero velocity and has no heading constraint unless one is supplied.
     A queued intermediate waypoint is a fly-through transition: when the next
     destination is known, the combined plan passes within 1 meter and continues
-    without applying terminal velocity or heading tests. If no admitted next
-    destination exists at planning time, the destination is terminal. Queue
-    changes invalidate and replan from the committed state.
+    without applying terminal velocity or heading tests. At a noncollinear
+    waypoint, the ship changes velocity before the crossing so its nonzero
+    velocity vector is aligned with the outgoing leg at the waypoint. The
+    complete-route plan selects the crossing speed under its
+    maneuver objective. If no admitted next destination exists at planning
+    time, the destination is terminal. Queue changes invalidate and replan from
+    the committed state.
 21. Very short terminal moves use a triangular profile that omits
     capped-speed travel: accelerate only until the deterministic switch point,
     then brake. If current velocity already places the ship beyond that switch
     point, brake immediately. The terminal settle rule commits exact zero only
     after all applicable arrival tolerances pass, so the planner never toggles
-    repeatedly around the destination.
+    repeatedly around the destination. If full-rate thrust cannot produce a
+    representable millisecond schedule, lower all-direction precision thrust
+    and select the shortest admitted two-phase duration that respects both the
+    acceleration and complete-vector speed caps. This is an ordinary analytic
+    plan, not a return to authored constant travel duration.
 22. Cruise-versus-sub-cruise comparison includes turning, acceleration,
     braking, and final heading. Build both candidates under the
     currently selected maneuver objective, then compare their complete arrival
@@ -335,8 +366,8 @@ authorize implementation.
     velocity, effective deceleration, turn time, and arrival tolerance. It
     applies acceleration opposite velocity, does not stack passive drag with
     active braking, commits zero velocity after terminal tolerances are met, and
-    retains full speed on unplanned cruise dropout while beginning the strongest
-    valid braking maneuver.
+    retains full speed on unplanned cruise dropout while beginning the dedicated
+    two-times-primary braking phase toward maximum sub-cruise speed.
 24. Replanning first materializes exact position, velocity, and
     heading from the active phase at the commit timestamp. It retains the
     current effective-capability revision for that materialization, then applies

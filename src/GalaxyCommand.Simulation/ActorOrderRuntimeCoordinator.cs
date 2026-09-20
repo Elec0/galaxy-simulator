@@ -55,6 +55,8 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     private readonly SessionEconomyOwner? _economy;
     private readonly RelationshipOwner _relationships;
     private readonly GameFactStore _facts;
+    private readonly IReadOnlyDictionary<ConstructionDesignId, ShipManeuverCapability>
+        _maneuverCapabilities;
     private readonly List<GameEventRecord> _eventRecords = [];
     private bool _isPoisoned;
 
@@ -73,6 +75,10 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         _worldTopology = new WorldTopology(setup.Systems, setup.ConnectorTopology);
         _navigation = navigation;
         _facts = facts;
+        _maneuverCapabilities = BuildManeuverCapabilities(
+            setup.Ships.Select(ship => ship.Design)
+                .Concat(setup.MaterializationPolicies.SelectMany(
+                    policy => policy.AllowedDesigns.Values)));
         _relationships = new RelationshipOwner(setup.Relationships);
         _lifecycle = new EntityLifecycleOwner(
             _movement,
@@ -113,6 +119,9 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         _inventoryCommit = inventoryCommit;
         _relationships = relationships;
         _economy = economy;
+        _maneuverCapabilities = BuildManeuverCapabilities(
+            lifecycle.MaterializationPolicies.SelectMany(
+                policy => policy.AllowedDesigns.Values));
         CheckpointResult<SimulationEngine<GameEvent>> engine =
             SimulationEngine<GameEvent>.RestoreCheckpoint(this, engineCheckpoint);
         if (!engine.IsSuccess)
@@ -591,6 +600,11 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                         && emerge.ShipId == actor.ShipId
                         && emerge.TransitId == transit.Id
                         && emerge.Generation == transit.Generation),
+                ShipSpatialStateCheckpoint.AnalyticManeuver maneuver =>
+                    HasExactManeuverEvents(
+                        checkpoint.Engine.Agenda.PendingEvents,
+                        actor.ShipId,
+                        maneuver),
                 _ => false,
             };
             if (!found)
@@ -602,6 +616,54 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Requires every saved analytic boundary to resolve to its exact agenda
+    /// key, generation, motion identity, and phase payload in cursor order.
+    /// </summary>
+    private static bool HasExactManeuverEvents(
+        IReadOnlyList<ScheduledEvent<GameEvent>> pendingEvents,
+        ShipId shipId,
+        ShipSpatialStateCheckpoint.AnalyticManeuver maneuver)
+    {
+        int expectedCount = maneuver.Plan.Phases.Count
+            - maneuver.CurrentPhaseIndex;
+        if (maneuver.PendingEventKeys.Count != expectedCount)
+        {
+            return false;
+        }
+
+        for (int offset = 0; offset < expectedCount; offset++)
+        {
+            int phaseIndex = maneuver.CurrentPhaseIndex + offset;
+            EventKey key = maneuver.PendingEventKeys[offset];
+            ScheduledEvent<GameEvent>? scheduled = pendingEvents.SingleOrDefault(
+                candidate => candidate.Key == key);
+            if (scheduled is null
+                || scheduled.Generation != maneuver.Generation
+                || scheduled.Payload is not GameEvent.SpatialMovement
+                {
+                    Event: SpatialMovementEvent.Maneuver spatial,
+                }
+                || spatial.ShipId != shipId
+                || spatial.Event.MotionId != maneuver.Id
+                || spatial.Event.Generation != maneuver.Generation)
+            {
+                return false;
+            }
+
+            bool payloadMatches = phaseIndex < maneuver.Plan.Phases.Count - 1
+                ? spatial.Event is ManeuverScheduleEvent.PhaseBoundary boundary
+                    && boundary.PhaseIndex == phaseIndex
+                : spatial.Event is ManeuverScheduleEvent.Complete;
+            if (!payloadMatches)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static CheckpointResult<GameSessionRuntimeCheckpoint> RuntimeRejected(
@@ -664,7 +726,10 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                     record.DesignId,
                     record.CargoInventoryId,
                     cargo.Capacity,
+                    record.ManeuverCapabilityRevision,
                     ship.State,
+                    ship.Velocity,
+                    ship.Heading,
                     _control.Capture(ship.ShipId),
                     _orders.CaptureCurrent(ship.ShipId),
                     _orders.CaptureQueue(ship.ShipId),
@@ -975,6 +1040,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
     {
     }
 
+    /// <inheritdoc/>
     public ScheduledEventDisposition HandleEvent(
         ScheduledEvent<GameEvent> simulationEvent,
         SimulationTime now,
@@ -1009,6 +1075,36 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                 traversing.Transit,
             _ => null,
         };
+        ScheduledTerminalManeuver? endingManeuver = spatial.Event switch
+        {
+            SpatialMovementEvent.Maneuver maneuver
+                when maneuver.Event is ManeuverScheduleEvent.Complete
+                    && _movement.GetState(maneuver.ShipId)
+                        is ShipSpatialState.AnalyticManeuver active
+                    && active.Maneuver.MotionId == maneuver.Event.MotionId =>
+                active.Maneuver,
+            _ => null,
+        };
+        ScheduledTerminalManeuver? phaseBoundaryManeuver = spatial.Event switch
+        {
+            SpatialMovementEvent.Maneuver maneuver
+                when maneuver.Event is ManeuverScheduleEvent.PhaseBoundary
+                    && _movement.GetState(maneuver.ShipId)
+                        is ShipSpatialState.AnalyticManeuver active
+                    && active.Maneuver.MotionId == maneuver.Event.MotionId =>
+                active.Maneuver,
+            _ => null,
+        };
+        ScheduledTerminalManeuver? waypointManeuver =
+            phaseBoundaryManeuver is { } boundaryManeuver
+                && spatial.Event is SpatialMovementEvent.Maneuver
+                {
+                    Event: ManeuverScheduleEvent.PhaseBoundary waypointBoundary,
+                }
+                && boundaryManeuver.IsWaypointBoundary(
+                    waypointBoundary.PhaseIndex)
+                    ? boundaryManeuver
+                    : null;
         var transitions = new List<ShipOrderTransition>();
         var factProposals = new List<GameFactProposal>();
         ScheduledEventDisposition disposition = _movement.HandleEvent(
@@ -1017,6 +1113,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             now);
         if (disposition == ScheduledEventDisposition.Applied)
         {
+            bool continueOrders = true;
             switch (spatial.Event)
             {
                 case SpatialMovementEvent.Arrive arrive:
@@ -1041,6 +1138,91 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                             arrive.ShipId,
                             active.Id,
                             arrive.MotionId);
+                        break;
+                    }
+                case SpatialMovementEvent.Maneuver
+                {
+                    Event: ManeuverScheduleEvent.PhaseBoundary boundary,
+                }:
+                    if (phaseBoundaryManeuver is { } transitioning)
+                    {
+                        AddCruiseTransitionProposal(
+                            spatial.Event.ShipId,
+                            boundary,
+                            transitioning,
+                            now,
+                            factProposals);
+                    }
+
+                    if (waypointManeuver is { } continuing)
+                    {
+                        ShipId shipId = spatial.Event.ShipId;
+                        ShipOrder active = _orders.GetActive(shipId)
+                            ?? throw new InvalidOperationException(
+                                $"Ship {shipId} reached a waypoint without an active order.");
+                        TravelLeg.Local waypointLeg = _orders.NextLeg(
+                            shipId,
+                            active.Id) as TravelLeg.Local
+                            ?? throw new InvalidOperationException(
+                                $"Ship {shipId} reached a local waypoint without a local route leg.");
+                        ShipKinematicState reached = continuing.Plan.StateAt(now);
+                        if (!ManeuverArrival.IsFlyThroughWaypointReached(
+                            reached,
+                            waypointLeg.Destination))
+                        {
+                            throw new InvalidOperationException(
+                                $"Ship {shipId} waypoint boundary did not satisfy its positional tolerance.");
+                        }
+
+                        _orders.CompleteLeg(
+                            shipId,
+                            active.Id,
+                            continuing.MotionId);
+                        _orders.BindMotion(
+                            shipId,
+                            active.Id,
+                            continuing.MotionId);
+                        factProposals.Add(WaypointArrivedProposal(
+                            shipId,
+                            continuing.MotionId.Value,
+                            boundary.PhaseIndex,
+                            new ShipWaypointArrivedFact(
+                                shipId,
+                                continuing.MotionId,
+                                waypointLeg.Destination,
+                                reached.Position,
+                                now,
+                                active.Id)));
+                    }
+
+                    // Other physical boundaries update spatial state only;
+                    // the bound order owns the complete terminal maneuver.
+                    continueOrders = false;
+                    break;
+                case SpatialMovementEvent.Maneuver maneuver
+                    when maneuver.Event is ManeuverScheduleEvent.Complete:
+                    {
+                        ShipOrder active = _orders.GetActive(maneuver.ShipId)
+                            ?? throw new InvalidOperationException(
+                                $"Ship {maneuver.ShipId} completed a maneuver without an active order.");
+                        ScheduledTerminalManeuver completed = endingManeuver
+                            ?? throw new InvalidOperationException(
+                                $"Applied completion for ship {maneuver.ShipId} had no matching maneuver.");
+                        ShipKinematicState final = completed.Plan.StateAt(now);
+                        factProposals.Add(PhysicalWorkEndedProposal(
+                            maneuver.ShipId,
+                            completed.MotionId.Value,
+                            new ShipLocalMotionEndedFact(
+                                maneuver.ShipId,
+                                Snapshot(completed),
+                                final.Position,
+                                now,
+                                LocalMotionEndReason.Arrived,
+                                active.Id)));
+                        _orders.CompleteLeg(
+                            maneuver.ShipId,
+                            active.Id,
+                            completed.MotionId);
                         break;
                     }
                 case SpatialMovementEvent.Emerge emerge:
@@ -1076,15 +1258,22 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                         $"Unsupported spatial event {spatial.Event.GetType().Name}.");
             }
 
-            StartOrContinueOrders(
-                spatial.Event.ShipId,
-                transitions,
-                factProposals);
-            AddOrderTransitionProposals(transitions, factProposals);
-            _facts.Commit(
-                now,
-                new ScheduledEventFactCause(simulationEvent.Key),
-                factProposals);
+            if (continueOrders)
+            {
+                StartOrContinueOrders(
+                    spatial.Event.ShipId,
+                    transitions,
+                    factProposals);
+                AddOrderTransitionProposals(transitions, factProposals);
+            }
+
+            if (factProposals.Count > 0)
+            {
+                _facts.Commit(
+                    now,
+                    new ScheduledEventFactCause(simulationEvent.Key),
+                    factProposals);
+            }
         }
 
         return disposition;
@@ -1269,7 +1458,10 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         ArgumentNullException.ThrowIfNull(proposal);
         ArgumentNullException.ThrowIfNull(transitions);
         ArgumentNullException.ThrowIfNull(factProposals);
-        ShipOrder order = _orders.Create(proposal.Source, proposal.Destination);
+        ShipOrder order = _orders.Create(
+            proposal.Source,
+            proposal.Destination,
+            proposal.RequestedHeading);
         switch (proposal.Placement)
         {
             case OrderPlacement.ReplaceAll:
@@ -1447,6 +1639,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                     source,
                     command.Destination,
                     command.Placement,
+                    command.RequestedHeading,
                     null),
                 null);
         }
@@ -1472,6 +1665,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                 source,
                 command.Destination,
                 command.Placement,
+                command.RequestedHeading,
                 plan),
             null);
     }
@@ -1692,6 +1886,10 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             : new EndOverrideEvaluation(null, rejection);
     }
 
+    /// <summary>
+    /// Advances one active order until it either completes, waits for transit,
+    /// or publishes exactly one bound physical movement schedule.
+    /// </summary>
     private void StartOrContinueOrders(
         ShipId shipId,
         ICollection<ShipOrderTransition> transitions,
@@ -1748,53 +1946,151 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             TravelLeg? nextLeg = _orders.NextLeg(shipId, active.Id);
             if (nextLeg is null)
             {
-                if (!DestinationSatisfied(current, active.Destination))
+                if (RuntimeDestinationSatisfied(
+                        shipId,
+                        current,
+                        active.Destination,
+                        active.RequestedHeading))
                 {
-                    throw new InvalidOperationException(
-                        $"Order {active.Id} exhausted its plan before reaching its destination.");
+                    _orders.CompleteActive(
+                        shipId,
+                        active.Id,
+                        transitions);
+                    continue;
                 }
 
-                _orders.CompleteActive(
-                    shipId,
-                    active.Id,
-                    transitions);
-                continue;
+                // A route can legitimately contain no local leg when its
+                // destination is already reached. The remaining heading goal
+                // still owns a physical stationary maneuver before completion.
+                if (active.RequestedHeading is { } heading
+                    && DestinationSatisfied(current, active.Destination))
+                {
+                    ShipKinematicState start = _movement.KinematicStateAt(
+                        shipId,
+                        CurrentTime)
+                        ?? throw new InvalidOperationException(
+                            $"Ship {shipId} has no system-local kinematic state.");
+                    EffectiveShipManeuverCapability capability =
+                        ResolveManeuverCapability(shipId);
+                    BoundedTerminalPlanSelection headingSelection =
+                        BoundedTerminalManeuverPlanner.Select(
+                            CurrentTime,
+                            start,
+                            current,
+                            heading,
+                            capability,
+                            ManeuverObjective.FastestArrival);
+                    ExecutableBoundedTerminalManeuverPlan headingPlan =
+                        headingSelection.ExecutablePlan
+                        ?? throw new InvalidOperationException(
+                            $"Terminal heading for ship {shipId} produced no executable analytic plan.");
+                    StartTerminalManeuver(
+                        shipId,
+                        active,
+                        headingPlan,
+                        waypointPhaseIndices: [],
+                        factProposals);
+                    return;
+                }
+
+                throw new InvalidOperationException(
+                    $"Order {active.Id} exhausted its plan before reaching its destination.");
             }
 
             switch (nextLeg)
             {
                 case TravelLeg.Local local:
                     {
-                        LocalMotionCommit<GameEvent> commit =
-                            _movement.CommitStartOrReplace(
-                                shipId,
-                                local,
-                                CurrentTime,
-                                movement =>
-                                    (GameEvent)new GameEvent.SpatialMovement(movement));
-                        LocalMotionSegment? motion = commit.Motion;
-                        if (motion is null)
+                        if (local.Duration == SimulationDuration.Zero
+                            || local.Origin == local.Destination)
                         {
                             _orders.CompleteLeg(shipId, active.Id, null);
                             continue;
                         }
 
-                        AgendaCommitResult agendaCommit = AgendaCommitOwner.Commit(
-                            _agenda,
-                            [commit.EventProposal
-                                ?? throw new InvalidOperationException(
-                                    $"Local motion {motion.Id} produced no arrival proposal.")]);
-                        _movement.BindCompletionEvent(
+                        ShipKinematicState start = _movement.KinematicStateAt(
                             shipId,
-                            AssertSingleEventKey(agendaCommit));
-                        _orders.BindMotion(shipId, active.Id, motion.Id);
-                        factProposals.Add(PhysicalWorkStartedProposal(
+                            CurrentTime)
+                            ?? throw new InvalidOperationException(
+                                $"Ship {shipId} has no system-local kinematic state.");
+                        EffectiveShipManeuverCapability capability =
+                            ResolveManeuverCapability(shipId);
+                        TravelPlan route = active.Plan
+                            ?? throw new InvalidOperationException(
+                                $"Order {active.Id} has no travel plan.");
+                        TravelLeg[] remaining = route.Legs
+                            .Skip(active.NextLegIndex)
+                            .ToArray();
+                        TravelLeg.Local[] remainingLocal = remaining
+                            .OfType<TravelLeg.Local>()
+                            .ToArray();
+                        bool hasMultipleLocalLegs = remaining.Length > 1
+                            && remainingLocal.Length == remaining.Length;
+                        ShipHeading? terminalHeading = hasMultipleLocalLegs
+                            || remaining.Length == 1
+                                ? active.RequestedHeading
+                                : null;
+                        // A connector boundary requires an exact terminal local
+                        // state at its source endpoint. Plan that approach as an
+                        // ordinary maneuver instead of treating the complete
+                        // cross-system route as one local fly-through path.
+                        SystemPosition terminalDestination = hasMultipleLocalLegs
+                            ? remainingLocal[^1].Destination
+                            : local.Destination;
+                        BoundedTerminalPlanSelection selection =
+                            BoundedTerminalManeuverPlanner.Select(
+                                CurrentTime,
+                                start,
+                                terminalDestination,
+                                terminalHeading,
+                                capability,
+                                ManeuverObjective.FastestArrival);
+                        if (selection.ExecutablePlan is not { } plan)
+                        {
+                            throw new InvalidOperationException(
+                                $"Local route for ship {shipId} produced no executable analytic plan.");
+                        }
+
+                        IReadOnlyList<int> waypointPhaseIndices = [];
+                        if (hasMultipleLocalLegs)
+                        {
+                            SystemPosition[] waypoints = remainingLocal[..^1]
+                                .Select(static leg => leg.Destination)
+                                .ToArray();
+                            if (!WaypointManeuverPlan.TryCreate(
+                                    plan,
+                                    start,
+                                    terminalDestination,
+                                    waypoints,
+                                    out WaypointManeuverPlan? waypointPlan))
+                            {
+                                SystemPosition[] destinations = remainingLocal
+                                    .Select(static leg => leg.Destination)
+                                    .ToArray();
+                                if (!WaypointManeuverPlan.TryCreateRoute(
+                                        CurrentTime,
+                                        start,
+                                        destinations,
+                                        capability,
+                                        ManeuverObjective.FastestArrival,
+                                        terminalHeading,
+                                        out waypointPlan))
+                                {
+                                    throw new InvalidOperationException(
+                                        $"Waypoint route for ship {shipId} produced no executable analytic plan.");
+                                }
+                            }
+
+                            plan = waypointPlan!.Plan;
+                            waypointPhaseIndices = waypointPlan.WaypointPhaseIndices;
+                        }
+
+                        StartTerminalManeuver(
                             shipId,
-                            motion.Id.Value,
-                            new ShipLocalMotionStartedFact(
-                                shipId,
-                                Snapshot(motion),
-                                active.Id)));
+                            active,
+                            plan,
+                            waypointPhaseIndices,
+                            factProposals);
                         return;
                     }
                 case TravelLeg.Connector connector:
@@ -1830,14 +2126,70 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         }
     }
 
+    /// <summary>
+    /// Commits and binds one already-selected analytic schedule, retaining the
+    /// active order link and any route waypoint phase identities atomically.
+    /// </summary>
+    private void StartTerminalManeuver(
+        ShipId shipId,
+        ShipOrder active,
+        ExecutableBoundedTerminalManeuverPlan plan,
+        IReadOnlyList<int> waypointPhaseIndices,
+        List<GameFactProposal> factProposals)
+    {
+        TerminalManeuverCommit<GameEvent> commit =
+            _movement.CommitStartTerminalManeuver(
+                shipId,
+                plan,
+                ManeuverObjective.FastestArrival,
+                CurrentTime,
+                movement =>
+                    (GameEvent)new GameEvent.SpatialMovement(movement),
+                waypointPhaseIndices);
+        AgendaCommitResult agendaCommit = AgendaCommitOwner.Commit(
+            _agenda,
+            commit.EventProposals);
+        _movement.BindTerminalManeuverEvents(
+            shipId,
+            agendaCommit.EventKeys);
+        _orders.BindMotion(
+            shipId,
+            active.Id,
+            commit.Maneuver.MotionId);
+        factProposals.Add(PhysicalWorkStartedProposal(
+            shipId,
+            commit.Maneuver.MotionId.Value,
+            new ShipLocalMotionStartedFact(
+                shipId,
+                Snapshot(commit.Maneuver),
+                active.Id)));
+    }
+
+    /// <summary>
+    /// Resolves the current base design at its authored mass. Typed equipment
+    /// contributions remain owned by TASK-068 and can replace this lookup
+    /// without changing maneuver planning or schedule ownership.
+    /// </summary>
+    private EffectiveShipManeuverCapability ResolveManeuverCapability(
+        ShipId shipId)
+    {
+        GameSessionShip ship = _lifecycle.GetRequiredShip(shipId);
+        ShipManeuverCapability capability = _maneuverCapabilities.GetValueOrDefault(
+            ship.DesignId)
+            ?? throw new InvalidOperationException(
+                $"Ship {shipId} has no maneuver capability for design {ship.DesignId}.");
+        return capability.ResolveForMass(capability.BaseMassKilograms);
+    }
+
     private void EndActiveLocalMotion(
         ShipId shipId,
         LocalMotionEndReason reason,
         List<GameFactProposal> factProposals)
     {
         ArgumentNullException.ThrowIfNull(factProposals);
-        if (_movement.GetState(shipId)
-            is not ShipSpatialState.Moving moving)
+        ShipSpatialState? state = _movement.GetState(shipId);
+        if (state is not ShipSpatialState.Moving
+            && state is not ShipSpatialState.AnalyticManeuver)
         {
             return;
         }
@@ -1845,11 +2197,58 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         ShipOrder active = _orders.GetActive(shipId)
             ?? throw new InvalidOperationException(
                 $"Ship {shipId} has local motion without an active order.");
-        LocalMotionSegment motion = moving.Motion;
-        if (!_movement.CommitCancel(shipId, CurrentTime))
+        LocalMotionSnapshot motion;
+        switch (state)
         {
-            throw new InvalidOperationException(
-                $"Ship {shipId} local motion disappeared before cancellation commit.");
+            case ShipSpatialState.Moving moving:
+                motion = Snapshot(moving.Motion);
+                if (!_movement.CommitCancel(shipId, CurrentTime))
+                {
+                    throw new InvalidOperationException(
+                        $"Ship {shipId} local motion disappeared before cancellation commit.");
+                }
+
+                break;
+            case ShipSpatialState.AnalyticManeuver analytic:
+                motion = Snapshot(analytic.Maneuver);
+                bool wasCruising = analytic.Maneuver.CurrentPhase?.Kind
+                    == ManeuverPhaseKind.CruiseTravel;
+                AgendaCancellationCheck cancellation =
+                    _movement.TryInterruptTerminalManeuver(
+                        shipId,
+                        CurrentTime,
+                        _agenda,
+                        movement =>
+                            (GameEvent)new GameEvent.SpatialMovement(movement),
+                        out ManeuverInterruption? interruption);
+                if (cancellation != AgendaCancellationCheck.Matches
+                    || interruption is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Ship {shipId} maneuver cancellation did not match its pending agenda events.");
+                }
+
+                if (wasCruising
+                    && reason == LocalMotionEndReason.ReplacedByCommand)
+                {
+                    ShipKinematicState dropout = interruption.MaterializedState;
+                    factProposals.Add(PhysicalCruiseTransitionProposal(
+                        shipId,
+                        analytic.Maneuver.MotionId.Value,
+                        analytic.Maneuver.CurrentPhaseIndex,
+                        new ShipCruiseDroppedOutFact(
+                            shipId,
+                            analytic.Maneuver.MotionId,
+                            dropout.Position,
+                            dropout.Velocity,
+                            CurrentTime,
+                            active.Id)));
+                }
+
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported local movement state {state.GetType().Name}.");
         }
 
         SystemPosition finalPosition = _movement.PositionAt(shipId, CurrentTime)
@@ -1860,7 +2259,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             motion.Id.Value,
             new ShipLocalMotionEndedFact(
                 shipId,
-                Snapshot(motion),
+                motion,
                 finalPosition,
                 CurrentTime,
                 reason,
@@ -1876,6 +2275,49 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         PreparedEntityRemoval removal,
         out PreparedMovementCancellation[] cancellations)
     {
+        if (_movement.GetState(removal.ShipId)
+            is ShipSpatialState.AnalyticManeuver analytic)
+        {
+            IReadOnlyList<PendingManeuverScheduleEvent> pending =
+                analytic.Maneuver.PendingEvents
+                ?? throw new InvalidOperationException(
+                    $"Ship {removal.ShipId} has an unbound analytic maneuver.");
+            var prepared = new PreparedMovementCancellation[pending.Count];
+            for (int index = 0; index < pending.Count; index++)
+            {
+                PendingManeuverScheduleEvent boundary = pending[index];
+                GameEvent expected = new GameEvent.SpatialMovement(
+                    new SpatialMovementEvent.Maneuver(
+                        removal.ShipId,
+                        boundary.Payload));
+                AgendaCancellationCheck boundaryCheck = _agenda.CheckCancellation(
+                    boundary.EventKey,
+                    boundary.Generation,
+                    expected);
+                if (boundaryCheck != AgendaCancellationCheck.Matches)
+                {
+                    cancellations = [];
+                    EntityRemovalRejectionReason reason =
+                        boundaryCheck == AgendaCancellationCheck.Missing
+                            ? EntityRemovalRejectionReason.PendingMovementEventMissing
+                            : EntityRemovalRejectionReason.PendingMovementEventMismatch;
+                    return new EntityRemovalResult.Rejected(
+                        removal.Request,
+                        reason);
+                }
+
+                prepared[index] = new PreparedMovementCancellation(
+                    boundary.EventKey,
+                    boundary.Generation,
+                    expected);
+            }
+
+            Array.Sort(prepared, static (left, right) =>
+                left.EventKey.CompareTo(right.EventKey));
+            cancellations = prepared;
+            return null;
+        }
+
         PendingMovementCompletion? completion =
             _movement.GetPendingCompletion(removal.ShipId);
         if (completion is null)
@@ -1958,7 +2400,8 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                     transition.Destination,
                     transition.PreviousStatus,
                     transition.NextStatus,
-                    transition.Reason)));
+                    transition.Reason,
+                    transition.RequestedHeading)));
             ordinal = checked(ordinal + 1);
         }
     }
@@ -1987,6 +2430,87 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
                 0),
             fact);
 
+    private static GameFactProposal WaypointArrivedProposal(
+        ShipId shipId,
+        ulong activityId,
+        int phaseIndex,
+        GameFact fact) =>
+        new(
+            new GameFactProposalKey(
+                GameFactCommitCategory.PhysicalWaypoint,
+                shipId.Value,
+                activityId,
+                phaseIndex),
+            fact);
+
+    /// <summary>
+    /// Emits only the two semantic cruise transitions. Boundaries inserted for
+    /// waypoints inside a spool or cruise phase retain the same adjacent phase
+    /// kind and therefore remain diagnostic-only.
+    /// </summary>
+    private void AddCruiseTransitionProposal(
+        ShipId shipId,
+        ManeuverScheduleEvent.PhaseBoundary boundary,
+        ScheduledTerminalManeuver maneuver,
+        SimulationTime now,
+        List<GameFactProposal> factProposals)
+    {
+        int nextIndex = boundary.PhaseIndex + 1;
+        if (nextIndex >= maneuver.Plan.Phases.Count)
+        {
+            return;
+        }
+
+        ManeuverPhaseKind ending = maneuver.Plan.Phases[boundary.PhaseIndex].Kind;
+        ManeuverPhaseKind starting = maneuver.Plan.Phases[nextIndex].Kind;
+        bool entersCruise = ending == ManeuverPhaseKind.MovingSpool
+            && starting == ManeuverPhaseKind.CruiseTravel;
+        bool dropsOut = ending == ManeuverPhaseKind.CruiseTravel
+            && starting == ManeuverPhaseKind.ActiveBrake;
+        if (!entersCruise && !dropsOut)
+        {
+            return;
+        }
+
+        ShipOrder order = _orders.GetActive(shipId)
+            ?? throw new InvalidOperationException(
+                $"Ship {shipId} crossed a cruise boundary without an active order.");
+        ShipKinematicState state = maneuver.Plan.StateAt(now);
+        GameFact fact = entersCruise
+            ? new ShipCruiseEnteredFact(
+                shipId,
+                maneuver.MotionId,
+                state.Position,
+                state.Velocity,
+                now,
+                order.Id)
+            : new ShipCruiseDroppedOutFact(
+                shipId,
+                maneuver.MotionId,
+                state.Position,
+                state.Velocity,
+                now,
+                order.Id);
+        factProposals.Add(PhysicalCruiseTransitionProposal(
+            shipId,
+            maneuver.MotionId.Value,
+            boundary.PhaseIndex,
+            fact));
+    }
+
+    private static GameFactProposal PhysicalCruiseTransitionProposal(
+        ShipId shipId,
+        ulong activityId,
+        int phaseIndex,
+        GameFact fact) =>
+        new(
+            new GameFactProposalKey(
+                GameFactCommitCategory.PhysicalCruiseTransition,
+                shipId.Value,
+                activityId,
+                phaseIndex),
+            fact);
+
     private static LocalMotionSnapshot Snapshot(LocalMotionSegment motion) =>
         new(
             motion.Id,
@@ -1996,6 +2520,27 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             motion.DepartedAt,
             motion.ArrivesAt,
             motion.CompletionEventKey);
+
+    /// <summary>
+    /// Projects the complete analytic schedule through the existing local-work
+    /// fact contract. Internal phase keys remain diagnostic-only; the final key
+    /// represents completion of the complete local movement.
+    /// </summary>
+    private static LocalMotionSnapshot Snapshot(
+        ScheduledTerminalManeuver maneuver)
+    {
+        EventKey? completionKey = maneuver.PendingEvents is { Count: > 0 } pending
+            ? pending[^1].EventKey
+            : null;
+        return new LocalMotionSnapshot(
+            maneuver.MotionId,
+            maneuver.Generation,
+            maneuver.Plan.StateAt(maneuver.Plan.StartsAt).Position,
+            maneuver.Plan.StateAt(maneuver.Plan.EndsAt).Position,
+            maneuver.Plan.StartsAt,
+            maneuver.Plan.EndsAt,
+            completionKey);
+    }
 
     private static ConnectorTransitSnapshot Snapshot(
         ConnectorTransitSegment transit) =>
@@ -2008,6 +2553,36 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             transit.DepartedAt,
             transit.ArrivesAt,
             transit.CompletionEventKey);
+
+    /// <summary>
+    /// Builds one stable maneuver-capability catalog from initial and
+    /// materializable ship definitions. Reusing an identifier with different
+    /// authored movement behavior is rejected before any command can plan.
+    /// </summary>
+    private static Dictionary<ConstructionDesignId, ShipManeuverCapability>
+        BuildManeuverCapabilities(IEnumerable<ShipDesign> designs)
+    {
+        ArgumentNullException.ThrowIfNull(designs);
+        var capabilities = new Dictionary<
+            ConstructionDesignId,
+            ShipManeuverCapability>();
+        foreach (ShipDesign design in designs)
+        {
+            ArgumentNullException.ThrowIfNull(design);
+            if (capabilities.TryGetValue(
+                    design.Id,
+                    out ShipManeuverCapability? existing)
+                && existing != design.ManeuverCapability)
+            {
+                throw new InvalidOperationException(
+                    $"Ship design {design.Id} has conflicting maneuver capabilities.");
+            }
+
+            capabilities[design.Id] = design.ManeuverCapability;
+        }
+
+        return capabilities;
+    }
 
     private NavigationPlanResult Plan(
         ShipId shipId,
@@ -2125,6 +2700,33 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
             _ => false,
         };
 
+    /// <summary>
+    /// Applies the maneuver contract's terminal position and velocity
+    /// tolerances after an analytic leg, while retaining exact legacy rules
+    /// for system and entity destinations.
+    /// </summary>
+    private bool RuntimeDestinationSatisfied(
+        ShipId shipId,
+        SystemPosition current,
+        NavigationDestination destination,
+        ShipHeading? requestedHeading) =>
+        destination switch
+        {
+            NavigationDestination.Position position =>
+                _movement.KinematicStateAt(shipId, CurrentTime) is { } state
+                && ManeuverArrival.EvaluateTerminal(
+                    state,
+                    position.Value,
+                    requestedHeading).IsSatisfied,
+            _ => DestinationSatisfied(current, destination)
+                && (requestedHeading is null
+                    || _movement.KinematicStateAt(shipId, CurrentTime) is { } state
+                    && ManeuverArrival.EvaluateTerminal(
+                        state,
+                        current,
+                        requestedHeading).IsSatisfied),
+        };
+
     private CommandResult? RejectIneligible(
         ShipId shipId,
         CommandSource source) =>
@@ -2169,6 +2771,7 @@ internal sealed class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEven
         CommandSource Source,
         NavigationDestination Destination,
         OrderPlacement Placement,
+        ShipHeading? RequestedHeading,
         TravelPlan? Plan);
 
     private sealed record MoveOrderEvaluation(

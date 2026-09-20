@@ -39,7 +39,8 @@ public sealed record ShipOrderSnapshot(
     CommandSource Source,
     NavigationDestination Destination,
     ShipOrderStatus Status,
-    ShipOrderReason Reason);
+    ShipOrderReason Reason,
+    ShipHeading? RequestedHeading = null);
 
 internal enum CancelOrderDisposition
 {
@@ -53,6 +54,7 @@ internal sealed record ShipOrderTransition(
     ShipOrderId OrderId,
     CommandSource Source,
     NavigationDestination Destination,
+    ShipHeading? RequestedHeading,
     ShipOrderStatus? PreviousStatus,
     ShipOrderStatus NextStatus,
     ShipOrderReason Reason);
@@ -190,11 +192,16 @@ internal sealed class ShipOrderCoordinator
 
     internal ShipOrder Create(
         CommandSource source,
-        NavigationDestination destination)
+        NavigationDestination destination,
+        ShipHeading? requestedHeading = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(destination);
-        return new ShipOrder(_ids.Allocate(), source, destination);
+        return new ShipOrder(
+            _ids.Allocate(),
+            source,
+            destination,
+            requestedHeading);
     }
 
     internal ShipOrder? GetActive(ShipId shipId) =>
@@ -671,7 +678,8 @@ internal sealed class ShipOrderCoordinator
             order.Plan,
             order.NextLegIndex,
             order.MotionId,
-            order.TransitId);
+            order.TransitId,
+            order.RequestedHeading);
 
     /// <summary>
     /// Restores one work set while preserving FIFO queue order and enforcing
@@ -853,7 +861,8 @@ internal sealed class ShipOrderCoordinator
         var restored = new ShipOrder(
             checkpoint.Id,
             checkpoint.Source!,
-            checkpoint.Destination!)
+            checkpoint.Destination!,
+            checkpoint.RequestedHeading)
         {
             Status = status,
             Reason = reason,
@@ -1279,6 +1288,7 @@ internal sealed class ShipOrderCoordinator
             order.Id,
             order.Source,
             order.Destination,
+            order.RequestedHeading,
             previousStatus,
             status,
             reason));
@@ -1322,7 +1332,8 @@ internal sealed class ShipOrderCoordinator
                         $"Order {order.Id} has not entered its lifecycle."),
                 order.Reason
                     ?? throw new InvalidOperationException(
-                        $"Order {order.Id} has no lifecycle reason."));
+                        $"Order {order.Id} has no lifecycle reason."),
+                order.RequestedHeading);
 
     private static ReadOnlyCollection<ShipOrderSnapshot> CopySnapshots(
         IEnumerable<ShipOrder> orders) =>
@@ -1368,11 +1379,13 @@ internal sealed class ShipOrder
     internal ShipOrder(
         ShipOrderId id,
         CommandSource source,
-        NavigationDestination destination)
+        NavigationDestination destination,
+        ShipHeading? requestedHeading = null)
     {
         Id = id;
         Source = source;
         Destination = destination;
+        RequestedHeading = requestedHeading;
     }
 
     internal ShipOrderId Id { get; }
@@ -1380,6 +1393,8 @@ internal sealed class ShipOrder
     internal CommandSource Source { get; }
 
     internal NavigationDestination Destination { get; }
+
+    internal ShipHeading? RequestedHeading { get; }
 
     internal ShipOrderStatus? Status { get; set; }
 

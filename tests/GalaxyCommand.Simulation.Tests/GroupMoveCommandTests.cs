@@ -21,19 +21,27 @@ public sealed class GroupMoveCommandTests
             Assert.IsType<MoveShipGroupCommand>(record.Envelope.Command).ShipIds);
         Assert.Equal(
             GameSessionTestFixture.Position(1_100, 2_000),
-            Ship(session, 1).Motion?.Destination);
+            Assert.IsType<NavigationDestination.Position>(
+                Ship(session, 1).CurrentOrder?.Destination).Value);
         Assert.Equal(
             GameSessionTestFixture.Position(1_000, 1_900),
-            Ship(session, 2).Motion?.Destination);
+            Assert.IsType<NavigationDestination.Position>(
+                Ship(session, 2).CurrentOrder?.Destination).Value);
         Assert.Equal(
             GameSessionTestFixture.Position(900, 2_000),
-            Ship(session, 3).Motion?.Destination);
+            Assert.IsType<NavigationDestination.Position>(
+                Ship(session, 3).CurrentOrder?.Destination).Value);
         Assert.Equal(
             GameSessionTestFixture.Position(1_000, 2_100),
-            Ship(session, 4).Motion?.Destination);
+            Assert.IsType<NavigationDestination.Position>(
+                Ship(session, 4).CurrentOrder?.Destination).Value);
         Assert.All(
             session.CaptureSnapshot().Ships,
-            ship => Assert.Equal(ShipOrderStatus.Active, ship.CurrentOrder?.Status));
+            ship =>
+            {
+                Assert.Equal(ShipOrderStatus.Active, ship.CurrentOrder?.Status);
+                Assert.NotNull(ship.Maneuver);
+            });
     }
 
     [Fact]
@@ -58,6 +66,7 @@ public sealed class GroupMoveCommandTests
             {
                 Assert.Null(ship.CurrentOrder);
                 Assert.Null(ship.Motion);
+                Assert.Null(ship.Maneuver);
             });
     }
 
@@ -86,7 +95,13 @@ public sealed class GroupMoveCommandTests
         Assert.Equal(ShipOrderStatus.Cancelled, Ship(session, 3).CurrentOrder?.Status);
         Assert.Null(Ship(session, 2).CurrentOrder);
         Assert.Null(Ship(session, 4).CurrentOrder);
-        Assert.All(session.CaptureSnapshot().Ships, ship => Assert.Null(ship.Motion));
+        Assert.All(
+            session.CaptureSnapshot().Ships,
+            ship =>
+            {
+                Assert.Null(ship.Motion);
+                Assert.Null(ship.Maneuver);
+            });
     }
 
     [Fact]
@@ -112,7 +127,7 @@ public sealed class GroupMoveCommandTests
         Assert.Equal(CommandResultStatus.Rejected, cancellation.Result.Status);
         Assert.Equal(CommandRejectionCodes.InvalidSource, cancellation.Result.RejectionCode);
         Assert.Equal(ShipOrderStatus.Active, Ship(session, 1).CurrentOrder?.Status);
-        Assert.NotNull(Ship(session, 1).Motion);
+        Assert.NotNull(Ship(session, 1).Maneuver);
     }
 
     private static GameSession CreateFourShipSession(

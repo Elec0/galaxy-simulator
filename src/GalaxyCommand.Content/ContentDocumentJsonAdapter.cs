@@ -39,7 +39,7 @@ public static partial class ContentJsonAdapter
             {
                 writer.WriteStartObject();
                 writer.WriteString("format", DefinitionsFormat);
-                writer.WriteNumber("schemaVersion", CurrentSchemaVersion);
+                writer.WriteNumber("schemaVersion", CurrentDocumentSchemaVersion);
                 writer.WriteStartArray("definitions");
                 foreach (ContentDefinitionSource definition in source.Definitions)
                 {
@@ -88,7 +88,7 @@ public static partial class ContentJsonAdapter
             {
                 writer.WriteStartObject();
                 writer.WriteString("format", ScenarioFormat);
-                writer.WriteNumber("schemaVersion", CurrentSchemaVersion);
+                writer.WriteNumber("schemaVersion", CurrentDocumentSchemaVersion);
                 writer.WriteString("id", source.Id.Value);
                 writer.WriteString("fallback", source.InvariantFallback);
                 WriteReferences(writer, source.References);
@@ -356,7 +356,7 @@ public static partial class ContentJsonAdapter
             return Diagnostic(ContentDiagnosticKind.WrongFormat, source, "$.format", "The document format discriminator is incorrect.");
         }
 
-        return !schemaVersion.TryGetInt32(out int version) || version != CurrentSchemaVersion
+        return !schemaVersion.TryGetInt32(out int version) || version != CurrentDocumentSchemaVersion
             ? Diagnostic(ContentDiagnosticKind.UnsupportedSchemaVersion, source, "$.schemaVersion", "The content schema version is unsupported.")
             : null;
     }

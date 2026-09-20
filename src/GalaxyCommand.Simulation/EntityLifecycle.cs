@@ -99,7 +99,23 @@ public sealed record GameSessionShip(
     ShipId Id,
     PrincipalId PrincipalId,
     ConstructionDesignId DesignId,
-    InventoryId CargoInventoryId);
+    InventoryId CargoInventoryId,
+    ShipManeuverCapabilityRevision ManeuverCapabilityRevision)
+{
+    public GameSessionShip(
+        ShipId id,
+        PrincipalId principalId,
+        ConstructionDesignId designId,
+        InventoryId cargoInventoryId)
+        : this(
+            id,
+            principalId,
+            designId,
+            cargoInventoryId,
+            ShipManeuverCapabilityRevision.Initial)
+    {
+    }
+}
 
 internal enum ConstructionMaterializationDeferredReason
 {
@@ -395,7 +411,8 @@ internal sealed class EntityLifecycleOwner
                     ship.Id,
                     ship.PrincipalId,
                     ship.DesignId,
-                    ship.CargoInventoryId))
+                    ship.CargoInventoryId,
+                    ship.ManeuverCapabilityRevision))
                 .OrderBy(ship => ship.EntityId.Value),
             _receipts.Values.Select(receipt =>
                 new EntityMaterializationReceiptCheckpoint(
@@ -670,8 +687,9 @@ internal sealed class EntityLifecycleOwner
                 ship.ShipId,
                 ship.PrincipalId,
                 ship.DesignId,
-                ship.CargoInventoryId));
-            _movement.Add(ship.ShipId, ship.Position);
+                ship.CargoInventoryId,
+                ShipManeuverCapabilityRevision.Initial));
+            _movement.Add(ship.ShipId, ship.Position, ship.Heading);
             _control.Add(ship.ShipId, ship.BaseController);
             _orders.Add(ship.ShipId);
             _entities.ApplyAddShip(ship.EntityId, ship.ShipId);
@@ -735,6 +753,16 @@ internal sealed class EntityLifecycleOwner
                     "A live ship design identifier must be nonzero.");
             }
 
+            // No installed-equipment owner exists before TASK-068, so only
+            // the base-design materialization can reproduce a saved revision.
+            if (ship.ManeuverCapabilityRevision
+                != ShipManeuverCapabilityRevision.Initial)
+            {
+                return new CheckpointValidationFailure(
+                    $"{path}[{index}].maneuverCapabilityRevision",
+                    "A live ship maneuver capability revision cannot be reproduced by its base design.");
+            }
+
             if (!entities.CanAddShip(ship.EntityId, ship.ShipId))
             {
                 return new CheckpointValidationFailure(
@@ -771,7 +799,8 @@ internal sealed class EntityLifecycleOwner
                 ship.ShipId,
                 ship.PrincipalId,
                 ship.DesignId,
-                ship.CargoInventoryId));
+                ship.CargoInventoryId,
+                ship.ManeuverCapabilityRevision));
             entities.ApplyAddShip(ship.EntityId, ship.ShipId);
         }
 
@@ -991,7 +1020,8 @@ internal sealed class EntityLifecycleOwner
             ship.Design.Id,
             ship.Design.CargoCapacity,
             ship.Position,
-            ship.BaseController);
+            ship.BaseController,
+            ship.Heading);
     }
 
     /// <summary>
@@ -1072,7 +1102,8 @@ internal sealed class EntityLifecycleOwner
             shipId,
             policy!.PrincipalId,
             design.Id,
-            inventoryId));
+            inventoryId,
+            ShipManeuverCapabilityRevision.Initial));
         _movement.Add(shipId, policy.Position);
         _control.Add(shipId, policy.BaseController);
         _orders.Add(shipId);
@@ -1245,7 +1276,8 @@ internal sealed class EntityLifecycleOwner
         ConstructionDesignId DesignId,
         Quantity CargoCapacity,
         SystemPosition Position,
-        ActorController BaseController);
+        ActorController BaseController,
+        ShipHeading Heading);
 
     private readonly record struct MaterializationKey(
         FacilityId FacilityId,

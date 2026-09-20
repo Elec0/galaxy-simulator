@@ -18,7 +18,8 @@ public sealed record InitialShipSetup
         PrincipalId principalId,
         ShipDesign design,
         SystemPosition position,
-        ActorController baseController)
+        ActorController baseController,
+        ShipHeading? heading = null)
     {
         ArgumentOutOfRangeException.ThrowIfZero(entityId.Value);
         ArgumentOutOfRangeException.ThrowIfZero(id.Value);
@@ -41,6 +42,7 @@ public sealed record InitialShipSetup
         Design = design;
         Position = position;
         BaseController = baseController;
+        Heading = heading ?? ShipHeading.Zero;
     }
 
     public EntityId EntityId { get; }
@@ -56,6 +58,8 @@ public sealed record InitialShipSetup
     public SystemPosition Position { get; }
 
     public ActorController BaseController { get; }
+
+    public ShipHeading Heading { get; }
 }
 
 /// <summary>

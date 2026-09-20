@@ -171,12 +171,23 @@ internal sealed record ConstructionInputPolicyCheckpoint(
     MaterialId MaterialId,
     Quantity Quantity);
 
+internal sealed record ShipManeuverCapabilityCheckpoint(
+    int BehaviorVersion,
+    ulong BaseMassKilograms,
+    ManeuverAcceleration BaseAcceleration,
+    ManeuverAcceleration? CustomPassiveDeceleration,
+    ManeuverSpeed MaximumSubCruiseSpeed,
+    ManeuverSpeed CruiseSpeed,
+    ManeuverTurnRate TurnRate,
+    SimulationDuration MovingSpoolDuration);
+
 internal sealed record ShipDesignPolicyCheckpoint(
     ConstructionDesignId Id,
     string? Name,
     IReadOnlyList<ConstructionInputPolicyCheckpoint?> Inputs,
     Work RequiredWork,
-    Quantity CargoCapacity);
+    Quantity CargoCapacity,
+    ShipManeuverCapabilityCheckpoint? ManeuverCapability);
 
 internal sealed record MaterializationPolicyCheckpoint(
     FacilityId FacilityId,
@@ -519,7 +530,8 @@ internal sealed record ShipOrderCheckpoint(
     TravelPlan? Plan,
     int NextLegIndex,
     MotionId? MotionId,
-    ConnectorTransitId? TransitId);
+    ConnectorTransitId? TransitId,
+    ShipHeading? RequestedHeading = null);
 
 internal sealed class ShipOrderWorkSetCheckpoint
 {
@@ -570,7 +582,25 @@ internal sealed record EntityLifecycleShipCheckpoint(
     ShipId ShipId,
     PrincipalId PrincipalId,
     ConstructionDesignId DesignId,
-    InventoryId CargoInventoryId);
+    InventoryId CargoInventoryId,
+    ShipManeuverCapabilityRevision ManeuverCapabilityRevision)
+{
+    internal EntityLifecycleShipCheckpoint(
+        EntityId entityId,
+        ShipId shipId,
+        PrincipalId principalId,
+        ConstructionDesignId designId,
+        InventoryId cargoInventoryId)
+        : this(
+            entityId,
+            shipId,
+            principalId,
+            designId,
+            cargoInventoryId,
+            ShipManeuverCapabilityRevision.Initial)
+    {
+    }
+}
 
 internal sealed record EntityMaterializationReceiptCheckpoint(
     ConstructionMaterializationEffect? Effect,
@@ -792,6 +822,46 @@ internal abstract record ShipSpatialStateCheckpoint
         EventKey? CompletionEventKey)
         : ShipSpatialStateCheckpoint;
 
+    internal sealed record AnalyticManeuver : ShipSpatialStateCheckpoint
+    {
+        internal AnalyticManeuver(
+            MotionId id,
+            EventGeneration generation,
+            ExecutableBoundedTerminalManeuverPlan plan,
+            ManeuverObjective objective,
+            int currentPhaseIndex,
+            IEnumerable<int> waypointPhaseIndices,
+            IEnumerable<EventKey> pendingEventKeys)
+        {
+            ArgumentNullException.ThrowIfNull(plan);
+            ArgumentNullException.ThrowIfNull(waypointPhaseIndices);
+            ArgumentNullException.ThrowIfNull(pendingEventKeys);
+            Id = id;
+            Generation = generation;
+            Plan = plan;
+            Objective = objective;
+            CurrentPhaseIndex = currentPhaseIndex;
+            WaypointPhaseIndices = new ReadOnlyCollection<int>(
+                waypointPhaseIndices.ToArray());
+            PendingEventKeys = new ReadOnlyCollection<EventKey>(
+                pendingEventKeys.ToArray());
+        }
+
+        internal MotionId Id { get; }
+
+        internal EventGeneration Generation { get; }
+
+        internal ExecutableBoundedTerminalManeuverPlan Plan { get; }
+
+        internal ManeuverObjective Objective { get; }
+
+        internal int CurrentPhaseIndex { get; }
+
+        internal ReadOnlyCollection<int> WaypointPhaseIndices { get; }
+
+        internal ReadOnlyCollection<EventKey> PendingEventKeys { get; }
+    }
+
     internal sealed record ConnectorTransit(
         ConnectorTransitId Id,
         EventGeneration Generation,
@@ -807,6 +877,8 @@ internal abstract record ShipSpatialStateCheckpoint
 internal sealed record SpatialActorCheckpoint(
     ShipId ShipId,
     EventGeneration Generation,
+    ShipVelocity Velocity,
+    ShipHeading Heading,
     ShipSpatialStateCheckpoint State);
 
 internal sealed class SpatialMovementCheckpoint

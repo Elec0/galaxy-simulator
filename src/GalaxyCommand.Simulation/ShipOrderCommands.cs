@@ -4,10 +4,15 @@ public sealed record MoveShipCommand : GameplayCommand
 {
     public const string CommandKind = "ship.move";
 
+    /// <summary>
+    /// Creates one move intent with an optional terminal heading. The heading
+    /// constrains only the final destination, never intermediate waypoints.
+    /// </summary>
     public MoveShipCommand(
         ShipId shipId,
         NavigationDestination destination,
-        OrderPlacement placement)
+        OrderPlacement placement,
+        ShipHeading? requestedHeading = null)
         : base(CommandKind)
     {
         ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
@@ -23,6 +28,7 @@ public sealed record MoveShipCommand : GameplayCommand
         ShipId = shipId;
         Destination = destination;
         Placement = placement;
+        RequestedHeading = requestedHeading;
     }
 
     public ShipId ShipId { get; }
@@ -30,6 +36,8 @@ public sealed record MoveShipCommand : GameplayCommand
     public NavigationDestination Destination { get; }
 
     public OrderPlacement Placement { get; }
+
+    public ShipHeading? RequestedHeading { get; }
 }
 
 /// <summary>

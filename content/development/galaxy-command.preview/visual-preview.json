@@ -1,6 +1,6 @@
 {
   "format": "galaxy-command-content-scenario",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "visual-preview",
   "fallback": "Development Visual Preview",
   "references": [

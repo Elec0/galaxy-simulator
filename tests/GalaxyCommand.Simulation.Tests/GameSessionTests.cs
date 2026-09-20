@@ -5,6 +5,19 @@ namespace GalaxyCommand.Simulation.Tests;
 public sealed class GameSessionTests
 {
     [Fact]
+    public void MoveCommandRetainsOptionalRequestedHeading()
+    {
+        var requestedHeading = new ShipHeading(90_000);
+        var command = new MoveShipCommand(
+            GameSessionTestFixture.Ship,
+            GameSessionTestFixture.Destination(2, 0),
+            OrderPlacement.ReplaceAll,
+            requestedHeading);
+
+        Assert.Equal(requestedHeading, command.RequestedHeading);
+    }
+
+    [Fact]
     public void MoveOrderAdvancesAndCompletesThroughSession()
     {
         GameSession session = GameSessionTestFixture.Create();
@@ -22,17 +35,22 @@ public sealed class GameSessionTests
         Assert.Equal(ShipOrderStatus.Active, active.CurrentOrder?.Status);
         Assert.Equal(ShipOrderReason.MovingToDestination, active.CurrentOrder?.Reason);
         Assert.Equal(destination, active.CurrentOrder?.Destination);
-        Assert.NotNull(active.Motion);
+        Assert.NotNull(active.Maneuver);
 
-        session.AdvanceTo(new SimulationTime(100));
+        GameSessionTestFixture.AdvanceUntilOrderTerminal(session);
 
         GameShipSnapshot completed = Assert.Single(session.CaptureSnapshot().Ships);
         Assert.Equal(GameSessionTestFixture.Position(100, 50), completed.Position);
         Assert.Null(completed.Motion);
+        Assert.Null(completed.Maneuver);
         Assert.Equal(ShipOrderStatus.Completed, completed.CurrentOrder?.Status);
         Assert.Equal(ShipOrderReason.DestinationReached, completed.CurrentOrder?.Reason);
-        GameEventRecord movement = Assert.Single(session.EventRecords);
-        Assert.Equal(ScheduledEventDisposition.Applied, movement.Disposition);
+        Assert.NotEmpty(session.EventRecords);
+        Assert.All(
+            session.EventRecords,
+            movement => Assert.Equal(
+                ScheduledEventDisposition.Applied,
+                movement.Disposition));
     }
 
     [Fact]
@@ -67,7 +85,9 @@ public sealed class GameSessionTests
                 GameSessionTestFixture.Ship,
                 GameSessionTestFixture.Destination(100, 0),
                 OrderPlacement.ReplaceAll));
-        session.AdvanceTo(new SimulationTime(50));
+        session.AdvanceTo(new SimulationTime(1_000));
+        SystemPosition materialized = Assert.IsType<SystemPosition>(
+            Assert.Single(session.CaptureSnapshot().Ships).Position);
 
         GameplayCommandRecord replacement = session.SubmitCommand(
             GameSessionTestFixture.Player,
@@ -78,20 +98,23 @@ public sealed class GameSessionTests
 
         Assert.Equal(CommandResultStatus.Accepted, replacement.Result.Status);
         GameShipSnapshot replaced = Assert.Single(session.CaptureSnapshot().Ships);
-        Assert.Equal(GameSessionTestFixture.Position(50, 0), replaced.Motion?.Origin);
-        Assert.Equal(GameSessionTestFixture.Position(50, 100), replaced.Motion?.Destination);
+        Assert.Equal(materialized, replaced.Position);
+        Assert.NotNull(replaced.Maneuver);
         Assert.Equal(new ShipOrderId(2), replaced.CurrentOrder?.Id);
 
-        session.AdvanceTo(new SimulationTime(150));
+        GameSessionTestFixture.AdvanceUntilOrderTerminal(session);
 
         GameShipSnapshot completed = Assert.Single(session.CaptureSnapshot().Ships);
-        Assert.Equal(GameSessionTestFixture.Position(50, 100), completed.Position);
+        Assert.True(ManeuverArrival.EvaluateTerminal(
+            new ShipKinematicState(
+                Assert.IsType<SystemPosition>(completed.Position),
+                completed.Velocity,
+                completed.Heading),
+            GameSessionTestFixture.Position(50, 100),
+            requestedHeading: null).IsSatisfied);
         Assert.Equal(ShipOrderStatus.Completed, completed.CurrentOrder?.Status);
-        Assert.Collection(
+        Assert.All(
             session.EventRecords,
-            stale => Assert.Equal(
-                ScheduledEventDisposition.IgnoredStaleGeneration,
-                stale.Disposition),
             applied => Assert.Equal(
                 ScheduledEventDisposition.Applied,
                 applied.Disposition));
@@ -107,7 +130,9 @@ public sealed class GameSessionTests
                 GameSessionTestFixture.Ship,
                 GameSessionTestFixture.Destination(100, 0),
                 OrderPlacement.ReplaceAll));
-        session.AdvanceTo(new SimulationTime(25));
+        session.AdvanceTo(new SimulationTime(1_000));
+        SystemPosition materialized = Assert.IsType<SystemPosition>(
+            Assert.Single(session.CaptureSnapshot().Ships).Position);
 
         GameplayCommandRecord cancellation = session.SubmitCommand(
             GameSessionTestFixture.Player,
@@ -117,19 +142,17 @@ public sealed class GameSessionTests
 
         Assert.Equal(CommandResultStatus.Accepted, cancellation.Result.Status);
         GameShipSnapshot cancelled = Assert.Single(session.CaptureSnapshot().Ships);
-        Assert.Equal(GameSessionTestFixture.Position(25, 0), cancelled.Position);
+        Assert.Equal(materialized, cancelled.Position);
         Assert.Null(cancelled.Motion);
+        Assert.Null(cancelled.Maneuver);
         Assert.Equal(ShipOrderStatus.Cancelled, cancelled.CurrentOrder?.Status);
         Assert.Equal(ShipOrderReason.CancelledByCommand, cancelled.CurrentOrder?.Reason);
 
-        session.AdvanceTo(new SimulationTime(100));
+        session.AdvanceTo(new SimulationTime(20_000));
 
-        Assert.Equal(
-            GameSessionTestFixture.Position(25, 0),
-            Assert.Single(session.CaptureSnapshot().Ships).Position);
-        Assert.Equal(
-            ScheduledEventDisposition.IgnoredStaleGeneration,
-            Assert.Single(session.EventRecords).Disposition);
+        Assert.Equal(materialized, Assert.Single(
+            session.CaptureSnapshot().Ships).Position);
+        Assert.Empty(session.EventRecords);
     }
 
     [Fact]

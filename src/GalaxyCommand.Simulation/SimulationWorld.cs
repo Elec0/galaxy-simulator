@@ -119,13 +119,15 @@ internal sealed class SimulationWorld
     private ShipDesign AddShipDesign(
         string name,
         ConstructionRecipe recipe,
-        Quantity cargoCapacity)
+        Quantity cargoCapacity,
+        ShipManeuverCapability maneuverCapability)
     {
         var design = new ShipDesign(
             ConstructionDesignIds.Allocate(),
             name,
             recipe,
-            cargoCapacity);
+            cargoCapacity,
+            maneuverCapability);
         ConstructionDesigns.Add(design);
         return design;
     }
@@ -211,8 +213,9 @@ internal sealed class SimulationWorld
         internal ShipDesign AddShipDesign(
             string name,
             ConstructionRecipe recipe,
-            Quantity cargoCapacity) =>
-            World.AddShipDesign(name, recipe, cargoCapacity);
+            Quantity cargoCapacity,
+            ShipManeuverCapability maneuverCapability) =>
+            World.AddShipDesign(name, recipe, cargoCapacity, maneuverCapability);
 
         internal ConstructionOrderId EnqueueConstruction(
             Shipyard shipyard,

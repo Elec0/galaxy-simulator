@@ -45,6 +45,34 @@ public sealed class BenchmarkConfigurationTests
     }
 
     [Fact]
+    public void RepeatedReplanningPresetDefinesTimeSeparatedReplacements()
+    {
+        BenchmarkPreset preset = BenchmarkPresets.Get(
+            "maneuver.repeated-replanning");
+
+        Assert.True(preset.IsHeavy);
+        Assert.Equal(100, preset.Parameters["replanCount"]);
+        Assert.Equal(50_000, preset.Parameters["replanIntervalMilliseconds"]);
+        Assert.Equal(
+            5_000_000,
+            preset.Parameters[BenchmarkParameterNames.SimulatedDurationMilliseconds]);
+        Assert.Equal("603601f07a12a8c1", preset.ExpectedDigest);
+    }
+
+    [Fact]
+    public void ConnectorVolumePresetAllowsCompleteAnalyticTraversals()
+    {
+        BenchmarkPreset preset = BenchmarkPresets.Get(
+            BenchmarkPresets.NavigationConnectorVolume);
+
+        Assert.Equal(2, preset.Version);
+        Assert.Equal(
+            1_000_000,
+            preset.Parameters[BenchmarkParameterNames.SimulatedDurationMilliseconds]);
+        Assert.Equal("673c9af7f54a80e4", preset.ExpectedDigest);
+    }
+
+    [Fact]
     public void NumericOverridesAreVisibleAndMakeRunNonCanonical()
     {
         BenchmarkCommandRequest request = BenchmarkCommandLine.Parse(
@@ -100,6 +128,27 @@ public sealed class BenchmarkConfigurationTests
 
         Assert.Contains(
             "activeShipCount <= shipCount",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReplanningPresetRejectsReplacementOutsideSimulationWindow()
+    {
+        var overrides = new Dictionary<string, long>(StringComparer.Ordinal)
+        {
+            [BenchmarkParameterNames.ReplanCount] = 5,
+            [BenchmarkParameterNames.ReplanIntervalMilliseconds] = 250,
+            [BenchmarkParameterNames.SimulatedDurationMilliseconds] = 999,
+        };
+
+        BenchmarkUsageException exception = Assert.Throws<BenchmarkUsageException>(
+            () => BenchmarkScenarioResolver.ResolvePreset(
+                BenchmarkPresets.ManeuverRepeatedReplanning,
+                overrides));
+
+        Assert.Contains(
+            "every timed replan",
             exception.Message,
             StringComparison.Ordinal);
     }
@@ -182,6 +231,48 @@ public sealed class BenchmarkConfigurationTests
             StringComparison.Ordinal);
         Assert.Contains(
             "\"DomainMeasurementsAvailability\": \"unavailable\"",
+            output.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("benchmark_failure", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FullApplicationRunsReducedRepeatedReplanningScenario()
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        int exitCode = BenchmarkApplication.Run(
+            [
+                "--suite",
+                "full",
+                "--preset",
+                BenchmarkPresets.ManeuverRepeatedReplanning,
+                "--set",
+                $"{BenchmarkParameterNames.WarmupIterations}=0",
+                "--set",
+                $"{BenchmarkParameterNames.MeasuredIterations}=1",
+                "--set",
+                $"{BenchmarkParameterNames.ReplanCount}=4",
+                "--set",
+                $"{BenchmarkParameterNames.ReplanIntervalMilliseconds}=50000",
+                "--set",
+                $"{BenchmarkParameterNames.SimulatedDurationMilliseconds}=200000",
+            ],
+            output,
+            error);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains(
+            "\"Id\": \"maneuver.repeated-replanning\"",
+            output.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"commands\": 4",
+            output.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"events\": 4",
             output.ToString(),
             StringComparison.Ordinal);
         Assert.DoesNotContain("benchmark_failure", error.ToString(), StringComparison.Ordinal);

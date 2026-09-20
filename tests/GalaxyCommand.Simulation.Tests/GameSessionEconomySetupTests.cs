@@ -293,7 +293,8 @@ public sealed class GameSessionEconomySetupTests
             new ConstructionRecipe(
                 [new KeyValuePair<MaterialId, Quantity>(material, new Quantity(1))],
                 new Work(1)),
-            new Quantity(10));
+            new Quantity(10),
+            GameSessionTestFixture.ManeuverCapability);
         var setup = new GameSessionSetup(
             [new StarSystem(GameSessionTestFixture.System, "Test System")],
             [CreateInitialShip()],

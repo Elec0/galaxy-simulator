@@ -25,8 +25,22 @@ public sealed class GameSessionSnapshotTests
         Assert.Equal(GameSessionTestFixture.CargoInventory, ship.CargoInventoryId);
         Assert.Equal(GameSessionTestFixture.Design.CargoCapacity, ship.CargoCapacity);
         Assert.Equal(GameSessionTestFixture.Position(0, 0), ship.Position);
+        Assert.Equal(ShipVelocity.Zero, ship.Velocity);
+        Assert.Equal(ShipHeading.Zero, ship.Heading);
         Assert.Null(ship.Motion);
         Assert.Null(ship.CurrentOrder);
+    }
+
+    [Fact]
+    public void InitialSnapshotPublishesScenarioHeading()
+    {
+        var heading = new ShipHeading(123_456);
+        GameSession session = GameSessionTestFixture.Create(heading: heading);
+
+        GameShipSnapshot ship = Assert.Single(session.CaptureSnapshot().Ships);
+
+        Assert.Equal(heading, ship.Heading);
+        Assert.Equal(ShipVelocity.Zero, ship.Velocity);
     }
 
     [Fact]

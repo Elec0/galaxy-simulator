@@ -6,17 +6,26 @@ namespace GalaxyCommand.Simulation;
 /// </summary>
 public sealed class ShipDesign : ConstructionDesign
 {
+    /// <summary>
+    /// Creates a constructible ship definition with explicit cargo and
+    /// maneuver capability; callers cannot rely on hidden movement defaults.
+    /// </summary>
     public ShipDesign(
         ConstructionDesignId id,
         string name,
         ConstructionRecipe recipe,
-        Quantity cargoCapacity)
+        Quantity cargoCapacity,
+        ShipManeuverCapability maneuverCapability)
         : base(id, name, recipe)
     {
+        ArgumentNullException.ThrowIfNull(maneuverCapability);
         CargoCapacity = cargoCapacity;
+        ManeuverCapability = maneuverCapability;
     }
 
     public Quantity CargoCapacity { get; }
+
+    public ShipManeuverCapability ManeuverCapability { get; }
 }
 
 public sealed record Ship(

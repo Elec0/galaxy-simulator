@@ -15,6 +15,8 @@ public static class BenchmarkParameterNames
     public const string ShipCount = "shipCount";
     public const string ActiveShipCount = "activeShipCount";
     public const string CommandCount = "commandCount";
+    public const string ReplanCount = "replanCount";
+    public const string ReplanIntervalMilliseconds = "replanIntervalMilliseconds";
     public const string FactRetentionCapacity = "factRetentionCapacity";
     public const string TravelDurationMilliseconds = "travelDurationMilliseconds";
     public const string DestinationDistance = "destinationDistance";
@@ -69,6 +71,7 @@ public static class BenchmarkPresets
     public const string SpatialOneCrowded = "spatial.one-crowded";
     public const string NavigationConnectorVolume = "navigation.connector-volume";
     public const string FactsRetentionAndRead = "facts.retention-and-read";
+    public const string ManeuverRepeatedReplanning = "maneuver.repeated-replanning";
 
     private static readonly ReadOnlyDictionary<string, BenchmarkPreset> ValuesById =
         CreateValues();
@@ -102,7 +105,7 @@ public static class BenchmarkPresets
                     (BenchmarkParameterNames.FactRetentionCapacity, 50_000),
                     (BenchmarkParameterNames.TravelDurationMilliseconds, 1_000),
                     (BenchmarkParameterNames.DestinationDistance, 100)),
-                "4a587cefd3335149"),
+                "92f748f87de3d720"),
             new(
                 SpatialOneCrowded,
                 true,
@@ -117,7 +120,7 @@ public static class BenchmarkPresets
                     (BenchmarkParameterNames.FactRetentionCapacity, 25_000),
                     (BenchmarkParameterNames.TravelDurationMilliseconds, 1_000),
                     (BenchmarkParameterNames.DestinationDistance, 100)),
-                "2e6e6c8a57013a7d"),
+                "2e7b8e468f47a265"),
             new(
                 NavigationConnectorVolume,
                 true,
@@ -125,14 +128,15 @@ public static class BenchmarkPresets
                     (BenchmarkParameterNames.WarmupIterations, 1),
                     (BenchmarkParameterNames.MeasuredIterations, 5),
                     (BenchmarkParameterNames.Seed, 1),
-                    (BenchmarkParameterNames.SimulatedDurationMilliseconds, 10_000),
+                    (BenchmarkParameterNames.SimulatedDurationMilliseconds, 1_000_000),
                     (BenchmarkParameterNames.SystemCount, 32),
                     (BenchmarkParameterNames.ShipCount, 1_000),
                     (BenchmarkParameterNames.ActiveShipCount, 1_000),
                     (BenchmarkParameterNames.FactRetentionCapacity, 100_000),
                     (BenchmarkParameterNames.TravelDurationMilliseconds, 100),
                     (BenchmarkParameterNames.DestinationDistance, 100)),
-                "d76e990b96a552f7"),
+                "673c9af7f54a80e4",
+                version: 2),
             new(
                 FactsRetentionAndRead,
                 true,
@@ -145,7 +149,21 @@ public static class BenchmarkPresets
                     (BenchmarkParameterNames.FactRetentionCapacity, 50_000),
                     (BenchmarkParameterNames.TravelDurationMilliseconds, 1_000),
                     (BenchmarkParameterNames.DestinationDistance, 100)),
-                "f9bdd5df868167d8"),
+                "9ffab4f2262b68b6"),
+            new(
+                ManeuverRepeatedReplanning,
+                true,
+                Parameters(
+                    (BenchmarkParameterNames.WarmupIterations, 1),
+                    (BenchmarkParameterNames.MeasuredIterations, 5),
+                    (BenchmarkParameterNames.Seed, 1),
+                    (BenchmarkParameterNames.SimulatedDurationMilliseconds, 5_000_000),
+                    (BenchmarkParameterNames.ReplanCount, 100),
+                    (BenchmarkParameterNames.ReplanIntervalMilliseconds, 50_000),
+                    (BenchmarkParameterNames.FactRetentionCapacity, 10_000),
+                    (BenchmarkParameterNames.TravelDurationMilliseconds, 1_000),
+                    (BenchmarkParameterNames.DestinationDistance, 1_000_000)),
+                "603601f07a12a8c1"),
         ];
         return new ReadOnlyDictionary<string, BenchmarkPreset>(
             values.ToDictionary(value => value.Id, StringComparer.Ordinal));
@@ -407,6 +425,9 @@ public static class BenchmarkScenarioValidator
                 RequireRange(scenario, BenchmarkParameterNames.CommandCount, 1, 10_000_000);
                 ValidateMovementValues(scenario);
                 break;
+            case BenchmarkPresets.ManeuverRepeatedReplanning:
+                ValidateRepeatedReplanning(scenario);
+                break;
             default:
                 throw new BenchmarkUsageException(
                     $"Scenario '{scenario.Id}' uses unsupported base preset '{scenario.BasePreset}'.");
@@ -445,6 +466,31 @@ public static class BenchmarkScenarioValidator
             BenchmarkParameterNames.DestinationDistance,
             1,
             int.MaxValue);
+    }
+
+    /// <summary>
+    /// Keeps every replacement inside the configured simulation window so the
+    /// timed workload never relies on an implicit extension of benchmark time.
+    /// </summary>
+    private static void ValidateRepeatedReplanning(
+        ResolvedBenchmarkScenario scenario)
+    {
+        RequireRange(scenario, BenchmarkParameterNames.ReplanCount, 1, 1_000_000);
+        RequireRange(
+            scenario,
+            BenchmarkParameterNames.ReplanIntervalMilliseconds,
+            1,
+            86_400_000);
+        ValidateMovementValues(scenario);
+        long lastReplanAt = checked(
+            (scenario.Get(BenchmarkParameterNames.ReplanCount) - 1)
+            * scenario.Get(BenchmarkParameterNames.ReplanIntervalMilliseconds));
+        if (lastReplanAt
+            > scenario.Get(BenchmarkParameterNames.SimulatedDurationMilliseconds))
+        {
+            throw new BenchmarkUsageException(
+                $"Scenario '{scenario.Id}' requires every timed replan to occur within simulatedDurationMilliseconds.");
+        }
     }
 
     private static void RequireRange(

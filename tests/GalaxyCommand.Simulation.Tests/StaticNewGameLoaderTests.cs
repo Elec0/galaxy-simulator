@@ -48,12 +48,75 @@ public sealed class StaticNewGameLoaderTests
         Assert.Equal("Starter Ship", ship.Design.Name);
         Assert.Equal(new ConstructionDesignId(1), ship.Design.Id);
         Assert.Equal(new Quantity(100), ship.Design.CargoCapacity);
+        Assert.Equal(10_000UL, ship.Design.ManeuverCapability.BaseMassKilograms);
+        Assert.Equal(
+            10_000UL,
+            ship.Design.ManeuverCapability.BaseAcceleration.MillimetersPerSecondSquared);
+        Assert.Null(ship.Design.ManeuverCapability.CustomPassiveDeceleration);
+        Assert.Equal(
+            300_000UL,
+            ship.Design.ManeuverCapability.MaximumSubCruiseSpeed.MillimetersPerSecond);
+        Assert.Equal(
+            1_000_000UL,
+            ship.Design.ManeuverCapability.CruiseSpeed.MillimetersPerSecond);
+        Assert.Equal(
+            45_000UL,
+            ship.Design.ManeuverCapability.TurnRate.MillidegreesPerSecond);
+        Assert.Equal(10_000UL, ship.Design.ManeuverCapability.MovingSpoolDuration.Milliseconds);
+        Assert.Equal(ShipHeading.Zero, ship.Heading);
         Assert.Equal(new CommandSourceId("local-player"), ship.BaseController.Id);
 
         StaticGalaxyLayoutEntry layout = Assert.Single(result.GalaxyLayout!);
         Assert.Equal(system.Id, layout.SystemId);
         Assert.Equal(0m, layout.X);
         Assert.Equal(0m, layout.Y);
+    }
+
+    [Fact]
+    public void ScenarioHeadingLoadsAndCanonicalizesOneRevolution()
+    {
+        string temporaryRoot = Path.Combine(
+            Path.GetTempPath(),
+            $"galaxy-command-heading-content-{Guid.NewGuid():N}");
+        string packageDirectory = Path.Combine(temporaryRoot, "galaxy-command.core");
+        Directory.CreateDirectory(packageDirectory);
+        try
+        {
+            string sourceDirectory = Path.Combine(
+                FindRepositoryRoot(),
+                "content",
+                "built-in",
+                "galaxy-command.core");
+            foreach (string fileName in new[] { "package.json", "definitions.json", "minimal.json" })
+            {
+                File.Copy(
+                    Path.Combine(sourceDirectory, fileName),
+                    Path.Combine(packageDirectory, fileName));
+            }
+
+            string scenarioPath = Path.Combine(packageDirectory, "minimal.json");
+            File.WriteAllText(
+                scenarioPath,
+                File.ReadAllText(scenarioPath).Replace(
+                    "\"controllerSource\": \"local-player\"",
+                    "\"controllerSource\": \"local-player\",\n        \"headingDegrees\": \"360\"",
+                    StringComparison.Ordinal));
+
+            StaticNewGameLoadResult result = BuiltInNewGame.Load(
+                temporaryRoot,
+                RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]),
+                factRetentionCapacity: 1024,
+                maximumDegreeOfParallelism: 2);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(
+                ShipHeading.Zero,
+                Assert.Single(result.Setup!.Ships).Heading);
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
     }
 
     [Fact]
@@ -153,6 +216,54 @@ public sealed class StaticNewGameLoaderTests
             Assert.Contains(
                 result.Diagnostics,
                 diagnostic => diagnostic.Path.EndsWith(".system", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ZeroAuthoredManeuverMassRejectsTheCompleteSetupAtItsFieldPath()
+    {
+        string temporaryRoot = Path.Combine(
+            Path.GetTempPath(),
+            $"galaxy-command-maneuver-content-{Guid.NewGuid():N}");
+        string packageDirectory = Path.Combine(temporaryRoot, "galaxy-command.core");
+        Directory.CreateDirectory(packageDirectory);
+        try
+        {
+            string sourceDirectory = Path.Combine(
+                FindRepositoryRoot(),
+                "content",
+                "built-in",
+                "galaxy-command.core");
+            foreach (string fileName in new[] { "package.json", "definitions.json", "minimal.json" })
+            {
+                File.Copy(
+                    Path.Combine(sourceDirectory, fileName),
+                    Path.Combine(packageDirectory, fileName));
+            }
+
+            string definitionsPath = Path.Combine(packageDirectory, "definitions.json");
+            File.WriteAllText(
+                definitionsPath,
+                File.ReadAllText(definitionsPath).Replace(
+                    "\"baseMassKilograms\": 10000",
+                    "\"baseMassKilograms\": 0",
+                    StringComparison.Ordinal));
+
+            StaticNewGameLoadResult result = BuiltInNewGame.Load(
+                temporaryRoot,
+                RandomRootSeed.FromBytes(new byte[RandomRootSeed.ByteCount]),
+                factRetentionCapacity: 1024,
+                maximumDegreeOfParallelism: 2);
+
+            Assert.False(result.IsSuccess);
+            Assert.Null(result.Setup);
+            Assert.Contains(
+                result.Diagnostics,
+                diagnostic => diagnostic.Path == "$definition.values.baseMassKilograms");
         }
         finally
         {
