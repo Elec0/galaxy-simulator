@@ -2,9 +2,12 @@
   <Project Path="src/GalaxyCommand.Content/GalaxyCommand.Content.csproj" />
   <Project Path="src/GalaxyCommand.Content.Validator/GalaxyCommand.Content.Validator.csproj" />
   <Project Path="src/GalaxyCommand.Simulation/GalaxyCommand.Simulation.csproj" />
+  <Project Path="src/GalaxyCommand.Client/GalaxyCommand.Client.csproj" />
   <Project Path="src/GalaxyCommand.Godot/GalaxyCommand.Godot.csproj" />
   <Project Path="tests/GalaxyCommand.Simulation.Tests/GalaxyCommand.Simulation.Tests.csproj" />
-  <Project Path="tests/GalaxyCommand.Godot.Tests/GalaxyCommand.Godot.Tests.csproj" />
+  <Project Path="tests/GalaxyCommand.Client.Tests/GalaxyCommand.Client.Tests.csproj" />
   <Project Path="tests/GalaxyCommand.Content.Tests/GalaxyCommand.Content.Tests.csproj" />
+  <Project Path="tests/GalaxyCommand.Content.Validator.Tests/GalaxyCommand.Content.Validator.Tests.csproj" />
   <Project Path="benchmarks/GalaxyCommand.Benchmarks/GalaxyCommand.Benchmarks.csproj" />
+  <Project Path="tests/GalaxyCommand.Benchmarks.Tests/GalaxyCommand.Benchmarks.Tests.csproj" />
 </Solution>

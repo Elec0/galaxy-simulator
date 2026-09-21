@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Sensor deployables](sensor-deployables.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Accessibility](accessibility.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Group and fleet commands](group-and-fleet-commands.md) · [Ship maneuver kinematics](ship-maneuver-kinematics.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Sensor deployables](sensor-deployables.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Accessibility](accessibility.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Group and fleet commands](group-and-fleet-commands.md) · [Ship maneuver kinematics](ship-maneuver-kinematics.md) · [Source-code organization](source-code-organization.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -27,6 +27,7 @@ source of detailed scope and acceptance criteria.
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` owns equipment and ship slots. `TASK-055` owns trade balance, pricing, and settlement design. |
 | Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, and `TASK-089` completed ship thrust and maneuver-kinematics design. | `TASK-090` implements ship maneuver kinematics, `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-075` owns deployment and pickup ranges, and `TASK-088` retains late-term spatial authoring guidance. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
+| Source-code organization | `TASK-091` reorganized source and tests around the documented simulation authority, client presentation, deterministic execution, and test-harness boundaries without changing simulation behavior or public type identity. | Further namespace or assembly changes require measured need and separately approved work. |
 
 ## Current focus
 
@@ -917,6 +918,22 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-091: Reorganize source and tests by ownership boundary**
+  - Reorganized simulation production and tests around kernel, session, actor,
+    spatial, economy, entity, relationship, persistence, loading,
+    presentation, and diagnostic ownership while preserving the
+    `GalaxyCommand.Simulation` namespace and public type identities.
+  - Extracted framework-independent application behavior into
+    `GalaxyCommand.Client`, reduced Godot to its rendering and input adapters,
+    and created dedicated client, validator, and benchmark test projects with
+    direct production references and no linked-source compilation.
+  - Split the large fact, relationship, spatial-navigation, checkpoint, and
+    runtime-coordinator files along their documented responsibilities. Final
+    validation passed all 976 tests, including deterministic simulation and
+    benchmark-configuration coverage, plus the Godot build and headless
+    startup. No follow-up task remains.
+  - Context: [Source-code organization](source-code-organization.md)
 
 - [x] **TASK-089: Define ship thrust, maneuver kinematics, and short moves**
   - Confirmed authored mass, acceleration, speed caps, turn rate, spool duration,

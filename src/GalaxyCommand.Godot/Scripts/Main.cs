@@ -1,4 +1,5 @@
 using GalaxyCommand.Content;
+using GalaxyCommand.Client;
 using GalaxyCommand.Simulation;
 using Godot;
 using System.Diagnostics;

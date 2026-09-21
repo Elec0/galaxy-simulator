@@ -9,6 +9,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Vision and principles](docs/vision.md)
 - [Player experience](docs/player-experience.md)
 - [Simulation architecture](docs/simulation-architecture.md)
+- [Source-code organization](docs/source-code-organization.md)
 - [Runtime orchestration and domain ownership](docs/runtime-orchestration.md)
 - [Navigation and spatial architecture](docs/navigation-architecture.md)
 - [Authoritative system-local coordinate scale](docs/system-local-coordinate-scale.md)
@@ -53,7 +54,12 @@ The active solution contains:
 - `GalaxyCommand.Content`: the rendering- and simulation-independent content library
 - `GalaxyCommand.Content.Validator`: the headless production content validator
 - `GalaxyCommand.Simulation`: the rendering-independent simulation library
-- `GalaxyCommand.Simulation.Tests`: deterministic simulation tests
+- `GalaxyCommand.Client`: rendering-framework-independent application behavior
+- `GalaxyCommand.Godot`: the Godot rendering and input adapter
+- `GalaxyCommand.Benchmarks`: deterministic benchmark configuration and runner
+
+Dedicated test projects mirror the content, validator, simulation, client, and
+benchmark projects.
 
 Run the C# verification commands from this directory:
 

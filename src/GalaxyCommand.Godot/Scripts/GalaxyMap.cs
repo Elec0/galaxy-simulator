@@ -1,3 +1,4 @@
+using GalaxyCommand.Client;
 using GalaxyCommand.Simulation;
 using Godot;
 

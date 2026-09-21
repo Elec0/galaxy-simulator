@@ -1,0 +1,280 @@
+using GalaxyCommand.Benchmarks;
+
+namespace GalaxyCommand.Benchmarks.Tests;
+
+public sealed class BenchmarkConfigurationTests
+{
+    [Fact]
+    public void DefaultSmokeSuiteExplainsThatTheAcceptanceBenchmarkWasRetired()
+    {
+        BenchmarkCommandRequest request = BenchmarkCommandLine.Parse([]);
+
+        BenchmarkUsageException exception = Assert.Throws<BenchmarkUsageException>(
+            () => BenchmarkCommandLine.Resolve(request));
+
+        Assert.Contains("No smoke benchmark remains", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HeavyPresetRequiresExplicitFullSuite()
+    {
+        BenchmarkCommandRequest request = BenchmarkCommandLine.Parse(
+            ["--preset", BenchmarkPresets.SpatialOneCrowded]);
+
+        BenchmarkUsageException exception = Assert.Throws<BenchmarkUsageException>(
+            () => BenchmarkCommandLine.Resolve(request));
+
+        Assert.Contains("--suite full", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FullSuiteAllowsHeavyPresetWithoutRunningIt()
+    {
+        BenchmarkCommandRequest request = BenchmarkCommandLine.Parse(
+            [
+                "--suite",
+                "full",
+                "--preset",
+                BenchmarkPresets.SpatialOneCrowded,
+            ]);
+
+        ResolvedBenchmarkScenario scenario = Assert.Single(
+            BenchmarkCommandLine.Resolve(request));
+
+        Assert.True(scenario.IsHeavy);
+    }
+
+    [Fact]
+    public void RepeatedReplanningPresetDefinesTimeSeparatedReplacements()
+    {
+        BenchmarkPreset preset = BenchmarkPresets.Get(
+            "maneuver.repeated-replanning");
+
+        Assert.True(preset.IsHeavy);
+        Assert.Equal(100, preset.Parameters["replanCount"]);
+        Assert.Equal(50_000, preset.Parameters["replanIntervalMilliseconds"]);
+        Assert.Equal(
+            5_000_000,
+            preset.Parameters[BenchmarkParameterNames.SimulatedDurationMilliseconds]);
+        Assert.Equal("603601f07a12a8c1", preset.ExpectedDigest);
+    }
+
+    [Fact]
+    public void ConnectorVolumePresetAllowsCompleteAnalyticTraversals()
+    {
+        BenchmarkPreset preset = BenchmarkPresets.Get(
+            BenchmarkPresets.NavigationConnectorVolume);
+
+        Assert.Equal(2, preset.Version);
+        Assert.Equal(
+            1_000_000,
+            preset.Parameters[BenchmarkParameterNames.SimulatedDurationMilliseconds]);
+        Assert.Equal("673c9af7f54a80e4", preset.ExpectedDigest);
+    }
+
+    [Fact]
+    public void NumericOverridesAreVisibleAndMakeRunNonCanonical()
+    {
+        BenchmarkCommandRequest request = BenchmarkCommandLine.Parse(
+            [
+                "--suite",
+                "full",
+                "--preset",
+                BenchmarkPresets.SpatialOneCrowded,
+                "--set",
+                $"{BenchmarkParameterNames.MeasuredIterations}=1",
+            ]);
+
+        ResolvedBenchmarkScenario scenario = Assert.Single(
+            BenchmarkCommandLine.Resolve(request));
+
+        Assert.Equal(1, scenario.GetInt32(BenchmarkParameterNames.MeasuredIterations));
+        Assert.False(scenario.IsCanonical);
+        Assert.Null(scenario.ExpectedDigest);
+    }
+
+    [Fact]
+    public void UnknownNumericOverrideIsRejected()
+    {
+        BenchmarkCommandRequest request = BenchmarkCommandLine.Parse(
+            [
+                "--suite",
+                "full",
+                "--preset",
+                BenchmarkPresets.SpatialOneCrowded,
+                "--set",
+                "notAParameter=1",
+            ]);
+
+        BenchmarkUsageException exception = Assert.Throws<BenchmarkUsageException>(
+            () => BenchmarkCommandLine.Resolve(request));
+
+        Assert.Contains("Unknown numeric parameter", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ActiveShipCountCannotExceedShipCount()
+    {
+        var overrides = new Dictionary<string, long>(StringComparer.Ordinal)
+        {
+            [BenchmarkParameterNames.ShipCount] = 10,
+            [BenchmarkParameterNames.ActiveShipCount] = 11,
+        };
+
+        BenchmarkUsageException exception = Assert.Throws<BenchmarkUsageException>(
+            () => BenchmarkScenarioResolver.ResolvePreset(
+                BenchmarkPresets.SpatialOneCrowded,
+                overrides));
+
+        Assert.Contains(
+            "activeShipCount <= shipCount",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReplanningPresetRejectsReplacementOutsideSimulationWindow()
+    {
+        var overrides = new Dictionary<string, long>(StringComparer.Ordinal)
+        {
+            [BenchmarkParameterNames.ReplanCount] = 5,
+            [BenchmarkParameterNames.ReplanIntervalMilliseconds] = 250,
+            [BenchmarkParameterNames.SimulatedDurationMilliseconds] = 999,
+        };
+
+        BenchmarkUsageException exception = Assert.Throws<BenchmarkUsageException>(
+            () => BenchmarkScenarioResolver.ResolvePreset(
+                BenchmarkPresets.ManeuverRepeatedReplanning,
+                overrides));
+
+        Assert.Contains(
+            "every timed replan",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ScenarioFileAndCommandLineOverridesUseDocumentedPrecedence()
+    {
+        string path = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(
+                path,
+                """
+                {
+                  "schemaVersion": 1,
+                  "scenarioId": "test.custom-crowded",
+                  "basePreset": "spatial.one-crowded",
+                  "basePresetVersion": 1,
+                  "parameters": {
+                    "shipCount": 20,
+                    "activeShipCount": 10
+                  }
+                }
+                """);
+            var commandLineOverrides = new Dictionary<string, long>(
+                StringComparer.Ordinal)
+            {
+                [BenchmarkParameterNames.ActiveShipCount] = 5,
+            };
+
+            ResolvedBenchmarkScenario scenario =
+                BenchmarkScenarioResolver.ResolveFile(
+                    path,
+                    commandLineOverrides);
+
+            Assert.Equal("test.custom-crowded", scenario.Id);
+            Assert.Equal(20, scenario.GetInt32(BenchmarkParameterNames.ShipCount));
+            Assert.Equal(5, scenario.GetInt32(BenchmarkParameterNames.ActiveShipCount));
+            Assert.Equal(1, scenario.GetInt32(BenchmarkParameterNames.SystemCount));
+            Assert.False(scenario.IsCanonical);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void FullApplicationRunsAnExplicitReducedBenchmarkScenario()
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        int exitCode = BenchmarkApplication.Run(
+            [
+                "--suite",
+                "full",
+                "--preset",
+                BenchmarkPresets.SpatialOneCrowded,
+                "--set",
+                $"{BenchmarkParameterNames.WarmupIterations}=0",
+                "--set",
+                $"{BenchmarkParameterNames.MeasuredIterations}=1",
+                "--set",
+                $"{BenchmarkParameterNames.ShipCount}=2",
+                "--set",
+                $"{BenchmarkParameterNames.ActiveShipCount}=2",
+            ],
+            output,
+            error);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains(
+            "\"Id\": \"spatial.one-crowded\"",
+            output.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"SchemaVersion\": 2",
+            output.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"DomainMeasurementsAvailability\": \"unavailable\"",
+            output.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("benchmark_failure", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FullApplicationRunsReducedRepeatedReplanningScenario()
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        int exitCode = BenchmarkApplication.Run(
+            [
+                "--suite",
+                "full",
+                "--preset",
+                BenchmarkPresets.ManeuverRepeatedReplanning,
+                "--set",
+                $"{BenchmarkParameterNames.WarmupIterations}=0",
+                "--set",
+                $"{BenchmarkParameterNames.MeasuredIterations}=1",
+                "--set",
+                $"{BenchmarkParameterNames.ReplanCount}=4",
+                "--set",
+                $"{BenchmarkParameterNames.ReplanIntervalMilliseconds}=50000",
+                "--set",
+                $"{BenchmarkParameterNames.SimulatedDurationMilliseconds}=200000",
+            ],
+            output,
+            error);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains(
+            "\"Id\": \"maneuver.repeated-replanning\"",
+            output.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"commands\": 4",
+            output.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"events\": 4",
+            output.ToString(),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("benchmark_failure", error.ToString(), StringComparison.Ordinal);
+    }
+}

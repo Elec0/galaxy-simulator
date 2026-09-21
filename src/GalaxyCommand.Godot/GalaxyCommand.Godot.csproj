@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../GalaxyCommand.Client/GalaxyCommand.Client.csproj" />
     <ProjectReference Include="../GalaxyCommand.Simulation/GalaxyCommand.Simulation.csproj" />
   </ItemGroup>
 
