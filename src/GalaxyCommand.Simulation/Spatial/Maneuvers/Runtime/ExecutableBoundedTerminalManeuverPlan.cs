@@ -58,6 +58,34 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             _ => settled,
             ManeuverPhaseSchedules.TerminalSettle(at));
 
+    /// <summary>
+    /// Adapts orderless passive drift into the shared analytic scheduler so a
+    /// cancelled ship keeps moving until drag brings it to rest.
+    /// </summary>
+    internal static ExecutableBoundedTerminalManeuverPlan FromPassiveDrag(
+        DecelerationManeuverSegment segment)
+    {
+        ArgumentNullException.ThrowIfNull(segment);
+        if (segment.Kind != ManeuverDecelerationKind.PassiveDrag)
+        {
+            throw new ArgumentException(
+                "An orderless drift plan requires passive drag.",
+                nameof(segment));
+        }
+
+        return new ExecutableBoundedTerminalManeuverPlan(
+            BoundedTerminalPlanKind.PassiveDrag,
+            segment.StartsAt,
+            segment.EndsAt,
+            segment.StateAt,
+            [
+                new ManeuverScheduledPhase(
+                    ManeuverPhaseKind.CoastUnderPassiveDrag,
+                    segment.StartsAt,
+                    segment.EndsAt),
+            ]);
+    }
+
     internal static ExecutableBoundedTerminalManeuverPlan From(
         StationaryTurnManeuverPlan plan) =>
         new(

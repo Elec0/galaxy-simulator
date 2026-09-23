@@ -278,6 +278,54 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     }
 
     /// <summary>
+    /// Schedules orderless passive deceleration from the ship's exact
+    /// materialized cancellation state. A ship already at rest needs no work.
+    /// </summary>
+    private void StartPassiveDrag(ShipId shipId)
+    {
+        ShipKinematicState? localState = _movement.KinematicStateAt(
+            shipId,
+            CurrentTime);
+        // Connector traversal remains authoritative after its order is
+        // cancelled and has no system-local velocity to decelerate.
+        if (localState is null
+            && _movement.GetState(shipId) is ShipSpatialState.ConnectorTransit)
+        {
+            return;
+        }
+
+        ShipKinematicState start = localState
+            ?? throw new InvalidOperationException(
+                $"Ship {shipId} has no system-local kinematic state.");
+        if (start.Velocity == ShipVelocity.Zero)
+        {
+            return;
+        }
+
+        EffectiveShipManeuverCapability capability =
+            ResolveManeuverCapability(shipId);
+        var drag = new DecelerationManeuverSegment(
+            ManeuverDecelerationKind.PassiveDrag,
+            CurrentTime,
+            start,
+            capability.PassiveDeceleration);
+        TerminalManeuverCommit<GameEvent> commit =
+            _movement.CommitStartTerminalManeuver(
+                shipId,
+                ExecutableBoundedTerminalManeuverPlan.FromPassiveDrag(drag),
+                ManeuverObjective.ShortestPath,
+                CurrentTime,
+                movement =>
+                    (GameEvent)new GameEvent.SpatialMovement(movement));
+        AgendaCommitResult agendaCommit = AgendaCommitOwner.Commit(
+            _agenda,
+            commit.EventProposals);
+        _movement.BindTerminalManeuverEvents(
+            shipId,
+            agendaCommit.EventKeys);
+    }
+
+    /// <summary>
     /// Resolves the current base design at its authored mass. Typed equipment
     /// contributions remain owned by TASK-068 and can replace this lookup
     /// without changing maneuver planning or schedule ownership.
@@ -303,6 +351,28 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         if (state is not ShipSpatialState.Moving
             && state is not ShipSpatialState.AnalyticManeuver)
         {
+            return;
+        }
+
+        if (state is ShipSpatialState.AnalyticManeuver
+            {
+                Maneuver.Plan.Kind: BoundedTerminalPlanKind.PassiveDrag,
+            })
+        {
+            AgendaCancellationCheck passiveCancellation =
+                _movement.TryInterruptTerminalManeuver(
+                    shipId,
+                    CurrentTime,
+                    _agenda,
+                    movement =>
+                        (GameEvent)new GameEvent.SpatialMovement(movement),
+                    out _);
+            if (passiveCancellation != AgendaCancellationCheck.Matches)
+            {
+                throw new InvalidOperationException(
+                    $"Ship {shipId} passive drag cancellation did not match its pending agenda event.");
+            }
+
             return;
         }
 

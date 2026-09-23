@@ -13,6 +13,7 @@ public partial class GalaxyMap : Control
 {
 	private const float SystemHitRadius = 18.0f;
 	private const float ShipHitRadius = 14.0f;
+	private const float ShipGlyphRadius = 6.0f;
 	private const float MinimumZoom = 0.25f;
 	private const float MaximumZoom = 4.0f;
 	private readonly SortedSet<ShipId> _selectedShipIds = new(
@@ -282,7 +283,16 @@ public partial class GalaxyMap : Control
 				DrawArc(position, 12.0f, 0, Mathf.Tau, 32, new Color("70c7e8"), 2.0f, true);
 			}
 
-			DrawCircle(position, 6.0f, new Color("f5c86b"));
+			SystemMapShipTriangle triangle = SystemMapShipGlyph.CreateTriangle(
+				ship.Heading,
+				ShipGlyphRadius);
+			DrawColoredPolygon(
+				[
+					position + ToGodotVector(triangle.Tip),
+					position + ToGodotVector(triangle.FirstBase),
+					position + ToGodotVector(triangle.SecondBase),
+				],
+				new Color("f5c86b"));
 			DrawString(ThemeDB.FallbackFont, position + new Vector2(10, 5), $"S{ship.Id.Value}", fontSize: 12, modulate: new Color("d8bb78"));
 		}
 	}
@@ -397,6 +407,8 @@ public partial class GalaxyMap : Control
 	private Vector2 FromSystemView(Vector2 position) => _systemCamera + ((position - (Size / 2)) / _systemZoom);
 
 	private static Vector2 ToVector(SpatialPosition position) => new((float)position.X.Units, (float)-position.Y.Units);
+
+	private static Vector2 ToGodotVector(System.Numerics.Vector2 vector) => new(vector.X, vector.Y);
 
 	private static bool ShouldDrawRoute(ShipOrderSnapshot? order) => order?.Status is ShipOrderStatus.Active or ShipOrderStatus.Waiting;
 

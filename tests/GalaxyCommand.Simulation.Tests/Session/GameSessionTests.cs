@@ -121,7 +121,7 @@ public sealed class GameSessionTests
     }
 
     [Fact]
-    public void CancellationMaterializesPositionAndInvalidatesArrival()
+    public void CancellationMaterializesPositionInvalidatesArrivalAndStartsPassiveDrag()
     {
         GameSession session = GameSessionTestFixture.Create();
         session.SubmitCommand(
@@ -144,15 +144,21 @@ public sealed class GameSessionTests
         GameShipSnapshot cancelled = Assert.Single(session.CaptureSnapshot().Ships);
         Assert.Equal(materialized, cancelled.Position);
         Assert.Null(cancelled.Motion);
-        Assert.Null(cancelled.Maneuver);
+        Assert.Equal(BoundedTerminalPlanKind.PassiveDrag, cancelled.Maneuver?.PlanKind);
         Assert.Equal(ShipOrderStatus.Cancelled, cancelled.CurrentOrder?.Status);
         Assert.Equal(ShipOrderReason.CancelledByCommand, cancelled.CurrentOrder?.Reason);
 
         session.AdvanceTo(new SimulationTime(20_000));
 
-        Assert.Equal(materialized, Assert.Single(
-            session.CaptureSnapshot().Ships).Position);
-        Assert.Empty(session.EventRecords);
+        GameShipSnapshot stopped = Assert.Single(session.CaptureSnapshot().Ships);
+        Assert.NotEqual(materialized, stopped.Position);
+        Assert.NotEqual(GameSessionTestFixture.Position(100, 0), stopped.Position);
+        Assert.Equal(ShipVelocity.Zero, stopped.Velocity);
+        Assert.Null(stopped.Maneuver);
+        Assert.Single(session.EventRecords);
+        Assert.Equal(
+            ScheduledEventDisposition.Applied,
+            session.EventRecords[0].Disposition);
     }
 
     [Fact]

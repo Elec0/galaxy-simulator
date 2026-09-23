@@ -218,10 +218,17 @@ internal sealed partial class ActorOrderRuntimeCoordinator
 
         if (disposition == CancelOrderDisposition.Active)
         {
-            StartOrContinueOrders(
-                proposal.ShipId,
-                transitions,
-                factProposals);
+            if (_orders.GetActive(proposal.ShipId) is not null)
+            {
+                StartOrContinueOrders(
+                    proposal.ShipId,
+                    transitions,
+                    factProposals);
+            }
+            else
+            {
+                StartPassiveDrag(proposal.ShipId);
+            }
         }
     }
 

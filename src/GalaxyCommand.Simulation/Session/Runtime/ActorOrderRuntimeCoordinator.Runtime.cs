@@ -224,12 +224,24 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                 case SpatialMovementEvent.Maneuver maneuver
                     when maneuver.Event is ManeuverScheduleEvent.Complete:
                     {
-                        ShipOrder active = _orders.GetActive(maneuver.ShipId)
-                            ?? throw new InvalidOperationException(
-                                $"Ship {maneuver.ShipId} completed a maneuver without an active order.");
                         ScheduledTerminalManeuver completed = endingManeuver
                             ?? throw new InvalidOperationException(
                                 $"Applied completion for ship {maneuver.ShipId} had no matching maneuver.");
+                        if (completed.Plan.Kind == BoundedTerminalPlanKind.PassiveDrag)
+                        {
+                            if (_orders.GetActive(maneuver.ShipId) is not null)
+                            {
+                                throw new InvalidOperationException(
+                                    $"Ship {maneuver.ShipId} completed orderless passive drag with an active order.");
+                            }
+
+                            continueOrders = false;
+                            break;
+                        }
+
+                        ShipOrder active = _orders.GetActive(maneuver.ShipId)
+                            ?? throw new InvalidOperationException(
+                                $"Ship {maneuver.ShipId} completed a maneuver without an active order.");
                         ShipKinematicState final = completed.Plan.StateAt(now);
                         factProposals.Add(PhysicalWorkEndedProposal(
                             maneuver.ShipId,

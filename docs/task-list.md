@@ -77,6 +77,11 @@ This section is to put work that is currently being performed. Once the work is 
     rounding, schedule the stop boundary upward, preserve direction and
     heading, never reverse, retain distinct single-rate instructions, and
     publish exact zero velocity at the scheduled stop.
+  - Routed explicit cancellation of a moving local order into an orderless
+    passive-drag schedule from the exact materialized state. Presentation now
+    observes continued position and velocity changes until the ship reaches
+    rest, while queued-order promotion and connector traversal retain their
+    existing ownership.
   - Added the shared latest-safe-braking calculation for terminal approaches
     and short moves. It uses complete vector speeds and the accepted
     squared-speed relation, publishes normally rounded millimeter diagnostics,
@@ -918,6 +923,15 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-092: Render heading-aware Godot ship glyphs**
+  - Replaced each system-map ship dot with a centered equilateral triangle.
+    Its tip follows the immutable authoritative local heading after the map's
+    existing screen-coordinate projection, without changing simulation state
+    or ship selection behavior.
+  - Added framework-independent client geometry coverage for all cardinal
+    headings. Client tests, the Godot build, and headless preview startup pass.
+  - Context: [Presentation snapshots](presentation-snapshots.md) · [Source-code organization](source-code-organization.md)
 
 - [x] **TASK-091: Reorganize source and tests by ownership boundary**
   - Reorganized simulation production and tests around kernel, session, actor,

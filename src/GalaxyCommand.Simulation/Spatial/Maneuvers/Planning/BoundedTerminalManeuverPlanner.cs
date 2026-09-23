@@ -13,6 +13,7 @@ public enum BoundedTerminalPlanKind
     ReducedThrustTerminal,
     WaypointRoute,
     DirectionalPlanner,
+    PassiveDrag,
 }
 
 /// <summary>

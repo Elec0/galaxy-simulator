@@ -5,6 +5,44 @@ namespace GalaxyCommand.Simulation.Tests;
 public sealed class GameSessionTerminalManeuverTests
 {
     [Fact]
+    public void CancellationPassivelyDeceleratesMaterializedVelocityToRest()
+    {
+        GameSession session = CreateSession();
+        session.SubmitCommand(
+            GameSessionTestFixture.Player,
+            new MoveShipCommand(
+                GameSessionTestFixture.Ship,
+                GameSessionTestFixture.Destination(100, 0),
+                OrderPlacement.ReplaceAll));
+        session.AdvanceTo(new SimulationTime(1_000));
+        GameShipSnapshot moving = Assert.Single(session.CaptureSnapshot().Ships);
+
+        session.SubmitCommand(
+            GameSessionTestFixture.Player,
+            new CancelShipOrderCommand(
+                GameSessionTestFixture.Ship,
+                new ShipOrderId(1)));
+
+        GameShipSnapshot cancelled = Assert.Single(session.CaptureSnapshot().Ships);
+        Assert.Equal(ShipOrderStatus.Cancelled, cancelled.CurrentOrder?.Status);
+        Assert.Equal(moving.Position, cancelled.Position);
+        Assert.Equal(moving.Velocity, cancelled.Velocity);
+        Assert.NotNull(cancelled.Maneuver);
+
+        session.AdvanceTo(new SimulationTime(2_000));
+        GameShipSnapshot decelerating = Assert.Single(session.CaptureSnapshot().Ships);
+        Assert.NotEqual(cancelled.Position, decelerating.Position);
+        Assert.True(
+            ManeuverVector.SpeedMagnitude(decelerating.Velocity)
+                < ManeuverVector.SpeedMagnitude(cancelled.Velocity));
+
+        session.AdvanceTo(cancelled.Maneuver!.NextBoundary!.Timestamp);
+        GameShipSnapshot stopped = Assert.Single(session.CaptureSnapshot().Ships);
+        Assert.Equal(ShipVelocity.Zero, stopped.Velocity);
+        Assert.Null(stopped.Maneuver);
+    }
+
+    [Fact]
     public void ZeroDistanceRequestedHeadingTurnsBeforeCompletingOrder()
     {
         GameSession session = CreateSession();
