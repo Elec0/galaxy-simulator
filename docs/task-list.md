@@ -25,7 +25,7 @@ source of detailed scope and acceptance criteria.
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` owns equipment and ship slots. `TASK-055` owns trade balance, pricing, and settlement design. |
-| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. | `TASK-068` owns installed-equipment capability contributions, `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-075` owns deployment and pickup ranges, and `TASK-088` retains late-term spatial authoring guidance. |
+| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract; `TASK-075` completed deployment and pickup range and action-order design. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. | `TASK-068` owns installed-equipment capability contributions, `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-095` implements deployables and range orders, `TASK-094` owns player order-failure notifications, and `TASK-088` retains late-term spatial authoring guidance. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 | Source-code organization | `TASK-091` reorganized source and tests around the documented simulation authority, client presentation, deterministic execution, and test-harness boundaries without changing simulation behavior or public type identity. | Further namespace or assembly changes require measured need and separately approved work. |
 
@@ -78,7 +78,7 @@ This section is to put work that is currently being performed. Once the work is 
     preference store completed by `TASK-084`, not a separate pacing-only file.
   - Context: [Time and pacing](time-and-pacing.md)
 
-`TASK-068`, `TASK-071`, `TASK-073`, and `TASK-075` remain in the
+`TASK-068`, `TASK-071`, and `TASK-073` remain in the
 near-term parking-lot horizon until the project owner promotes one of them.
 
 ## Future parking lot
@@ -91,17 +91,24 @@ The parking-lot horizons organize deferred work by likely sequencing. A task
 in the **Near term** parking-lot section remains deferred; it is not promoted to
 the project-level **Near-term work** section above.
 
-- [ ] **TASK-075: Define deployable deployment and pickup ranges**
-  - Define the bounded numeric range and policy source for authorized ships to
-    deploy or pick up stationary sensor deployables, measured from the acting
-    ship's committed system-local position.
-  - Define admission-time reevaluation while the ship or target moves, command
-    failure behavior, facts, snapshots, checkpoints, and saves without creating
-    collision, avoidance, combat, or a general NPC knowledge model.
-  - Build on completed `TASK-019` and `TASK-074`; coordinate spatial
-    implementation with `TASK-071`, sensor consumption with `TASK-073`, and
-    combat range with `TASK-046` without merging their policies.
-  - Context: [Sensor deployables](sensor-deployables.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
+- [ ] **TASK-095: Implement sensor deployables and deployment/pickup orders**
+  - Implement the accepted `TASK-074` and `TASK-075` inventory/entity lifecycle,
+    item-defined deployment range, ship-defined pickup range, and approach
+    orders with moving execution, inclusive bounds, no reservations, terminal
+    failure, and immediate queue progression on success.
+  - Coordinate range-entry timing with `TASK-071` and sensor-source consumption
+    with `TASK-073`. Supply facts, snapshots, checkpoint/save continuity,
+    deterministic contention, and the design's focused verification criteria.
+    Player failure notification remains deferred to `TASK-094`.
+  - Context: [Sensor deployables](sensor-deployables.md) · [Moving-ship interactions](moving-ship-interactions.md)
+
+- [ ] **TASK-094: Define and implement player order-failure notifications**
+  - Provide a player-facing notification when an accepted order fails,
+    including deploy and pickup orders from `TASK-075`, using authoritative
+    order outcomes and typed failure reasons.
+  - Defer notification policy and presentation until owner review; preserve
+    semantic failure facts and terminal order state independently of this UI.
+  - Context: [Sensor deployables](sensor-deployables.md#execution-and-failure) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md)
 
 - [ ] **TASK-071: Implement moving-ship interaction discovery and timing**
   - Implement the accepted `TASK-019` contracts for explicit interaction
@@ -618,6 +625,17 @@ the project-level **Near-term work** section above.
 
 ## Completed foundations
 
+- [x] **TASK-075: Define deployable deployment and pickup ranges**
+  - Confirmed on 2026-10-01: item-defined 2,500-meter deployment range and
+    ship-defined 5,000-meter pickup range, both inclusive, with out-of-range
+    orders moving into range before acting.
+  - Defined moving execution, revalidation without reservations, terminal
+    failure on lost eligibility, immediate queue progression on success,
+    deterministic contention, and facts, snapshot, checkpoint/save, and
+    verification requirements. Implementation remains `TASK-095`; player
+    failure notification remains deferred to `TASK-094`.
+  - Context: [Sensor deployables](sensor-deployables.md#deployment-and-pickup-range-design-task-075)
+
 - [x] **TASK-093: Apply a provisional course-turn threshold**
   - Added a temporary 50-meter Euclidean threshold for exact-rest off-heading
     moves. At or beyond it, the ship turns toward its resolved course before
@@ -837,7 +855,7 @@ the project-level **Near-term work** section above.
     valid system-local placement, no initial occupancy rule, deterministic
     contention, facts, observed presentation, checkpoint and save state, and
     the committed sensor-source handoff consumed by `TASK-073`.
-  - Deferred numeric deployment and pickup range policy to `TASK-075`, and
+  - Range and action-order design completed by `TASK-075`; deferred
     combat targeting, destruction, and disposition to `TASK-046`.
   - Context: [Sensor deployables](sensor-deployables.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Entity lifecycle](entity-lifecycle.md) · [Inventory and cargo](inventory-and-cargo.md)
 

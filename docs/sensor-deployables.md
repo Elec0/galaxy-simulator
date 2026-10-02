@@ -7,8 +7,8 @@
 `TASK-074` defines the entity and lifecycle boundary for the initial stationary
 sensor deployable before `TASK-073` consumes it as a sensor source. It does not
 define sensor observation outcomes, construction assets, equipment, combat, or
-general placement mechanics. `TASK-075` retains the deferred numeric deployment
-and pickup range policy.
+general placement mechanics. Completed `TASK-075` defines deployment and pickup
+range policy and the orders that move an acting ship into range.
 
 ## Accepted boundary
 
@@ -75,8 +75,10 @@ An authorized ship submits an explicit deployment command that names one
 eligible inventory item and a target `SystemPosition` in that ship's current
 system. The command is admitted only when the ship is live and not in connector
 transit, the source inventory is controlled by the owning principal, the item
-is available, the target is valid system-local position data, and the command
-satisfies the bounded-range policy defined below.
+is available, and the target is valid system-local position data. The owner
+confirmed under `TASK-075` that an out-of-range command creates an order to move
+into range and then act. Command admission and execution of the inventory and
+entity transition are therefore distinct checks, as defined below.
 
 The initial contract adds no occupancy, minimum-separation, collision,
 avoidance, terrain, or other physical-placement rule. Independent deployables
@@ -94,13 +96,135 @@ one deterministic winner. Independent items targeting the same position do not
 conflict under the initial no-occupancy contract. A ship admits at most one
 deploy or pickup command at one commit boundary.
 
-### Deferred range policy
+### Deployment and pickup range design (TASK-075)
 
-Deployment and pickup must ultimately require a bounded system-local range
-relative to the interacting principal. The authorized ship's committed
-system-local position is that principal's interaction origin. `TASK-075` must
-define the numeric range and policy source. Until it does, this document does
-not authorize an unbounded interaction rule, including within one system.
+**Decision status:** Confirmed by the project owner on 2026-10-01. The
+completed `TASK-075` design establishes the range values, definition owners,
+move-into-range behavior, execution while
+moving, no reservations, inclusive boundaries, and terminal failure on lost
+eligibility. Successful execution immediately advances the order queue.
+
+The completed lifecycle contract establishes who may act and which inventory
+and entity changes commit together. This design establishes how close the
+acting ship must be, where that policy comes from, and what happens when the
+ship is outside the permitted range.
+
+Completed `TASK-087` supplies the measurement contract: one coordinate unit is
+one meter, positions represent points, and ordinary range uses Euclidean
+distance. Authoritative comparisons use squared distances with wide checked
+arithmetic inside the common coordinate envelope. See [Authoritative
+system-local coordinate scale](system-local-coordinate-scale.md).
+
+#### Confirmed range and order decisions
+
+| Operation | Initial range | Policy source | Out-of-range behavior |
+| --- | --- | --- | --- |
+| Deploy | 2,500 meters | Deployable item definition | Create an order that moves into range, then deploys at the commanded position |
+| Pick up | 5,000 meters | Acting ship definition | Create an order that moves into range, then picks up the named deployed entity |
+
+Deployment and pickup use independently defined ranges. The authorized ship's
+committed system-local position is the interaction origin. The deployment
+target remains the explicit commanded position; pickup names the live deployed
+entity. Moving the ship does not move the deployment target or the stationary
+deployable. Sensor radius and shooting range retain their separate owners.
+The ship-defined interaction/pickup range does not by itself define outcomes
+for other interaction domains.
+
+The order retains its action intent through movement rather than requiring the
+caller to submit a second deploy or pickup command. It must participate in the
+existing actor-control and order lifecycle, including cancellation, suspension,
+target invalidation, and deterministic commit. These confirmed decisions do not
+select a new navigation algorithm or create a second movement owner.
+
+#### Execution and failure
+
+Deployment and pickup may execute while the acting ship is moving. Neither
+action requires zero speed. Both ranges include their exact boundary:
+deployment permits a distance of exactly 2,500 meters and pickup permits
+exactly 5,000 meters. Compare squared distance with squared applicable range
+using the shared wide-arithmetic contract.
+
+Approach orders reserve neither the deployment item nor pickup inventory
+capacity or the target deployable. Accepting an order does not prevent another
+eligible operation from consuming that item, filling the inventory, or picking
+up that target first. Execution revalidates live actor and target state,
+current controller and ownership authorization, system membership, applicable
+range, item availability, and destination inventory capacity before the atomic
+inventory and entity transition. A ship in connector transit cannot execute
+either action because it has no system-local position.
+
+An invalid initial submission is a rejected command under the existing command
+contract. An accepted order that subsequently loses its required item,
+capacity, authorization, target, or another required eligibility condition
+fails with a typed reason. It does not wait for the item or capacity to return,
+reserve resources retroactively, or retry after failure. Outside range during
+a valid approach is expected progress, not itself a failure.
+
+Range-entry work uses `TASK-071` and the authoritative motion schedule. Due
+reevaluation reads the committed spatial view after physical completions at
+that timestamp. A forecast or a crossing in the preceding interval triggers
+reevaluation; it does not authorize execution if the ship is already outside
+range at the representable timestamp. Committed changes to motion, target,
+inventory, authorization, or applicable policy invalidate affected evaluations.
+Stale scheduled work cannot execute a cancelled, failed, or completed order.
+
+Evaluation reads stable inputs and returns buffered proposals. Deterministic
+owner commit revalidates contended resources in the existing stable command
+order, so two unreserved orders cannot both consume one item or pick up one
+entity. A losing accepted order fails without a partial inventory or entity
+transition. Only a successful action emits the deployment or pickup success
+fact. Failure uses the existing semantic order-transition fact and terminal
+order reason; the accepted command receipt remains distinct from its later
+order outcome.
+
+The player must eventually be notified when an order fails. The notification
+system and its presentation are explicitly deferred to `TASK-094`. Recording
+the authoritative failure and its reason is required even before that surface
+exists. This design does not add a temporary notification mechanism.
+
+```mermaid
+flowchart TD
+    accepted["Accepted action order, no reservations"]
+    evaluate["Revalidate committed eligibility and range"]
+    approach["Move into range through movement owner"]
+    failed["Fail order with typed reason"]
+    commit["Atomic inventory and entity commit"]
+    fact["Success fact, complete order, advance queue"]
+    accepted --> evaluate
+    evaluate -->|"Valid, outside range"| approach
+    approach -->|"Range entry or state change"| evaluate
+    evaluate -->|"Lost required eligibility"| failed
+    evaluate -->|"Valid, within inclusive range"| commit
+    commit --> fact
+```
+
+#### Successful execution and order progression
+
+Successful deployment or pickup completes the action order and immediately
+advances the order queue through the existing order coordinator. It does not
+wait for the ship to stop or finish the remaining approach movement. Movement
+handoff uses the committed position and velocity and the existing movement and
+order lifecycle; success does not introduce an instantaneous stop. Any
+replacement or invalidation of approach work goes through the movement owner.
+Stale approach events cannot execute the completed action again.
+
+#### Verification criteria
+
+Implementation must prove exact-boundary, just-inside, just-outside, diagonal,
+and large-coordinate comparisons for both independently sourced ranges. It
+must cover moving execution, brief swept crossings that end outside range,
+connector transit, cancellation and stale events, same-time contention without
+reservations, item or capacity loss, authorization loss, and target removal.
+Failed execution must leave inventory and entity state unchanged while exposing
+the terminal reason through the order lifecycle. Checkpoint continuation must
+produce the same outcomes as uninterrupted execution. Any batched evaluation
+must preserve the single-thread result across worker counts, partition layouts,
+and batch sizes.
+
+Neither operation may execute outside its applicable bounded range, even when
+the actor and target are in the same system. Accepting an approach order does
+not authorize its later inventory or entity mutation without execution-time
+eligibility.
 
 ## Facts, presentation, persistence, and sensor handoff
 
@@ -122,6 +246,18 @@ It does not retain derived spatial indexes or sensor coverage. Restore resolves
 the definition and ownership links, validates them, then publishes only fully
 live deployed entities.
 
+Pending deploy and pickup orders retain their stable order and source-command
+identities, acting ship, action kind, source or destination inventory references,
+deployment item and position or pickup entity target, lifecycle state, and
+movement correlation through the existing authoritative order and movement
+checkpoint boundaries. There is no reservation state to save. The resolved
+item-defined deployment range and ship-defined pickup range must retain their
+authoritative meaning through versioned definition references or saved policy,
+following the existing content and save compatibility contracts. Restore must
+not silently substitute changed range values or execute a pending action twice.
+Spatial candidates and range forecasts remain derived data and rebuild from
+restored committed state.
+
 After a successful deployment commit, the deployable owner publishes an
 immutable sensor-source record containing entity identity, owning principal,
 system, position, and sensor radius. `TASK-073` reads only this committed record
@@ -130,7 +266,8 @@ own placement, inventory, command, or lifecycle transitions.
 
 ## Deferred work
 
-`TASK-075` owns the numeric deployment and pickup range policy. `TASK-046`
+`TASK-095` implements the accepted deployable lifecycle and range-order
+contracts. `TASK-094` owns deferred player notification of order failure. `TASK-046`
 owns combat targeting, shooting range, damage, destruction, and its resulting
 disposition.
 
@@ -138,6 +275,6 @@ The approved interactions do not imply capture, transfer between principals,
 repair, resupply, refuelling, hacking, deactivation, recovery after damage, or
 salvage. A later task may introduce any of these only with an owning contract.
 
-`TASK-069` implements the generalized inventory side after this design defines
-the necessary transaction boundary. `TASK-073` consumes the deployed entity as
-a stationary sensor source only after its lifecycle contract is accepted.
+Completed `TASK-069` supplies generalized inventory. `TASK-095` implements the
+deployable transactions over that foundation. `TASK-073` consumes committed
+deployed entities as stationary sensor sources.

@@ -82,8 +82,8 @@ Station participation depends on the station identity and lifecycle owned by
 inventory item that materializes into a deployed entity, including its identity,
 placement, ownership, pickup, facts, presentation, persistence, and committed
 sensor-source handoff in [Sensor deployables](sensor-deployables.md). `TASK-075`
-retains only the deferred numeric deployment and pickup range policy. `TASK-073`
-consumes the completed deployable contract.
+completed deployment and pickup range and action-order design. `TASK-095`
+implements the deployable contract that `TASK-073` consumes.
 
 ## Live contacts and retained discoveries
 
