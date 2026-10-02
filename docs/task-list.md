@@ -25,7 +25,7 @@ source of detailed scope and acceptance criteria.
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` owns equipment and ship slots. `TASK-055` owns trade balance, pricing, and settlement design. |
-| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, and `TASK-089` completed ship thrust and maneuver-kinematics design. | `TASK-090` implements ship maneuver kinematics, `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-075` owns deployment and pickup ranges, and `TASK-088` retains late-term spatial authoring guidance. |
+| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. | `TASK-068` owns installed-equipment capability contributions, `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-075` owns deployment and pickup ranges, and `TASK-088` retains late-term spatial authoring guidance. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 | Source-code organization | `TASK-091` reorganized source and tests around the documented simulation authority, client presentation, deterministic execution, and test-harness boundaries without changing simulation behavior or public type identity. | Further namespace or assembly changes require measured need and separately approved work. |
 
@@ -33,326 +33,6 @@ source of detailed scope and acceptance criteria.
 
 This section is to put work that is currently being performed. Once the work is finished the task should be moved to Completed, and an entry should be added to the Project Status summary above.
 
-- [ ] **TASK-090: Implement ship thrust, maneuver kinematics, and short moves**
-  - Started the fixed-point capability foundation: exact invariant parsing for
-    authored speed, acceleration, and turn-rate values; a validated immutable
-    base-capability aggregate; and canonical heading with deterministic
-    clockwise shortest-turn ties.
-  - Added immediate mass and policy-ratio resolution with exact intermediate
-    rationals, nearest-unit rounding, upward half-unit ties, the 25-percent
-    default passive rate, the 10-percent precision rate, custom passive-rate
-    replacement, and preservation of speed, turn, and spool caps.
-  - Migrated content documents to schema version 2 while retaining package
-    schema version 1. The built-in starter ship and development preview courier
-    now author a 10,000-kilogram base mass, 10-meter-per-second-squared base
-    acceleration, no custom passive deceleration, 300-meter-per-second maximum
-    sub-cruise speed, 1,000-meter-per-second cruise speed, 45-degree-per-second
-    turn rate, and 10,000-millisecond moving spool.
-  - Extended `ShipDesign`, construction fixtures, benchmarks, and the runtime
-    materialization-policy checkpoint with the immutable maneuver capability;
-    strict static-content loading rejects missing, unknown, malformed, zero, or
-    inexact authored capability values without publishing a partial setup. The
-    runtime-policy checkpoint records maneuver behavior version 1 and rejects
-    unavailable versions before reconstructing a ship design.
-  - Added authoritative signed velocity vectors and canonical heading to the
-    spatial owner, immutable spatial and game snapshots, and spatial
-    checkpoints. Scenario ships accept an optional exact heading and otherwise
-    start at zero; checkpoint restore preserves the live heading and velocity.
-    The compatibility constant-duration segment publishes a normally rounded
-    component velocity while active, retains it after explicit cancellation,
-    and clears it at its scheduled stop.
-  - Added a shared checked fixed-point kinematic evaluator for analytic and
-    future fine-grained movement. Constant acceleration and angular rate
-    evaluate directly from one immutable phase-start state, retain exact
-    intermediate ratios only within the evaluation, publish normally rounded
-    position, velocity, and heading, and reject overflow or out-of-segment
-    extrapolation through a bounded analytic segment.
-  - Added the deterministic arrival boundary: terminal evaluation applies the
-    accepted one-meter Euclidean position, one-meter-per-second vector-speed,
-    and optional one-degree shortest-arc heading tolerances. Terminal settle
-    publishes exact zero velocity without snapping position or heading, while
-    queued fly-through waypoints test position only.
-  - Added shared passive-drag and active-braking deceleration segments. They
-    derive vector speed with a deterministic integer square root and normal
-    rounding, schedule the stop boundary upward, preserve direction and
-    heading, never reverse, retain distinct single-rate instructions, and
-    publish exact zero velocity at the scheduled stop.
-  - Routed explicit cancellation of a moving local order into an orderless
-    passive-drag schedule from the exact materialized state. Presentation now
-    observes continued position and velocity changes until the ship reaches
-    rest, while queued-order promotion and connector traversal retain their
-    existing ownership.
-  - Added the shared latest-safe-braking calculation for terminal approaches
-    and short moves. It uses complete vector speeds and the accepted
-    squared-speed relation, publishes normally rounded millimeter diagnostics,
-    and compares the unrounded ratio at the brake-now boundary with arrival
-    tolerance applied.
-  - Added deterministic triangular short-move switch profiles from rest. The
-    profile resolves asymmetric accelerate and brake rates, publishes normally
-    rounded switch distance and speed, admits a speed-cap touch without a
-    travel phase, and rejects candidates that require capped-speed travel.
-    Moving-start profiles advance the switch from the initial aligned speed and
-    begin braking immediately at or beyond that boundary, including above a
-    newly reduced speed cap rather than clamping velocity.
-  - Bound those profiles to same-system analytic short-move plans from rest.
-    Plans normalize signed acceleration toward the destination, preserve
-    heading, schedule a normally rounded acceleration boundary followed by
-    active braking, enforce the speed cap, and publish exact zero only when the
-    stopped state satisfies terminal arrival tolerance. Aligned moving starts
-    before the switch reuse the same two phases and accelerate only through the
-    remaining speed increase; sideways, away, and immediate-braking states are
-    left to their distinct planner paths.
-  - Added aligned moving-start immediate-braking plans. They admit exact and
-    beyond-switch velocity, retain above-cap speed until active braking changes
-    it, handle zero-distance drift, preserve heading, and distinguish a
-    terminally complete stop from unavoidable overshoot that requires replanning.
-  - Added a typed deterministic selector for bounded aligned short moves. It
-    prioritizes terminal settle, then immediate braking, then acceleration-first
-    triangular motion, and explicitly returns general-planner ownership for
-    capped travel, unaligned velocity, or other unsupported candidates.
-  - Added aligned scalar capped-speed profiles with accelerate, positive travel,
-    and brake distances. They support existing below-cap speed and asymmetric
-    rates, publish normally rounded millimeter distances, retain exact cap-touch
-    ownership in the triangular path, and reject above-cap starts for braking.
-  - Bound capped profiles to same-system analytic plans with optional
-    acceleration, required positive constant-speed travel, and active braking.
-    Plans preserve signed or diagonal direction and heading, omit acceleration
-    when already at the cap, and publish only schedules that satisfy terminal
-    arrival tolerance after discrete phase-boundary rounding.
-  - Added unified aligned sub-cruise selection that preserves terminal-settle,
-    immediate-braking, and triangular precedence, admits capped-speed plans only
-    after those bounded outcomes, and explicitly hands unaligned or otherwise
-    unsupported requests to directional planning.
-  - Added analytic stationary heading-only turns for exact zero-distance goals.
-    Plans use the effective turn-rate cap, shortest signed arc with clockwise
-    half-turn ties, normally rounded positive duration, endpoint tolerance
-    admission, and explicit handoff for moving or translating requests.
-  - Added bounded terminal-goal selection with optional final heading. It
-    prioritizes complete terminal settle, admits stationary turns only from
-    exact rest at the destination, preserves heading-free aligned sub-cruise
-    selection, and explicitly delegates combined or unsupported goals.
-  - Added the exact ship-relative translational thrust envelope. It represents
-    forward-only primary allocation separately from the all-direction precision
-    vector, enforces the precision magnitude cap and shared elliptical budget,
-    and keeps temporary exact comparisons local without publishing rationals.
-  - Added deterministic fixed-point CORDIC projection for forward thrust at any
-    canonical millidegree heading. It uses a Q2.62 direction vector, a fixed
-    nanodegree arctangent table, exact cardinal axes, clockwise world
-    orientation, normal component rounding, and checked signed publication.
-  - Extended CORDIC projection to complete primary-plus-precision allocations.
-    Positive lateral points right, clockwise from forward; projection first
-    admits the exact envelope, uses wide exact intermediates, rounds normally,
-    and rejects invalid or unrepresentable candidates without partial output.
-  - Added inverse fixed-point CORDIC vectoring from any nonzero signed
-    system-local displacement to a canonical clockwise millidegree course. It
-    preserves exact cardinal axes, rounds arbitrary quadrants normally, covers
-    the complete signed displacement range, and rejects the undefined zero vector.
-  - Added typed fastest-arrival and shortest-path maneuver objectives with
-    immutable candidate ranks. Comparison applies the accepted arrival and path
-    priorities, then fewer phases and an ordinal stable profile key, with
-    fastest-arrival as the default objective.
-  - Attached deterministic candidate ranks to stationary turns, immediate
-    braking, triangular short moves, and capped-speed plans. Ranks use each
-    scheduled arrival, analytic path distance, actual phase count, and stable
-    profile identity; capped plans distinguish the optional acceleration phase.
-  - Added deterministic candidate-set reduction over immutable ranks. It
-    supports both maneuver objectives, rejects invalid or empty inputs, and
-    selects the same preferred rank regardless of evaluation or input order.
-  - Added the first directional composite candidate from exact rest: resolve a
-    CORDIC course, turn in place, then execute an existing triangular or
-    capped-speed translation. The composite publishes combined schedule and
-    rank metadata only when the discrete turn reaches the exact forward-thrust
-    course; tolerance-only headings remain explicit future planner work.
-  - Added heading-preserving precision translation from exact rest. It consumes
-    the resolved effective capability directly, uses the precision rate for
-    both acceleration and active braking, supports triangular and capped-speed
-    schedules, preserves no-snap terminal arrival, and publishes distinct rank
-    identities for later comparison with turn-then-primary candidates.
-  - Added stationary directional candidate selection over the effective
-    capability. It compares exact-course primary, exact turn-then-primary, and
-    heading-preserving precision plans under either maneuver objective; primary
-    candidates accelerate forward at the primary rate and brake at the
-    precision rate, with typed settle and unsupported-schedule outcomes.
-  - Added optional terminal-heading composition to stationary directional
-    candidates before ranking. Complete primary and precision schedules include
-    any final stationary turn at the authoritative no-snap stop position;
-    unschedulable terminal turns remove the candidate instead of publishing a
-    partial arrival.
-  - Integrated stationary directional selection into the bounded terminal
-    entry point through a capability-aware objective overload. Exact-rest
-    translation now returns the complete ranked candidate, while terminal
-    settle, pure stationary turns, moving aligned travel, and explicit general
-    planner handoff retain their established precedence and ownership.
-  - Made capability-aware aligned moving selection respect the ship-relative
-    thrust boundary. Exact CORDIC course headings may use primary acceleration
-    with precision braking; every other heading uses precision acceleration and
-    braking, and moving zero-distance goals brake without inventing a course.
-  - Added complete aligned-moving terminal plans. Concrete immediate-braking,
-    triangular, and capped translations may append a requested final stationary
-    turn at the authoritative stopped position; complete ranks include that
-    turn, while stops outside destination tolerance retain explicit directional
-    handoff instead of publishing a partial arrival.
-  - Added a conservative precision-brake-then-stationary directional candidate
-    for moving states that cannot complete an aligned arrival. It materializes
-    the authoritative precision-braking stop, replans from exact zero, and
-    ranks braking plus the complete stationary continuation without snapping or
-    stacking passive drag.
-  - Added a unified read-only executable view for every concrete bounded
-    terminal outcome. Runtime consumers can use one inclusive `StartsAt`,
-    `EndsAt`, and `StateAt` contract without reimplementing payload dispatch;
-    terminal settle is a zero-duration schedule and directional handoff remains
-    explicitly non-executable.
-  - Added immutable generation-bound terminal maneuver runtime schedules and
-    typed completion payloads. Only an exact motion identity, active generation,
-    agenda generation, and endpoint timestamp materialize the analytic terminal
-    state; replaced generations and mismatched work are deterministic no-ops.
-  - Added canonical read-only phase schedules to executable bounded plans.
-    The accepted turn, acceleration, capped-speed travel, passive-drag,
-    active-brake, and terminal-settle kinds have stable typed identities;
-    current concrete plans project exact contiguous boundaries without
-    recalculating timestamps.
-  - Added generation-bound internal phase events and one authoritative runtime
-    phase cursor. Exact non-final boundaries materialize state and advance once;
-    skipped, duplicate, stale, or mistimed work is a no-op, while the existing
-    completion payload exclusively closes the final phase.
-  - Added deterministic agenda proposals for every remaining maneuver boundary.
-    Proposals retain exact phase timestamps, physical-completion ordering,
-    generation-bound payloads, and canonical local ordinals while leaving
-    creation-sequence allocation with the agenda owner.
-  - Bound committed agenda keys back to exact remaining maneuver envelopes.
-    Atomic validation rejects missing, duplicate, mistimed, wrong-phase, or
-    out-of-order key sets; applied boundaries consume one envelope so
-    cancellation and future checkpoint work see only authoritative pending work.
-  - Added all-or-nothing invalidation of a bound maneuver schedule after its
-    caller materializes interruption state. Every remaining exact agenda entry
-    is preflighted before ordered cancellation; missing or mismatched work
-    changes nothing, while success makes all later old-generation events stale.
-  - Added the materialize-and-interrupt transaction. It requires the agenda's
-    exact current time inside the active phase, evaluates the analytic state,
-    proves the next generation before mutation, then invalidates pending work;
-    a pending boundary runs first and cancellation failure publishes no result.
-  - Added one runtime event dispatcher and schedule-owned next-boundary
-    diagnostics. The diagnostic follows the authoritative cursor, exposes the
-    current phase and exact generation-bound expectation, gains its agenda key
-    after binding, and disappears after completion or invalidation.
-  - Integrated analytic terminal maneuvers as a distinct authoritative
-    `SpatialMovement` state without changing existing command routing. Start
-    validates the exact kinematic boundary before identity allocation; spatial
-    events advance phases and settle completion; replacement materializes,
-    cancels, advances generation, and schedules from one transaction. Live
-    snapshots and runtime checkpoints retain objective, phase cursor, analytic
-    state, immutable plan, and exact pending agenda keys through continuation.
-  - Routed ordinary single-leg local move orders through the design-derived
-    fastest-arrival planner and authoritative analytic schedule. Internal phase
-    boundaries update physical state without completing the bound order;
-    terminal completion applies arrival tolerances, advances the route, and
-    retains the existing local-work fact envelope. Replacement and cancellation
-    materialize exact state and atomically remove all later boundaries, while
-    checkpoint restore validates every saved maneuver key and payload.
-  - Added combined analytic fly-through plans for ordered local route legs. A
-    collinear route splits the already-selected terminal trajectory. A
-    noncollinear route uses bounded paired precision-thrust transitions to
-    cross each corner at its exact position with nonzero velocity aligned to
-    the outgoing leg. Crossing speed comes from that leg's ordinary plan under
-    the same objective; every acceleration and vector-speed boundary respects
-    the effective capability. One motion identity advances every waypoint and
-    emits its semantic arrival fact without stopping or replanning. Phase and
-    waypoint identities survive checkpoint restore.
-  - Removed the final constant-duration local-motion fallback from order
-    execution. When full-rate stationary or post-braking movement cannot form a
-    representable millisecond schedule, a reduced all-direction precision
-    thrust plan selects the shortest admitted two-phase duration, respects the
-    acceleration and complete-vector speed caps, and settles at zero without
-    snapping. Valid heading-free single-leg and waypoint routes now require an
-    executable analytic plan; a missing plan is an invariant failure rather
-    than a silent return to legacy travel duration.
-  - Added complete moving-spool cruise candidates from exact rest. Each plan
-    uses inverse and forward CORDIC for its outbound course, accelerates to
-    maximum sub-cruise speed, spools while moving for the authored duration,
-    enters cruise instantaneously, drops out at the latest planned boundary,
-    brakes to terminal rest, and includes any course or final-heading turn.
-    The bounded selector compares complete cruise and sub-cruise arrivals and
-    chooses cruise only when it is strictly earlier, retaining sub-cruise on a
-    tie. Runtime schedules expose spool and cruise phases, publish typed cruise
-    entry and planned-dropout facts with exact post-transition state, preserve
-    those facts through selected-ship presentation, and continue identically
-    from a checkpoint captured during cruise.
-  - Added cruise replanning from an already aligned maximum-sub-cruise-speed
-    state. Replacing a move during spool cancels the old generation and discards
-    all partial progress; when cruise remains strictly faster, the replacement
-    schedules a fresh complete authored spool without an acceleration phase.
-    The canceled completion cannot enter cruise or emit a transition fact.
-  - Added owner-resolved forced cruise dropout. An unplanned cruise interruption
-    preserves the full cruise velocity and emits its dropout fact at the exact
-    trigger, then a distinct analytic brake reduces speed to the maximum
-    sub-cruise cap at twice effective primary acceleration before ordinary
-    planning continues. Move replacement exercises the complete transaction,
-    stale prior boundaries remain canceled, a later cruise requires a fresh
-    spool, equal cruise and sub-cruise caps omit the forced phase, and checkpoint
-    restore during dropout preserves the remaining schedule and fact stream.
-  - Added the interaction-facing analytic replacement boundary without taking
-    ownership of interaction detection or outcome policy. A consuming owner
-    supplies an already selected replacement and its own enum-typed reason; one
-    atomic receipt returns the invalidated motion and phase identity,
-    prior objective, exact interruption state and next generation, plus the new
-    schedule proposals. Forced dropout is covered through this same boundary so
-    later interaction domains can buffer semantic facts without mutating
-    movement internals.
-  - Added deterministic scale evidence for the single-thread reference path.
-    Forty-eight independent long maneuvers produce identical committed and
-    completed snapshots and event dispositions when read-only planning runs in
-    reversed `(2 workers, batch 3)` and `(4 workers, batch 7)` layouts before
-    stable ship-order commit. Affected canonical many-system, crowded-system,
-    and fact-churn digests now cover analytic schedules. A new
-    repeated-replanning preset advances between 100 replacements, crosses
-    physical boundaries, and records canonical digest `603601f07a12a8c1`.
-  - Completed the unblocked maneuver diagnostic and semantic-fact audit. Live
-    ship snapshots now expose a typed effective-capability revision alongside
-    exact kinematic state, plan kind, objective, current phase, and next
-    boundary. The initial base-design revision is saved and restored with each
-    live ship, and restore rejects a nonzero revision that cannot yet be
-    reproduced without `TASK-068` equipment state. Focused tests prove typed
-    start, replacement interruption, destination and waypoint arrival, and
-    cruise-transition facts while ordinary internal phase boundaries remain
-    fact-silent. Non-owned contact filtering and observer-safe projection remain
-    with `TASK-073`, as required by the accepted `TASK-020` boundary.
-  - Replaced constant-duration connector approaches with complete analytic
-    terminal maneuvers. A mixed route now settles at the connector source,
-    begins transit only after the approach motion completes, and resumes
-    analytic movement after emergence. Focused proof covers exact local and
-    connector fact ordering, replacement before transit, deterministic
-    incremental advancement, and checkpoint continuation from inside the
-    approach phase through final destination arrival. Connector entry consumes
-    the same inclusive one-meter Euclidean position tolerance as the completed
-    approach without snapping the ship. Canonical connector-volume preset 2
-    now runs for 1,000,000 simulated milliseconds so all analytic approaches
-    and transits remain represented, with digest `673c9af7f54a80e4`.
-  - Completed optional final-heading order integration. Move commands retain
-    the terminal heading through active, queued, replaced, terminal, semantic
-    fact, snapshot, and checkpoint state. Zero-distance goals schedule a
-    stationary turn instead of completing early; ordinary, reduced-thrust, and
-    noncollinear waypoint plans append the final turn without constraining
-    intermediate waypoint crossings or creating a second motion identity.
-  - Audited accepted design decisions 26 through 32. The unblocked analytic,
-    event-phase, checkpoint, diagnostic, semantic-fact, numeric-boundary, and
-    deterministic-layout evidence is complete. Reduced-thrust fallback now has
-    direct rejection proof at the timestamp and coordinate arithmetic limits.
-    `TASK-022` already owns encoded save mechanics; saved content-reference
-    compatibility and migration remain `TASK-037`.
-  - Complete the accepted capability foundation after `TASK-068` supplies typed
-    installed-equipment contributions. Advance the established capability
-    revision when the effective capability changes, without adding physical
-    force or fuel simulation.
-  - Promote analytic movement into fine-grained execution only through the
-    domain-owned activation from `TASK-071`, retaining the single-thread
-    reference path and proving identical results across each supported worker,
-    partition, and batch layout. `TASK-072`, `TASK-046`, and `TASK-051` consume
-    the established replacement boundary without moving their outcome policies
-    into this task.
-  - Add observer-safe non-player maneuver projection only through `TASK-073`'s
-    accepted observation boundary. Do not expose private authoritative motion
-    state through presentation facts or diagnostics.
-  - Context: [Ship thrust, maneuver kinematics, and short moves](ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 ## Near-term work
 
@@ -431,6 +111,10 @@ the project-level **Near-term work** section above.
   - Retain the single-thread reference path and add focused crossing,
     replanning, connector-emergence, restore, partition, batch-layout, and
     worker-count proof before a gameplay domain depends on the substrate.
+  - Consume the completed `TASK-090` analytic maneuver schedule and replacement
+    boundary when an interaction domain activates fine-grained execution. Define
+    that domain-owned activation and prove deterministic results across every
+    supported worker, partition, and batch layout.
   - Build on completed `TASK-019`. Keep combat, sensors, inspection, assistance,
     and docking outcomes with their owning tasks, and ship geometry, collision,
     and avoidance with `TASK-072`, rather than inventing placeholder policy
@@ -450,6 +134,9 @@ the project-level **Near-term work** section above.
     supported worker, partition, and batch layouts. Do not add NPC fog-of-war,
     allied sensor sharing, sensor equipment modifiers, stealth, occlusion, or
     extrapolated moving contacts.
+  - Provide the observer-safe non-player maneuver projection deferred by
+    completed `TASK-090`, using the accepted observation boundary without
+    exposing private authoritative motion state through facts or diagnostics.
   - Build on completed `TASK-020` and the spatial substrate implemented by
     `TASK-071`; coordinate station participation with `TASK-057`, deployable
     participation with `TASK-074`, equipment contributions with `TASK-068`,
@@ -465,6 +152,10 @@ the project-level **Near-term work** section above.
   - Define equipment installation, removal, replacement, reservation,
     ownership, activation, damage or destruction boundaries, commands, facts,
     snapshots, checkpoints, saves, and deterministic contention behavior.
+  - Supply typed installed-equipment maneuver contributions to the completed
+    `TASK-090` capability foundation. Materialize the ship at the commit
+    timestamp, advance its effective-capability revision, invalidate remaining
+    maneuver work, and replan without adding force or fuel simulation.
   - Build on the generalized item identity, cargo, and transfer semantics from
     completed `TASK-041` and the content catalogs completed by `TASK-063`.
     Coordinate authored definitions with `TASK-023`, combat effects with
@@ -668,6 +359,9 @@ the project-level **Near-term work** section above.
     silently replacing definitions, and report both conflicting sources.
   - Define deterministic migrations or clear incompatibility diagnostics when
     an older save references renamed, replaced, removed, or changed content.
+  - Define compatibility and migration for the qualified maneuver-design
+    references saved by completed `TASK-090`, rejecting an incompatible
+    reference before session publication.
   - Context: [Relational simulation architecture](relational-simulation-architecture.md)
 
 - [ ] **TASK-040: Define player-safe recovery from corrupted sessions and content failures**
@@ -949,6 +643,18 @@ the project-level **Near-term work** section above.
     startup. No follow-up task remains.
   - Context: [Source-code organization](source-code-organization.md)
 
+- [x] **TASK-090: Implement ship thrust, maneuver kinematics, and short moves**
+  - Completed fixed-point authored and effective base capabilities, heading and
+    velocity state, deterministic analytic planning, sub-cruise and cruise
+    movement, fly-through routes, cancellation and replacement, facts,
+    snapshots, checkpoints, connector approaches, and optional final headings.
+  - Completed focused numeric-boundary, event-phase, checkpoint, diagnostic,
+    semantic-fact, and deterministic-layout validation. Installed-equipment
+    contributions, interaction-owned fine-grained activation, observer-safe
+    projection, and saved-reference migration remain with `TASK-068`,
+    `TASK-071`, `TASK-073`, and `TASK-037`, respectively.
+  - Context: [Ship thrust, maneuver kinematics, and short moves](ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
+
 - [x] **TASK-089: Define ship thrust, maneuver kinematics, and short moves**
   - Confirmed authored mass, acceleration, speed caps, turn rate, spool duration,
     optional passive deceleration, fixed-point units, mass scaling, derived
@@ -960,7 +666,7 @@ the project-level **Near-term work** section above.
     exact arrival tolerances, and planned or forced cruise braking.
   - Confirmed deterministic interaction transitions, same-time ordering,
     persistence, observer-safe presentation, compatibility, test, and benchmark
-    contracts. Implementation remains `TASK-090`.
+    contracts. Implementation completed by `TASK-090`.
   - Context: [Ship thrust, maneuver kinematics, and short moves](ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [x] **TASK-087: Define authoritative system-local coordinate scale**
@@ -971,8 +677,8 @@ the project-level **Near-term work** section above.
   - Confirmed analytic scheduled cruise with temporary local fixed-step
     encounters, moving spool, separate cruise and sub-cruise speeds, exact
     transition timing, and deterministic ownership boundaries.
-  - Implementation remains with `TASK-071`, `TASK-072`, `TASK-073`,
-    `TASK-075`, and `TASK-090`; `TASK-088` retains late-term spatial authoring
+  - Implementation remains with `TASK-071`, `TASK-072`, `TASK-073`, and
+    `TASK-075`; `TASK-090` is complete and `TASK-088` retains late-term spatial authoring
     guidance.
   - Context: [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
 

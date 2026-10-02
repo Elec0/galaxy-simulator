@@ -435,16 +435,20 @@ authorize implementation.
     repeated replanning, and bounded promotion into active interactions while
     retaining the single-thread reference path.
 
-## Implementation handoff
+## Implementation outcome
 
-This design is ready for the separately tracked `TASK-090`
-implementation when the project owner promotes it. That work may:
+The separately tracked `TASK-090` completed the accepted analytic maneuver
+scope:
 
-1. extend the format-neutral ship-definition model and strict content adapter;
-2. validate and resolve immutable base maneuver capabilities;
-3. add authoritative live maneuver state and deterministic planning;
-4. integrate sub-cruise movement with spool, cruise, interactions, commands,
+1. extended the format-neutral ship-definition model and strict content adapter;
+2. validated and resolved immutable base maneuver capabilities;
+3. added authoritative live maneuver state and deterministic planning;
+4. integrated sub-cruise movement with spool, cruise, commands,
    facts, snapshots, checkpoints, and saves;
-5. migrate built-in content and compatibility versions; and
-6. prove the single-thread reference path and supported parallel layouts with
+5. migrated built-in content and compatibility versions; and
+6. proved the single-thread reference path and supported parallel layouts with
    focused tests and benchmark evidence.
+
+Installed-equipment capability contributions, interaction-owned fine-grained
+activation, observer-safe non-player projection, and saved-reference migration
+remain with `TASK-068`, `TASK-071`, `TASK-073`, and `TASK-037`, respectively.

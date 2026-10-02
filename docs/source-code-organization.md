@@ -124,7 +124,7 @@ them.
 
 ### Maneuver organization
 
-The completed unblocked portion of `TASK-090` makes maneuvers the clearest
+The completed `TASK-090` maneuver implementation makes maneuvers the clearest
 first slice:
 
 - `Capabilities` contains authored and effective capability values and the
