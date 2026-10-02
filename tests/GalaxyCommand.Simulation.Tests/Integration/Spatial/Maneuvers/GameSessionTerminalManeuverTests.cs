@@ -74,6 +74,23 @@ public sealed class GameSessionTerminalManeuverTests
     }
 
     [Fact]
+    public void FiftyMeterInexactMoveTurnsBeforePrecisionTranslation()
+    {
+        GameSession session = CreateSession();
+
+        session.SubmitCommand(
+            GameSessionTestFixture.Player,
+            new MoveShipCommand(
+                GameSessionTestFixture.Ship,
+                GameSessionTestFixture.Destination(30, -40),
+                OrderPlacement.ReplaceAll));
+        session.AdvanceTo(new SimulationTime(1_000));
+
+        GameShipSnapshot turning = Assert.Single(session.CaptureSnapshot().Ships);
+        Assert.NotEqual(ShipHeading.Zero, turning.Heading);
+    }
+
+    [Fact]
     public void DiagnosticSnapshotExposesManeuverCapabilityRevision()
     {
         GameSession session = CreateSession();

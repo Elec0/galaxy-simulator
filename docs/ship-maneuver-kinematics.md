@@ -331,7 +331,11 @@ authorize implementation.
     heading. When no final heading is requested, heading is
     unconstrained. The selected plan retains whatever heading its final phase
     produces rather than adding a turn that does not advance the chosen
-    objective.
+    objective. As a temporary policy, an exact-rest move of at least 50 meters
+    whose current heading differs from its resolved course turns before
+    precision translation when exact-course primary thrust is unavailable.
+    This provisional threshold will be replaced by a rule derived from ship
+    size when that model is defined.
 
 ### Arrival, short moves, and cruise transitions
 

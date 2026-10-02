@@ -5,6 +5,7 @@ public enum StationaryDirectionalPlanKind
     TerminalSettle,
     PrimarySubCruise,
     TurnThenPrimary,
+    TurnThenPrecisionSubCruise,
     PrecisionSubCruise,
     DirectionalPlanner,
 }
@@ -20,6 +21,7 @@ public sealed record StationaryDirectionalPlanSelection
         ShipKinematicState? settledState,
         PrimarySubCruiseManeuverPlan? primarySubCruisePlan,
         TurnThenSubCruiseManeuverPlan? turnThenPrimaryPlan,
+        TurnThenPrecisionSubCruiseManeuverPlan? turnThenPrecisionPlan,
         PrecisionSubCruiseManeuverPlan? precisionSubCruisePlan,
         StationaryDirectionalManeuverPlan? completePlan,
         ManeuverCandidateRank? selectedRank)
@@ -28,6 +30,7 @@ public sealed record StationaryDirectionalPlanSelection
         SettledState = settledState;
         PrimarySubCruisePlan = primarySubCruisePlan;
         TurnThenPrimaryPlan = turnThenPrimaryPlan;
+        TurnThenPrecisionPlan = turnThenPrecisionPlan;
         PrecisionSubCruisePlan = precisionSubCruisePlan;
         CompletePlan = completePlan;
         SelectedRank = selectedRank;
@@ -40,6 +43,8 @@ public sealed record StationaryDirectionalPlanSelection
     public PrimarySubCruiseManeuverPlan? PrimarySubCruisePlan { get; }
 
     public TurnThenSubCruiseManeuverPlan? TurnThenPrimaryPlan { get; }
+
+    public TurnThenPrecisionSubCruiseManeuverPlan? TurnThenPrecisionPlan { get; }
 
     public PrecisionSubCruiseManeuverPlan? PrecisionSubCruisePlan { get; }
 
@@ -54,6 +59,7 @@ public sealed record StationaryDirectionalPlanSelection
             settled,
             primarySubCruisePlan: null,
             turnThenPrimaryPlan: null,
+            turnThenPrecisionPlan: null,
             precisionSubCruisePlan: null,
             completePlan: null,
             selectedRank: null);
@@ -66,6 +72,7 @@ public sealed record StationaryDirectionalPlanSelection
             settledState: null,
             plan.PrimarySubCruisePlan,
             turnThenPrimaryPlan: null,
+            turnThenPrecisionPlan: null,
             precisionSubCruisePlan: null,
             plan,
             rank);
@@ -78,6 +85,20 @@ public sealed record StationaryDirectionalPlanSelection
             settledState: null,
             primarySubCruisePlan: null,
             plan.TurnThenPrimaryPlan,
+            turnThenPrecisionPlan: null,
+            precisionSubCruisePlan: null,
+            plan,
+            rank);
+
+    internal static StationaryDirectionalPlanSelection TurnThenPrecision(
+        StationaryDirectionalManeuverPlan plan,
+        ManeuverCandidateRank rank) =>
+        new(
+            StationaryDirectionalPlanKind.TurnThenPrecisionSubCruise,
+            settledState: null,
+            primarySubCruisePlan: null,
+            turnThenPrimaryPlan: null,
+            plan.TurnThenPrecisionPlan,
             precisionSubCruisePlan: null,
             plan,
             rank);
@@ -90,6 +111,7 @@ public sealed record StationaryDirectionalPlanSelection
             settledState: null,
             primarySubCruisePlan: null,
             turnThenPrimaryPlan: null,
+            turnThenPrecisionPlan: null,
             plan.PrecisionSubCruisePlan,
             plan,
             rank);
@@ -100,6 +122,7 @@ public sealed record StationaryDirectionalPlanSelection
             settledState: null,
             primarySubCruisePlan: null,
             turnThenPrimaryPlan: null,
+            turnThenPrecisionPlan: null,
             precisionSubCruisePlan: null,
             completePlan: null,
             selectedRank: null);
@@ -111,6 +134,11 @@ public sealed record StationaryDirectionalPlanSelection
 /// </summary>
 public static class StationaryDirectionalManeuverPlanner
 {
+
+    // Temporary presentation and maneuver policy until a future ship-size
+    // model supplies the course-turn threshold.
+    private const long MinimumCourseTurnDistanceMeters = 50;
+
     /// <summary>
     /// Selects terminal settle, exact-course primary travel, turn-then-primary
     /// travel, or heading-preserving precision travel from exact rest. Primary
@@ -235,6 +263,51 @@ public static class StationaryDirectionalManeuverPlanner
                 out precisionComplete);
         }
 
+        StationaryDirectionalManeuverPlan? turnThenPrecisionComplete = null;
+        if (RequiresCourseTurn(start, destination)
+            && primaryComplete is null
+            && TurnThenPrecisionSubCruiseManeuverPlan.TryCreateFromRest(
+                startsAt,
+                start,
+                destination,
+                capability,
+                out TurnThenPrecisionSubCruiseManeuverPlan? turnThenPrecision)
+            && turnThenPrecision is not null)
+        {
+            StationaryDirectionalManeuverPlan.TryCreate(
+                turnThenPrecision,
+                destination,
+                requestedHeading,
+                capability.TurnRate,
+                out turnThenPrecisionComplete);
+        }
+
+        if (RequiresCourseTurn(start, destination))
+        {
+            if (primaryComplete is not null)
+            {
+                ManeuverCandidateRank requiredTurnRank = ManeuverPlanRanking.Rank(
+                    primaryComplete);
+                return primaryComplete.Kind
+                    == StationaryDirectionalPlanKind.PrimarySubCruise
+                    ? StationaryDirectionalPlanSelection.PrimarySubCruise(
+                        primaryComplete,
+                        requiredTurnRank)
+                    : StationaryDirectionalPlanSelection.TurnThenPrimary(
+                        primaryComplete,
+                        requiredTurnRank);
+            }
+
+            if (turnThenPrecisionComplete is not null)
+            {
+                return StationaryDirectionalPlanSelection.TurnThenPrecision(
+                    turnThenPrecisionComplete,
+                    ManeuverPlanRanking.Rank(turnThenPrecisionComplete));
+            }
+
+            return StationaryDirectionalPlanSelection.DirectionalPlanner();
+        }
+
         ManeuverCandidateRank? primaryRank = primaryComplete is not null
             ? ManeuverPlanRanking.Rank(primaryComplete)
             : null;
@@ -268,5 +341,30 @@ public static class StationaryDirectionalManeuverPlanner
         return StationaryDirectionalPlanSelection.PrecisionSubCruise(
             precisionComplete!,
             precisionRank!);
+    }
+
+    /// <summary>
+    /// Keeps sub-50-meter precision adjustments heading-preserving while
+    /// requiring longer off-heading moves to establish a visible course.
+    /// </summary>
+    private static bool RequiresCourseTurn(
+        ShipKinematicState start,
+        SystemPosition destination)
+    {
+        Int128 x = (Int128)destination.Position.X.Units
+            - start.Position.Position.X.Units;
+        Int128 y = (Int128)destination.Position.Y.Units
+            - start.Position.Position.Y.Units;
+        Int128 thresholdSquared = (Int128)MinimumCourseTurnDistanceMeters
+            * MinimumCourseTurnDistanceMeters;
+        if ((x * x) + (y * y) < thresholdSquared)
+        {
+            return false;
+        }
+
+        ShipHeading course = ManeuverHeadingProjection.ResolveCourseHeading(
+            checked((long)(x * 1_000)),
+            checked((long)(y * 1_000)));
+        return start.Heading != course;
     }
 }

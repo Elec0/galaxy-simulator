@@ -112,6 +112,22 @@ public sealed class StationaryDirectionalManeuverPlannerTests
     }
 
     [Fact]
+    public void FiftyMeterInexactCourseSelectsTurnThenPrecision()
+    {
+        StationaryDirectionalPlanSelection selection =
+            StationaryDirectionalManeuverPlanner.Select(
+                SimulationTime.Zero,
+                State(0, 0, 0),
+                Position(30, -40),
+                Capability(),
+                ManeuverObjective.FastestArrival);
+
+        Assert.Equal(
+            StationaryDirectionalPlanKind.TurnThenPrecisionSubCruise,
+            selection.Kind);
+    }
+
+    [Fact]
     public void SatisfiedDestinationSettlesWithoutPublishingCandidateRank()
     {
         StationaryDirectionalPlanSelection selection =

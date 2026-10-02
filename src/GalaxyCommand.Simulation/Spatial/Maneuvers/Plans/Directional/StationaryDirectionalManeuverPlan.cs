@@ -12,6 +12,7 @@ public sealed record StationaryDirectionalManeuverPlan
         ShipHeading? requestedHeading,
         PrimarySubCruiseManeuverPlan? primarySubCruisePlan,
         TurnThenSubCruiseManeuverPlan? turnThenPrimaryPlan,
+        TurnThenPrecisionSubCruiseManeuverPlan? turnThenPrecisionPlan,
         PrecisionSubCruiseManeuverPlan? precisionSubCruisePlan,
         StationaryTurnManeuverPlan? finalTurnPlan)
     {
@@ -20,6 +21,7 @@ public sealed record StationaryDirectionalManeuverPlan
         RequestedHeading = requestedHeading;
         PrimarySubCruisePlan = primarySubCruisePlan;
         TurnThenPrimaryPlan = turnThenPrimaryPlan;
+        TurnThenPrecisionPlan = turnThenPrecisionPlan;
         PrecisionSubCruisePlan = precisionSubCruisePlan;
         FinalTurnPlan = finalTurnPlan;
     }
@@ -34,6 +36,8 @@ public sealed record StationaryDirectionalManeuverPlan
 
     public TurnThenSubCruiseManeuverPlan? TurnThenPrimaryPlan { get; }
 
+    public TurnThenPrecisionSubCruiseManeuverPlan? TurnThenPrecisionPlan { get; }
+
     public PrecisionSubCruiseManeuverPlan? PrecisionSubCruisePlan { get; }
 
     public StationaryTurnManeuverPlan? FinalTurnPlan { get; }
@@ -44,6 +48,8 @@ public sealed record StationaryDirectionalManeuverPlan
             PrimarySubCruisePlan!.StartsAt,
         StationaryDirectionalPlanKind.TurnThenPrimary =>
             TurnThenPrimaryPlan!.StartsAt,
+        StationaryDirectionalPlanKind.TurnThenPrecisionSubCruise =>
+            TurnThenPrecisionPlan!.StartsAt,
         StationaryDirectionalPlanKind.PrecisionSubCruise =>
             PrecisionSubCruisePlan!.StartsAt,
         _ => throw InvalidTranslation(),
@@ -55,6 +61,8 @@ public sealed record StationaryDirectionalManeuverPlan
             PrimarySubCruisePlan!.EndsAt,
         StationaryDirectionalPlanKind.TurnThenPrimary =>
             TurnThenPrimaryPlan!.EndsAt,
+        StationaryDirectionalPlanKind.TurnThenPrecisionSubCruise =>
+            TurnThenPrecisionPlan!.EndsAt,
         StationaryDirectionalPlanKind.PrecisionSubCruise =>
             PrecisionSubCruisePlan!.EndsAt,
         _ => throw InvalidTranslation(),
@@ -78,6 +86,7 @@ public sealed record StationaryDirectionalManeuverPlan
             StationaryDirectionalPlanKind.PrimarySubCruise,
             translation,
             turnThenPrimaryPlan: null,
+            turnThenPrecisionPlan: null,
             precisionSubCruisePlan: null,
             destination,
             requestedHeading,
@@ -99,6 +108,30 @@ public sealed record StationaryDirectionalManeuverPlan
         TryCreate(
             StationaryDirectionalPlanKind.TurnThenPrimary,
             primarySubCruisePlan: null,
+            translation,
+            turnThenPrecisionPlan: null,
+            precisionSubCruisePlan: null,
+            destination,
+            requestedHeading,
+            turnRate,
+            translation.EndsAt,
+            translation.StateAt,
+            out plan);
+
+    /// <summary>
+    /// Composes the threshold-required course turn and the bounded precision
+    /// translation that follows it.
+    /// </summary>
+    internal static bool TryCreate(
+        TurnThenPrecisionSubCruiseManeuverPlan translation,
+        SystemPosition destination,
+        ShipHeading? requestedHeading,
+        ManeuverTurnRate turnRate,
+        out StationaryDirectionalManeuverPlan? plan) =>
+        TryCreate(
+            StationaryDirectionalPlanKind.TurnThenPrecisionSubCruise,
+            primarySubCruisePlan: null,
+            turnThenPrimaryPlan: null,
             translation,
             precisionSubCruisePlan: null,
             destination,
@@ -122,6 +155,7 @@ public sealed record StationaryDirectionalManeuverPlan
             StationaryDirectionalPlanKind.PrecisionSubCruise,
             primarySubCruisePlan: null,
             turnThenPrimaryPlan: null,
+            turnThenPrecisionPlan: null,
             translation,
             destination,
             requestedHeading,
@@ -158,6 +192,7 @@ public sealed record StationaryDirectionalManeuverPlan
         StationaryDirectionalPlanKind kind,
         PrimarySubCruiseManeuverPlan? primarySubCruisePlan,
         TurnThenSubCruiseManeuverPlan? turnThenPrimaryPlan,
+        TurnThenPrecisionSubCruiseManeuverPlan? turnThenPrecisionPlan,
         PrecisionSubCruiseManeuverPlan? precisionSubCruisePlan,
         SystemPosition destination,
         ShipHeading? requestedHeading,
@@ -201,6 +236,7 @@ public sealed record StationaryDirectionalManeuverPlan
             requestedHeading,
             primarySubCruisePlan,
             turnThenPrimaryPlan,
+            turnThenPrecisionPlan,
             precisionSubCruisePlan,
             finalTurn);
         return true;
@@ -217,6 +253,8 @@ public sealed record StationaryDirectionalManeuverPlan
                 PrimarySubCruisePlan!.StateAt(time),
             StationaryDirectionalPlanKind.TurnThenPrimary =>
                 TurnThenPrimaryPlan!.StateAt(time),
+            StationaryDirectionalPlanKind.TurnThenPrecisionSubCruise =>
+                TurnThenPrecisionPlan!.StateAt(time),
             StationaryDirectionalPlanKind.PrecisionSubCruise =>
                 PrecisionSubCruisePlan!.StateAt(time),
             _ => throw InvalidTranslation(),

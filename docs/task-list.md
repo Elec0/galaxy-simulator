@@ -618,6 +618,16 @@ the project-level **Near-term work** section above.
 
 ## Completed foundations
 
+- [x] **TASK-093: Apply a provisional course-turn threshold**
+  - Added a temporary 50-meter Euclidean threshold for exact-rest off-heading
+    moves. At or beyond it, the ship turns toward its resolved course before
+    translation, including when rounded non-cardinal primary thrust is
+    unavailable and precision translation remains necessary.
+  - Kept sub-50-meter precision adjustments heading-preserving. The threshold
+    is explicitly provisional and will be replaced by a ship-size-derived rule
+    when `TASK-072` defines ship geometry.
+  - Context: [Ship thrust, maneuver kinematics, and short moves](ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](system-local-coordinate-scale.md)
+
 - [x] **TASK-092: Render heading-aware Godot ship glyphs**
   - Replaced each system-map ship dot with a centered equilateral triangle.
     Its tip follows the immutable authoritative local heading after the map's

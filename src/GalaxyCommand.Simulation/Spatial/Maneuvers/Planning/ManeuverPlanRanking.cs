@@ -17,6 +17,10 @@ public static class ManeuverPlanRanking
         new("turn-then-short-move-triangular");
     private static readonly ManeuverProfileKey TurnThenCappedSpeedProfile =
         new("turn-then-capped-speed");
+    private static readonly ManeuverProfileKey TurnThenPrecisionTriangularProfile =
+        new("turn-then-precision-short-move-triangular");
+    private static readonly ManeuverProfileKey TurnThenPrecisionCappedSpeedProfile =
+        new("turn-then-precision-capped-speed");
     private static readonly ManeuverProfileKey PrecisionTriangularProfile =
         new("precision-short-move-triangular");
     private static readonly ManeuverProfileKey PrecisionCappedSpeedProfile =
@@ -180,6 +184,26 @@ public static class ManeuverPlanRanking
     }
 
     /// <summary>
+    /// Ranks a course turn followed by precision translation with a distinct
+    /// profile identity from heading-preserving precision movement.
+    /// </summary>
+    public static ManeuverCandidateRank Rank(
+        TurnThenPrecisionSubCruiseManeuverPlan plan)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ManeuverCandidateRank translation = Rank(plan.PrecisionPlan);
+        ManeuverProfileKey profile = plan.PrecisionPlan.TranslationPlan.Kind
+            == AlignedSubCruisePlanKind.Triangular
+                ? TurnThenPrecisionTriangularProfile
+                : TurnThenPrecisionCappedSpeedProfile;
+        return new ManeuverCandidateRank(
+            plan.EndsAt,
+            translation.PathDistance,
+            checked(translation.PhaseCount + 1),
+            profile);
+    }
+
+    /// <summary>
     /// Ranks exact-course primary travel using its underlying schedule and a
     /// stable identity distinct from precision and unbound aligned profiles.
     /// </summary>
@@ -228,6 +252,9 @@ public static class ManeuverPlanRanking
             StationaryDirectionalPlanKind.TurnThenPrimary
                 when plan.TurnThenPrimaryPlan is { } turnThenPrimary =>
                 Rank(turnThenPrimary),
+            StationaryDirectionalPlanKind.TurnThenPrecisionSubCruise
+                when plan.TurnThenPrecisionPlan is { } turnThenPrecision =>
+                Rank(turnThenPrecision),
             StationaryDirectionalPlanKind.PrecisionSubCruise
                 when plan.PrecisionSubCruisePlan is { } precision =>
                 Rank(precision),

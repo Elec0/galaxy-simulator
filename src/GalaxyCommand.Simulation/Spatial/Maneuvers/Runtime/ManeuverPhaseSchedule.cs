@@ -207,6 +207,11 @@ internal static class ManeuverPhaseSchedules
                 Concat(
                     From(turnThenPrimary.CourseTurnPlan),
                     From(turnThenPrimary.TranslationPlan)),
+            StationaryDirectionalPlanKind.TurnThenPrecisionSubCruise
+                when plan.TurnThenPrecisionPlan is { } turnThenPrecision =>
+                Concat(
+                    From(turnThenPrecision.CourseTurnPlan),
+                    From(turnThenPrecision.PrecisionPlan.TranslationPlan)),
             StationaryDirectionalPlanKind.PrecisionSubCruise
                 when plan.PrecisionSubCruisePlan is { } precision =>
                 From(precision.TranslationPlan),
