@@ -30,6 +30,8 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Save slots, autosave, and local preferences](docs/save-slots-and-local-preferences.md)
 - [Gameplay content and static new-game composition](docs/gameplay-content.md)
 - [Generalized inventory and cargo](docs/inventory-and-cargo.md)
+- [Equipment and ship slots](docs/equipment-and-ship-slots.md)
+- [Ship and fleet balance direction: VRO reference](docs/ship-and-fleet-balance.md)
 - [Internationalization and localization](docs/internationalization-and-localization.md)
 - [Accessibility](docs/accessibility.md)
 - [Planned game-system inventory](docs/planned-systems.md)

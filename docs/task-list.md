@@ -24,8 +24,8 @@ source of detailed scope and acceptance criteria.
 | Dialogue and randomness | `TASK-016` completed dialogue design. `TASK-021` and `TASK-066` completed deterministic-randomness design and implementation. | `TASK-065` implements dialogue. |
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
-| Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` owns equipment and ship slots. `TASK-055` owns trade balance, pricing, and settlement design. |
-| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract; `TASK-075` completed deployment and pickup range and action-order design. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. | `TASK-068` owns installed-equipment capability contributions, `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-095` implements deployables and range orders, `TASK-094` owns player order-failure notifications, and `TASK-088` retains late-term spatial authoring guidance. |
+| Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` completed the [equipment and ship-slot design](equipment-and-ship-slots.md); `TASK-099` owns implementation. `TASK-055` owns trade balance, pricing, and settlement design. |
+| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract; `TASK-075` completed deployment and pickup range and action-order design. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. | `TASK-068` defined installed-equipment capability contributions; `TASK-099` implements them, `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-095` implements deployables and range orders, `TASK-094` owns player order-failure notifications, and `TASK-088` retains late-term spatial authoring guidance. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 | Source-code organization | `TASK-091` reorganized source and tests around the documented simulation authority, client presentation, deterministic execution, and test-harness boundaries without changing simulation behavior or public type identity. | Further namespace or assembly changes require measured need and separately approved work. |
 
@@ -78,7 +78,7 @@ This section is to put work that is currently being performed. Once the work is 
     preference store completed by `TASK-084`, not a separate pacing-only file.
   - Context: [Time and pacing](time-and-pacing.md)
 
-`TASK-068`, `TASK-071`, and `TASK-073` remain in the
+`TASK-071` and `TASK-073` remain in the
 near-term parking-lot horizon until the project owner promotes one of them.
 
 ## Future parking lot
@@ -90,6 +90,82 @@ prerequisites and desired behavior are sufficiently defined.
 The parking-lot horizons organize deferred work by likely sequencing. A task
 in the **Near term** parking-lot section remains deferred; it is not promoted to
 the project-level **Near-term work** section above.
+
+- [ ] **TASK-099: Implement equipment loadouts and refit integration**
+  - Implement the accepted `TASK-068` definitions, stable instance/slot custody,
+    compatibility, fixed removal, condition curves, enhancement profiles,
+    capability composition/replanning, facts, disclosure, checkpoints, and
+    deterministic validation criteria through the shared content/session path.
+  - Implement normal queued refit intent with no advance reservations and atomic
+    execution-time validation, one final loadout publication, causal outcomes,
+    event-driven invalidation, and the accepted control-override boundary.
+  - Coordinate station service/settlement contracts with `TASK-097` and
+    `TASK-055`, observation integration with `TASK-073`, and notifications with
+    `TASK-094`. Do not invent missing station, combat, repair, or UI policy;
+    fitting-screen UI design remains `TASK-098` and ship-loss disposition `TASK-096`.
+  - Retain single-thread execution and prove identical state, IDs, resources,
+    order outcomes, motion, facts, and save continuation across supported worker,
+    partition, and batch layouts; enable concurrency only with benchmark evidence.
+  - Context: [Equipment and ship slots](equipment-and-ship-slots.md)
+
+- [ ] **TASK-098: Design the fitting-screen UI**
+  - Design the selected-ship/station refit screen, which opens immediately when
+    the player requests a refit and applies a temporary local pause.
+  - Capture and restore the complete pre-screen pause/speed state on approval,
+    cancellation, and exit: manual pause remains manual pause; a running game
+    returns to its previous speed. Coordinate pacing ownership with `TASK-038`.
+  - Provide a local draft with no authoritative changes, explicit approval that
+    submits ordinary queued refit intent, and cancellation/exit even for an
+    invalid draft. Distinguish approval from later instantaneous execution.
+  - Support reversing equipment choices within a fitting session when parts
+    are available, grouped slots, hull/slot sizes, multi-slot occupancy,
+    mandatory-group validation, tiers, and modification tradeoffs. Avoid a
+    giant finished-equipment market or excessive fitting-budget complexity.
+  - Decide previews for capability changes, compatibility, condition, component
+    and Credit settlement, and typed rejection/cancellation explanations;
+    cover queued or invalidated intent without giving the UI simulation authority.
+  - Coordinate availability and settlement disclosures with `TASK-097`, outcomes
+    with `TASK-094`, observer-safe fields with `TASK-073`, and localization and
+    accessibility with their accepted contracts. Keep UI design separate from
+    equipment implementation; detailed interactions require owner review.
+  - Context: [Equipment and ship slots](equipment-and-ship-slots.md) · [Time and pacing](time-and-pacing.md) · [Accessibility](accessibility.md)
+
+- [ ] **TASK-097: Design station refitting and equipment reclamation services**
+  - Own station details moved out of `TASK-068`: ships refit only at stations
+    with the requisite service module, using the shared equipment vocabulary.
+    Coordinate station/module composition with `TASK-057` and docking with
+    `TASK-051`; ship slots remain ship-specific.
+  - Retain the owner's direction: stations construct equipment directly onto
+    ships from component inputs rather than selling individual finished parts.
+    Removed equipment is dismantled into building parts sold to the station.
+    Recovery and prices should allow experimentation without large losses.
+  - Permit restoring a removed equipment choice within the same fitting session
+    when enough parts are available. Decide recipe/recovery quantities,
+    damaged-equipment reclamation, modification rebuilding, and net settlement
+    with `TASK-055`, preserving material causality and no duplicated value.
+  - Define station service identity, ship/size eligibility, docking or proximity,
+    requesting authority, ownership changes, source/destination inventories,
+    resource availability, prices/quotes, provider capacity, and service removal.
+  - Supply an atomic preparation/validation/commit contract for the equipment
+    owner, inventory, and Credit settlement. Fitting is instantaneous for now,
+    can be queued, and cancels with notification when eligibility is lost.
+    Keep whole-refit rejection atomic and preserve accepted deterministic priority.
+  - Consume the accepted reservation-free Q15 policy: no draft/queued refit
+    reservations; validate resources and settlement atomically at execution,
+    respecting other workflows' commitments. Define invalidation triggers,
+    typed outcomes, facts, checkpoints,
+    restoration, and deterministic contention without silently adding advance
+    reservations or work duration. UI remains `TASK-098`.
+  - Context: [Equipment and ship slots](equipment-and-ship-slots.md) · [Inventory and cargo](inventory-and-cargo.md) · [Economy](economy.md)
+
+- [ ] **TASK-096: Define installed-equipment disposition on ship destruction**
+  - After ship destruction is implemented through combat and lifecycle work,
+    decide installed-item disposition, pending fitting-order cleanup, and any
+    resource or settlement commitments without silently creating salvage.
+  - Preserve atomic owner cleanup, causal facts, and checkpoint continuity.
+    Equipment destroyed while its ship remains live stays installed and
+    nonfunctional under `TASK-068`; this follow-up owns ship-loss disposition.
+  - Context: [Equipment and ship slots](equipment-and-ship-slots.md) · [Entity lifecycle](entity-lifecycle.md)
 
 - [ ] **TASK-095: Implement sensor deployables and deployment/pickup orders**
   - Implement the accepted `TASK-074` and `TASK-075` inventory/entity lifecycle,
@@ -104,7 +180,8 @@ the project-level **Near-term work** section above.
 
 - [ ] **TASK-094: Define and implement player order-failure notifications**
   - Provide a player-facing notification when an accepted order fails,
-    including deploy and pickup orders from `TASK-075`, using authoritative
+    including deploy and pickup orders from `TASK-075` and fitting cancellation
+    or failure from `TASK-068`, using authoritative
     order outcomes and typed failure reasons.
   - Defer notification policy and presentation until owner review; preserve
     semantic failure facts and terminal order state independently of this UI.
@@ -150,25 +227,6 @@ the project-level **Near-term work** section above.
     and the application surface with `TASK-049`. Do not invent either missing
     entity domain inside sensor implementation.
   - Context: [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Presentation snapshots](presentation-snapshots.md) · [Concurrency and performance](concurrency-and-performance.md)
-
-- [ ] **TASK-068: Define equipment, ship slots, installation, and removal**
-  - Define which generalized physical items can become equipment and how ship
-    designs declare stable slots, hardpoints, compatibility, limits, and
-    installed capability contributions without prescribing later combat,
-    repair, or station outcome policy.
-  - Define equipment installation, removal, replacement, reservation,
-    ownership, activation, damage or destruction boundaries, commands, facts,
-    snapshots, checkpoints, saves, and deterministic contention behavior.
-  - Supply typed installed-equipment maneuver contributions to the completed
-    `TASK-090` capability foundation. Materialize the ship at the commit
-    timestamp, advance its effective-capability revision, invalidate remaining
-    maneuver work, and replan without adding force or fuel simulation.
-  - Build on the generalized item identity, cargo, and transfer semantics from
-    completed `TASK-041` and the content catalogs completed by `TASK-063`.
-    Coordinate authored definitions with `TASK-023`, combat effects with
-    `TASK-046`, ship progression with `TASK-056`, station capabilities with
-    `TASK-057`, and repair behavior with `TASK-058`.
-  - Context: [Gameplay content](gameplay-content.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-032: Define semantic economy facts**
   - Define gameplay-facing production, construction, and logistics lifecycle
@@ -394,6 +452,10 @@ the project-level **Near-term work** section above.
   - Build combat engagement and pursuit on the moving-ship interaction contract
     from completed `TASK-019`; do not introduce a separate combat-only position
     or motion model.
+  - Use the owner-selected VRO reference for complementary ship roles,
+    target-specific weapons, and fleet support. Exact mechanics and tuning
+    remain for owner review.
+  - Context: [Ship and fleet balance direction](ship-and-fleet-balance.md)
 
 - [ ] **TASK-051: Define docking, undocking, and berth capacity**
   - Define approach, access validation, berth or docking-capacity allocation,
@@ -453,6 +515,8 @@ the project-level **Near-term work** section above.
   - Define how station construction and expansion consume material and work,
     choose location, allocate identity, change regional capacity, handle
     interruption or removal, and join commands, facts, snapshots, and saves.
+  - Station refit/reclamation service design is tracked in `TASK-097`, using
+    the shared equipment vocabulary without putting station details in `TASK-068`.
   - Begin after `TASK-068` defines installed equipment; completed `TASK-063`
     supplies content catalogs. Coordinate docking with `TASK-051`, territory with
     `TASK-059`, and strategic construction with `TASK-026`.
@@ -529,6 +593,8 @@ the project-level **Near-term work** section above.
     snapshots, checkpoints, and the viability of continued one-ship play.
   - Begin after `TASK-068` defines equipment and `TASK-055` defines exchange;
     coordinate construction with `TASK-034` and combat losses with `TASK-046`.
+  - Balance reference: [Ship and fleet roles](ship-and-fleet-balance.md),
+    preserving continued one-ship viability alongside fleet specialization.
   - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md)
 
 - [ ] **TASK-058: Define repair and maintenance**
@@ -624,6 +690,19 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-068: Define equipment, ship slots, installation, and removal**
+  - Completed the owner-approved design on 2026-10-06: discrete equipment
+    identity, grouped stable hull slots, exact-size multi-slot occupancy,
+    explicit removal policy, mandatory-group validation, and reservation-free
+    atomic refitting with one final loadout publication.
+  - Defined deterministic damage curves/fact cadence, bounded enhancement
+    profiles, typed capability composition/replanning, queue invalidation,
+    observer-safe disclosure, checkpoint continuity, and acceptance criteria.
+  - Implementation remains `TASK-099`; station services are `TASK-097`,
+    fitting-screen UI is `TASK-098`, repair remains `TASK-058`, and ship-loss
+    equipment disposition remains `TASK-096`.
+  - Context: [Equipment and ship slots](equipment-and-ship-slots.md)
 
 - [x] **TASK-075: Define deployable deployment and pickup ranges**
   - Confirmed on 2026-10-01: item-defined 2,500-meter deployment range and
