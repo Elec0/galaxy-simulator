@@ -1,0 +1,161 @@
+{
+  "SchemaVersion": 2,
+  "RecordedAtUtc": "2026-10-08T20:43:54.092545+00:00",
+  "Suite": "full",
+  "Machine": {
+    "Framework": ".NET 10.0.10",
+    "OperatingSystem": "macOS 26.7.1",
+    "ProcessArchitecture": "Arm64",
+    "ProcessorCount": 11,
+    "ServerGarbageCollection": false
+  },
+  "Scenarios": [
+    {
+      "Id": "interaction.index-scan",
+      "BasePreset": "interaction.index-scan",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Parameters": {
+        "activeShipCount": 5000,
+        "destinationDistance": 20,
+        "gridWidth": 16,
+        "layout": 1,
+        "measuredIterations": 5,
+        "participantSpacing": 1,
+        "queryCount": 100,
+        "rangeUnits": 10,
+        "scopeStride": 1,
+        "seed": 1,
+        "shipCount": 10000,
+        "simulatedDurationMilliseconds": 501,
+        "systemCount": 1,
+        "travelDurationMilliseconds": 1000,
+        "treeLeafSize": 4,
+        "warmupIterations": 1
+      },
+      "Digest": "4aa009b9b759eed6",
+      "SimulatedMilliseconds": 501,
+      "Counts": {
+        "activeShips": 5000,
+        "broadPhaseCandidates": 999900,
+        "exactChecks": 999900,
+        "indexBoxTests": 0,
+        "indexEntries": 0,
+        "indexNodes": 0,
+        "matches": 15415,
+        "queries": 100,
+        "scopedEntries": 1000000,
+        "ships": 10000,
+        "systems": 1
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 126.0985,
+        "MinimumMilliseconds": 47.2856,
+        "MaximumMilliseconds": 142.0171,
+        "MedianAllocatedBytes": 23853600,
+        "Generation0Collections": 13,
+        "Generation1Collections": 8,
+        "Generation2Collections": 6
+      }
+    },
+    {
+      "Id": "interaction.index-grid",
+      "BasePreset": "interaction.index-grid",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Parameters": {
+        "activeShipCount": 5000,
+        "destinationDistance": 20,
+        "gridWidth": 16,
+        "layout": 1,
+        "measuredIterations": 5,
+        "participantSpacing": 1,
+        "queryCount": 100,
+        "rangeUnits": 10,
+        "scopeStride": 1,
+        "seed": 1,
+        "shipCount": 10000,
+        "simulatedDurationMilliseconds": 501,
+        "systemCount": 1,
+        "travelDurationMilliseconds": 1000,
+        "treeLeafSize": 4,
+        "warmupIterations": 1
+      },
+      "Digest": "4aa009b9b759eed6",
+      "SimulatedMilliseconds": 501,
+      "Counts": {
+        "activeShips": 5000,
+        "broadPhaseCandidates": 24464,
+        "exactChecks": 24464,
+        "indexBoxTests": 69027,
+        "indexEntries": 10724,
+        "indexNodes": 80,
+        "matches": 15415,
+        "queries": 100,
+        "scopedEntries": 1000000,
+        "ships": 10000,
+        "systems": 1
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 39.3448,
+        "MinimumMilliseconds": 38.328,
+        "MaximumMilliseconds": 40.1637,
+        "MedianAllocatedBytes": 25846832,
+        "Generation0Collections": 15,
+        "Generation1Collections": 5,
+        "Generation2Collections": 5
+      }
+    },
+    {
+      "Id": "interaction.index-hierarchy",
+      "BasePreset": "interaction.index-hierarchy",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Parameters": {
+        "activeShipCount": 5000,
+        "destinationDistance": 20,
+        "gridWidth": 16,
+        "layout": 1,
+        "measuredIterations": 5,
+        "participantSpacing": 1,
+        "queryCount": 100,
+        "rangeUnits": 10,
+        "scopeStride": 1,
+        "seed": 1,
+        "shipCount": 10000,
+        "simulatedDurationMilliseconds": 501,
+        "systemCount": 1,
+        "travelDurationMilliseconds": 1000,
+        "treeLeafSize": 4,
+        "warmupIterations": 1
+      },
+      "Digest": "4aa009b9b759eed6",
+      "SimulatedMilliseconds": 501,
+      "Counts": {
+        "activeShips": 5000,
+        "broadPhaseCandidates": 24464,
+        "exactChecks": 24464,
+        "indexBoxTests": 26868,
+        "indexEntries": 10000,
+        "indexNodes": 7711,
+        "matches": 15415,
+        "queries": 100,
+        "scopedEntries": 1000000,
+        "ships": 10000,
+        "systems": 1
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 54.2037,
+        "MinimumMilliseconds": 34.4355,
+        "MaximumMilliseconds": 76.6119,
+        "MedianAllocatedBytes": 45459136,
+        "Generation0Collections": 29,
+        "Generation1Collections": 12,
+        "Generation2Collections": 10
+      }
+    }
+  ]
+}

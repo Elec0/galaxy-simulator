@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "interaction.scoped-proximity.dense",
+  "basePreset": "interaction.scoped-proximity",
+  "basePresetVersion": 1,
+  "parameters": {
+    "participantSpacing": 0
+  }
+}

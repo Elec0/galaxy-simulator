@@ -3,6 +3,7 @@ namespace GalaxyCommand.Simulation;
 public enum RuntimeEvaluationWave
 {
     PhysicalCompletion = 1,
+    SpatialInteractions = 2,
     ProductionReadiness = 3,
     ConstructionReadiness = 4,
     LogisticsAssignment = 6,
@@ -71,6 +72,11 @@ public sealed class AgendaCommitResult
 /// </summary>
 public static class AgendaCommitOwner
 {
+    /// <summary>
+    /// Orders and prevalidates a complete proposal wave before serial scheduling. Duplicate
+    /// order, invalid timeline/phase, or creation-sequence exhaustion fails before any event
+    /// is appended. The caller maintains the exclusive agenda commit boundary.
+    /// </summary>
     public static AgendaCommitResult Commit<TEvent>(
         EventAgenda<TEvent> agenda,
         IEnumerable<AgendaEventProposal<TEvent>> proposals)
@@ -96,9 +102,10 @@ public static class AgendaCommitOwner
         return new AgendaCommitResult(keys);
     }
 
+    /// <summary>Checks sorted proposal order, timeline, phase, and allocator capacity before any serial append.</summary>
     private static void Validate<TEvent>(
         EventAgenda<TEvent> agenda,
-        IReadOnlyList<AgendaEventProposal<TEvent>> proposals)
+        AgendaEventProposal<TEvent>[] proposals)
     {
         AgendaProposalOrder? previous = null;
         foreach (AgendaEventProposal<TEvent> proposal in proposals)
@@ -127,5 +134,8 @@ public static class AgendaCommitOwner
 
             previous = proposal.Order;
         }
+        // Schedule advances the allocator once per proposal. Check the whole wave so
+        // exhaustion cannot leave earlier proposals appended without owner correlations.
+        agenda.EnsureCreationCapacity(proposals.Length);
     }
 }

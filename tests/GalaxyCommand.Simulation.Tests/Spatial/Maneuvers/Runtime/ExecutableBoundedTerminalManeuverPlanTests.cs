@@ -5,6 +5,40 @@ namespace GalaxyCommand.Simulation.Tests;
 public sealed class ExecutableBoundedTerminalManeuverPlanTests
 {
     [Fact]
+    public void WaypointRouteFreezesTheCallerTransitionCollection()
+    {
+        ShipKinematicState state = State(0, 0, 0, 0, 0);
+        var transitions = new List<AnalyticManeuverSegment>
+        {
+            new(SimulationTime.Zero, new SimulationTime(10), state, ShipAcceleration.Zero, ShipAngularRate.Zero),
+        };
+        ExecutableBoundedTerminalManeuverPlan route = ExecutableBoundedTerminalManeuverPlan.WaypointRoute(transitions,
+            ExecutableBoundedTerminalManeuverPlan.TerminalSettle(new SimulationTime(10), state));
+        transitions.Clear();
+
+        Assert.Equal(state, route.StateAt(new SimulationTime(5)));
+    }
+
+    [Theory]
+    [InlineData(25, 2237)]
+    [InlineData(65, 3764)]
+    public void ProjectedCurvesRetainAccelerationAndBrakingContactTimes(long target, ulong expected)
+    {
+        BoundedTerminalPlanSelection selection = BoundedTerminalManeuverPlanner.Select(
+            SimulationTime.Zero, State(0, 0, 0, 0, 0), Position(90, 0), null,
+            new ManeuverAcceleration(10_000), new ManeuverAcceleration(10_000),
+            new ManeuverSpeed(30_000), new ManeuverTurnRate(45_000));
+        ExecutableBoundedTerminalManeuverPlan plan = selection.ExecutablePlan!;
+        InteractionPhaseCurve stationary = InteractionPhaseCurve.Fixed(Position(target, 0), plan.StartsAt, plan.EndsAt);
+
+        SweptRangeContact contact = Assert.IsType<SweptRangeContact>(plan.InteractionCurves
+            .Select(curve => InteractionPhaseRangeQuery.Find(curve, stationary, plan.StartsAt, plan.EndsAt, 0))
+            .Where(contact => contact is not null).OrderBy(contact => contact!.Timestamp).FirstOrDefault());
+
+        Assert.Equal(new SimulationTime(expected), contact.Timestamp);
+    }
+
+    [Fact]
     public void TerminalSettleIsAZeroDurationExecutablePlan()
     {
         var startsAt = new SimulationTime(125);

@@ -28,5 +28,6 @@ internal sealed record GameSessionCheckpoint(
     DeterministicRandomCheckpoint? Random,
     GameFactStoreCheckpoint Facts,
     CommandAdmissionCheckpoint CommandAdmission,
-    InventoryCommitOwnerCheckpoint? InventoryCommit = null);
+    InventoryCommitOwnerCheckpoint? InventoryCommit = null,
+    SpatialInteractionRegistrationCheckpoint? SpatialInteractions = null);
 

@@ -1,0 +1,66 @@
+{
+  "SchemaVersion": 2,
+  "RecordedAtUtc": "2026-10-13T17:37:00.429277+00:00",
+  "Suite": "full",
+  "Machine": {
+    "Framework": ".NET 10.0.10",
+    "OperatingSystem": "macOS 26.7.1",
+    "ProcessArchitecture": "Arm64",
+    "ProcessorCount": 11,
+    "ServerGarbageCollection": false
+  },
+  "Scenarios": [
+    {
+      "Id": "interaction.session-batched",
+      "BasePreset": "interaction.session-batched",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Parameters": {
+        "activeShipCount": 64,
+        "batchSize": 64,
+        "destinationDistance": 100,
+        "factRetentionCapacity": 10000,
+        "interestCount": 2048,
+        "measuredIterations": 5,
+        "rangeUnits": 2,
+        "replanCount": 4,
+        "replanIntervalMilliseconds": 1000,
+        "seed": 1,
+        "shipCount": 256,
+        "simulatedDurationMilliseconds": 6000,
+        "systemCount": 4,
+        "travelDurationMilliseconds": 1000,
+        "warmupIterations": 3,
+        "workerCount": 8
+      },
+      "Digest": "995aa31fbfc67979",
+      "SimulatedMilliseconds": 6000,
+      "Counts": {
+        "commands": 256,
+        "effects": 2886,
+        "evaluationWaves": 4,
+        "events": 3974,
+        "factsCommitted": 1152,
+        "factsRetained": 1152,
+        "interactionEventsApplied": 2886,
+        "interactionEventsIgnored": 1024,
+        "interestsCanceled": 558,
+        "interestsRegistered": 2048,
+        "interestsRemaining": 1490,
+        "interestsUpdated": 1676,
+        "ships": 256,
+        "systems": 4
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 56.7924,
+        "MinimumMilliseconds": 56.1328,
+        "MaximumMilliseconds": 68.8753,
+        "MedianAllocatedBytes": 181434144,
+        "Generation0Collections": 109,
+        "Generation1Collections": 22,
+        "Generation2Collections": 20
+      }
+    }
+  ]
+}

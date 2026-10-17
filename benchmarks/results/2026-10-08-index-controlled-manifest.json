@@ -1,0 +1,38 @@
+{
+  "Experiment": "TASK-071 index comparison",
+  "RuntimeEnvironment": {
+    "DOTNET_TieredCompilation": "0"
+  },
+  "ProcessIsolation": "One preset per process",
+  "WarmupIterations": 3,
+  "MeasuredIterations": 7,
+  "Reports": [
+    "2026-10-08-index-controlled-2500-sparse-scan.json",
+    "2026-10-08-index-controlled-2500-sparse-grid.json",
+    "2026-10-08-index-controlled-2500-sparse-hierarchy.json",
+    "2026-10-08-index-controlled-2500-clusters-scan.json",
+    "2026-10-08-index-controlled-2500-clusters-grid.json",
+    "2026-10-08-index-controlled-2500-clusters-hierarchy.json",
+    "2026-10-08-index-controlled-2500-dense-scan.json",
+    "2026-10-08-index-controlled-2500-dense-grid.json",
+    "2026-10-08-index-controlled-2500-dense-hierarchy.json",
+    "2026-10-08-index-controlled-10000-sparse-scan.json",
+    "2026-10-08-index-controlled-10000-sparse-grid.json",
+    "2026-10-08-index-controlled-10000-sparse-hierarchy.json",
+    "2026-10-08-index-controlled-10000-clusters-scan.json",
+    "2026-10-08-index-controlled-10000-clusters-grid.json",
+    "2026-10-08-index-controlled-10000-clusters-hierarchy.json",
+    "2026-10-08-index-controlled-10000-dense-scan.json",
+    "2026-10-08-index-controlled-10000-dense-grid.json",
+    "2026-10-08-index-controlled-10000-dense-hierarchy.json",
+    "2026-10-08-index-controlled-2500-sparse-queries-1000-scan.json",
+    "2026-10-08-index-controlled-2500-sparse-queries-1000-grid.json",
+    "2026-10-08-index-controlled-2500-sparse-queries-1000-hierarchy.json",
+    "2026-10-08-index-controlled-2500-clusters-queries-1000-scan.json",
+    "2026-10-08-index-controlled-2500-clusters-queries-1000-grid.json",
+    "2026-10-08-index-controlled-2500-clusters-queries-1000-hierarchy.json",
+    "2026-10-08-index-controlled-2500-dense-queries-1000-scan.json",
+    "2026-10-08-index-controlled-2500-dense-queries-1000-grid.json",
+    "2026-10-08-index-controlled-2500-dense-queries-1000-hierarchy.json"
+  ]
+}

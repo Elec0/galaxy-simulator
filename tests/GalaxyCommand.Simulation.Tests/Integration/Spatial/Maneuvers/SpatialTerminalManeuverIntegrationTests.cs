@@ -5,6 +5,41 @@ namespace GalaxyCommand.Simulation.Tests;
 public sealed class SpatialTerminalManeuverIntegrationTests
 {
     [Fact]
+    public void AnalyticStartAndEachAppliedBoundaryAdvanceSpatialRevision()
+    {
+        var fixture = new ManeuverFixture();
+        ShipKinematicState start = State(0, 0, ShipVelocity.Zero, 0);
+        fixture.Movement.Add(fixture.ShipId, start.Position, start.Heading);
+        ExecutableBoundedTerminalManeuverPlan plan = Plan(
+            SimulationTime.Zero, start, Position(25, 0), ManeuverObjective.FastestArrival);
+        _ = fixture.Start(plan, ManeuverObjective.FastestArrival);
+        Assert.Equal(new SpatialRevision(1), fixture.Movement.GetSpatialRevision(fixture.ShipId));
+
+        fixture.Engine.RunUntil(plan.EndsAt);
+
+        Assert.Equal(new SpatialRevision((ulong)plan.Phases.Count + 1),
+            fixture.Movement.GetSpatialRevision(fixture.ShipId));
+    }
+
+    [Fact]
+    public void AnalyticInterruptionAdvancesSpatialRevision()
+    {
+        var fixture = new ManeuverFixture();
+        ShipKinematicState start = State(0, 0, ShipVelocity.Zero, 0);
+        fixture.Movement.Add(fixture.ShipId, start.Position, start.Heading);
+        ExecutableBoundedTerminalManeuverPlan plan = Plan(
+            SimulationTime.Zero, start, Position(25, 0), ManeuverObjective.FastestArrival);
+        _ = fixture.Start(plan, ManeuverObjective.FastestArrival);
+        SimulationTime now = Inside(plan.Phases[0]);
+        fixture.Engine.RunUntil(now);
+
+        Assert.Equal(AgendaCancellationCheck.Matches, fixture.Movement.TryInterruptTerminalManeuver(
+            fixture.ShipId, now, fixture.Agenda, static value => value, out _));
+
+        Assert.Equal(new SpatialRevision(2), fixture.Movement.GetSpatialRevision(fixture.ShipId));
+    }
+
+    [Fact]
     public void StartOwnsTheScheduleAndPublishesLiveAnalyticSnapshot()
     {
         var movement = new SpatialMovement();
@@ -125,6 +160,7 @@ public sealed class SpatialTerminalManeuverIntegrationTests
                     LocalMotionEndReason>? replacement);
 
         Assert.Equal(AgendaCancellationCheck.Matches, result);
+        Assert.Equal(new SpatialRevision(2), fixture.Movement.GetSpatialRevision(fixture.ShipId));
         Assert.NotNull(replacement);
         Assert.Equal(original.MotionId, replacement.InterruptedMotionId);
         Assert.Equal(

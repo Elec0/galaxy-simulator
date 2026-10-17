@@ -322,6 +322,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             GameEvent.SpatialMovement spatial =>
                 new GameEventKind.SpatialMovement(spatial.Event),
             GameEvent.Economic economic => new GameEventKind.Economic(economic.Event),
+            GameEvent.SpatialInteraction interaction => new GameEventKind.SpatialInteraction(interaction.Forecast.Candidate),
             _ => throw new InvalidOperationException(
                 $"Unsupported game event {simulationEvent.Payload.GetType().Name}."),
         };

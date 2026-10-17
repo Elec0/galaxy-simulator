@@ -105,6 +105,9 @@ reference does not remove those tiers or settle unanswered fitting questions.
 Role specialization can guide the tradeoffs between equipment families while
 upgrades remain possible within a family.
 
+The first [combat activation contract](combat-activation.md) records the
+owner-selected engagement and movement handoff boundaries.
+
 `TASK-046` owns combat resolution and the rules that make these relationships
 work. `TASK-068` owns slots, compatibility, and installed capabilities.
 `TASK-056` owns ship acquisition, replacement, upgrades, and continued

@@ -4,6 +4,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
 {
     internal void ThrowIfUnhealthy()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_evaluatingInteractions) throw new InvalidOperationException("Interaction evaluation must use stable inputs and buffer its effects.");
         if (_isPoisoned)
         {
             throw new InvalidOperationException(
@@ -11,8 +13,24 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         }
     }
 
-    internal RunReport AdvanceTo(SimulationTime target) =>
-        _engine.RunUntil(target);
+    /// <summary>Prepares current interests and advances within live controlled intervals, including admissions during the run.</summary>
+    internal RunReport AdvanceTo(SimulationTime target)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(target.Milliseconds, CurrentTime.Milliseconds, nameof(target));
+        _interactionRegistration?.EnsureEvaluationBindings();
+        try
+        {
+            PrepareStateUpdate(CurrentTime, _agenda);
+            return AdvanceWithinControlledMotion(target);
+        }
+        catch
+        {
+            // Due envelopes may already have been popped or some effects committed.
+            // A failed wave cannot safely resume or publish a checkpoint.
+            _isPoisoned = true;
+            throw;
+        }
+    }
 
     internal GameSnapshot CaptureSnapshot()
     {
@@ -80,7 +98,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
 
     /// <summary>
     /// Applies a prepared entity removal, invalidates inbound entity-target
-    /// orders, and commits their facts before the removal fact.
+    /// orders, and commits their facts before the removal fact. Controlled motion on the
+    /// removed actor or an inbound-order owner rejects before any affected owner mutates.
     /// </summary>
     internal EntityRemovalResult RemoveEntity(EntityRemovalRequest request)
     {
@@ -95,6 +114,12 @@ internal sealed partial class ActorOrderRuntimeCoordinator
 
         PreparedEntityRemoval removal =
             ((EntityRemovalPreparation.Prepared)preparation).Value;
+        // Removal also changes inbound orders. Protect every affected controlled
+        // participant before any economy, agenda, order, or lifecycle commit.
+        if (_movement.GetState(removal.ShipId) is ShipSpatialState.InteractionControlled ||
+            removal.InboundOrders.Any(targeted => _movement.GetState(targeted.ShipId) is ShipSpatialState.InteractionControlled))
+            return new EntityRemovalResult.Rejected(request, EntityRemovalRejectionReason.OwnerConflict);
+
         PreparedEconomyEntityRemoval? economyRemoval = null;
         if (_economy is not null
             && !_economy.TryPrepareEntityRemoval(

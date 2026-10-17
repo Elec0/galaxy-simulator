@@ -94,6 +94,14 @@ public sealed class EventAgenda<TEvent>
 
     public int Count => _pending.Count;
 
+    /// <summary>Checks capacity for an entire serial commit without allocating sequences or changing pending work.</summary>
+    internal void EnsureCreationCapacity(int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        _ = checked(_nextCreationSequence + (ulong)count);
+    }
+
+
     /// <summary>
     /// Captures exact pending work and allocator state only when no timestamp
     /// phase is open.

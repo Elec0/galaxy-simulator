@@ -1,0 +1,94 @@
+{
+  "SchemaVersion": 2,
+  "RecordedAtUtc": "2026-10-08T20:20:32.868571+00:00",
+  "Suite": "full",
+  "Machine": {
+    "Framework": ".NET 10.0.10",
+    "OperatingSystem": "macOS 26.7.1",
+    "ProcessArchitecture": "Arm64",
+    "ProcessorCount": 11,
+    "ServerGarbageCollection": false
+  },
+  "Scenarios": [
+    {
+      "Id": "interaction.scoped-proximity",
+      "BasePreset": "interaction.scoped-proximity",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Parameters": {
+        "activeShipCount": 5000,
+        "destinationDistance": 20,
+        "measuredIterations": 5,
+        "participantSpacing": 0,
+        "queryCount": 100,
+        "rangeUnits": 10,
+        "seed": 1,
+        "shipCount": 10000,
+        "simulatedDurationMilliseconds": 500,
+        "systemCount": 1,
+        "travelDurationMilliseconds": 1000,
+        "warmupIterations": 1
+      },
+      "Digest": "c4b6e2a8ccbaa0b1",
+      "SimulatedMilliseconds": 500,
+      "Counts": {
+        "activeShips": 5000,
+        "matches": 999900,
+        "queries": 100,
+        "scopedCandidates": 1000000,
+        "ships": 10000,
+        "systems": 1
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 1881.257,
+        "MinimumMilliseconds": 1817.2245,
+        "MaximumMilliseconds": 2240.1955,
+        "MedianAllocatedBytes": 4625449640,
+        "Generation0Collections": 2748,
+        "Generation1Collections": 97,
+        "Generation2Collections": 52
+      }
+    },
+    {
+      "Id": "interaction.prepared-proximity",
+      "BasePreset": "interaction.prepared-proximity",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Parameters": {
+        "activeShipCount": 5000,
+        "destinationDistance": 20,
+        "measuredIterations": 5,
+        "participantSpacing": 0,
+        "queryCount": 100,
+        "rangeUnits": 10,
+        "seed": 1,
+        "shipCount": 10000,
+        "simulatedDurationMilliseconds": 500,
+        "systemCount": 1,
+        "travelDurationMilliseconds": 1000,
+        "warmupIterations": 1
+      },
+      "Digest": "c4b6e2a8ccbaa0b1",
+      "SimulatedMilliseconds": 500,
+      "Counts": {
+        "activeShips": 5000,
+        "matches": 999900,
+        "queries": 100,
+        "scopedCandidates": 1000000,
+        "ships": 10000,
+        "systems": 1
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 52.3832,
+        "MinimumMilliseconds": 37.8755,
+        "MaximumMilliseconds": 85.6446,
+        "MedianAllocatedBytes": 52669480,
+        "Generation0Collections": 57,
+        "Generation1Collections": 52,
+        "Generation2Collections": 23
+      }
+    }
+  ]
+}

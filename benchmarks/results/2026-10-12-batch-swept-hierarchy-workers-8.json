@@ -1,0 +1,62 @@
+{
+  "SchemaVersion": 2,
+  "RecordedAtUtc": "2026-10-13T00:16:04.499838+00:00",
+  "Suite": "full",
+  "Machine": {
+    "Framework": ".NET 10.0.10",
+    "OperatingSystem": "macOS 26.7.1",
+    "ProcessArchitecture": "Arm64",
+    "ProcessorCount": 11,
+    "ServerGarbageCollection": false
+  },
+  "Scenarios": [
+    {
+      "Id": "interaction.batch-swept-hierarchy",
+      "BasePreset": "interaction.batch-swept-hierarchy",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Parameters": {
+        "activeShipCount": 1250,
+        "batchSize": 64,
+        "destinationDistance": 20,
+        "gridCellBudget": 4096,
+        "gridWidth": 16,
+        "layout": 0,
+        "measuredIterations": 5,
+        "motionKind": 1,
+        "participantSpacing": 100,
+        "queryCount": 1000,
+        "rangeUnits": 10,
+        "scopeStride": 1,
+        "seed": 1,
+        "shipCount": 2500,
+        "simulatedDurationMilliseconds": 1000,
+        "systemCount": 1,
+        "travelDurationMilliseconds": 1000,
+        "treeLeafSize": 4,
+        "warmupIterations": 3,
+        "workerCount": 8
+      },
+      "Digest": "5c677d303c9e9c4f",
+      "SimulatedMilliseconds": 1000,
+      "Counts": {
+        "activeShips": 1250,
+        "contacts": 0,
+        "queries": 1000,
+        "scopedEntries": 2500000,
+        "ships": 2500,
+        "systems": 1
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 11.0666,
+        "MinimumMilliseconds": 9.4792,
+        "MaximumMilliseconds": 11.3485,
+        "MedianAllocatedBytes": 13189536,
+        "Generation0Collections": 8,
+        "Generation1Collections": 4,
+        "Generation2Collections": 4
+      }
+    }
+  ]
+}

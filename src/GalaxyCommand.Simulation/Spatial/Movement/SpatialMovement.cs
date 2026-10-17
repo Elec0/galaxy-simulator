@@ -59,6 +59,8 @@ public abstract record ShipSpatialState
         public ManeuverObjective Objective { get; }
     }
 
+    public sealed record InteractionControlled(InteractionMotionOwner Owner, AnalyticManeuverSegment Interval) : ShipSpatialState;
+
     public sealed record ConnectorTransit : ShipSpatialState
     {
         public ConnectorTransit(ConnectorTransitSegment transit)
@@ -377,6 +379,9 @@ public abstract record ShipSpatialSnapshotState
         ShipKinematicState CurrentState,
         TerminalManeuverSnapshot Maneuver) : ShipSpatialSnapshotState;
 
+    public sealed record InteractionControlled(InteractionMotionOwner Owner,
+        AnalyticManeuverSegment Interval, ShipKinematicState CurrentState) : ShipSpatialSnapshotState;
+
     public sealed record ConnectorTransit(
         ConnectorTransitSnapshot Transit) : ShipSpatialSnapshotState;
 }
@@ -407,6 +412,7 @@ public sealed record ShipSpatialSnapshot(
                 localMotion.CurrentPosition,
             ShipSpatialSnapshotState.AnalyticManeuver maneuver =>
                 maneuver.CurrentState.Position,
+            ShipSpatialSnapshotState.InteractionControlled controlled => controlled.CurrentState.Position,
             ShipSpatialSnapshotState.ConnectorTransit => null,
             _ => throw new InvalidOperationException(
                 $"Unsupported spatial snapshot state {State.GetType().Name}."),
@@ -426,12 +432,39 @@ public sealed record ShipSpatialSnapshot(
 /// Authoritative owner of ship spatial state for compatibility movement,
 /// analytic maneuvering, and connector traversal.
 /// </summary>
-public sealed class SpatialMovement
+public sealed partial class SpatialMovement
 {
     private readonly SortedDictionary<ShipId, ActorState> _actors =
         new(EntityIdComparer<ShipId>.Instance);
     private readonly IdSequence<MotionId> _motionIds = new();
     private readonly IdSequence<ConnectorTransitId> _transitIds = new();
+
+    private readonly List<SpatialInteractionChanges> _interactionChanges = [];
+
+    /// <summary>Attaches a derived transition buffer seeded with current actors, including after restore.</summary>
+    public SpatialInteractionChanges AttachInteractionChanges()
+    {
+        var changes = new SpatialInteractionChanges(DetachInteractionChanges);
+        foreach ((ShipId shipId, ActorState actor) in _actors)
+            changes.Record(shipId, actor.SpatialRevision);
+        _interactionChanges.Add(changes);
+        return changes;
+    }
+
+    private void DetachInteractionChanges(SpatialInteractionChanges changes) => _interactionChanges.Remove(changes);
+
+    /// <summary>Publishes only movement-owner commits to opt-in derived buffers.</summary>
+    private void RecordInteractionChange(ShipId shipId, SpatialRevision? revision)
+    {
+        foreach (SpatialInteractionChanges changes in _interactionChanges)
+            changes.Record(shipId, revision);
+    }
+
+    private void CommitSpatialRevision(ShipId shipId, ActorState actor, SpatialRevision revision, SimulationTime now)
+    {
+        actor.CommitSpatialRevision(revision, now);
+        RecordInteractionChange(shipId, revision);
+    }
 
     /// <summary>
     /// Creates an empty spatial owner with fresh movement identity sequences.
@@ -544,6 +577,14 @@ public sealed class SpatialMovement
                         maneuver.WaypointPhaseIndices,
                         pending.Select(static item => item.EventKey));
                     break;
+                case ShipSpatialState.InteractionControlled controlled:
+                    if (currentTime < controlled.Interval.StartsAt || currentTime > controlled.Interval.EndsAt)
+                        return CaptureRejected(shipId, "interaction", "Controlled interval is outside its bounded time range.");
+                    ShipKinematicState controlledState = controlled.Interval.StateAt(currentTime);
+                    checkpointVelocity = controlledState.Velocity;
+                    checkpointHeading = controlledState.Heading;
+                    state = new ShipSpatialStateCheckpoint.InteractionControlled(controlled.Owner, controlled.Interval);
+                    break;
                 case ShipSpatialState.ConnectorTransit traversing:
                     ConnectorTransitSegment transit = traversing.Transit;
                     if (transit.Generation != actor.Generation ||
@@ -582,7 +623,8 @@ public sealed class SpatialMovement
                 actor.Generation,
                 checkpointVelocity,
                 checkpointHeading,
-                state));
+                state,
+                actor.SpatialRevision));
         }
 
         return CheckpointResult<SpatialMovementCheckpoint>.Success(
@@ -657,12 +699,14 @@ public sealed class SpatialMovement
                     actor.Generation,
                     state!,
                     actor.Velocity,
-                    actor.Heading));
+                    actor.Heading,
+                    actor.SpatialRevision));
         }
 
         return CheckpointResult<SpatialMovement>.Success(restored);
     }
 
+    /// <summary>Adds a stationary actor and publishes its initial interaction revision; duplicate identities are rejected.</summary>
     public void Add(
         ShipId shipId,
         SystemPosition position,
@@ -676,6 +720,8 @@ public sealed class SpatialMovement
         {
             throw new InvalidOperationException($"Duplicate spatial actor {shipId}.");
         }
+
+        RecordInteractionChange(shipId, _actors[shipId].SpatialRevision);
     }
 
     public ShipSpatialState? GetState(ShipId shipId) =>
@@ -683,6 +729,24 @@ public sealed class SpatialMovement
 
     public bool Contains(ShipId shipId) =>
         _actors.ContainsKey(shipId);
+
+    /// <summary>Returns the movement-owner correlation revision, or null for a missing actor.</summary>
+    public SpatialRevision? GetSpatialRevision(ShipId shipId) =>
+        _actors.GetValueOrDefault(shipId)?.SpatialRevision;
+
+    /// <summary>
+    /// Captures immutable interaction inputs at a coordinator-owned stable
+    /// boundary. No movement commit may interleave with this capture.
+    /// </summary>
+    public InteractionSpatialReadView CaptureInteractionReadView(SimulationTime now) =>
+        new(now, CaptureSnapshot(now).Select(snapshot =>
+            new InteractionSpatialParticipant(snapshot, _actors[snapshot.ShipId].SpatialRevision,
+                _actors[snapshot.ShipId].Completion is { } receipt && receipt.Timestamp == now
+                    ? receipt : null,
+                _actors[snapshot.ShipId].State is ShipSpatialState.AnalyticManeuver active ? active.Maneuver.Plan : null,
+                Array.AsReadOnly(_actors[snapshot.ShipId].ManeuverReceipts.Where(receipt => receipt.Timestamp == now).ToArray()),
+                _actors[snapshot.ShipId].InteractionReceipts is { Count: > 0 } receipts && receipts[0].Timestamp == now
+                    ? Array.AsReadOnly(receipts.ToArray()) : null)));
 
     public SystemPosition? PositionAt(ShipId shipId, SimulationTime time)
     {
@@ -693,6 +757,7 @@ public sealed class SpatialMovement
             ShipSpatialState.Moving moving => moving.Motion.PositionAt(time),
             ShipSpatialState.AnalyticManeuver maneuver =>
                 maneuver.Maneuver.Plan.StateAt(time).Position,
+            ShipSpatialState.InteractionControlled controlled => controlled.Interval.StateAt(time).Position,
             ShipSpatialState.ConnectorTransit => null,
             _ => null,
         };
@@ -719,6 +784,7 @@ public sealed class SpatialMovement
                 actor.Heading),
             ShipSpatialState.AnalyticManeuver maneuver =>
                 maneuver.Maneuver.Plan.StateAt(time),
+            ShipSpatialState.InteractionControlled controlled => controlled.Interval.StateAt(time),
             ShipSpatialState.ConnectorTransit => null,
             _ => null,
         };
@@ -745,12 +811,14 @@ public sealed class SpatialMovement
                 $"Ship {shipId} is at {current}, not the planned origin {leg.Origin}.");
         }
 
+        SpatialRevision nextRevision = actor.SpatialRevision.Next();
         EventGeneration generation = actor.State is ShipSpatialState.Moving
             ? actor.Generation.Next()
             : actor.Generation;
         if (leg.Duration == SimulationDuration.Zero
             || leg.Origin == leg.Destination)
         {
+            CommitSpatialRevision(shipId, actor, nextRevision, now);
             actor.Generation = generation;
             actor.Velocity = ShipVelocity.Zero;
             actor.State = new ShipSpatialState.AtPosition(leg.Destination);
@@ -770,6 +838,7 @@ public sealed class SpatialMovement
             shipId,
             motion.Id,
             motion.Generation));
+        CommitSpatialRevision(shipId, actor, nextRevision, now);
         actor.Generation = generation;
         actor.Velocity = velocity;
         actor.State = new ShipSpatialState.Moving(motion);
@@ -817,6 +886,7 @@ public sealed class SpatialMovement
             actor.Velocity,
             actor.Heading);
         ValidatePlanStart(plan, now, current);
+        SpatialRevision nextRevision = actor.SpatialRevision.Next();
 
         var maneuver = new ScheduledTerminalManeuver(
             _motionIds.Allocate(),
@@ -830,6 +900,7 @@ public sealed class SpatialMovement
                     new SpatialMovementEvent.Maneuver(
                         shipId,
                         maneuverEvent)));
+        CommitSpatialRevision(shipId, actor, nextRevision, now);
         actor.Velocity = current.Velocity;
         actor.Heading = current.Heading;
         actor.State = new ShipSpatialState.AnalyticManeuver(
@@ -880,6 +951,7 @@ public sealed class SpatialMovement
         int interruptedPhaseIndex = active.Maneuver.CurrentPhaseIndex;
         ShipKinematicState expectedStart = active.Maneuver.Plan.StateAt(now);
         ValidatePlanStart(replacementPlan, now, expectedStart);
+        SpatialRevision nextRevision = actor.SpatialRevision.Next();
 
         AgendaCancellationCheck cancellation = active.Maneuver.TryInterrupt(
             now,
@@ -903,6 +975,7 @@ public sealed class SpatialMovement
                     new SpatialMovementEvent.Maneuver(
                         shipId,
                         maneuverEvent)));
+        CommitSpatialRevision(shipId, actor, nextRevision, now);
         actor.Generation = interruption.NextGeneration;
         actor.Velocity = interruption.MaterializedState.Velocity;
         actor.Heading = interruption.MaterializedState.Heading;
@@ -918,6 +991,76 @@ public sealed class SpatialMovement
             reason,
             interruption,
             commit);
+        return AgendaCancellationCheck.Matches;
+    }
+
+    /// <summary>
+    /// Interrupts an explicit set of analytic maneuvers in ship identity order.
+    /// All participant states, revision/generation capacity, wrapped envelopes,
+    /// and cancellations are prepared before any mutation. Missing or mismatched
+    /// agenda work returns no results and leaves every participant unchanged.
+    /// Repeated cancellation keys across participants return Mismatch before mutation.
+    /// The wrapper must be a pure envelope adapter; it runs only during preflight.
+    /// This releases analytic schedules; it does not establish domain membership.
+    /// </summary>
+    public AgendaCancellationCheck TryInterruptTerminalManeuvers<TEvent>(
+        IEnumerable<ShipId> shipIds, SimulationTime now, EventAgenda<TEvent> agenda,
+        Func<SpatialMovementEvent, TEvent> wrapEvent,
+        out IReadOnlyDictionary<ShipId, ManeuverInterruption>? interruptions)
+    {
+        ArgumentNullException.ThrowIfNull(shipIds);
+        ArgumentNullException.ThrowIfNull(agenda);
+        ArgumentNullException.ThrowIfNull(wrapEvent);
+        interruptions = null;
+        if (agenda.CurrentTime != now)
+            throw new InvalidOperationException("Interruption time must match the agenda's current time.");
+
+        ShipId[] ships = shipIds.ToArray();
+        Array.Sort(ships, EntityIdComparer<ShipId>.Instance);
+        for (int index = 0; index < ships.Length; index++)
+        {
+            ArgumentOutOfRangeException.ThrowIfZero(ships[index].Value);
+            if (index > 0 && ships[index] == ships[index - 1])
+                throw new ArgumentException("Interruption participants must be distinct.", nameof(shipIds));
+        }
+
+        var prepared = new List<(ShipId Ship, Dictionary<SpatialMovementEvent, TEvent> Payloads)>(ships.Length);
+        var cancellationKeys = new HashSet<EventKey>();
+        foreach (ShipId ship in ships)
+        {
+            ActorState actor = GetRequiredActor(ship);
+            var active = actor.State as ShipSpatialState.AnalyticManeuver
+                ?? throw new InvalidOperationException($"Ship {ship} has no analytic maneuver to interrupt.");
+            _ = actor.SpatialRevision.Next();
+            _ = active.Maneuver.PrepareInterruption(now, agenda.CurrentTime);
+            IReadOnlyList<PendingManeuverScheduleEvent> pending = active.Maneuver.PendingEvents
+                ?? throw new InvalidOperationException($"Ship {ship} has no bound maneuver schedule.");
+            var payloads = new Dictionary<SpatialMovementEvent, TEvent>();
+            foreach (PendingManeuverScheduleEvent item in pending)
+            {
+                // A malformed restored claim must not consume one envelope twice.
+                if (!cancellationKeys.Add(item.EventKey)) return AgendaCancellationCheck.Mismatch;
+                var movementEvent = new SpatialMovementEvent.Maneuver(ship, item.Payload);
+                TEvent payload = wrapEvent(movementEvent);
+                AgendaCancellationCheck check = agenda.CheckCancellation(item.EventKey, item.Generation, payload);
+                if (check != AgendaCancellationCheck.Matches) return check;
+                payloads.Add(movementEvent, payload);
+            }
+            prepared.Add((ship, payloads));
+        }
+
+        // Only cached wrappers run after preflight. Under exclusive owner commit,
+        // no later participant can fail preparation after an earlier ship changes.
+        var results = new SortedDictionary<ShipId, ManeuverInterruption>(EntityIdComparer<ShipId>.Instance);
+        foreach (var item in prepared)
+        {
+            AgendaCancellationCheck check = TryInterruptTerminalManeuver(item.Ship, now, agenda,
+                movementEvent => item.Payloads[movementEvent], out ManeuverInterruption? interruption);
+            if (check != AgendaCancellationCheck.Matches || interruption is null)
+                throw new InvalidOperationException("A prepared interruption no longer matches authoritative state.");
+            results.Add(item.Ship, interruption);
+        }
+        interruptions = new ReadOnlyDictionary<ShipId, ManeuverInterruption>(results);
         return AgendaCancellationCheck.Matches;
     }
 
@@ -941,6 +1084,7 @@ public sealed class SpatialMovement
         var active = actor.State as ShipSpatialState.AnalyticManeuver
             ?? throw new InvalidOperationException(
                 $"Ship {shipId} has no analytic maneuver to interrupt.");
+        SpatialRevision nextRevision = actor.SpatialRevision.Next();
         AgendaCancellationCheck cancellation = active.Maneuver.TryInterrupt(
             now,
             agenda,
@@ -955,6 +1099,7 @@ public sealed class SpatialMovement
         ManeuverInterruption result = materialized
             ?? throw new InvalidOperationException(
                 "A successful maneuver interruption produced no materialized state.");
+        CommitSpatialRevision(shipId, actor, nextRevision, now);
         actor.Generation = result.NextGeneration;
         actor.Velocity = result.MaterializedState.Velocity;
         actor.Heading = result.MaterializedState.Heading;
@@ -986,6 +1131,7 @@ public sealed class SpatialMovement
                 $"Ship {shipId} is not within arrival tolerance of connector origin {leg.Origin}.");
         }
 
+        SpatialRevision nextRevision = actor.SpatialRevision.Next();
         SimulationTime arrivesAt = now.Add(leg.Duration);
         var transit = new ConnectorTransitSegment(
             _transitIds.Allocate(),
@@ -1000,6 +1146,7 @@ public sealed class SpatialMovement
             transit.Id,
             transit.Generation));
         actor.Velocity = ShipVelocity.Zero;
+        CommitSpatialRevision(shipId, actor, nextRevision, now);
         actor.State = new ShipSpatialState.ConnectorTransit(transit);
         return new ConnectorTransitCommit<TEvent>(
             transit,
@@ -1027,7 +1174,7 @@ public sealed class SpatialMovement
             return false;
         }
 
-        MaterializeForChange(actor, now);
+        MaterializeForChange(shipId, actor, now);
         return true;
     }
 
@@ -1089,7 +1236,7 @@ public sealed class SpatialMovement
                 GetRequiredCompletionEventKey(transit.Transit)),
             ShipSpatialState.AnalyticManeuver => throw new InvalidOperationException(
                 "Analytic maneuvers own multiple pending boundaries."),
-            ShipSpatialState.AtPosition => null,
+            ShipSpatialState.AtPosition or ShipSpatialState.InteractionControlled => null,
             _ => throw new InvalidOperationException(
                 $"Unsupported spatial state {actor.State.GetType().Name}."),
         };
@@ -1108,12 +1255,15 @@ public sealed class SpatialMovement
 
         if (actor.State is ShipSpatialState.Moving)
         {
-            MaterializeForChange(actor, now);
+            MaterializeForChange(shipId, actor, now);
         }
 
-        return _actors.Remove(shipId);
+        _actors.Remove(shipId);
+        RecordInteractionChange(shipId, null);
+        return true;
     }
 
+    /// <summary>Applies exact movement completions and publishes revised correlations; mismatched or stale events are no-ops.</summary>
     public ScheduledEventDisposition HandleEvent(
         SpatialMovementEvent movementEvent,
         EventGeneration scheduledGeneration,
@@ -1141,6 +1291,13 @@ public sealed class SpatialMovement
                 when actor.State is ShipSpatialState.Moving moving
                     && moving.Motion.Id == arrive.MotionId
                     && moving.Motion.ArrivesAt == now:
+                SpatialRevision previousRevision = actor.SpatialRevision;
+                CommitSpatialRevision(movementEvent.ShipId, actor, actor.SpatialRevision.Next(), now);
+                actor.Completion = new LocalMotionCompletionReceipt(
+                    new LocalMotionSnapshot(moving.Motion.Id, moving.Motion.Generation,
+                        moving.Motion.Origin, moving.Motion.Destination, moving.Motion.DepartedAt,
+                        moving.Motion.ArrivesAt, moving.Motion.CompletionEventKey),
+                    previousRevision, actor.SpatialRevision, now);
                 actor.State = new ShipSpatialState.AtPosition(
                     moving.Motion.Destination);
                 actor.Velocity = ShipVelocity.Zero;
@@ -1149,6 +1306,7 @@ public sealed class SpatialMovement
                 when actor.State is ShipSpatialState.ConnectorTransit traversing
                     && traversing.Transit.Id == emerge.TransitId
                     && traversing.Transit.ArrivesAt == now:
+                CommitSpatialRevision(movementEvent.ShipId, actor, actor.SpatialRevision.Next(), now);
                 actor.State = new ShipSpatialState.AtPosition(
                     traversing.Transit.Destination);
                 actor.Velocity = ShipVelocity.Zero;
@@ -1157,6 +1315,9 @@ public sealed class SpatialMovement
                 when actor.State is ShipSpatialState.AnalyticManeuver active
                     && active.Maneuver.MotionId
                         == maneuverEvent.Event.MotionId:
+                SpatialRevision analyticPreviousRevision = actor.SpatialRevision;
+                int completedPhaseIndex = active.Maneuver.CurrentPhaseIndex;
+                SpatialRevision nextRevision = actor.SpatialRevision.Next();
                 ScheduledEventDisposition disposition =
                     active.Maneuver.HandleEvent(
                         maneuverEvent.Event,
@@ -1171,6 +1332,10 @@ public sealed class SpatialMovement
                 ShipKinematicState state = materialized
                     ?? throw new InvalidOperationException(
                         "Applied maneuver event produced no kinematic state.");
+                CommitSpatialRevision(movementEvent.ShipId, actor, nextRevision, now);
+                actor.ManeuverReceipts.Add(new ManeuverBoundaryReceipt(active.Maneuver.MotionId,
+                    active.Maneuver.Generation, completedPhaseIndex, active.Maneuver.Plan,
+                    analyticPreviousRevision, nextRevision, now));
                 actor.Velocity = state.Velocity;
                 actor.Heading = state.Heading;
                 if (active.Maneuver.IsComplete)
@@ -1234,6 +1399,11 @@ public sealed class SpatialMovement
                                 maneuver.CurrentPhaseIndex,
                                 maneuver.CurrentPhase,
                                 maneuver.NextBoundary))));
+                    break;
+                case ShipSpatialState.InteractionControlled controlled:
+                    ShipKinematicState controlledState = controlled.Interval.StateAt(now);
+                    snapshots.Add(new ShipSpatialSnapshot(shipId, controlledState.Velocity, controlledState.Heading,
+                        new ShipSpatialSnapshotState.InteractionControlled(controlled.Owner, controlled.Interval, controlledState)));
                     break;
                 case ShipSpatialState.ConnectorTransit traversing:
                     ConnectorTransitSegment transit = traversing.Transit;
@@ -1306,7 +1476,9 @@ public sealed class SpatialMovement
         return negative ? -magnitude : magnitude;
     }
 
-    private static SystemPosition MaterializeForChange(
+    /// <summary>Materializes a canceled linear trajectory and publishes its revised correlation.</summary>
+    private SystemPosition MaterializeForChange(
+        ShipId shipId,
         ActorState actor,
         SimulationTime now)
     {
@@ -1327,7 +1499,9 @@ public sealed class SpatialMovement
         }
 
         SystemPosition position = moving.Motion.PositionAt(now);
+        SpatialRevision nextRevision = actor.SpatialRevision.Next();
         actor.Generation = actor.Generation.Next();
+        CommitSpatialRevision(shipId, actor, nextRevision, now);
         actor.State = new ShipSpatialState.AtPosition(position);
         return position;
     }
@@ -1552,6 +1726,24 @@ public sealed class SpatialMovement
                     restoredManeuver,
                     maneuver.Objective);
                 return null;
+            case ShipSpatialStateCheckpoint.InteractionControlled controlled:
+                if (string.IsNullOrWhiteSpace(controlled.Owner.DomainKind) || controlled.Owner.ActivityId == 0 ||
+                    controlled.Interval is null || !IsValidPosition(controlled.Interval.Start.Position) ||
+                    currentTime < controlled.Interval.StartsAt || currentTime > controlled.Interval.EndsAt)
+                    return new CheckpointValidationFailure(path, "Invalid interaction owner, geometry, or bounded time.");
+                try
+                {
+                    ShipKinematicState state = controlled.Interval.StateAt(currentTime);
+                    _ = controlled.Interval.StateAt(controlled.Interval.EndsAt);
+                    if (state.Velocity != actor.Velocity || state.Heading != actor.Heading)
+                        return new CheckpointValidationFailure(path, "Controlled geometry does not reproduce saved kinematics.");
+                }
+                catch (OverflowException)
+                {
+                    return new CheckpointValidationFailure(path, "Controlled geometry exceeds fixed-point range.");
+                }
+                restored = new ShipSpatialState.InteractionControlled(controlled.Owner, controlled.Interval);
+                return null;
             case ShipSpatialStateCheckpoint.ConnectorTransit transit:
                 if (transit.Id.Value == 0 ||
                     !WasAllocated(checkpoint.TransitIds, transit.Id.Value) ||
@@ -1639,12 +1831,39 @@ public sealed class SpatialMovement
             EventGeneration generation,
             ShipSpatialState state,
             ShipVelocity velocity,
-            ShipHeading heading)
+            ShipHeading heading,
+            SpatialRevision spatialRevision)
         {
+            SpatialRevision = spatialRevision;
             Generation = generation;
             State = state;
             Velocity = velocity;
             Heading = heading;
+        }
+
+        public SpatialRevision SpatialRevision { get; set; }
+
+        public LocalMotionCompletionReceipt? Completion { get; set; }
+
+        public List<ManeuverBoundaryReceipt> ManeuverReceipts { get; } = [];
+
+        public List<InteractionMotionCompletionReceipt> InteractionReceipts { get; } = [];
+
+        /// <summary>
+        /// Commits a trajectory revision while preserving proven earlier
+        /// completions in this timestamp's stable view. Older receipts expire.
+        /// </summary>
+        public void CommitSpatialRevision(SpatialRevision revision, SimulationTime now)
+        {
+            SpatialRevision = revision;
+            if (InteractionReceipts.Count != 0 && InteractionReceipts[0].Timestamp != now)
+                InteractionReceipts.Clear();
+            if (ManeuverReceipts.Count != 0 && ManeuverReceipts[0].Timestamp != now)
+                ManeuverReceipts.Clear();
+            if (Completion?.Timestamp != now)
+            {
+                Completion = null;
+            }
         }
 
         public EventGeneration Generation { get; set; } = new(0);

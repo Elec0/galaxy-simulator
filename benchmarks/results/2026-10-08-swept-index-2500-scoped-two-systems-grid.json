@@ -1,0 +1,65 @@
+{
+  "SchemaVersion": 2,
+  "RecordedAtUtc": "2026-10-08T21:27:49.338025+00:00",
+  "Suite": "full",
+  "Machine": {
+    "Framework": ".NET 10.0.10",
+    "OperatingSystem": "macOS 26.7.1",
+    "ProcessArchitecture": "Arm64",
+    "ProcessorCount": 11,
+    "ServerGarbageCollection": false
+  },
+  "Scenarios": [
+    {
+      "Id": "interaction.swept-grid",
+      "BasePreset": "interaction.swept-grid",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Parameters": {
+        "activeShipCount": 1250,
+        "destinationDistance": 2000,
+        "gridWidth": 16,
+        "layout": 0,
+        "measuredIterations": 5,
+        "motionKind": 0,
+        "participantSpacing": 100,
+        "queryCount": 10,
+        "rangeUnits": 10,
+        "scopeStride": 2,
+        "seed": 1,
+        "shipCount": 2500,
+        "simulatedDurationMilliseconds": 1000,
+        "systemCount": 2,
+        "travelDurationMilliseconds": 1000,
+        "treeLeafSize": 4,
+        "warmupIterations": 1
+      },
+      "Digest": "9c7f61f9f79ac93e",
+      "SimulatedMilliseconds": 1000,
+      "Counts": {
+        "activeShips": 1250,
+        "broadPhaseCandidates": 1241,
+        "contacts": 6,
+        "exactChecks": 1241,
+        "gridOverflowEntries": 625,
+        "indexBoxTests": 3161,
+        "indexEntries": 1250,
+        "indexNodes": 625,
+        "queries": 10,
+        "scopedEntries": 12500,
+        "ships": 2500,
+        "systems": 2
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 4.4144,
+        "MinimumMilliseconds": 3.2977,
+        "MaximumMilliseconds": 4.7014,
+        "MedianAllocatedBytes": 6333520,
+        "Generation0Collections": 4,
+        "Generation1Collections": 1,
+        "Generation2Collections": 0
+      }
+    }
+  ]
+}

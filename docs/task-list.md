@@ -25,14 +25,14 @@ source of detailed scope and acceptance criteria.
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` completed the [equipment and ship-slot design](equipment-and-ship-slots.md); `TASK-099` owns implementation. `TASK-055` owns trade balance, pricing, and settlement design. |
-| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract; `TASK-075` completed deployment and pickup range and action-order design. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. | `TASK-068` defined installed-equipment capability contributions; `TASK-099` implements them, `TASK-071` implements spatial interaction, `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-095` implements deployables and range orders, `TASK-094` owns player order-failure notifications, and `TASK-088` retains late-term spatial authoring guidance. |
+| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract; `TASK-075` completed deployment and pickup range and action-order design. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. `TASK-071` completed shared interaction discovery, timing, deterministic evaluation, and explicit motion handoffs. | `TASK-068` defined installed-equipment capability contributions; `TASK-099` implements them; `TASK-046` retains frozen combat design and `TASK-103` tracks combat activation and active-domain continuation. `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-095` implements deployables and range orders, `TASK-094` owns player order-failure notifications, and `TASK-088` retains late-term spatial authoring guidance. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 | Source-code organization | `TASK-091` reorganized source and tests around the documented simulation authority, client presentation, deterministic execution, and test-harness boundaries without changing simulation behavior or public type identity. | Further namespace or assembly changes require measured need and separately approved work. |
 
 ## Current focus
 
-This section is to put work that is currently being performed. Once the work is finished the task should be moved to Completed, and an entry should be added to the Project Status summary above.
-
+No task is currently promoted. TASK-071 is complete; deferred work remains in
+its existing horizon until the owner promotes it.
 
 ## Near-term work
 
@@ -78,10 +78,150 @@ This section is to put work that is currently being performed. Once the work is 
     preference store completed by `TASK-084`, not a separate pacing-only file.
   - Context: [Time and pacing](time-and-pacing.md)
 
-`TASK-071` and `TASK-073` remain in the
-near-term parking-lot horizon until the project owner promotes one of them.
+`TASK-073` remains in the near-term parking-lot horizon until the project
+owner promotes it.
 
 ## Future parking lot
+
+- [ ] **TASK-103: Implement combat activation and active-domain continuation**
+  - Added when TASK-071 closed on 2026-10-17 to track runtime work not covered
+    by TASK-046's design scope. Begin only after the relevant TASK-046 contracts
+    are settled and approved; its design remains frozen until owner resumption.
+  - Build on completed TASK-071: implement order-backed authorized admission,
+    domain-owned engagement identity and complete membership claims, fixed-step
+    agenda ownership, deterministic evaluation/commit, and exact motion renewal.
+  - Integrate combat order holds, pursuit/reentry, controller authority, scripted
+    overrides, removal, elapsed settlement, and release/replanning according to
+    the accepted domain contract. Preserve reject-until-explicit-release guards
+    until owner-approved domain transitions can coordinate every affected owner.
+  - Implement cleanup of queued and in-flight stale steps, durable cadence and
+    settlement correlation, domain state/checkpoints, and cross-owner restore
+    validation with exact pending keys. Prove continuation and exactly-once
+    outcomes through restore, membership changes, interruption, and removal.
+  - Integrate current-schema saved representations with TASK-037's compatibility
+    and migration boundary. Do not treat movement-component restore as full active
+    engagement persistence or persist derived indexes and host worker settings.
+  - Keep TASK-101/TASK-102's admission/targeting extensions separate and retain
+    a serial reference path with deterministic batch/worker equivalence tests.
+  - Context: [Combat activation](combat-activation.md) · [Shared runtime and deferred scope](moving-ship-interactions.md#closure-recommendation-and-deferred-scope)
+
+- [ ] **TASK-046: Define combat resolution**
+  - Design frozen by the owner on 2026-10-16 for later resumption under this
+    task. Accepted contracts below remain recorded; do not continue combat design
+    as a prerequisite to the shared foundation completed by TASK-071. Runtime
+    activation and active-domain continuation are now tracked by TASK-103.
+  - Started the combat activation design slice on 2026-10-13 after owner
+    selection as TASK-071's first consuming domain. Accepted multi-ship engagement
+    membership with one engagement controlling each ship, dedicated session-wide
+    EngagementId, explicit fixed step preserved through restore, authorized intent
+    for entry, exit before replacement navigation, and rejection of competing
+    admission. TASK-101 revisits the last decision later.
+  - Accepted immediate entry motion evaluation with cadence anchored to entry,
+    first-valid complete admission in canonical contact/effect order, and exact-time
+    materialization from the committed interval curve on exit on 2026-10-13.
+  - Accepted immediate surviving-engagement motion reevaluation on mid-interval
+    roster changes, prior-interval settlement before scheduled-boundary membership
+    changes, and termination when no authorized combat pair remains on 2026-10-13.
+    Survivors release through the exact-time handoff; original cadence is retained
+    while the engagement remains viable.
+  - Accepted order-backed combat intent with identity/generation, explicit complete
+    create/join claims, smallest contributing eligible contact key as origin,
+    and exactly-once elapsed settlement before roster changes with a durable cursor
+    on 2026-10-13. Current order records are movement-only and lack a generation;
+    define the combat-order/revision extension here and coordinate saved schema
+    changes with TASK-037 rather than assuming existing fields.
+  - Accepted Active-only combat authorization, a separate continuation condition
+    that preserves intent beyond entry range, and ordinary-navigation pursuit for
+    a still-valid Active combat order after disengagement on 2026-10-13. Waiting,
+    suspension, and terminal work grant no authorization; replacement work wins
+    and terminal orders are never revived.
+  - Accepted one-actor/one-target-ship combat commands using ReplaceAll/Append
+    on 2026-10-14. Combat policy may admit the hostile target without its own
+    order; the attacker gains no controller or steering authority over it. Each
+    additional ally requires an independent current Active combat order and
+    validated controller authority, retained in complete-claim correlation.
+    TASK-102 defers group/area targeting.
+  - Reviewed defender-order integration on 2026-10-14: current suspension is
+    script-override-specific and cancellation promotes queued work immediately.
+    A combat hold/release must explicitly integrate with these owners and preserve
+    controller/override authority.
+  - Accepted defender work suspension with a combat-specific reason, retained
+    queue/controller, defender-owned versioned response policy without an automatic
+    attack order, and exact-state release revalidation on 2026-10-14. Valid retained
+    work gets a fresh plan; recoverably blocked work waits with a reason/wake;
+    unachievable work fails. Canceled or replaced work is never revived.
+  - Reviewed override handlers on 2026-10-14: begin/end directly end local motion,
+    and override end immediately resumes ordinary work after control restoration.
+    Reconcile those paths and current ActorControlRevision validation with combat
+    ownership.
+  - Accepted override transitions during combat with current authority revalidation
+    on 2026-10-14. Combat release resumes only eligible current override work while
+    an override remains; override release restores base control/work but retains
+    ordinary-motion hold while combat remains authorized. Each release clears only
+    its own constraint; stale authority cannot resume work.
+  - Reviewed checkpoint owner boundaries on 2026-10-14: orders already retain
+    base/override work, control retains ActorControlRevision, and movement owns
+    kinematics, but session/movement checkpoints have no active-combat component
+    or combat movement variant.
+  - Accepted a single combat-membership binding with derived order holds, full
+    structured blocking-cause projection, and preserved exact pending step keys
+    on 2026-10-14. Defined cross-owner liveness, authorization, spatial, cadence,
+    settlement, and agenda-allocation restore invariants; compiled record layouts
+    remain open.
+  - Accepted cancellation of all queued engagement steps before removing engagement
+    state on 2026-10-16, including old-generation envelopes. Defined restore rejection
+    for any queued step naming an absent engagement, live-engagement stale no-ops,
+    preservation of unrelated keys/allocators, and in-flight stale-work guards.
+    Concrete cleanup bookkeeping, step payload, and runtime proofs remain open.
+  - Settle combat order revision/schema, defender response mechanics/policy selection,
+    compiled owner/checkpoint/projection layouts and cleanup bookkeeping,
+    combat-aware preflight/order transitions,
+    completion/expiry/retargeting, continuation triggers/reentry,
+    bounded pursuit and idle/coasting policy, discrete outcomes/cooldowns/
+    accumulation, and checkpoint/fact/projection contracts before TASK-103
+    implements the consuming domain. TASK-071 completed the shared handoff. Collision and docking decisions remain
+    deferred with TASK-072 and TASK-051.
+  - Define combat orders, targeting policy, damage, withdrawal, surrender,
+    capture, and destruction.
+  - Decide how observed and unobserved combat differ without changing causal
+    outcomes.
+  - Build combat engagement and pursuit on the moving-ship interaction contract
+    from completed `TASK-019`; do not introduce a separate combat-only position
+    or motion model.
+  - Use the owner-selected VRO reference for complementary ship roles,
+    target-specific weapons, and fleet support. Exact mechanics and tuning
+    remain for owner review.
+  - Context: [Combat activation and movement handoff](combat-activation.md) · [Ship and fleet balance direction](ship-and-fleet-balance.md)
+
+- [ ] **TASK-102: Define group and area combat targeting**
+  - The owner's 2026-10-14 first combat command is one acting ship against one
+    explicit target ship using ordinary placement. Keep group and area targeting
+    out of that initial TASK-046 payload.
+  - Later define explicit-selection/group admission, controller validation,
+    partial or atomic command results, target-selection and area semantics,
+    order correlation, and deterministic outcomes before extending combat commands.
+    Preserve independent per-ship order ownership and TASK-101's separate review
+    of engagement transfer/merging; do not infer either from a selection UI.
+  - Context: [Combat command and participant authority](combat-activation.md#first-combat-order-command-and-participant-authority) · [Group commands](group-and-fleet-commands.md).
+
+- [ ] **TASK-101: Revisit competing combat-engagement admission**
+  - Added at the owner's request on 2026-10-13. The initial TASK-046 contract
+    rejects admission of an engaged ship to a different engagement; each ship
+    retains one movement-controlling engagement.
+  - Revisit the gameplay need for admission rejection, deliberate transfer,
+    engagement merging, or another policy after the first combat lifecycle has
+    evidence. Define deterministic membership conflicts, kinematic handoff,
+    queued-step invalidation, intent continuity, and checkpoint continuation for
+    any approved change. Do not introduce shared motion ownership implicitly.
+  - Context: [Combat activation](combat-activation.md#accepted-owner-decisions).
+
+- [ ] **TASK-100: Investigate repeated exact maneuver-query allocations**
+  - Profile the dense mixed swept-query fixture, which allocates about one GB
+    per 100-query iteration at 2,500 ships. Identify repeated trajectory and
+    boundary preparation costs before choosing an optimization. Preserve exact
+    continuous geometry, committed resets, contact flags, immutable ownership,
+    and worker-count invariance; measure allocation as well as time.
+  - Context: [Interaction batch measurements](interaction-batch-measurements.md).
 
 These items are intentionally retained without implying that they should be
 worked on now. Promote an item to current or near-term work when its
@@ -186,24 +326,6 @@ the project-level **Near-term work** section above.
   - Defer notification policy and presentation until owner review; preserve
     semantic failure facts and terminal order state independently of this UI.
   - Context: [Sensor deployables](sensor-deployables.md#execution-and-failure) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md)
-
-- [ ] **TASK-071: Implement moving-ship interaction discovery and timing**
-  - Implement the accepted `TASK-019` contracts for explicit interaction
-    interests, system-local proximity and swept-path evaluation, exact
-    millisecond crossing schedules, invalidation, and deterministic candidate
-    normalization.
-  - Retain the single-thread reference path and add focused crossing,
-    replanning, connector-emergence, restore, partition, batch-layout, and
-    worker-count proof before a gameplay domain depends on the substrate.
-  - Consume the completed `TASK-090` analytic maneuver schedule and replacement
-    boundary when an interaction domain activates fine-grained execution. Define
-    that domain-owned activation and prove deterministic results across every
-    supported worker, partition, and batch layout.
-  - Build on completed `TASK-019`. Keep combat, sensors, inspection, assistance,
-    and docking outcomes with their owning tasks, and ship geometry, collision,
-    and avoidance with `TASK-072`, rather than inventing placeholder policy
-    here.
-  - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
   - Implement the accepted `TASK-020` contracts for player-owned ship,
@@ -444,20 +566,9 @@ the project-level **Near-term work** section above.
     contract is accepted. Depends on `TASK-022`, `TASK-023`, and `TASK-037`.
   - Context: [Authoritative save boundary](authoritative-save-boundary.md) · [Version content catalogs](task-list.md#task-037-version-content-catalogs-and-migrate-saved-content-references)
 
-- [ ] **TASK-046: Define combat resolution**
-  - Define combat orders, targeting policy, damage, withdrawal, surrender,
-    capture, and destruction.
-  - Decide how observed and unobserved combat differ without changing causal
-    outcomes.
-  - Build combat engagement and pursuit on the moving-ship interaction contract
-    from completed `TASK-019`; do not introduce a separate combat-only position
-    or motion model.
-  - Use the owner-selected VRO reference for complementary ship roles,
-    target-specific weapons, and fleet support. Exact mechanics and tuning
-    remain for owner review.
-  - Context: [Ship and fleet balance direction](ship-and-fleet-balance.md)
-
 - [ ] **TASK-051: Define docking, undocking, and berth capacity**
+  - Owner explicitly deferred docking decisions on 2026-10-13 while combat
+    defines the first TASK-071 activation contract. Preserve this task for later.
   - Define approach, access validation, berth or docking-capacity allocation,
     queueing, arrival, docked state, undocking, cancellation, and failure for
     ships interacting with stations or other facilities.
@@ -660,6 +771,8 @@ the project-level **Near-term work** section above.
   - Context: [Time and pacing](time-and-pacing.md)
 
 - [ ] **TASK-072: Define ship geometry, physical collision, and avoidance**
+  - Owner explicitly deferred collision and avoidance decisions on 2026-10-13
+    while combat defines the first TASK-071 activation contract.
   - Decide whether ships remain point positions for generic movement or have
     authoritative two-dimensional occupied geometry, and whether ships may
     pass through one another when no gameplay domain requests an interaction.
@@ -690,6 +803,25 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-071: Implement moving-ship interaction discovery and timing**
+  - Completed on 2026-10-17 with owner acceptance of the shared-foundation scope:
+    exact continuous and instant discovery, durable session-wide interests,
+    invalidation and completion correlation, canonical candidate reduction,
+    deterministic scheduling, stable domain evaluation, and serial effects.
+  - Added immutable prepared scopes, caller-selected scan/grid/hierarchy queries,
+    opt-in bounded pure worker batches, deterministic failure handling, and
+    retained benchmark fixtures, digests, and measurement reports.
+  - Added exact controlled intervals, atomic participant entry/update/release and
+    analytic cancellation handoff, component checkpoints, guarded session APIs,
+    interval-end advancement stops, mutation exclusion, and snapshot projection.
+  - All 1,406 solution tests pass; Release build has zero warnings/errors.
+    Active-domain scheduling, gameplay membership/order policy, and full active
+    session persistence are not implemented here: design stays frozen under
+    TASK-046 and implementation is tracked by TASK-103. Save compatibility stays
+    TASK-037; allocation investigation stays TASK-100. TASK-101/TASK-102 retain
+    later admission and targeting decisions; collision/docking remain TASK-072/TASK-051.
+  - Context: [Shared-runtime acceptance and deferred scope](moving-ship-interactions.md#closure-recommendation-and-deferred-scope)
 
 - [x] **TASK-068: Define equipment, ship slots, installation, and removal**
   - Completed the owner-approved design on 2026-10-06: discrete equipment

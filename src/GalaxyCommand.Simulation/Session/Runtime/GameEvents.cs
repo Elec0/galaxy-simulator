@@ -9,6 +9,8 @@ public abstract record GameEventKind
     public sealed record SpatialMovement(SpatialMovementEvent Event) : GameEventKind;
 
     public sealed record Economic(EconomicEvent Event) : GameEventKind;
+
+    public sealed record SpatialInteraction(InteractionCandidate Candidate) : GameEventKind;
 }
 
 public sealed record GameEventRecord(
@@ -28,6 +30,8 @@ internal abstract record GameEvent
     internal sealed record SpatialMovement(SpatialMovementEvent Event) : GameEvent;
 
     internal sealed record Economic(EconomicEvent Event) : GameEvent;
+
+    internal sealed record SpatialInteraction(InteractionForecast Forecast) : GameEvent;
 }
 
 internal sealed record PreparedMovementCancellation(

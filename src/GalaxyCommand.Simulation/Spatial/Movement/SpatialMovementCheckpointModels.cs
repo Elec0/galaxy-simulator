@@ -62,6 +62,9 @@ internal abstract record ShipSpatialStateCheckpoint
         internal ReadOnlyCollection<EventKey> PendingEventKeys { get; }
     }
 
+    internal sealed record InteractionControlled(InteractionMotionOwner Owner, AnalyticManeuverSegment Interval)
+        : ShipSpatialStateCheckpoint;
+
     internal sealed record ConnectorTransit(
         ConnectorTransitId Id,
         EventGeneration Generation,
@@ -79,7 +82,8 @@ internal sealed record SpatialActorCheckpoint(
     EventGeneration Generation,
     ShipVelocity Velocity,
     ShipHeading Heading,
-    ShipSpatialStateCheckpoint State);
+    ShipSpatialStateCheckpoint State,
+    SpatialRevision SpatialRevision = default);
 
 internal sealed class SpatialMovementCheckpoint
 {

@@ -7,6 +7,9 @@ namespace GalaxyCommand.Benchmarks;
 
 public static class BenchmarkParameterNames
 {
+    public const string InterestCount = "interestCount";
+    public const string WorkerCount = "workerCount";
+    public const string BatchSize = "batchSize";
     public const string WarmupIterations = "warmupIterations";
     public const string MeasuredIterations = "measuredIterations";
     public const string Seed = "seed";
@@ -19,6 +22,15 @@ public static class BenchmarkParameterNames
     public const string ReplanIntervalMilliseconds = "replanIntervalMilliseconds";
     public const string FactRetentionCapacity = "factRetentionCapacity";
     public const string TravelDurationMilliseconds = "travelDurationMilliseconds";
+    public const string MotionKind = "motionKind";
+    public const string Layout = "layout";
+    public const string ScopeStride = "scopeStride";
+    public const string GridWidth = "gridWidth";
+    public const string GridCellBudget = "gridCellBudget";
+    public const string TreeLeafSize = "treeLeafSize";
+    public const string QueryCount = "queryCount";
+    public const string RangeUnits = "rangeUnits";
+    public const string ParticipantSpacing = "participantSpacing";
     public const string DestinationDistance = "destinationDistance";
 }
 
@@ -67,6 +79,25 @@ public sealed record BenchmarkPreset
 
 public static class BenchmarkPresets
 {
+    public const string InteractionSessionSerial = "interaction.session-serial";
+    public const string InteractionSessionBatched = "interaction.session-batched";
+    public const string InteractionBatchSweptScan = "interaction.batch-swept-scan";
+    public const string InteractionBatchSweptGrid = "interaction.batch-swept-grid";
+    public const string InteractionBatchSweptHierarchy = "interaction.batch-swept-hierarchy";
+    public const string InteractionRuntimeSweptScan = "interaction.runtime-swept-scan";
+    public const string InteractionRuntimeSweptGrid = "interaction.runtime-swept-grid";
+    public const string InteractionRuntimeSweptHierarchy = "interaction.runtime-swept-hierarchy";
+    public const string InteractionSweptScan = "interaction.swept-scan";
+    public const string InteractionSweptGrid = "interaction.swept-grid";
+    public const string InteractionSweptHierarchy = "interaction.swept-hierarchy";
+    public const string InteractionRuntimeScan = "interaction.runtime-scan";
+    public const string InteractionRuntimeGrid = "interaction.runtime-grid";
+    public const string InteractionRuntimeHierarchy = "interaction.runtime-hierarchy";
+    public const string InteractionIndexScan = "interaction.index-scan";
+    public const string InteractionIndexGrid = "interaction.index-grid";
+    public const string InteractionIndexHierarchy = "interaction.index-hierarchy";
+    public const string InteractionPreparedProximity = "interaction.prepared-proximity";
+    public const string InteractionScopedProximity = "interaction.scoped-proximity";
     public const string SpatialManyQuiet = "spatial.many-quiet";
     public const string SpatialOneCrowded = "spatial.one-crowded";
     public const string NavigationConnectorVolume = "navigation.connector-volume";
@@ -91,6 +122,23 @@ public static class BenchmarkPresets
     {
         BenchmarkPreset[] values =
         [
+            new(
+                InteractionScopedProximity,
+                true,
+                Parameters(
+                    (BenchmarkParameterNames.WarmupIterations, 1),
+                    (BenchmarkParameterNames.MeasuredIterations, 5),
+                    (BenchmarkParameterNames.Seed, 1),
+                    (BenchmarkParameterNames.SimulatedDurationMilliseconds, 500),
+                    (BenchmarkParameterNames.SystemCount, 1),
+                    (BenchmarkParameterNames.ShipCount, 2_500),
+                    (BenchmarkParameterNames.ActiveShipCount, 1_250),
+                    (BenchmarkParameterNames.QueryCount, 100),
+                    (BenchmarkParameterNames.RangeUnits, 10),
+                    (BenchmarkParameterNames.ParticipantSpacing, 100),
+                    (BenchmarkParameterNames.TravelDurationMilliseconds, 1_000),
+                    (BenchmarkParameterNames.DestinationDistance, 20)),
+                "c09a37599b5eb648"),
             new(
                 SpatialManyQuiet,
                 true,
@@ -165,8 +213,95 @@ public static class BenchmarkPresets
                     (BenchmarkParameterNames.DestinationDistance, 1_000_000)),
                 "603601f07a12a8c1"),
         ];
+        BenchmarkPreset reference = values.Single(value => value.Id == InteractionScopedProximity);
+        BenchmarkPreset prepared = new(InteractionPreparedProximity, true, reference.Parameters, reference.ExpectedDigest);
+        var indexParameters = new Dictionary<string, long>(reference.Parameters)
+        {
+            [BenchmarkParameterNames.Layout] = 0,
+            [BenchmarkParameterNames.ScopeStride] = 1,
+            [BenchmarkParameterNames.GridWidth] = 16,
+            [BenchmarkParameterNames.TreeLeafSize] = 4,
+            [BenchmarkParameterNames.SimulatedDurationMilliseconds] = 501,
+        };
+        BenchmarkPreset[] indexes =
+        [
+            new(InteractionIndexScan, true, indexParameters, "b75076796115dc88"),
+            new(InteractionIndexGrid, true, indexParameters, "b75076796115dc88"),
+            new(InteractionIndexHierarchy, true, indexParameters, "b75076796115dc88"),
+        ];
+        var runtimeParameters = new Dictionary<string, long>(indexParameters)
+        {
+            [BenchmarkParameterNames.GridCellBudget] = 4096,
+        };
+        BenchmarkPreset[] runtime =
+        [
+            new(InteractionRuntimeScan, true, runtimeParameters, "b75076796115dc88"),
+            new(InteractionRuntimeGrid, true, runtimeParameters, "b75076796115dc88"),
+            new(InteractionRuntimeHierarchy, true, runtimeParameters, "b75076796115dc88"),
+        ];
+        var sweptParameters = new Dictionary<string, long>(indexParameters)
+        {
+            [BenchmarkParameterNames.ShipCount] = 250,
+            [BenchmarkParameterNames.ActiveShipCount] = 125,
+            [BenchmarkParameterNames.QueryCount] = 10,
+            [BenchmarkParameterNames.DestinationDistance] = 2000,
+            [BenchmarkParameterNames.SimulatedDurationMilliseconds] = 1000,
+            [BenchmarkParameterNames.MotionKind] = 0,
+        };
+        BenchmarkPreset[] sweeps =
+        [
+            new(InteractionSweptScan, true, sweptParameters, "418f5c9774f5bbdc"),
+            new(InteractionSweptGrid, true, sweptParameters, "418f5c9774f5bbdc"),
+            new(InteractionSweptHierarchy, true, sweptParameters, "418f5c9774f5bbdc"),
+        ];
+        var runtimeSweptParameters = new Dictionary<string, long>(sweptParameters)
+        {
+            [BenchmarkParameterNames.GridCellBudget] = 4096,
+        };
+        BenchmarkPreset[] runtimeSweeps =
+        [
+            new(InteractionRuntimeSweptScan, true, runtimeSweptParameters, "418f5c9774f5bbdc"),
+            new(InteractionRuntimeSweptGrid, true, runtimeSweptParameters, "418f5c9774f5bbdc"),
+            new(InteractionRuntimeSweptHierarchy, true, runtimeSweptParameters, "418f5c9774f5bbdc"),
+        ];
+        var batchParameters = new Dictionary<string, long>(runtimeSweptParameters)
+        {
+            [BenchmarkParameterNames.WorkerCount] = 1,
+            [BenchmarkParameterNames.BatchSize] = 64,
+        };
+        BenchmarkPreset[] batchSweeps =
+        [
+            new(InteractionBatchSweptScan, true, batchParameters, "418f5c9774f5bbdc"),
+            new(InteractionBatchSweptGrid, true, batchParameters, "418f5c9774f5bbdc"),
+            new(InteractionBatchSweptHierarchy, true, batchParameters, "418f5c9774f5bbdc"),
+        ];
+        var sessionParameters = Parameters(
+            (BenchmarkParameterNames.WarmupIterations, 1),
+            (BenchmarkParameterNames.MeasuredIterations, 5),
+            (BenchmarkParameterNames.Seed, 1),
+            (BenchmarkParameterNames.SimulatedDurationMilliseconds, 6000),
+            (BenchmarkParameterNames.SystemCount, 2),
+            (BenchmarkParameterNames.ShipCount, 32),
+            (BenchmarkParameterNames.ActiveShipCount, 8),
+            (BenchmarkParameterNames.InterestCount, 256),
+            (BenchmarkParameterNames.ReplanCount, 4),
+            (BenchmarkParameterNames.ReplanIntervalMilliseconds, 1000),
+            (BenchmarkParameterNames.FactRetentionCapacity, 10000),
+            (BenchmarkParameterNames.TravelDurationMilliseconds, 1000),
+            (BenchmarkParameterNames.DestinationDistance, 100),
+            (BenchmarkParameterNames.RangeUnits, 2));
+        var sessionBatchParameters = new Dictionary<string, long>(sessionParameters)
+        {
+            [BenchmarkParameterNames.WorkerCount] = 1,
+            [BenchmarkParameterNames.BatchSize] = 64,
+        };
+        BenchmarkPreset[] sessions =
+        [
+            new(InteractionSessionSerial, true, sessionParameters, "1079ca5a77a8341f"),
+            new(InteractionSessionBatched, true, sessionBatchParameters, "1079ca5a77a8341f"),
+        ];
         return new ReadOnlyDictionary<string, BenchmarkPreset>(
-            values.ToDictionary(value => value.Id, StringComparer.Ordinal));
+            values.Append(prepared).Concat(indexes).Concat(runtime).Concat(sweeps).Concat(runtimeSweeps).Concat(batchSweeps).Concat(sessions).ToDictionary(value => value.Id, StringComparer.Ordinal));
     }
 
     private static ReadOnlyDictionary<string, long> Parameters(
@@ -397,6 +532,7 @@ public static class BenchmarkScenarioResolver
 
 public static class BenchmarkScenarioValidator
 {
+    /// <summary>Rejects invalid workloads before allocation or timed execution.</summary>
     public static void Validate(ResolvedBenchmarkScenario scenario)
     {
         ArgumentNullException.ThrowIfNull(scenario);
@@ -411,6 +547,20 @@ public static class BenchmarkScenarioValidator
 
         switch (scenario.BasePreset)
         {
+            case BenchmarkPresets.InteractionSessionBatched:
+                RequireRange(scenario, BenchmarkParameterNames.WorkerCount, 1, 1024);
+                RequireRange(scenario, BenchmarkParameterNames.BatchSize, 1, int.MaxValue);
+                goto case BenchmarkPresets.InteractionSessionSerial;
+            case BenchmarkPresets.InteractionSessionSerial:
+                RequireRange(scenario, BenchmarkParameterNames.SystemCount, 1, 10000);
+                RequireRange(scenario, BenchmarkParameterNames.ShipCount, 2, 1000000);
+                RequireRange(scenario, BenchmarkParameterNames.ActiveShipCount,
+                    scenario.Get(BenchmarkParameterNames.SystemCount),
+                    scenario.Get(BenchmarkParameterNames.ShipCount) - scenario.Get(BenchmarkParameterNames.SystemCount));
+                RequireRange(scenario, BenchmarkParameterNames.InterestCount, 1, 1000000);
+                RequireRange(scenario, BenchmarkParameterNames.RangeUnits, 0, int.MaxValue);
+                ValidateRepeatedReplanning(scenario);
+                break;
             case BenchmarkPresets.SpatialManyQuiet:
             case BenchmarkPresets.SpatialOneCrowded:
             case BenchmarkPresets.NavigationConnectorVolume:
@@ -420,6 +570,50 @@ public static class BenchmarkScenarioValidator
                     RequireRange(scenario, BenchmarkParameterNames.SystemCount, 2, 10_000);
                 }
 
+                break;
+            case BenchmarkPresets.InteractionSweptScan:
+            case BenchmarkPresets.InteractionSweptGrid:
+            case BenchmarkPresets.InteractionSweptHierarchy:
+                ValidateProximity(scenario);
+                RequireRange(scenario, BenchmarkParameterNames.Layout, 0, 1);
+                RequireRange(scenario, BenchmarkParameterNames.ScopeStride, 1, 10000);
+                RequireRange(scenario, BenchmarkParameterNames.GridWidth, 1, int.MaxValue);
+                RequireRange(scenario, BenchmarkParameterNames.TreeLeafSize, 1, 1024);
+                RequireRange(scenario, BenchmarkParameterNames.MotionKind, 0, 2);
+                RequireRange(scenario, BenchmarkParameterNames.TravelDurationMilliseconds, 1000, 86400000);
+                if (scenario.Get(BenchmarkParameterNames.MotionKind) == 2
+                    && scenario.Get(BenchmarkParameterNames.DestinationDistance) * 2000000 / scenario.Get(BenchmarkParameterNames.TravelDurationMilliseconds) == 0)
+                    throw new BenchmarkUsageException("Braking fixture requires a nonzero initial speed.");
+                break;
+            case BenchmarkPresets.InteractionBatchSweptScan:
+            case BenchmarkPresets.InteractionBatchSweptGrid:
+            case BenchmarkPresets.InteractionBatchSweptHierarchy:
+                RequireRange(scenario, BenchmarkParameterNames.WorkerCount, 1, 1024);
+                RequireRange(scenario, BenchmarkParameterNames.BatchSize, 1, int.MaxValue);
+                goto case BenchmarkPresets.InteractionRuntimeSweptScan;
+            case BenchmarkPresets.InteractionRuntimeSweptScan:
+            case BenchmarkPresets.InteractionRuntimeSweptGrid:
+            case BenchmarkPresets.InteractionRuntimeSweptHierarchy:
+                RequireRange(scenario, BenchmarkParameterNames.MotionKind, 0, 1);
+                RequireRange(scenario, BenchmarkParameterNames.TravelDurationMilliseconds, 1000, 86400000);
+                goto case BenchmarkPresets.InteractionRuntimeScan;
+            case BenchmarkPresets.InteractionRuntimeScan:
+            case BenchmarkPresets.InteractionRuntimeGrid:
+            case BenchmarkPresets.InteractionRuntimeHierarchy:
+                RequireRange(scenario, BenchmarkParameterNames.GridCellBudget, 1, int.MaxValue);
+                goto case BenchmarkPresets.InteractionIndexScan;
+            case BenchmarkPresets.InteractionIndexScan:
+            case BenchmarkPresets.InteractionIndexGrid:
+            case BenchmarkPresets.InteractionIndexHierarchy:
+                ValidateProximity(scenario);
+                RequireRange(scenario, BenchmarkParameterNames.Layout, 0, 1);
+                RequireRange(scenario, BenchmarkParameterNames.ScopeStride, 1, 10000);
+                RequireRange(scenario, BenchmarkParameterNames.GridWidth, 1, int.MaxValue);
+                RequireRange(scenario, BenchmarkParameterNames.TreeLeafSize, 1, 1024);
+                break;
+            case BenchmarkPresets.InteractionPreparedProximity:
+            case BenchmarkPresets.InteractionScopedProximity:
+                ValidateProximity(scenario);
                 break;
             case BenchmarkPresets.FactsRetentionAndRead:
                 RequireRange(scenario, BenchmarkParameterNames.CommandCount, 1, 10_000_000);
@@ -432,6 +626,22 @@ public static class BenchmarkScenarioValidator
                 throw new BenchmarkUsageException(
                     $"Scenario '{scenario.Id}' uses unsupported base preset '{scenario.BasePreset}'.");
         }
+    }
+
+    /// <summary>Keeps the sampled instant within known linear motion and bounds explicit query work.</summary>
+    private static void ValidateProximity(ResolvedBenchmarkScenario scenario)
+    {
+        RequireRange(scenario, BenchmarkParameterNames.SystemCount, 1, 10_000);
+        RequireRange(scenario, BenchmarkParameterNames.ShipCount, 1, 10_000_000);
+        RequireRange(scenario, BenchmarkParameterNames.ActiveShipCount, 0, scenario.Get(BenchmarkParameterNames.ShipCount));
+        RequireRange(scenario, BenchmarkParameterNames.QueryCount, 1, 1_000_000);
+        RequireRange(scenario, BenchmarkParameterNames.RangeUnits, 0, long.MaxValue);
+        RequireRange(scenario, BenchmarkParameterNames.ParticipantSpacing, 0, int.MaxValue);
+        RequireRange(scenario, BenchmarkParameterNames.DestinationDistance, 1, int.MaxValue);
+        RequireRange(scenario, BenchmarkParameterNames.TravelDurationMilliseconds, 1, 86_400_000);
+        if (scenario.Get(BenchmarkParameterNames.SimulatedDurationMilliseconds)
+            > scenario.Get(BenchmarkParameterNames.TravelDurationMilliseconds))
+            throw new BenchmarkUsageException("simulatedDurationMilliseconds must remain within travelDurationMilliseconds for proximity sampling.");
     }
 
     private static void ValidateSpatial(ResolvedBenchmarkScenario scenario)

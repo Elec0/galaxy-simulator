@@ -1,6 +1,6 @@
 namespace GalaxyCommand.Simulation;
 
-internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEvent>
+internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEvent>, ISimulationStateUpdateRuntime<GameEvent>, IDisposable
 {
     private readonly EventAgenda<GameEvent> _agenda;
     private readonly SimulationEngine<GameEvent> _engine;
@@ -150,7 +150,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
 
     public bool ShouldStop => _isPoisoned;
 
-    internal bool IsHealthy => !_isPoisoned;
+    internal bool IsHealthy => !_isPoisoned && !_disposed;
 
     /// <summary>
     /// Captures all runtime-owned sections only after engine and movement state
@@ -159,12 +159,16 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
     internal CheckpointResult<GameSessionRuntimeCheckpoint> CaptureCheckpoint(
         int factRetentionCapacity)
     {
-        if (_isPoisoned)
+        if (_isPoisoned || _disposed)
         {
             return RuntimeRejected(
                 "$.checkpoint.health",
                 "An unhealthy session cannot produce an authoritative checkpoint.");
         }
+
+        if (NextControlledMotionBoundary() is not null)
+            return RuntimeRejected("$.checkpoint.movement",
+                "Controlled-motion session checkpoints require domain roster and scheduling persistence, which is not integrated yet.");
 
         CheckpointResult<SimulationEngineCheckpoint<GameEvent>> engine =
             _engine.CaptureCheckpoint();
@@ -513,6 +517,10 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                     lifecycle.Entities.GetEntityId(spatial.Event.ShipId) is not null,
                 GameEvent.Economic economic =>
                     economy?.ContainsEventReference(economic.Event) == true,
+                GameEvent.SpatialInteraction interaction =>
+                    scheduled.Key.Phase == EventPhase.StateUpdate
+                    && scheduled.Key.Timestamp == interaction.Forecast.Candidate.Key.Timestamp
+                    && scheduled.Generation == interaction.Forecast.Candidate.Interest.Generation,
                 _ => false,
             };
             if (!resolved)

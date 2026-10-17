@@ -336,10 +336,25 @@ public sealed class ScheduledTerminalManeuver
         ArgumentNullException.ThrowIfNull(agenda);
         ArgumentNullException.ThrowIfNull(wrapEvent);
         interruption = null;
-        if (agenda.CurrentTime != now)
+        ManeuverInterruption prepared = PrepareInterruption(now, agenda.CurrentTime);
+        AgendaCancellationCheck cancellation =
+            InvalidateAndCancelPendingEvents(agenda, wrapEvent);
+        if (cancellation != AgendaCancellationCheck.Matches)
+        {
+            return cancellation;
+        }
+
+        interruption = prepared;
+        return AgendaCancellationCheck.Matches;
+    }
+
+    /// <summary>Validates time and generation capacity without invalidating the schedule.</summary>
+    internal ManeuverInterruption PrepareInterruption(SimulationTime now, SimulationTime agendaTime)
+    {
+        if (agendaTime != now)
         {
             throw new InvalidOperationException(
-                $"Interruption time {now.Milliseconds} ms does not match agenda time {agenda.CurrentTime.Milliseconds} ms.");
+                $"Interruption time {now.Milliseconds} ms does not match agenda time {agendaTime.Milliseconds} ms.");
         }
 
         if (IsInvalidated)
@@ -360,20 +375,7 @@ public sealed class ScheduledTerminalManeuver
                 $"Interruption time must be within active phase {CurrentPhaseIndex} before its pending boundary.");
         }
 
-        ShipKinematicState materialized = Plan.StateAt(now);
-        EventGeneration nextGeneration = Generation.Next();
-        AgendaCancellationCheck cancellation =
-            InvalidateAndCancelPendingEvents(agenda, wrapEvent);
-        if (cancellation != AgendaCancellationCheck.Matches)
-        {
-            return cancellation;
-        }
-
-        interruption = new ManeuverInterruption(
-            now,
-            materialized,
-            nextGeneration);
-        return AgendaCancellationCheck.Matches;
+        return new ManeuverInterruption(now, Plan.StateAt(now), Generation.Next());
     }
 
     /// <summary>

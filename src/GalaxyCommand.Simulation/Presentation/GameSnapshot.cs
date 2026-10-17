@@ -73,6 +73,7 @@ public sealed record GameShipSnapshot(
     {
     }
 
+    /// <summary>The captured system-local position; connector transit has no local position.</summary>
     public SystemPosition? Position =>
         SpatialState switch
         {
@@ -82,6 +83,8 @@ public sealed record GameShipSnapshot(
                 localMotion.CurrentPosition,
             ShipSpatialSnapshotState.AnalyticManeuver maneuver =>
                 maneuver.CurrentState.Position,
+            ShipSpatialSnapshotState.InteractionControlled controlled =>
+                controlled.CurrentState.Position,
             ShipSpatialSnapshotState.ConnectorTransit => null,
             _ => throw new InvalidOperationException(
                 $"Unsupported spatial snapshot state {SpatialState.GetType().Name}."),

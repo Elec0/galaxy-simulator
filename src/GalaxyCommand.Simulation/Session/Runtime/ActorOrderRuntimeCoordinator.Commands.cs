@@ -465,6 +465,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             factProposals);
     }
 
+    /// <summary>Preserves override authorization failures and rejects controlled ownership before any order or control mutation.</summary>
     private BeginOverrideEvaluation EvaluateBeginOverride(
         CommandSource source,
         BeginScriptedOverrideCommand command)
@@ -475,7 +476,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             command.ExpectedRevision);
         CommandResult? rejection = RejectInvalidOverride(
             validation,
-            command.ShipId);
+            command.ShipId) ?? RejectControlledMotion(command.ShipId);
         return rejection is null
             ? new BeginOverrideEvaluation(
                 new BeginOverrideProposal(
@@ -486,6 +487,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             : new BeginOverrideEvaluation(null, rejection);
     }
 
+    /// <summary>Requires explicit motion release before ending an override or resuming suspended navigation.</summary>
     private EndOverrideEvaluation EvaluateEndOverride(
         CommandSource source,
         EndScriptedOverrideCommand command)
@@ -496,7 +498,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             command.ExpectedRevision);
         CommandResult? rejection = RejectInvalidOverride(
             validation,
-            command.ShipId);
+            command.ShipId) ?? RejectControlledMotion(command.ShipId);
         return rejection is null
             ? new EndOverrideEvaluation(
                 new EndOverrideProposal(

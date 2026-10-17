@@ -17,7 +17,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
         SimulationTime startsAt,
         SimulationTime endsAt,
         Func<SimulationTime, ShipKinematicState> stateAt,
-        IEnumerable<ManeuverScheduledPhase> phases)
+        IEnumerable<ManeuverScheduledPhase> phases,
+        IEnumerable<InteractionPhaseCurve> interactionCurves)
     {
         Kind = kind;
         StartsAt = startsAt;
@@ -37,7 +38,12 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
                 "An executable maneuver requires a complete contiguous phase schedule.");
         }
 
+        InteractionPhaseCurve[] curves = interactionCurves.ToArray();
+        if (curves.Length == 0 || curves[0].StartsAt != startsAt || curves[^1].EndsAt != endsAt ||
+            curves.Zip(curves.Skip(1), static (previous, next) => previous.EndsAt != next.StartsAt).Any(static gap => gap))
+            throw new InvalidOperationException("Interaction curves must cover the complete original kinematic plan.");
         Phases = Array.AsReadOnly(phaseArray);
+        InteractionCurves = Array.AsReadOnly(curves);
     }
 
     public BoundedTerminalPlanKind Kind { get; }
@@ -48,6 +54,9 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
 
     public IReadOnlyList<ManeuverScheduledPhase> Phases { get; }
 
+    /// <summary>Original immutable geometry, independent of inserted observable schedule boundaries.</summary>
+    internal IReadOnlyList<InteractionPhaseCurve> InteractionCurves { get; }
+
     internal static ExecutableBoundedTerminalManeuverPlan TerminalSettle(
         SimulationTime at,
         ShipKinematicState settled) =>
@@ -56,7 +65,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             at,
             at,
             _ => settled,
-            ManeuverPhaseSchedules.TerminalSettle(at));
+            ManeuverPhaseSchedules.TerminalSettle(at),
+            [InteractionPhaseCurve.Fixed(settled.Position, at, at)]);
 
     /// <summary>
     /// Adapts orderless passive drift into the shared analytic scheduler so a
@@ -83,7 +93,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
                     ManeuverPhaseKind.CoastUnderPassiveDrag,
                     segment.StartsAt,
                     segment.EndsAt),
-            ]);
+            ],
+            [InteractionPhaseCurve.From(segment)]);
     }
 
     internal static ExecutableBoundedTerminalManeuverPlan From(
@@ -93,7 +104,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
-            ManeuverPhaseSchedules.From(plan));
+            ManeuverPhaseSchedules.From(plan),
+            ManeuverInteractionCurves.From(plan));
 
     /// <summary>
     /// Adapts the selected complete directional candidate and rejects any
@@ -109,7 +121,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
-            ManeuverPhaseSchedules.From(selection));
+            ManeuverPhaseSchedules.From(selection),
+            ManeuverInteractionCurves.From(plan));
     }
 
     internal static ExecutableBoundedTerminalManeuverPlan From(
@@ -119,7 +132,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
-            ManeuverPhaseSchedules.From(plan));
+            ManeuverPhaseSchedules.From(plan),
+            ManeuverInteractionCurves.From(plan));
 
     internal static ExecutableBoundedTerminalManeuverPlan From(
         CruiseTerminalManeuverPlan plan) =>
@@ -128,7 +142,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
-            ManeuverPhaseSchedules.From(plan));
+            ManeuverPhaseSchedules.From(plan),
+            ManeuverInteractionCurves.From(plan));
 
     internal static ExecutableBoundedTerminalManeuverPlan From(
         ForcedCruiseDropoutTerminalManeuverPlan plan) =>
@@ -137,7 +152,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
-            ManeuverPhaseSchedules.From(plan));
+            ManeuverPhaseSchedules.From(plan),
+            ManeuverInteractionCurves.From(plan));
 
     internal static ExecutableBoundedTerminalManeuverPlan From(
         BrakeThenStationaryDirectionalManeuverPlan plan) =>
@@ -146,7 +162,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
-            ManeuverPhaseSchedules.From(plan));
+            ManeuverPhaseSchedules.From(plan),
+            ManeuverInteractionCurves.From(plan));
 
     internal static ExecutableBoundedTerminalManeuverPlan From(
         ReducedThrustTerminalManeuverPlan plan) =>
@@ -155,7 +172,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
-            ManeuverPhaseSchedules.From(plan));
+            ManeuverPhaseSchedules.From(plan),
+            ManeuverInteractionCurves.From(plan));
 
     /// <summary>
     /// Creates one execution view over prevalidated corner-transition segments
@@ -168,6 +186,9 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
     {
         ArgumentNullException.ThrowIfNull(transitions);
         ArgumentNullException.ThrowIfNull(terminalPlan);
+        // Freeze the evaluator's input as well as the geometry projection so
+        // later caller edits cannot alter an already-captured read view.
+        transitions = Array.AsReadOnly(transitions.ToArray());
         if (transitions.Count == 0
             || transitions[^1].EndsAt != terminalPlan.StartsAt
             || transitions[^1].StateAt(transitions[^1].EndsAt)
@@ -192,7 +213,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             transitions[0].StartsAt,
             terminalPlan.EndsAt,
             time => StateAtWaypointRoute(transitions, terminalPlan, time),
-            phases);
+            phases,
+            transitions.Select(InteractionPhaseCurve.From).Concat(terminalPlan.InteractionCurves));
     }
 
     /// <summary>
@@ -211,7 +233,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
                 plan.StartsAt,
                 plan.EndsAt,
                 plan.StateAt,
-                ManeuverPhaseSchedules.From(selection)),
+                ManeuverPhaseSchedules.From(selection),
+                ManeuverInteractionCurves.From(selection)),
             {
                 Kind: AlignedSubCruisePlanKind.Triangular,
                 TriangularPlan: { } plan,
@@ -220,7 +243,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
                 plan.StartsAt,
                 plan.EndsAt,
                 plan.StateAt,
-                ManeuverPhaseSchedules.From(selection)),
+                ManeuverPhaseSchedules.From(selection),
+                ManeuverInteractionCurves.From(selection)),
             {
                 Kind: AlignedSubCruisePlanKind.CappedSpeed,
                 CappedSpeedPlan: { } plan,
@@ -229,7 +253,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
                 plan.StartsAt,
                 plan.EndsAt,
                 plan.StateAt,
-                ManeuverPhaseSchedules.From(selection)),
+                ManeuverPhaseSchedules.From(selection),
+                ManeuverInteractionCurves.From(selection)),
             _ => throw InvalidPayload(selection.Kind),
         };
 
@@ -311,7 +336,8 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             StartsAt,
             EndsAt,
             stateAt,
-            split);
+            split,
+            InteractionCurves);
     }
 
     private static InvalidOperationException InvalidPayload<TKind>(

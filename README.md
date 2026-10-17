@@ -15,6 +15,7 @@ The central goal is a persistent, understandable galaxy in which ships, stations
 - [Authoritative system-local coordinate scale](docs/system-local-coordinate-scale.md)
 - [Ship thrust, maneuver kinematics, and short moves](docs/ship-maneuver-kinematics.md)
 - [Moving-ship interaction architecture](docs/moving-ship-interactions.md)
+- [Combat activation and movement handoff](docs/combat-activation.md)
 - [Actor control and order lifecycle](docs/actor-control-and-orders.md)
 - [Individual NPC scope](docs/individual-npc-scope.md)
 - [Dialogue state and presentation](docs/dialogue.md)
@@ -122,6 +123,45 @@ dotnet run --project benchmarks/GalaxyCommand.Benchmarks/GalaxyCommand.Benchmark
   --suite full \
   --scenario-file benchmarks/scenarios/example.spatial-one-crowded.json
 ```
+
+The caller-scoped proximity baseline measures linear and stationary ships at
+one captured instant. Run its sparse preset or the dense scenario file in Release:
+
+```sh
+dotnet run -c Release --project benchmarks/GalaxyCommand.Benchmarks -- \
+  --suite full --preset interaction.scoped-proximity
+
+dotnet run -c Release --project benchmarks/GalaxyCommand.Benchmarks -- \
+  --suite full --scenario-file benchmarks/scenarios/example.interaction-dense.json
+```
+
+The [initial proximity measurements](docs/interaction-performance-baseline.md)
+record the timed scope, machine details, and reference/prepared comparisons.
+Add `--preset interaction.prepared-proximity` to the sparse command to compare
+immutable per-view geometry and scope preparation with identical fixtures.
+
+Benchmark-only spatial-index prototypes are compared in
+[Spatial interaction index measurements](docs/interaction-index-comparison.md).
+Use `interaction.index-scan`, `interaction.index-grid`, and
+`interaction.index-hierarchy` together with `--suite full` for matching
+two-dimensional fixtures. The sibling `interaction.swept-scan`,
+`interaction.swept-grid`, and `interaction.swept-hierarchy` presets compare
+[long sweeps and analytic bounds](docs/interaction-swept-index-comparison.md).
+These prototype presets retain their experimental wrappers. Use
+`interaction.runtime-scan`, `interaction.runtime-grid`, and
+`interaction.runtime-hierarchy` for the matching fixtures through the public
+instant-query API. [Public API measurements](docs/interaction-runtime-index-measurements.md)
+record preparation/query amortization and allocation. Runtime scan remains the
+default; callers must explicitly select and tune an index. The sibling
+`interaction.runtime-swept-scan`, `interaction.runtime-swept-grid`, and
+`interaction.runtime-swept-hierarchy` presets exercise real movement captures
+and next-boundary clipping. [Public swept measurements](docs/interaction-runtime-swept-measurements.md)
+record linear and mixed-maneuver comparisons. Use the matching
+`interaction.batch-swept-*` presets with explicit `workerCount` and `batchSize`
+overrides for [pure batch measurements](docs/interaction-batch-measurements.md).
+`interaction.session-serial` and `interaction.session-batched` exercise
+[advancing-session throughput and invalidation churn](docs/interaction-session-measurements.md)
+with serial domain callbacks and effects.
 
 Timing, allocation, and memory results are informational. Canonical digests,
 repeated-run agreement, semantic counts, and simulation invariants are enforced.

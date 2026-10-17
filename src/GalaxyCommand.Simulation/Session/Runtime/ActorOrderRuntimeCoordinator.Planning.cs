@@ -360,12 +360,13 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                         requestedHeading).IsSatisfied),
         };
 
+    /// <summary>Preserves controller eligibility and rejects navigation takeover before controlled motion is released.</summary>
     private CommandResult? RejectIneligible(
         ShipId shipId,
         CommandSource source) =>
         _control.CheckCommand(shipId, source) switch
         {
-            ActorCommandEligibility.Eligible => null,
+            ActorCommandEligibility.Eligible => RejectControlledMotion(shipId),
             ActorCommandEligibility.MissingActor => CommandResult.Rejected(
                 CommandRejectionCodes.InvalidIntent,
                 $"Unknown ship {shipId}."),
@@ -377,6 +378,13 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                 $"Command source {source.Kind}:{source.Id} does not control ship {shipId}."),
             _ => throw new InvalidOperationException("Unknown actor command eligibility."),
         };
+
+    /// <summary>Requires the controlling domain to release motion before navigation or scripted control changes.</summary>
+    private CommandResult? RejectControlledMotion(ShipId shipId) =>
+        _movement.GetState(shipId) is ShipSpatialState.InteractionControlled
+            ? CommandResult.Rejected(CommandRejectionCodes.InvalidState,
+                "Release controlled motion before changing navigation or scripted control.")
+            : null;
 
     private static CommandResult? RejectInvalidOverride(
         ActorOverrideValidation validation,

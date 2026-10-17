@@ -3,26 +3,41 @@ namespace GalaxyCommand.Simulation;
 /// <summary>
 /// Persistent rendering-independent boundary for one running game.
 /// </summary>
-public sealed class GameSession : IGameplayCommandHandler
+public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
 {
     private readonly GameFactStore _facts;
     private readonly ActorOrderRuntimeCoordinator _runtime;
     private readonly DeterministicRandomOwner _random;
     private readonly GameplayCommandProcessor _commands;
+    private readonly SpatialInteractionRegistration _spatialInteractions;
+
+    /// <summary>Fixed host performance binding, deliberately absent from authoritative checkpoints.</summary>
+    internal InteractionBatchExecution? InteractionExecution { get; }
 
     /// <summary>
     /// Creates one clean authoritative session from validated setup, including
     /// the setup's required deterministic random root.
     /// </summary>
-    public GameSession(
-        GameSessionSetup setup,
-        ISpatialNavigationPlanner navigation)
+    public GameSession(GameSessionSetup setup, ISpatialNavigationPlanner navigation)
+        : this(setup, navigation, null) { }
+
+    /// <summary>
+    /// Creates a session with fixed, optional pure forecast execution tuning. Null selects
+    /// serial execution. Domain callbacks and authoritative commits remain serial; tuning
+    /// is not authoritative checkpoint state and must be selected again on restore.
+    /// </summary>
+    public GameSession(GameSessionSetup setup, ISpatialNavigationPlanner navigation,
+        InteractionBatchExecution? interactionExecution)
     {
         ArgumentNullException.ThrowIfNull(setup);
+        InteractionExecution = interactionExecution;
+        _spatialInteractions = new SpatialInteractionRegistration();
         _facts = new GameFactStore(setup.FactRetentionCapacity);
         _runtime = new ActorOrderRuntimeCoordinator(setup, navigation, _facts);
         _random = new DeterministicRandomOwner(setup.RandomRootSeed);
         _commands = new GameplayCommandProcessor(this, _facts);
+        _spatialInteractions.AttachMutationGuard(EnsureHealthy);
+        _runtime.AttachSpatialInteractions(_spatialInteractions, this);
     }
 
     /// <summary>
@@ -33,8 +48,12 @@ public sealed class GameSession : IGameplayCommandHandler
         GameFactStore facts,
         ActorOrderRuntimeCoordinator runtime,
         DeterministicRandomOwner random,
-        CommandAdmissionCheckpoint commandAdmission)
+        CommandAdmissionCheckpoint commandAdmission,
+        SpatialInteractionRegistration spatialInteractions,
+        InteractionBatchExecution? interactionExecution)
     {
+        InteractionExecution = interactionExecution;
+        _spatialInteractions = spatialInteractions;
         _facts = facts;
         _runtime = runtime;
         _random = random;
@@ -49,7 +68,37 @@ public sealed class GameSession : IGameplayCommandHandler
         }
 
         _commands = commands.Value!;
+        _spatialInteractions.AttachMutationGuard(EnsureHealthy);
+        _runtime.AttachSpatialInteractions(_spatialInteractions, this);
     }
+
+    /// <summary>
+    /// Registers one distinct gameplay domain with the session-wide interest allocator.
+    /// The caller owns interest intent and effects. Duplicate domain names are rejected.
+    /// </summary>
+    public InteractionInterestOwner RegisterSpatialInteractionDomain(string domainKind)
+    {
+        EnsureHealthy();
+        return _spatialInteractions.Register(domainKind);
+    }
+
+    /// <summary>Finds a registered domain store so consumers can rebind after checkpoint restoration.</summary>
+    public InteractionInterestOwner? GetSpatialInteractionDomain(string domainKind)
+    {
+        EnsureHealthy();
+        return _spatialInteractions.Get(domainKind);
+    }
+
+    /// <summary>Binds a pure domain evaluator and its buffered effects to a registered store, including after restore.</summary>
+    public void BindSpatialInteractionDomain(string domainKind, ISpatialInteractionDomainEvaluator evaluator)
+    {
+        EnsureHealthy();
+        ArgumentNullException.ThrowIfNull(evaluator);
+        _spatialInteractions.Bind(domainKind, evaluator);
+    }
+
+    /// <summary>Releases movement notification subscriptions. Disposed sessions reject further authoritative operations.</summary>
+    public void Dispose() => _runtime.Dispose();
 
     public SimulationTime CurrentTime => _runtime.CurrentTime;
 
@@ -129,6 +178,10 @@ public sealed class GameSession : IGameplayCommandHandler
             holderPrincipalId,
             kind);
 
+    /// <summary>
+    /// Advances through completed timestamps up to target, stopping at the earliest active
+    /// controlled interval end until its owning domain explicitly renews or releases motion.
+    /// </summary>
     public RunReport AdvanceTo(SimulationTime target)
     {
         EnsureHealthy();
@@ -197,7 +250,8 @@ public sealed class GameSession : IGameplayCommandHandler
             _random.CaptureCheckpoint(),
             facts,
             _commands.CaptureCheckpoint(),
-            value.InventoryCommit);
+            value.InventoryCommit,
+            _spatialInteractions.CaptureCheckpoint());
         return CheckpointResult<GameSessionCheckpoint>.Success(checkpoint);
     }
 
@@ -230,10 +284,43 @@ public sealed class GameSession : IGameplayCommandHandler
             materialCompatibility);
     }
 
+    /// <summary>Restores authoritative owners while selecting fresh, fixed performance tuning outside the checkpoint.</summary>
+    internal static CheckpointResult<GameSession> RestoreCheckpoint(GameSessionCheckpoint checkpoint,
+        InteractionBatchExecution interactionExecution)
+    {
+        ArgumentNullException.ThrowIfNull(interactionExecution);
+        return RestoreCheckpointCore(checkpoint, definitions: null, interactionExecution: interactionExecution);
+    }
+
+    /// <summary>Restores against current definitions with caller-selected pure forecast tuning.</summary>
+    internal static CheckpointResult<GameSession> RestoreCheckpoint(GameSessionCheckpoint checkpoint,
+        PhysicalDefinitionCatalog definitions, InteractionBatchExecution interactionExecution)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        ArgumentNullException.ThrowIfNull(interactionExecution);
+        return RestoreCheckpointCore(checkpoint, definitions, interactionExecution: interactionExecution);
+    }
+
+    /// <summary>Restores mapped materials and current definitions with caller-selected pure forecast tuning.</summary>
+    internal static CheckpointResult<GameSession> RestoreCheckpoint(GameSessionCheckpoint checkpoint,
+        PhysicalDefinitionCatalog definitions, MaterialInventoryCompatibilityMap materialCompatibility,
+        InteractionBatchExecution interactionExecution)
+    {
+        ArgumentNullException.ThrowIfNull(definitions);
+        ArgumentNullException.ThrowIfNull(materialCompatibility);
+        ArgumentNullException.ThrowIfNull(interactionExecution);
+        return RestoreCheckpointCore(checkpoint, definitions, materialCompatibility, interactionExecution);
+    }
+
+    /// <summary>
+    /// Validates authoritative owners and behavior policies before assembly. Optional host
+    /// execution tuning is passed only to the assembled session, never read from checkpoint state.
+    /// </summary>
     private static CheckpointResult<GameSession> RestoreCheckpointCore(
         GameSessionCheckpoint checkpoint,
         PhysicalDefinitionCatalog? definitions,
-        MaterialInventoryCompatibilityMap? materialCompatibility = null)
+        MaterialInventoryCompatibilityMap? materialCompatibility = null,
+        InteractionBatchExecution? interactionExecution = null)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         if (checkpoint.Random is null)
@@ -243,6 +330,11 @@ public sealed class GameSession : IGameplayCommandHandler
                     "$.checkpoint.random",
                     "The deterministic random checkpoint is required."));
         }
+
+        CheckpointResult<SpatialInteractionRegistration> spatialInteractions =
+            SpatialInteractionRegistration.RestoreCheckpoint(checkpoint.SpatialInteractions);
+        if (!spatialInteractions.IsSuccess)
+            return CheckpointResult<GameSession>.Rejected(spatialInteractions.Failure!);
 
         // No current gameplay domain declares a stateful stream. Future owners
         // contribute their complete live-key sets at this aggregate boundary.
@@ -301,6 +393,10 @@ public sealed class GameSession : IGameplayCommandHandler
             return CheckpointResult<GameSession>.Rejected(runtime.Failure!);
         }
 
+        CheckpointValidationFailure? deliveryFailure = spatialInteractions.Value!.ValidateDeliveryHistory(
+            runtime.Value!.CaptureInteractionReadView());
+        if (deliveryFailure is not null) return CheckpointResult<GameSession>.Rejected(deliveryFailure);
+
         try
         {
             return CheckpointResult<GameSession>.Success(
@@ -308,7 +404,9 @@ public sealed class GameSession : IGameplayCommandHandler
                     facts.Value!,
                     runtime.Value!,
                     random.Value!,
-                    checkpoint.CommandAdmission));
+                    checkpoint.CommandAdmission,
+                    spatialInteractions.Value!,
+                    interactionExecution));
         }
         catch (InvalidOperationException error)
         {

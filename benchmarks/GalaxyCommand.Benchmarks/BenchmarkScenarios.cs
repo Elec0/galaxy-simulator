@@ -16,9 +16,29 @@ internal interface IBenchmarkScenario
 
 internal static class BenchmarkScenarioFactory
 {
+    /// <summary>Selects the implemented workload without enabling future domain placeholders.</summary>
     internal static IBenchmarkScenario Create(string basePreset) =>
         basePreset switch
         {
+            BenchmarkPresets.InteractionSessionSerial => new InteractionSessionBenchmarkScenario(false),
+            BenchmarkPresets.InteractionSessionBatched => new InteractionSessionBenchmarkScenario(true),
+            BenchmarkPresets.InteractionBatchSweptScan => new InteractionRuntimeSweptBenchmarkScenario("scan", batched: true),
+            BenchmarkPresets.InteractionBatchSweptGrid => new InteractionRuntimeSweptBenchmarkScenario("grid", batched: true),
+            BenchmarkPresets.InteractionBatchSweptHierarchy => new InteractionRuntimeSweptBenchmarkScenario("hierarchy", batched: true),
+            BenchmarkPresets.InteractionRuntimeSweptScan => new InteractionRuntimeSweptBenchmarkScenario("scan"),
+            BenchmarkPresets.InteractionRuntimeSweptGrid => new InteractionRuntimeSweptBenchmarkScenario("grid"),
+            BenchmarkPresets.InteractionRuntimeSweptHierarchy => new InteractionRuntimeSweptBenchmarkScenario("hierarchy"),
+            BenchmarkPresets.InteractionSweptScan => new InteractionSweptBenchmarkScenario("scan"),
+            BenchmarkPresets.InteractionSweptGrid => new InteractionSweptBenchmarkScenario("grid"),
+            BenchmarkPresets.InteractionSweptHierarchy => new InteractionSweptBenchmarkScenario("hierarchy"),
+            BenchmarkPresets.InteractionRuntimeScan => new InteractionIndexBenchmarkScenario("scan", publicRuntime: true),
+            BenchmarkPresets.InteractionRuntimeGrid => new InteractionIndexBenchmarkScenario("grid", publicRuntime: true),
+            BenchmarkPresets.InteractionRuntimeHierarchy => new InteractionIndexBenchmarkScenario("hierarchy", publicRuntime: true),
+            BenchmarkPresets.InteractionIndexScan => new InteractionIndexBenchmarkScenario("scan"),
+            BenchmarkPresets.InteractionIndexGrid => new InteractionIndexBenchmarkScenario("grid"),
+            BenchmarkPresets.InteractionIndexHierarchy => new InteractionIndexBenchmarkScenario("hierarchy"),
+            BenchmarkPresets.InteractionPreparedProximity => new InteractionProximityBenchmarkScenario(prepared: true),
+            BenchmarkPresets.InteractionScopedProximity => new InteractionProximityBenchmarkScenario(),
             BenchmarkPresets.SpatialManyQuiet => new SpatialBenchmarkScenario(),
             BenchmarkPresets.SpatialOneCrowded => new SpatialBenchmarkScenario(),
             BenchmarkPresets.NavigationConnectorVolume =>

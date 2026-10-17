@@ -219,6 +219,33 @@ public sealed class EventAgendaTests
     }
 
     [Fact]
+    public void AgendaOwnerRejectsExhaustedSequenceCapacityBeforeAppendingAnyProposal()
+    {
+        var agenda = EventAgenda<string>.RestoreCheckpoint(new EventAgendaCheckpoint<string>(
+            SimulationTime.Zero, ulong.MaxValue - 1, [])).Value!;
+        AgendaEventProposal<string>[] proposals = Enumerable.Range(0, 2).Select(index =>
+            new AgendaEventProposal<string>(new AgendaProposalOrder(RuntimeEvaluationWave.SpatialInteractions, 1, (ulong)index, 0, 0),
+                new SimulationTime(10), EventPhase.StateUpdate, default, "event")).ToArray();
+        Assert.Throws<OverflowException>(() => AgendaCommitOwner.Commit(agenda, proposals));
+        Assert.Equal(0, agenda.Count);
+        Assert.Equal(ulong.MaxValue - 1, agenda.CaptureCheckpoint().Value!.NextCreationSequence);
+    }
+
+    [Fact]
+    public void AgendaOwnerCanConsumeLastAvailableSequenceAndAcceptEmptyExhaustedWave()
+    {
+        var agenda = EventAgenda<string>.RestoreCheckpoint(new EventAgendaCheckpoint<string>(
+            SimulationTime.Zero, ulong.MaxValue - 1, [])).Value!;
+        var proposal = new AgendaEventProposal<string>(new AgendaProposalOrder(RuntimeEvaluationWave.SpatialInteractions, 1, 0, 0, 0),
+            new SimulationTime(10), EventPhase.StateUpdate, default, "last available");
+        Assert.Equal(ulong.MaxValue - 1, Assert.Single(AgendaCommitOwner.Commit(agenda, [proposal]).EventKeys).CreationSequence);
+        Assert.Equal(ulong.MaxValue, agenda.CaptureCheckpoint().Value!.NextCreationSequence);
+        Assert.Empty(AgendaCommitOwner.Commit(agenda, Array.Empty<AgendaEventProposal<string>>()).EventKeys);
+        Assert.Throws<OverflowException>(() => AgendaCommitOwner.Commit(agenda, [proposal]));
+        Assert.Equal(1, agenda.Count);
+    }
+
+    [Fact]
     public void AgendaOwnerRejectsDuplicateOrderBeforeScheduling()
     {
         var agenda = new EventAgenda<string>();

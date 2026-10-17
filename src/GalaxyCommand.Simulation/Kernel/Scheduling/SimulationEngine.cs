@@ -170,6 +170,7 @@ public sealed class SimulationEngine<TEvent>
         return new RunReport(startTime, CurrentTime, eventsProcessed);
     }
 
+    /// <summary>Drains physical work, optional stable StateUpdate waves, and Decision in phase order.</summary>
     private long ProcessTimestamp(SimulationTime timestamp, long eventsProcessed)
     {
         _agenda.AdvanceTo(timestamp);
@@ -178,6 +179,13 @@ public sealed class SimulationEngine<TEvent>
         foreach (EventPhase phase in Enum.GetValues<EventPhase>())
         {
             _agenda.EnterPhase(phase);
+            if (phase == EventPhase.StateUpdate && _runtime is ISimulationStateUpdateRuntime<TEvent> waveRuntime)
+            {
+                waveRuntime.PrepareStateUpdate(timestamp, _agenda);
+                eventsProcessed = ProcessStateUpdateWaves(waveRuntime, timestamp, eventsProcessed);
+                continue;
+            }
+
             if (phase == EventPhase.Decision)
             {
                 _runtime.Reconcile(timestamp, _agenda);
@@ -194,6 +202,27 @@ public sealed class SimulationEngine<TEvent>
 
         _agenda.CompleteTimestamp();
 
+        return eventsProcessed;
+    }
+
+    /// <summary>Captures each complete wave before dispatch and drains commit-created work before advancing phases.</summary>
+    private long ProcessStateUpdateWaves(ISimulationStateUpdateRuntime<TEvent> runtime,
+        SimulationTime timestamp, long eventsProcessed)
+    {
+        while (_agenda.NextEventKey is { } next && next.Timestamp == timestamp && next.Phase == EventPhase.StateUpdate)
+        {
+            var events = new List<ScheduledEvent<TEvent>>();
+            while (_agenda.PopNextInCurrentPhase() is { } scheduled) events.Add(scheduled);
+            IReadOnlyList<ScheduledEventDisposition> dispositions = runtime.HandleStateUpdateWave(
+                events.AsReadOnly(), timestamp, _agenda);
+            if (dispositions is null || dispositions.Count != events.Count)
+                throw new InvalidOperationException("A StateUpdate wave must return one disposition per envelope.");
+            for (int index = 0; index < events.Count; index++)
+            {
+                _runtime.RecordEvent(events[index], dispositions[index]);
+                eventsProcessed = checked(eventsProcessed + 1);
+            }
+        }
         return eventsProcessed;
     }
 
