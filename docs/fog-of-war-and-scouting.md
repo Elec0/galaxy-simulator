@@ -16,6 +16,257 @@ This document completes the design work approved by the project owner for
 
 **Decision status:** Accepted by the project owner on 2026-08-20.
 
+## TASK-073 implementation scope review
+
+The owner promoted `TASK-073` on 2026-10-19. The accepted observation behavior
+above remains unchanged. Review of the current simulation found three gaps
+that prevent implementing the complete contract without an owner decision:
+
+- Stations have no runtime identity, lifecycle, or approved observable state.
+  `TASK-057` still owns that design and `TASK-105` tracks its runtime; economic facilities cannot implicitly be
+  treated as stations.
+- Deployable identity, lifecycle, observable state, and sensor-source handoff
+  are designed, but their runtime implementation remains `TASK-095`.
+- Ship setup, definitions, and content have no base sensor-radius contract.
+  This design requires a definition-supplied radius but does not settle its
+  initial content values, validation, or integration with ship definitions.
+
+On 2026-10-19 the owner selected a staged implementation boundary for review,
+followed by implementation of approved stages. Station and deployable
+integration remains open. The owner subsequently approved the boundary and
+stage 1, then approved stage 2, decisions S1 through S9, and the proposed 10 km
+content radii. Those approvals authorize ship observation implementation. They
+do not complete the full ship, station, and deployable acceptance scope.
+
+### Approved stages and completion boundaries
+
+| Stage | Deliverable | Evidence required to finish the stage |
+| --- | --- | --- |
+| 1. Ship coverage evaluation | Immutable committed ship inputs, system-local source union, stable contact reduction, and a serial reference evaluator. Inputs carry explicit radii; this stage does not change live presentation. | Inclusive range boundaries, moving source and target combinations, overlapping-source loss, transit exclusion, emergence, creation/removal, canonical input ordering, and batch/partition equivalence. |
+| 2. Live ship observation | Definition/content sensor capability, session integration, safe ship presentation and selection, commit-time disclosure, Godot consumption, and current-schema checkpoint/save continuation. | Hidden ships and private fields absent from every presentation path; earlier hidden events stay hidden; disclosed events remain readable after coverage changes; restored and uninterrupted runs agree, including bounded fact retention and cursors. |
+| 3. Persistent observation owner | Session-owned discovery, stale state, refresh, confirmed absence, and persistence, using concrete approved station/deployable inputs. | Typed owner-approved views, last observation time, no refresh from hidden state, absence without invented cause/time, exact restore, and source/target lifecycle integration. Start when an owning entity domain supplies its runtime contract. |
+| 4. Full entity integration and closure | Station sources/targets from TASK-105 after TASK-057 design approval and deployable sources/targets from TASK-095; application consumes their approved records. | Every item in Implementation proof below, across all three entity categories, plus the complete regression suite and appropriate benchmark correctness checks. |
+
+Stages 1 and 2 are approved and implemented.
+Stage 3 must wait for a concrete persistent entity presentation contract; test
+fixtures alone cannot establish live station or deployable support. Stage 4
+is required for full `TASK-073` completion. All stages remain under this task ID;
+the entity prerequisites retain their existing owners and task IDs.
+
+```mermaid
+flowchart LR
+    ships["Committed ship state and definition radius"] --> evaluate["Read-only coverage batches"]
+    evaluate --> reduce["Stable contact reduction"]
+    reduce --> observation["Session observation commit"]
+    facts["Domain-approved event proposals"] --> disclosure["Commit-time disclosure and safe payload"]
+    observation --> disclosure
+    observation --> presentation["Observed contacts and selection"]
+    disclosure --> presentation
+    future["Future station and deployable owners"] -. approved inputs .-> evaluate
+    future -. typed persistent views .-> observation
+```
+
+### Contract decision register
+
+The owner approved the following contracts on 2026-10-19. Stage 1 supplies the
+serial coverage evaluator; stage 2 integrates the live ship boundary. New sensor
+worker execution still requires deterministic proof and benchmark evidence.
+
+| ID | Contract | Status |
+| --- | --- | --- |
+| S1 | Store base ship sensor radius in the ship definition, in authoritative distance units. Require an explicit nonnegative integer value, with zero covering only the source position. Use inclusive Euclidean distance and overflow-safe comparisons. Do not introduce equipment modifiers or an implicit default for old content. | Approved; starter ship and preview courier each use 10,000 meters. |
+| S2 | Select sources by asset-owning principal, independently of actor control. Stage 1 receives that principal explicitly. Stage 2 binds one player observer to the session as described in S9; no NPC discovery ledgers are created. Scripted control overrides do not transfer asset ownership. | Approved. |
+| S3 | Owned ships retain their currently approved detailed presentation. A covered non-owned ship exposes only entity ID, ship ID, owning principal, design identity, current system-local position, velocity, and heading at capture time. It exposes no orders, controller/override details, cargo inventory identity/capacity, capability revision, motion generation, future segment, objective, or maneuver plan. Use a separate observed-contact type rather than fabricated authoritative fields. | Approved. |
+| S4 | Resolve selection and focus through the same observed-contact projection as the map. A hidden requested ship resolves as unavailable without distinguishing hidden from removed. Rendering uses captured non-owned positions and does not extrapolate them between captures. Public static topology and observer-scoped relationships retain their accepted contracts. | Approved. |
+| S5 | Decide event disclosure at deterministic owner commit, retain the decision with bounded fact state, and persist it for delayed reads and restore. Evaluate spatial observability from the committed boundary view; for removal, the owner supplies the removed subject's committed removal position and prior ownership. Entering coverage later never retrospectively grants disclosure. | Approved. |
+| S6 | Keep complete authoritative facts for simulation/diagnostic consumers. Give presentation a separate safe notice projection: owned-asset detail follows its approved contract; non-owned spatial notices carry only an approved event kind, subject identity, event time, and observed position where applicable. Strip private plans, order IDs, transit destinations, and raw causal payloads. Apply existing relationship privacy as well as spatial disclosure. Unknown future fact kinds require explicit disclosure policy. | Approved with the existing-fact mapping below. |
+| S7 | Preserve source ordering, retention-gap signaling, and advancement past inspected hidden facts. Persist the bounded disclosure/projection data with its source fact so restore cannot recompute historical visibility from current coverage. Restore current sources from authoritative definitions and ship state; rebuild coverage and indexes. | Approved. |
+| S8 | Evaluate stable inputs in coarse batches, normalize by stable system/entity/source identity, and commit on the owner thread. Keep serial execution as the reference. Add worker execution only with deterministic equivalence tests and measured benchmark evidence; runtime worker/batch settings are not saved gameplay policy. | Serial evaluation, deterministic batches, and live owner commit approved. New worker execution requires measured evidence. |
+| S9 | Configure one registered player-observer principal and its exact local player command source in session setup. Persist that binding and validate it on restore. Player presentation requests must match that principal; complete authoritative diagnostic reads remain separate. Command attribution is local gameplay context, not authentication. | Approved. Delayed queries cannot select a new observer for a past commit. |
+
+Stage 1 uses explicit fixture radii. Stage 2 uses the approved definition
+values and fact-kind mapping below, with no inference from map size or movement
+speeds.
+Content, runtime-policy, checkpoint, and save versions change only where their
+meaning changes. Historical-save compatibility remains with `TASK-037`; the
+implementation must preserve that admission boundary rather than fabricate
+missing capabilities or disclosure history.
+
+The staged boundary leaves station identity, station observable fields, and
+deployable lifecycle with their owners. Their later adapters must use concrete
+typed views approved by those owners. It does not authorize a generic mutable
+entity registry, opaque saved presentation payloads, or replacement entity
+authority inside the observation component.
+
+### Stage 1 evaluator contract and evidence
+
+`ShipSensorCoverage.Evaluate` consumes one immutable interaction spatial view,
+an explicit observer principal, and a copied ship scope containing entity ID,
+ship ID, owning principal, and radius. The caller must capture ownership and
+capability at the same completed owner boundary as the spatial view. Duplicate
+entity or ship identities, zero identities, null inputs, absent scoped ships,
+and invalid batch sizes are rejected. The scope is explicit: spatial ships
+outside it cannot contribute coverage or become contacts. Live composition in
+stage 2 must supply the complete eligible ship roster.
+
+The result contains immutable, ship-ID-ordered owned, covered, and visible
+identity sets at the captured timestamp. Visibility is the union of owned and
+covered ships. Owned ships in transit stay visible but do not contribute local
+coverage. No discovery, disclosure, session, or presentation state is mutated.
+
+The evaluator reuses the shared exact instant geometry and caller-selected
+scan, sparse-grid, or hierarchy preparation. Source batches evaluate serially
+into private buffers before deterministic union. Grid widths, cell budgets,
+hierarchy leaf sizes, input permutations, and batch sizes agree with independent
+reference queries. Controlled intervals now use their exact analytic curve in
+the shared instant query; rounded published positions cannot create a false
+zero-radius contact. There is no worker execution or performance claim in this
+stage, and no future crossing is scheduled by this instantaneous evaluator.
+
+On 2026-10-19, all 24 coverage cases and the full 1,430-test solution suite
+passed. The Release solution build also passed with zero warnings or errors.
+Coverage cases include exact range limits, all moving/stationary
+combinations, immediate contact loss, overlap, transit/emergence, lifecycle,
+ownership changes, analytic boundaries, controlled intervals, immutable results,
+input rejection, and index/batch equivalence. These prove stage 1 only; live
+disclosure, persistence, and missing entity integration remain open.
+
+### Stage 2 live contracts
+
+**Decision status:** S1 through S9 and the 10 km starter-ship and
+preview-courier sensor radii below were approved by the owner on 2026-10-19.
+Stage 2 implementation is authorized. Worker execution still requires measured
+evidence, and station/deployable integration remains open under stages 3 and 4.
+
+The binding in S9 makes the one player observer explicit before any
+facts commit. Switching the request principal cannot reveal another principal's
+history. This binding changes presentation admission only; it grants no actor
+control or gameplay permission. A new-game loader must resolve both the player
+principal and player command source before creating the session.
+
+For initial content, `sensorRadiusMeters` is **10,000 meters**
+for both `galaxy-command.core:starter-ship` and
+`galaxy-command.preview:preview-courier`. This is the approved initial tuning
+value. All programmatic ship definitions must
+also supply an explicit radius, including zero when intentional. No runtime
+equipment contribution is introduced. Later balance changes remain explicit content changes.
+
+The safe notice envelope contains source sequence, event time, and
+its approved typed notice. It contains no raw `GameFactCause`. Owned-asset
+payloads preserve their already approved detail, while non-owned ship payloads
+use only the externally observable fields in S3. Relationship payloads retain
+their existing observer boundary. Each notice's eligibility and safe payload
+are captured at commit and retained with the same bounded lifetime as its
+source fact. Later queries do not inspect current positions to decide past
+eligibility. The approved existing-fact mapping is:
+
+| Authoritative fact kind | Player disclosure and payload |
+| --- | --- |
+| `CommandAcceptedFact`, `CommandRejectedFact` | Only for the exact configured player command source. Expose command sequence/kind and rejection code when present, without the raw causal envelope. Autonomous, script, and dialogue command receipts stay private; their owned-asset effects have independent notices. |
+| `ShipOrderTransitionFact` | Owned subjects only, retaining their approved order details. Being in sensor range does not disclose another ship's orders. |
+| `ShipLocalMotionStartedFact`, `ShipLocalMotionEndedFact` | Owned subjects retain approved detail. Covered non-owned subjects receive only a motion-changed notice with ship identity and committed position, without segment, destination, order, or private end reason. |
+| `ShipWaypointArrivedFact` | Owned subjects only. A waypoint is order intent, so range alone does not disclose it. |
+| `ShipCruiseEnteredFact`, `ShipCruiseDroppedOutFact` | Owned subjects retain approved detail. Covered non-owned subjects receive a motion-changed notice with ship identity and committed position, without order or motion identity. |
+| `ShipConnectorTransitStartedFact` | Owned subjects retain approved detail. A non-owned departure is observable only if its authoritative origin is inside committed player coverage; disclose departure identity/position without transit destination, duration, or order. |
+| `ShipConnectorTransitCompletedFact` | Owned subjects retain approved detail. A non-owned arrival is observable only if its emergence position is covered; disclose arrival identity/position without prior origin, transit itinerary, or order. |
+| `EntityMaterializedFact` | Owned assets are disclosed. Covered non-owned assets receive appearance identity, owning principal, design, and initial position, without private materialization source details. |
+| `EntityRemovedFact` | Prior owned assets are disclosed with approved removal detail. A non-owned removal is observable at its committed removal position under current coverage; disclose disappearance identity/position without reason, cargo disposition, or responsible party. Retain prior ownership and position in the commit input because the entity is already absent afterward. |
+| `StandingChangedFact` | Retain the existing rule: only changes whose subject principal is the observer. |
+| `DiplomaticConditionChangedFact` | Explicitly public under the existing relationship contract. |
+| `RelationshipGrantIssuedFact`, `RelationshipGrantRevokedFact` | Only for the grant holder matching the observer. Resolve and retain the holder at commit, including revocation, without consulting later grant state. |
+
+All spatial anchors above are owner-supplied authoritative boundary positions.
+Coverage uses the completed boundary source set, with owned-subject eligibility
+retained even when removal or transit eliminates its coverage contribution.
+S3 applies to every selection, focus, map, inspector, and application read path;
+sanitizing just the map leaves an information leak. Notice projection cannot
+forward a private cause through nested payloads or application diagnostics.
+
+Stage 2 must prove delayed-read and restore equivalence for both eligibility
+and payload, including a source leaving coverage, an observed subject being
+removed, a grant being revoked, and a hidden event followed by later discovery.
+Persistent structure records and real station/deployable adapters remain
+stages 3 and 4. These ship contracts do not close those stages.
+
+
+### Stage 2 implementation boundary
+
+The session reuses the relationship owner's registered player principal and
+requires an explicit `PlayerCommandSource` in every setup constructor. Static
+scenario content now supplies `playerCommandSource`; the Godot client consumes
+that binding. `ShipDesign.SensorRadiusUnits` and its runtime-policy checkpoint
+carry the explicit definition radius. Content document schema 3 requires the
+new fields; package manifest schema remains 1. Save schema 2 reserves the new
+observation state, and observation behavior version 1 names its policy.
+Missing historical radii or disclosure history are rejected rather than filled
+with guessed values. Navigation and maneuver behavior versions are unchanged.
+
+`GameObservedShipSnapshot` is the only ship type in player world, selection,
+and focus results. Its `OwnedDetail` contains the existing detailed ship view
+only for owned assets. Covered non-owned ships receive current identity and
+kinematics; hidden and removed selection IDs both resolve as unavailable.
+Godot draws routes only from owned detail and uses no diagnostic world/fact
+read to fill an external contact. Command outcomes show approved rejection
+codes without forwarding internal diagnostic reasons.
+
+Authoritative facts retain their source sequence and cause. The presentation
+path returns separate `GamePresentationFactEnvelope` values without a cause.
+A bounded receipt beside each source fact freezes its observer, historical
+subject ownership, eligibility, and approved payload. Direct operations join
+at their completed boundary; scheduled work joins only after the engine closes
+all phases at that timestamp. Fact queries never grant retrospective disclosure.
+Receipt preparation finishes before owner publication, and receipts are evicted
+with the source ring rather than retained in a second history.
+
+Disclosure evaluation copies only the unjoined retained suffix. Ownership-only
+policies use captured pending-subject ownership; other policies prepare one
+stable world/source view for that boundary. This avoids rebuilding full sensor
+geometry for each owned-asset command while preserving the same policy and
+receipt shape. Restore validates the binding, policy version, retained receipt
+coverage, historical ownership consistency, and safe source-to-notice mapping.
+Current sensor geometry is rebuilt from restored authority.
+
+The persistence proof is the current internal whole-session checkpoint boundary.
+General encoded saved-session admission remains unavailable under `TASK-037`,
+as it was before this work; stage 2 does not bypass catalog compatibility or
+claim a newly supported user save/load flow. Persistent discoveries and real
+station/deployable integration remain stages 3 and 4.
+
+
+### Stage 2 validation and remaining scope
+
+On 2026-10-19, all 1,467 solution tests passed in Debug and Release. The Release
+solution build had zero warnings/errors, and the Godot development preview
+started successfully in a headless smoke run with an isolated temporary log.
+This validates startup and adapter admission, not a visual layout review.
+Focused tests cover every existing spatial fact mapping, exact command-source
+binding, private order/waypoint exclusion, hidden history, delayed disclosure,
+owned and non-owned removal, grant revocation, bounded retention/cursors,
+malformed receipt rejection, and uninterrupted/restored continuation. Simultaneous
+emergence is tested in both event orders, and the engine join is tested after
+all same-time phases and follow-up work drain.
+
+Canonical `spatial.many-quiet`, `spatial.one-crowded`,
+`facts.retention-and-read`, and `maneuver.repeated-replanning` benchmarks pass.
+`navigation.connector-volume` produces `88e79d6112f53750` against registered
+`673c9af7f54a80e4` in both this worktree and an independently built, untouched
+`1a5a3d1` HEAD snapshot. The existing mismatch remains visible under `TASK-104`;
+its expectation was not changed by observation work.
+
+A separate 500-ship crowded check used two measured iterations and no warmup
+before and after limiting disclosure work to pending subjects. Its digest
+stayed `fb698bab6e5c0f4d`; median allocation fell from 504,336,064 to 7,716,980
+bytes, with informational median times of 438.512 and 71.090 milliseconds on
+this host. These figures compare two implementations within stage 2, not the
+repository's prior release, and do not establish a timing gate or worker-scaling
+claim. Sensor evaluation remains on the serial reference path.
+
+Persistent discoveries, stale/refresh/absence state, and real station/deployable
+source and target adapters remain unimplemented stages 3 and 4. `TASK-057` owns
+station design, `TASK-105` owns its approved runtime implementation, and
+`TASK-095` owns deployables. Full `TASK-073` completion remains open until those
+owners supply the concrete inputs required by its accepted proof.
+
 ## Decisions at a glance
 
 | Question | Decision |

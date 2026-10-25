@@ -26,7 +26,7 @@ public sealed class GameSessionRandomSetupTests
             [],
             GameSessionTestFixture.Relationships,
             seed,
-            factRetentionCapacity: 1);
+            factRetentionCapacity: 1, playerCommandSource: GameSessionTestFixture.Player);
 
         Assert.Same(seed, setup.RandomRootSeed);
     }
@@ -40,7 +40,7 @@ public sealed class GameSessionRandomSetupTests
                 [],
                 GameSessionTestFixture.Relationships,
                 null!,
-                factRetentionCapacity: 1));
+                factRetentionCapacity: 1, playerCommandSource: GameSessionTestFixture.Player));
 
         Assert.Equal("randomRootSeed", error.ParamName);
     }
@@ -56,7 +56,7 @@ public sealed class GameSessionRandomSetupTests
             [],
             GameSessionTestFixture.Relationships,
             RandomRootSeed.FromBytes(bytes),
-            factRetentionCapacity: 64);
+            factRetentionCapacity: 64, playerCommandSource: GameSessionTestFixture.Player);
         var session = new GameSession(
             setup,
             new DirectLocalNavigationPlanner(
@@ -88,7 +88,7 @@ public sealed class GameSessionRandomSetupTests
             [],
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 64);
+            factRetentionCapacity: 64, playerCommandSource: GameSessionTestFixture.Player);
         var session = new GameSession(
             setup,
             new DirectLocalNavigationPlanner(
@@ -111,7 +111,7 @@ public sealed class GameSessionRandomSetupTests
             [],
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 64);
+            factRetentionCapacity: 64, playerCommandSource: GameSessionTestFixture.Player);
         var session = new GameSession(
             setup,
             new DirectLocalNavigationPlanner(

@@ -110,7 +110,7 @@ public sealed class RelationshipTests
             [ship],
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 256));
+            factRetentionCapacity: 256, playerCommandSource: GameSessionTestFixture.Player));
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public sealed class RelationshipTests
                 [],
                 relationships,
                 GameSessionTestFixture.RootSeed,
-                factRetentionCapacity: 256),
+                factRetentionCapacity: 256, playerCommandSource: GameSessionTestFixture.Player),
             new DirectLocalNavigationPlanner(
                 new GameSessionTestFixture.FixedTravelTimeEstimator()));
 
@@ -839,7 +839,7 @@ public sealed class RelationshipTests
                 [],
                 relationships,
                 GameSessionTestFixture.RootSeed,
-                factRetentionCapacity: 256),
+                factRetentionCapacity: 256, playerCommandSource: GameSessionTestFixture.Player),
             new DirectLocalNavigationPlanner(
                 new GameSessionTestFixture.FixedTravelTimeEstimator()));
     }

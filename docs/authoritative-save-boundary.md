@@ -22,6 +22,14 @@ remain `TASK-022` work.
 
 **Decision status:** Proposed for project-owner review.
 
+`TASK-073` stage 2 adds player-observation continuity to the current internal
+checkpoint: the existing registered player principal, its explicit command
+source, observation behavior version, definition sensor radii, and bounded
+fact-disclosure receipts with historical subject ownership and safe payloads.
+Coverage and geometry are rebuilt after restore. Persistent structure discovery
+records remain open under `TASK-073` stages 3 and 4; this ship boundary does not
+claim station or deployable persistence or enable general encoded save admission.
+
 ## Boundary at a glance
 
 The save boundary contains every value whose absence could change a later

@@ -171,7 +171,8 @@ internal static class RuntimePolicyManifest
                         design.ManeuverCapability.MaximumSubCruiseSpeed,
                         design.ManeuverCapability.CruiseSpeed,
                         design.ManeuverCapability.TurnRate,
-                        design.ManeuverCapability.MovingSpoolDuration)))
+                        design.ManeuverCapability.MovingSpoolDuration),
+                    design.SensorRadiusUnits))
                 .ToArray()));
 
     /// <summary>
@@ -350,7 +351,8 @@ internal static class RuntimePolicyManifest
                     "The maneuver behavior version is unavailable.");
             }
 
-            if (string.IsNullOrWhiteSpace(design.Name)
+            if (design.SensorRadiusUnits is null
+                || string.IsNullOrWhiteSpace(design.Name)
                 || design.Inputs is null
                 || !TryResolveManeuverCapability(
                     design.ManeuverCapability,
@@ -378,7 +380,8 @@ internal static class RuntimePolicyManifest
                 design.Name,
                 new ConstructionRecipe(inputs, design.RequiredWork),
                 design.CargoCapacity,
-                maneuverCapability!));
+                maneuverCapability!,
+                design.SensorRadiusUnits!.Value));
         }
 
         designs.Sort((left, right) => left.Id.Value.CompareTo(right.Id.Value));

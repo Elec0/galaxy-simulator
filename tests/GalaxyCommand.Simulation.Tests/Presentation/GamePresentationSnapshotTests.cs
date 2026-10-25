@@ -25,11 +25,11 @@ public sealed class GamePresentationSnapshotTests
             [GameSessionTestFixture.Ship, secondShip],
             presentation.Selection.ResolvedShips.Select(ship => ship.Id));
         Assert.Empty(presentation.Selection.UnresolvedShipIds);
-        GameShipSnapshot focused = Assert.IsType<GameShipSnapshot>(
+        GameObservedShipSnapshot focused = Assert.IsType<GameObservedShipSnapshot>(
             presentation.Selection.FocusedShip);
         Assert.Equal(secondShip, focused.Id);
-        Assert.Equal(GameSessionTestFixture.PlayerController, focused.Control.BaseController);
-        Assert.Null(focused.CurrentOrder);
+        Assert.Equal(GameSessionTestFixture.PlayerController, focused.OwnedDetail!.Control.BaseController);
+        Assert.Null(focused.OwnedDetail!.CurrentOrder);
     }
 
     [Fact]
@@ -329,7 +329,7 @@ public sealed class GamePresentationSnapshotTests
             ],
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 256);
+            factRetentionCapacity: 256, playerCommandSource: GameSessionTestFixture.Player);
         return new GameSession(
             setup,
             new DirectLocalNavigationPlanner(
@@ -378,7 +378,7 @@ public sealed class GamePresentationSnapshotTests
                 [],
                 relationships,
                 GameSessionTestFixture.RootSeed,
-                factRetentionCapacity: 256),
+                factRetentionCapacity: 256, playerCommandSource: GameSessionTestFixture.Player),
             new DirectLocalNavigationPlanner(
                 new GameSessionTestFixture.FixedTravelTimeEstimator()));
     }
@@ -410,7 +410,7 @@ public sealed class GamePresentationSnapshotTests
         Assert.Equal(CommandResultStatus.Accepted, record.Result.Status);
     }
 
-    private static ShipId GetReferencedShipId(GameFactEnvelope envelope) =>
+    private static ShipId GetReferencedShipId(GamePresentationFactEnvelope envelope) =>
         envelope.Fact switch
         {
             ShipOrderTransitionFact transition => transition.ShipId,

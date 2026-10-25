@@ -960,7 +960,7 @@ public sealed class GameSessionTerminalManeuverTests
                 [design])],
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 64);
+            factRetentionCapacity: 64, playerCommandSource: GameSessionTestFixture.Player);
         return new GameSession(
             setup,
             new DirectLocalNavigationPlanner(
@@ -980,7 +980,7 @@ public sealed class GameSessionTerminalManeuverTests
                 new ManeuverSpeed(30_000),
                 new ManeuverSpeed(1_000_000),
                 new ManeuverTurnRate(45_000),
-                new SimulationDuration(10_000)));
+                new SimulationDuration(10_000)), sensorRadiusUnits: 10_000);
 
     private sealed class TwoLegPlanner : ISpatialNavigationPlanner
     {

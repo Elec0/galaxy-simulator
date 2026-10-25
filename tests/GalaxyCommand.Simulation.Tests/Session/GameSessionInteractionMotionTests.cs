@@ -302,6 +302,6 @@ public sealed class GameSessionInteractionMotionTests
         [new ShipMaterializationPolicy(new FacilityId(1), GameSessionTestFixture.Principal,
             GameSessionTestFixture.Position(0, 0), GameSessionTestFixture.PlayerController,
             InitialShipOrderPolicy.NoInitialOrder, [GameSessionTestFixture.Design])],
-        GameSessionTestFixture.Relationships, GameSessionTestFixture.RootSeed, 256),
+        GameSessionTestFixture.Relationships, GameSessionTestFixture.RootSeed, 256, playerCommandSource: GameSessionTestFixture.Player),
         new DirectLocalNavigationPlanner(new ChebyshevLocalTravelTimeEstimator(100)));
 }

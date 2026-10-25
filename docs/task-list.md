@@ -31,8 +31,51 @@ source of detailed scope and acceptance criteria.
 
 ## Current focus
 
-No task is currently promoted. TASK-071 is complete; deferred work remains in
-its existing horizon until the owner promotes it.
+- [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
+  - Promoted by the project owner on 2026-10-19. The owner selected a staged
+    boundary for review, then implementation of approved stages. The linked
+    design now proposes ship coverage, live ship presentation/disclosure,
+    persistent observation, and full entity integration stages. The owner
+    approved the boundary, stage 1, and then stage 2's live contracts and the
+    proposed 10 km starter-ship and preview-courier radii on 2026-10-19.
+    Station/deployable integration stays open under this task, with
+    prerequisites retaining their existing owners.
+  - Completed stage 1's pure ship coverage evaluator with explicit fixture
+    radii, principal-owned sources, exact geometry, immutable identity sets,
+    and deterministic serial source batches across existing spatial indexes.
+    All 24 coverage cases pass across existing index and batch layouts.
+  - Completed stage 2's explicit sensor definitions and player binding,
+    filtered ship presentation/selection, safe commit-time notices, bounded
+    disclosure receipts, checkpoint/restore validation, and Godot consumption.
+    All 1,467 solution tests and the Release build pass; headless Godot startup
+    passes. Four canonical benchmark presets pass; the connector-navigation
+    mismatch also occurs at untouched HEAD and is tracked by `TASK-104`.
+  - Stages 3 and 4 remain open for persistent discoveries and real station/
+    deployable integration. Station design remains `TASK-057`, station runtime
+    is `TASK-105`, and deployable runtime is `TASK-095`. Do not mark this task
+    complete until those integrations satisfy the full accepted proof.
+  - Implement the accepted `TASK-020` contracts for player-owned ship,
+    station, and deployable sensor coverage, live authoritative contacts,
+    transient ship disappearance, persistent structure discovery, stale
+    last-observed views, refresh, and confirmed absence.
+  - Cover moving-to-moving, moving-to-stationary, stationary-to-moving,
+    overlapping-source, connector-emergence, creation, removal, fact-disclosure,
+    checkpoint, and restore behavior without expanding `TASK-071` with sensor
+    outcome policy.
+  - Retain a single-thread reference path and prove identical results across
+    supported worker, partition, and batch layouts. Do not add NPC fog-of-war,
+    allied sensor sharing, sensor equipment modifiers, stealth, occlusion, or
+    extrapolated moving contacts.
+  - Provide the observer-safe non-player maneuver projection deferred by
+    completed `TASK-090`, using the accepted observation boundary without
+    exposing private authoritative motion state through facts or diagnostics.
+  - Build on completed `TASK-020` and the spatial substrate implemented by
+    `TASK-071`; coordinate station design with `TASK-057` and runtime with
+    `TASK-105`, deployable design with `TASK-074` and runtime with `TASK-095`,
+    equipment contributions with `TASK-068`,
+    and the application surface with `TASK-049`. Do not invent either missing
+    entity domain inside sensor implementation.
+  - Context: [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Presentation snapshots](presentation-snapshots.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 ## Near-term work
 
@@ -78,10 +121,27 @@ its existing horizon until the owner promotes it.
     preference store completed by `TASK-084`, not a separate pacing-only file.
   - Context: [Time and pacing](time-and-pacing.md)
 
-`TASK-073` remains in the near-term parking-lot horizon until the project
-owner promotes it.
-
 ## Future parking lot
+
+- [ ] **TASK-105: Implement the approved station entity runtime**
+  - Begin after `TASK-057` settles station composition and lifecycle design.
+    Implement its approved identity, ownership, creation/removal, observable
+    state, and checkpoint contracts; do not treat existing economic facilities
+    as stations or select missing station policy inside `TASK-073`.
+  - Supply concrete stationary source/target inputs and typed observable views
+    for `TASK-073` stages 3 and 4. Sensor capability and observable fields must
+    come from the approved station design, without inheriting ship tuning.
+  - Context: [Station design ownership](#mid-term) · [Fog-of-war stages](fog-of-war-and-scouting.md#approved-stages-and-completion-boundaries)
+
+- [ ] **TASK-104: Reconcile the connector-navigation benchmark expectation**
+  - The canonical `navigation.connector-volume` fixture produces
+    `88e79d6112f53750` while its registered expectation is `673c9af7f54a80e4`.
+    TASK-073 verification reproduced the same mismatch from an untouched
+    `1a5a3d1` HEAD snapshot on 2026-10-19, independently of observation changes.
+  - Investigate intended fixture behavior and digest coverage before updating
+    the expectation or changing navigation. Preserve this as a visible failing
+    benchmark rather than replacing its expected hash merely to pass.
+  - Context: [Scale and benchmark targets](scale-and-benchmark-targets.md)
 
 - [ ] **TASK-103: Implement combat activation and active-domain continuation**
   - Added when TASK-071 closed on 2026-10-17 to track runtime work not covered
@@ -327,28 +387,6 @@ the project-level **Near-term work** section above.
     semantic failure facts and terminal order state independently of this UI.
   - Context: [Sensor deployables](sensor-deployables.md#execution-and-failure) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md)
 
-- [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
-  - Implement the accepted `TASK-020` contracts for player-owned ship,
-    station, and deployable sensor coverage, live authoritative contacts,
-    transient ship disappearance, persistent structure discovery, stale
-    last-observed views, refresh, and confirmed absence.
-  - Cover moving-to-moving, moving-to-stationary, stationary-to-moving,
-    overlapping-source, connector-emergence, creation, removal, fact-disclosure,
-    checkpoint, and restore behavior without expanding `TASK-071` with sensor
-    outcome policy.
-  - Retain a single-thread reference path and prove identical results across
-    supported worker, partition, and batch layouts. Do not add NPC fog-of-war,
-    allied sensor sharing, sensor equipment modifiers, stealth, occlusion, or
-    extrapolated moving contacts.
-  - Provide the observer-safe non-player maneuver projection deferred by
-    completed `TASK-090`, using the accepted observation boundary without
-    exposing private authoritative motion state through facts or diagnostics.
-  - Build on completed `TASK-020` and the spatial substrate implemented by
-    `TASK-071`; coordinate station participation with `TASK-057`, deployable
-    participation with `TASK-074`, equipment contributions with `TASK-068`,
-    and the application surface with `TASK-049`. Do not invent either missing
-    entity domain inside sensor implementation.
-  - Context: [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Presentation snapshots](presentation-snapshots.md) · [Concurrency and performance](concurrency-and-performance.md)
 
 - [ ] **TASK-032: Define semantic economy facts**
   - Define gameplay-facing production, construction, and logistics lifecycle
@@ -628,6 +666,8 @@ the project-level **Near-term work** section above.
     interruption or removal, and join commands, facts, snapshots, and saves.
   - Station refit/reclamation service design is tracked in `TASK-097`, using
     the shared equipment vocabulary without putting station details in `TASK-068`.
+    Runtime implementation of the approved entity contract is tracked by
+    `TASK-105`; this task retains station design ownership.
   - Begin after `TASK-068` defines installed equipment; completed `TASK-063`
     supplies content catalogs. Coordinate docking with `TASK-051`, territory with
     `TASK-059`, and strategic construction with `TASK-026`.

@@ -8,24 +8,29 @@ public sealed class ShipDesign : ConstructionDesign
 {
     /// <summary>
     /// Creates a constructible ship definition with explicit cargo and
-    /// maneuver capability; callers cannot rely on hidden movement defaults.
+    /// maneuver capability and sensor radius in meters. Zero radius covers
+    /// only the ship's exact local position; no capability default is inferred.
     /// </summary>
     public ShipDesign(
         ConstructionDesignId id,
         string name,
         ConstructionRecipe recipe,
         Quantity cargoCapacity,
-        ShipManeuverCapability maneuverCapability)
+        ShipManeuverCapability maneuverCapability,
+        ulong sensorRadiusUnits)
         : base(id, name, recipe)
     {
         ArgumentNullException.ThrowIfNull(maneuverCapability);
         CargoCapacity = cargoCapacity;
         ManeuverCapability = maneuverCapability;
+        SensorRadiusUnits = sensorRadiusUnits;
     }
 
     public Quantity CargoCapacity { get; }
 
     public ShipManeuverCapability ManeuverCapability { get; }
+
+    public ulong SensorRadiusUnits { get; }
 }
 
 public sealed record Ship(

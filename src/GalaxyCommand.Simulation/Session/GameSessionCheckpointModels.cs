@@ -29,5 +29,6 @@ internal sealed record GameSessionCheckpoint(
     GameFactStoreCheckpoint Facts,
     CommandAdmissionCheckpoint CommandAdmission,
     InventoryCommitOwnerCheckpoint? InventoryCommit = null,
-    SpatialInteractionRegistrationCheckpoint? SpatialInteractions = null);
+    SpatialInteractionRegistrationCheckpoint? SpatialInteractions = null,
+    PlayerObservationCheckpoint? PlayerObservation = null);
 

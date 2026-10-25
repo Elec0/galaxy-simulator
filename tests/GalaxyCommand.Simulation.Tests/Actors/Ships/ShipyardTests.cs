@@ -20,7 +20,7 @@ public sealed class ShipyardTests
                 [new KeyValuePair<MaterialId, Quantity>(materialId, new Quantity(4))],
                 new Work(4)),
             new Quantity(7),
-            GameSessionTestFixture.ManeuverCapability);
+            GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000);
         var constructionInventory = new Inventory(inventoryId, new Quantity(10));
         constructionInventory.Add(materialId, new Quantity(4));
         var inventories = new InventoryRegistry();
@@ -84,13 +84,13 @@ public sealed class ShipyardTests
             "Small Freighter",
             new ConstructionRecipe([], new Work(1)),
             new Quantity(3),
-            GameSessionTestFixture.ManeuverCapability);
+            GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000);
         var large = new ShipDesign(
             designIds.Allocate(),
             "Large Freighter",
             new ConstructionRecipe([], new Work(1)),
             new Quantity(9),
-            GameSessionTestFixture.ManeuverCapability);
+            GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000);
         ConstructionOrderId smallOrder = shipyard.Enqueue(constructionIds, small);
         ConstructionOrderId largeOrder = shipyard.Enqueue(constructionIds, large);
         var reservationIds = new IdSequence<ReservationId>();

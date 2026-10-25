@@ -117,7 +117,7 @@ public partial class GalaxyMap : Control
 		}
 		else
 		{
-			GameShipSnapshot? focused = FocusedShipId is { } focusedId
+			GameObservedShipSnapshot? focused = FocusedShipId is { } focusedId
 				? _snapshot?.Ships.FirstOrDefault(ship => ship.Id == focusedId)
 				: null;
 			_systemCamera = focused?.Position is { } position && position.SystemId == _systemContext
@@ -261,7 +261,7 @@ public partial class GalaxyMap : Control
 			DrawString(ThemeDB.FallbackFont, position + new Vector2(10, -8), $"C{endpoint.Id.Value}", fontSize: 11, modulate: new Color("d9b9ef"));
 		}
 
-		foreach (GameShipSnapshot ship in _snapshot.Ships.Where(ship => ship.Position?.SystemId == system.Id))
+		foreach (GameObservedShipSnapshot ship in _snapshot.Ships.Where(ship => ship.Position?.SystemId == system.Id))
 		{
 			if (ship.Position is not { } systemPosition)
 			{
@@ -269,8 +269,8 @@ public partial class GalaxyMap : Control
 			}
 
 			Vector2 position = ToSystemView(systemPosition.Position);
-			if (ShouldDrawRoute(ship.CurrentOrder)
-				&& ship.CurrentOrder!.Destination is NavigationDestination.Position destination
+			if (ShouldDrawRoute(ship.OwnedDetail?.CurrentOrder)
+				&& ship.OwnedDetail!.CurrentOrder!.Destination is NavigationDestination.Position destination
 				&& destination.Value.SystemId == system.Id)
 			{
 				Vector2 target = ToSystemView(destination.Value.Position);
@@ -327,7 +327,7 @@ public partial class GalaxyMap : Control
 			return;
 		}
 
-		GameShipSnapshot? hit = _snapshot!.Ships.Where(ship => ship.Position?.SystemId == system.Id).OrderBy(ship => ship.Id.Value).FirstOrDefault(ship => ship.Position is { } position && ToSystemView(position.Position).DistanceTo(mouse.Position) <= ShipHitRadius);
+		GameObservedShipSnapshot? hit = _snapshot!.Ships.Where(ship => ship.Position?.SystemId == system.Id).OrderBy(ship => ship.Id.Value).FirstOrDefault(ship => ship.Position is { } position && ToSystemView(position.Position).DistanceTo(mouse.Position) <= ShipHitRadius);
 		if (hit is not null)
 		{
 			if (mouse.ShiftPressed)

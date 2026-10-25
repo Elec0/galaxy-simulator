@@ -173,8 +173,8 @@ public static class StaticNewGameLoader
             scenario.Values.Properties.ContainsKey("connectorEndpoints")
             || scenario.Values.Properties.ContainsKey("transitConnections");
         string[] scenarioProperties = declaresConnectorTopology
-            ? ["connectorEndpoints", "galaxyLayout", "playerPrincipal", "ships", "standingPolicy", "systems", "transitConnections"]
-            : ["galaxyLayout", "playerPrincipal", "ships", "standingPolicy", "systems"];
+            ? ["connectorEndpoints", "galaxyLayout", "playerCommandSource", "playerPrincipal", "ships", "standingPolicy", "systems", "transitConnections"]
+            : ["galaxyLayout", "playerCommandSource", "playerPrincipal", "ships", "standingPolicy", "systems"];
         if (!TryObjectProperties(
                 scenario.Values,
                 scenarioProperties,
@@ -235,7 +235,9 @@ public static class StaticNewGameLoader
             principals,
             designs,
             diagnostics);
-        if (standingPolicy is null || connectorTopology is null || diagnostics.Count > 0)
+        if (!TryString(scenario.Values, "playerCommandSource", source, "$scenario.values.playerCommandSource",
+                diagnostics, out string? playerCommandSource)
+            || standingPolicy is null || connectorTopology is null || diagnostics.Count > 0)
         {
             return null;
         }
@@ -252,7 +254,8 @@ public static class StaticNewGameLoader
                     standingPolicy,
                     []),
                 randomRootSeed,
-                factRetentionCapacity);
+                factRetentionCapacity,
+                new CommandSource(CommandSourceKind.Player, new CommandSourceId(playerCommandSource!)));
         }
         catch (Exception exception) when (exception is ArgumentException or OverflowException)
         {
@@ -331,6 +334,7 @@ public static class StaticNewGameLoader
                     diagnostics)
                 || !TryUInt64(definition!.Values, "cargoCapacity", key.ToString(), "$definition.values.cargoCapacity", diagnostics, out ulong capacity)
                 || !TryUInt64(definition.Values, "requiredWork", key.ToString(), "$definition.values.requiredWork", diagnostics, out ulong work)
+                || !TryUInt64(definition.Values, "sensorRadiusMeters", key.ToString(), "$definition.values.sensorRadiusMeters", diagnostics, out ulong sensorRadius)
                 || !TryComposeManeuverCapability(
                     definition.Values,
                     key.ToString(),
@@ -349,7 +353,8 @@ public static class StaticNewGameLoader
                     definition.InvariantFallback,
                     new ConstructionRecipe([], new Work(work)),
                     new Quantity(capacity),
-                    maneuverCapability!));
+                    maneuverCapability!,
+                    sensorRadius));
         }
 
         return designs;
@@ -373,6 +378,7 @@ public static class StaticNewGameLoader
             "maximumSubCruiseSpeedMetersPerSecond",
             "movingSpoolDurationMilliseconds",
             "requiredWork",
+            "sensorRadiusMeters",
             "turnRateDegreesPerSecond",
         ];
         string[] properties = value?.Properties.ContainsKey(

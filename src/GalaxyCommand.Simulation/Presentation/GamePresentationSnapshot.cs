@@ -75,14 +75,14 @@ public sealed record GamePresentationRequest
 /// </summary>
 public sealed record GamePresentationWorldSnapshot
 {
-    internal GamePresentationWorldSnapshot(GameSnapshot world)
+    internal GamePresentationWorldSnapshot(GameSnapshot world, IReadOnlyList<GameObservedShipSnapshot> ships)
     {
         ArgumentNullException.ThrowIfNull(world);
         Time = world.Time;
         Systems = world.Systems;
         ConnectorEndpoints = world.ConnectorEndpoints;
         TransitConnections = world.TransitConnections;
-        Ships = world.Ships;
+        Ships = ships;
     }
 
     public SimulationTime Time { get; }
@@ -93,7 +93,7 @@ public sealed record GamePresentationWorldSnapshot
 
     public IReadOnlyList<TransitConnectionSnapshot> TransitConnections { get; }
 
-    public IReadOnlyList<GameShipSnapshot> Ships { get; }
+    public IReadOnlyList<GameObservedShipSnapshot> Ships { get; }
 }
 
 /// <summary>
@@ -153,9 +153,9 @@ public sealed record GamePresentationSelection
 {
     internal GamePresentationSelection(
         IReadOnlyList<ShipId> requestedShipIds,
-        IReadOnlyList<GameShipSnapshot> resolvedShips,
+        IReadOnlyList<GameObservedShipSnapshot> resolvedShips,
         IReadOnlyList<ShipId> unresolvedShipIds,
-        GameShipSnapshot? focusedShip)
+        GameObservedShipSnapshot? focusedShip)
     {
         ArgumentNullException.ThrowIfNull(requestedShipIds);
         ArgumentNullException.ThrowIfNull(resolvedShips);
@@ -168,11 +168,11 @@ public sealed record GamePresentationSelection
 
     public IReadOnlyList<ShipId> RequestedShipIds { get; }
 
-    public IReadOnlyList<GameShipSnapshot> ResolvedShips { get; }
+    public IReadOnlyList<GameObservedShipSnapshot> ResolvedShips { get; }
 
     public IReadOnlyList<ShipId> UnresolvedShipIds { get; }
 
-    public GameShipSnapshot? FocusedShip { get; }
+    public GameObservedShipSnapshot? FocusedShip { get; }
 }
 
 /// <summary>
@@ -185,8 +185,8 @@ public sealed record GamePresentationSnapshot
         GamePresentationWorldSnapshot world,
         RelationshipPresentationSnapshot relationships,
         GamePresentationSelection selection,
-        GameFactReadResult facts,
-        IReadOnlyList<GameFactEnvelope> selectedShipFacts,
+        GamePresentationFactReadResult facts,
+        IReadOnlyList<GamePresentationFactEnvelope> selectedShipFacts,
         GameFactSequence? nextFactCursor)
     {
         ArgumentNullException.ThrowIfNull(world);
@@ -208,9 +208,9 @@ public sealed record GamePresentationSnapshot
 
     public GamePresentationSelection Selection { get; }
 
-    public GameFactReadResult Facts { get; }
+    public GamePresentationFactReadResult Facts { get; }
 
-    public IReadOnlyList<GameFactEnvelope> SelectedShipFacts { get; }
+    public IReadOnlyList<GamePresentationFactEnvelope> SelectedShipFacts { get; }
 
     /// <summary>
     /// Cursor after all source facts inspected for this observer-scoped read,
@@ -228,18 +228,25 @@ internal static class GamePresentationSnapshotFactory
     internal static GamePresentationSnapshot Create(
         GameSnapshot world,
         GamePresentationRequest request,
-        GameFactReadResult facts)
+        GameFactReadResult facts,
+        ShipSensorCoverageSnapshot coverage)
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(facts);
 
-        var shipsById = world.Ships.ToDictionary(ship => ship.Id);
-        var resolvedShips = new List<GameShipSnapshot>();
+        var visible = new HashSet<ShipId>(coverage.VisibleShipIds);
+        IReadOnlyList<GameObservedShipSnapshot> ships = GameSnapshotCollection.Copy(world.Ships
+            .Where(ship => visible.Contains(ship.Id))
+            .Select(ship => new GameObservedShipSnapshot(ship.EntityId, ship.Id, ship.PrincipalId,
+                ship.DesignId, ship.Position, ship.Velocity, ship.Heading,
+                ship.PrincipalId == request.ObserverPrincipalId ? ship : null)));
+        var shipsById = ships.ToDictionary(ship => ship.Id);
+        var resolvedShips = new List<GameObservedShipSnapshot>();
         var unresolvedShipIds = new List<ShipId>();
         foreach (ShipId shipId in request.SelectedShipIds)
         {
-            if (shipsById.TryGetValue(shipId, out GameShipSnapshot? ship))
+            if (shipsById.TryGetValue(shipId, out GameObservedShipSnapshot? ship))
             {
                 resolvedShips.Add(ship);
             }
@@ -249,22 +256,18 @@ internal static class GamePresentationSnapshotFactory
             }
         }
 
-        GameShipSnapshot? focusedShip = request.FocusedShipId is { } focused
-            && shipsById.TryGetValue(focused, out GameShipSnapshot? resolvedFocusedShip)
+        GameObservedShipSnapshot? focusedShip = request.FocusedShipId is { } focused
+            && shipsById.TryGetValue(focused, out GameObservedShipSnapshot? resolvedFocusedShip)
                 ? resolvedFocusedShip
                 : null;
-        IReadOnlyList<GameFactEnvelope> visibleFacts = GameSnapshotCollection.Copy(
-            facts.Facts.Where(fact => IsVisibleToObserver(
-                fact.Fact,
-                world.Relationships,
-                request.ObserverPrincipalId)));
-        var scopedFacts = new GameFactReadResult(
-            visibleFacts,
-            facts.OldestRetainedSequence,
-            facts.NewestCommittedSequence,
-            facts.CursorGap);
+        IReadOnlyList<GamePresentationFactEnvelope> visibleFacts = GameSnapshotCollection.Copy(
+            facts.Facts.Where(fact => fact.PlayerDisclosure?.ObserverPrincipalId == request.ObserverPrincipalId
+                && fact.PlayerDisclosure.Fact is not null)
+                .Select(fact => new GamePresentationFactEnvelope(fact.Sequence, fact.Timestamp, fact.PlayerDisclosure!.Fact!)));
+        var scopedFacts = new GamePresentationFactReadResult(
+            visibleFacts, facts.OldestRetainedSequence, facts.NewestCommittedSequence, facts.CursorGap);
         var selectedIds = new HashSet<ShipId>(request.SelectedShipIds);
-        IReadOnlyList<GameFactEnvelope> selectedShipFacts =
+        IReadOnlyList<GamePresentationFactEnvelope> selectedShipFacts =
             GameSnapshotCollection.Copy(visibleFacts.Where(fact =>
                 ReferencesSelectedShip(fact.Fact, selectedIds)));
         GameFactSequence? nextFactCursor = facts.Facts.Count > 0
@@ -272,7 +275,7 @@ internal static class GamePresentationSnapshotFactory
             : request.FactCursor;
 
         return new GamePresentationSnapshot(
-            new GamePresentationWorldSnapshot(world),
+            new GamePresentationWorldSnapshot(world, ships),
             CreateRelationshipPresentation(
                 world.Relationships,
                 request.ObserverPrincipalId),
@@ -284,29 +287,6 @@ internal static class GamePresentationSnapshotFactory
             scopedFacts,
             selectedShipFacts,
             nextFactCursor);
-    }
-
-    /// <summary>
-    /// Applies the initial relationship information boundary while preserving
-    /// non-relational facts and public diplomacy facts.
-    /// </summary>
-    private static bool IsVisibleToObserver(
-        GameFact fact,
-        RelationshipSnapshot relationships,
-        PrincipalId observerPrincipalId)
-    {
-        ArgumentNullException.ThrowIfNull(fact);
-        return fact switch
-        {
-            StandingChangedFact standing =>
-                standing.SubjectPrincipalId == observerPrincipalId,
-            DiplomaticConditionChangedFact => true,
-            RelationshipGrantIssuedFact grant =>
-                grant.HolderPrincipalId == observerPrincipalId,
-            RelationshipGrantRevokedFact grant => relationships.Grants.Any(value =>
-                value.Id == grant.Id && value.HolderPrincipalId == observerPrincipalId),
-            _ => true,
-        };
     }
 
     /// <summary>
@@ -351,11 +331,12 @@ internal static class GamePresentationSnapshotFactory
     /// Resolves the ship identity carried by fact kinds that participate in
     /// selected-ship presentation filtering.
     /// </summary>
-    private static ShipId? GetShipId(GameFact fact)
+    internal static ShipId? GetShipId(GameFact fact)
     {
         ArgumentNullException.ThrowIfNull(fact);
         return fact switch
         {
+            ObservedShipChangeFact observation => observation.ShipId,
             ShipOrderTransitionFact transition => transition.ShipId,
             ShipLocalMotionStartedFact started => started.ShipId,
             ShipLocalMotionEndedFact ended => ended.ShipId,

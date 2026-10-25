@@ -7,7 +7,7 @@ namespace GalaxyCommand.Simulation;
 internal static class SaveFormat
 {
     internal const string Discriminator = "galaxy-command-save";
-    internal const int CurrentSchemaVersion = 1;
+    internal const int CurrentSchemaVersion = 2;
 }
 
 internal enum SaveFormatFailureKind

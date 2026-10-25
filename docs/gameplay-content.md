@@ -25,6 +25,15 @@ startup integration. `TASK-037` owns save compatibility and saved-reference
 migration. Embedded save-policy definitions have not yet migrated to this
 content boundary.
 
+`TASK-073` stage 2 uses content document schema 3 for definitions and scenarios;
+package manifests remain schema 1. Each ship definition requires an exact
+unsigned integral `sensorRadiusMeters`, with zero covering only the source
+position. Static scenarios require an explicit `playerCommandSource` alongside
+`playerPrincipal`; actor control and asset ownership remain independent. The
+built-in starter ship and development preview courier use the owner-approved
+10,000-meter radius. Missing older capabilities are rejected rather than given
+implicit defaults; historical content/save compatibility remains `TASK-037`.
+
 ## Decisions at a glance
 
 | Question | Decision |

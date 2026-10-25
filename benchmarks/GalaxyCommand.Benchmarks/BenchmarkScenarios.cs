@@ -72,7 +72,7 @@ internal sealed class SpatialBenchmarkScenario : IBenchmarkScenario
                 ships,
                 ScenarioSetup.Relationships,
                 ScenarioSetup.RootSeed,
-                configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity)),
+                configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity), playerCommandSource: new CommandSource(CommandSourceKind.Player, new CommandSourceId("benchmark-player"))),
             new DirectLocalNavigationPlanner(
                 new FixedTravelTimeEstimator(travelDuration)));
         CommandSource source = ScenarioSetup.AutonomousSource;
@@ -120,7 +120,7 @@ internal sealed class ConnectorNavigationBenchmarkScenario : IBenchmarkScenario
                 topology,
                 ScenarioSetup.Relationships,
                 ScenarioSetup.RootSeed,
-                configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity)),
+                configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity), playerCommandSource: new CommandSource(CommandSourceKind.Player, new CommandSourceId("benchmark-player"))),
             new HierarchicalNavigationPlanner(
                 topology,
                 new FixedTravelTimeEstimator(duration)));
@@ -186,7 +186,7 @@ internal sealed class FactBenchmarkScenario : IBenchmarkScenario
                 ships,
                 ScenarioSetup.Relationships,
                 ScenarioSetup.RootSeed,
-                configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity)),
+                configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity), playerCommandSource: new CommandSource(CommandSourceKind.Player, new CommandSourceId("benchmark-player"))),
             new DirectLocalNavigationPlanner(
                 new FixedTravelTimeEstimator(duration)));
         int commandCount = configuration.GetInt32(BenchmarkParameterNames.CommandCount);
@@ -242,7 +242,7 @@ internal sealed class ManeuverRepeatedReplanningBenchmarkScenario
                 ScenarioSetup.Relationships,
                 ScenarioSetup.RootSeed,
                 configuration.GetInt32(
-                    BenchmarkParameterNames.FactRetentionCapacity)),
+                    BenchmarkParameterNames.FactRetentionCapacity), playerCommandSource: new CommandSource(CommandSourceKind.Player, new CommandSourceId("benchmark-player"))),
             new DirectLocalNavigationPlanner(
                 new FixedTravelTimeEstimator(routeDuration)));
 
@@ -324,7 +324,7 @@ internal static class ScenarioSetup
             ManeuverSpeed.ParseMetersPerSecond("300"),
             ManeuverSpeed.ParseMetersPerSecond("1000"),
             ManeuverTurnRate.ParseDegreesPerSecond("45"),
-            new SimulationDuration(10_000)));
+            new SimulationDuration(10_000)), sensorRadiusUnits: 10_000);
 
     internal static CommandSource AutonomousSource { get; } =
         new(CommandSourceKind.Autonomous, BenchmarkSourceId);

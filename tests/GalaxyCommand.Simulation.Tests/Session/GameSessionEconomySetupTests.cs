@@ -102,7 +102,7 @@ public sealed class GameSessionEconomySetupTests
                 economy,
                 GameSessionTestFixture.Relationships,
                 GameSessionTestFixture.RootSeed,
-                factRetentionCapacity: 16));
+                factRetentionCapacity: 16, playerCommandSource: GameSessionTestFixture.Player));
 
         Assert.Contains("controlling principal", error.Message);
     }
@@ -119,7 +119,7 @@ public sealed class GameSessionEconomySetupTests
             economy,
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 16);
+            factRetentionCapacity: 16, playerCommandSource: GameSessionTestFixture.Player);
 
         Assert.Same(economy, setup.Economy);
         EconomyFacilitySetup facility = Assert.Single(economy.Facilities);
@@ -141,7 +141,7 @@ public sealed class GameSessionEconomySetupTests
             CreateEconomySeed(),
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 16));
+            factRetentionCapacity: 16, playerCommandSource: GameSessionTestFixture.Player));
 
         Assert.Contains("materialization policy", error.Message);
     }
@@ -157,7 +157,7 @@ public sealed class GameSessionEconomySetupTests
             CreateEconomySeed(),
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 16);
+            factRetentionCapacity: 16, playerCommandSource: GameSessionTestFixture.Player);
         var session = new GameSession(
             setup,
             new DirectLocalNavigationPlanner(new GameSessionTestFixture.FixedTravelTimeEstimator()));
@@ -262,7 +262,7 @@ public sealed class GameSessionEconomySetupTests
             economy,
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 16);
+            factRetentionCapacity: 16, playerCommandSource: GameSessionTestFixture.Player);
         var session = new GameSession(
             setup,
             new DirectLocalNavigationPlanner(new GameSessionTestFixture.FixedTravelTimeEstimator()));
@@ -294,7 +294,7 @@ public sealed class GameSessionEconomySetupTests
                 [new KeyValuePair<MaterialId, Quantity>(material, new Quantity(1))],
                 new Work(1)),
             new Quantity(10),
-            GameSessionTestFixture.ManeuverCapability);
+            GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000);
         var setup = new GameSessionSetup(
             [new StarSystem(GameSessionTestFixture.System, "Test System")],
             [CreateInitialShip()],
@@ -309,7 +309,7 @@ public sealed class GameSessionEconomySetupTests
             CreateTransportEconomySeed(material, design),
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 16);
+            factRetentionCapacity: 16, playerCommandSource: GameSessionTestFixture.Player);
         var session = new GameSession(
             setup,
             new DirectLocalNavigationPlanner(new GameSessionTestFixture.FixedTravelTimeEstimator()));

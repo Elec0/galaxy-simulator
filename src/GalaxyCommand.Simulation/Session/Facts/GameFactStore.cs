@@ -27,6 +27,8 @@ public sealed record GameFactEnvelope
     public GameFactCause Cause { get; }
 
     public GameFact Fact { get; }
+
+    internal PlayerFactDisclosure? PlayerDisclosure { get; init; }
 }
 
 /// <summary>
@@ -107,6 +109,42 @@ internal sealed class GameFactStore
     private int _start;
     private int _count;
     private ulong? _nextSequence = 1;
+    private ulong? _firstPendingPlayerDisclosure;
+
+    internal bool HasPendingPlayerDisclosure => _firstPendingPlayerDisclosure is not null;
+
+    /// <summary>Copies only the unjoined retained suffix, excluding evicted facts and completed receipts.</summary>
+    internal IReadOnlyList<GameFactEnvelope> CapturePendingPlayerDisclosure()
+    {
+        if (_firstPendingPlayerDisclosure is not { } first || _count == 0) return [];
+        ulong oldest = GetAt(0).Sequence.Value;
+        int start = first <= oldest ? 0 : checked((int)(first - oldest));
+        var pending = new GameFactEnvelope[_count - start];
+        for (int index = start; index < _count; index++) pending[index - start] = GetAt(index);
+        return Array.AsReadOnly(pending);
+    }
+
+    /// <summary>
+    /// Freezes pending player disclosure only at an owner-completed boundary.
+    /// Preparation precedes publication; ring eviction bounds both raw facts
+    /// and their disclosure receipts without a separate unbounded history.
+    /// </summary>
+    internal void CompletePlayerDisclosure(Func<GameFactEnvelope, PlayerFactDisclosure> project)
+    {
+        if (_firstPendingPlayerDisclosure is null) return;
+        var replacements = new List<(int Index, GameFactEnvelope Fact)>();
+        ulong oldest = GetAt(0).Sequence.Value;
+        int start = _firstPendingPlayerDisclosure.Value <= oldest ? 0 : checked((int)(_firstPendingPlayerDisclosure.Value - oldest));
+        for (int index = start; index < _count; index++)
+        {
+            GameFactEnvelope fact = GetAt(index);
+            if (fact.PlayerDisclosure is null)
+                replacements.Add((index, fact with { PlayerDisclosure = project(fact) }));
+        }
+        foreach (var replacement in replacements)
+            _retained[(_start + replacement.Index) % _retained.Length] = replacement.Fact;
+        _firstPendingPlayerDisclosure = null;
+    }
 
     internal GameFactStore(int capacity)
     {
@@ -337,6 +375,7 @@ internal sealed class GameFactStore
 
     private void Append(GameFactEnvelope fact)
     {
+        if (fact.PlayerDisclosure is null) _firstPendingPlayerDisclosure ??= fact.Sequence.Value;
         if (_count < _retained.Length)
         {
             int destination = (_start + _count) % _retained.Length;

@@ -1,6 +1,6 @@
 {
   "format": "galaxy-command-content-definitions",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "definitions": [
     {
       "kind": "principal",
@@ -22,6 +22,7 @@
         "maximumSubCruiseSpeedMetersPerSecond": "300",
         "movingSpoolDurationMilliseconds": 10000,
         "requiredWork": 1,
+        "sensorRadiusMeters": 10000,
         "turnRateDegreesPerSecond": "45"
       }
     },

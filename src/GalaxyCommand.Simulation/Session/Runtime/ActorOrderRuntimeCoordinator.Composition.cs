@@ -1,6 +1,6 @@
 namespace GalaxyCommand.Simulation;
 
-internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEvent>, ISimulationStateUpdateRuntime<GameEvent>, IDisposable
+internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEvent>, ISimulationStateUpdateRuntime<GameEvent>, ISimulationTimestampCompletionRuntime, IDisposable
 {
     private readonly EventAgenda<GameEvent> _agenda;
     private readonly SimulationEngine<GameEvent> _engine;
@@ -36,6 +36,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         _worldTopology = new WorldTopology(setup.Systems, setup.ConnectorTopology);
         _navigation = navigation;
         _facts = facts;
+        _sensorRadii = BuildSensorRadii(setup.Ships.Select(ship => ship.Design)
+            .Concat(setup.MaterializationPolicies.SelectMany(policy => policy.AllowedDesigns.Values)));
         _maneuverCapabilities = BuildManeuverCapabilities(
             setup.Ships.Select(ship => ship.Design)
                 .Concat(setup.MaterializationPolicies.SelectMany(
@@ -79,6 +81,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         _lifecycle = lifecycle;
         _inventoryCommit = inventoryCommit;
         _relationships = relationships;
+        _sensorRadii = BuildSensorRadii(lifecycle.MaterializationPolicies.SelectMany(policy => policy.AllowedDesigns.Values));
         _economy = economy;
         _maneuverCapabilities = BuildManeuverCapabilities(
             lifecycle.MaterializationPolicies.SelectMany(

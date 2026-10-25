@@ -150,7 +150,7 @@ public sealed class GroupMoveCommandTests
             ships,
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 256);
+            factRetentionCapacity: 256, playerCommandSource: GameSessionTestFixture.Player);
 
         return new GameSession(
             setup,

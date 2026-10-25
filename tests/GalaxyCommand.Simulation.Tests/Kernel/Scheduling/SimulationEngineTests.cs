@@ -5,6 +5,18 @@ namespace GalaxyCommand.Simulation.Tests;
 public sealed class SimulationEngineTests
 {
     [Fact]
+    public void TimestampObserverJoinsAfterAllPhasesAndSameTimeFollowUpWork()
+    {
+        var runtime = new CounterRuntime { ScheduleFollowUpEvents = true };
+        var simulation = new SimulationEngine<CounterEvent>(runtime);
+        simulation.Schedule(new SimulationTime(100), EventPhase.PhysicalCompletion,
+            new EventGeneration(0), new CounterEvent(1));
+        simulation.RunUntil(new SimulationTime(100));
+        Assert.Equal<(SimulationTime, int, EventPhase?)>(
+            [(SimulationTime.Zero, 0, null), (new SimulationTime(100), 111, null)], runtime.CompletedTimestamps);
+    }
+
+    [Fact]
     public void NewSimulationStartsAtZero()
     {
         var runtime = new CounterRuntime();
@@ -338,8 +350,14 @@ public sealed class SimulationEngineTests
         int Delta,
         ScheduledEventDisposition Disposition = ScheduledEventDisposition.Applied);
 
-    private sealed class CounterRuntime : ISimulationRuntime<CounterEvent>
+    private sealed class CounterRuntime : ISimulationRuntime<CounterEvent>, ISimulationTimestampCompletionRuntime
     {
+        private EventAgenda<CounterEvent>? _agenda;
+
+        public List<(SimulationTime, int, EventPhase?)> CompletedTimestamps { get; } = [];
+
+        public void CompleteTimestamp(SimulationTime now) => CompletedTimestamps.Add((now, Value, _agenda!.CurrentPhase));
+
         public int Value { get; private set; }
 
         public List<EventPhase> ProcessedPhases { get; } = [];
@@ -364,10 +382,12 @@ public sealed class SimulationEngineTests
             Dispositions.Clear();
             ValuesSeenDuringReconciliation.Clear();
             AccruedTimes.Clear();
+            CompletedTimestamps.Clear();
         }
 
         public void Reconcile(SimulationTime now, EventAgenda<CounterEvent> agenda)
         {
+            _agenda = agenda;
             ValuesSeenDuringReconciliation.Add(Value);
             if (now == ScheduleDecisionDuringReconciliationAt)
             {

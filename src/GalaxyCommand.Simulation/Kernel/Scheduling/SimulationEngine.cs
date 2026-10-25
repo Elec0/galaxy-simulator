@@ -1,5 +1,12 @@
 namespace GalaxyCommand.Simulation;
 
+/// <summary>Optional owner join for state that must commit after the entire timestamp drains.</summary>
+public interface ISimulationTimestampCompletionRuntime
+{
+    /// <summary>Commits derived observations at the closed boundary without reopening earlier phases.</summary>
+    void CompleteTimestamp(SimulationTime now);
+}
+
 /// <summary>
 /// Domain-specific behavior hosted by the simulation engine.
 /// </summary>
@@ -201,6 +208,8 @@ public sealed class SimulationEngine<TEvent>
         }
 
         _agenda.CompleteTimestamp();
+        if (_runtime is ISimulationTimestampCompletionRuntime completedRuntime)
+            completedRuntime.CompleteTimestamp(timestamp);
 
         return eventsProcessed;
     }

@@ -1,6 +1,6 @@
 {
   "format": "galaxy-command-content-scenario",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "visual-preview",
   "fallback": "Development Visual Preview",
   "references": [
@@ -9,6 +9,7 @@
     "galaxy-command.preview/standing-policy/default-standing"
   ],
   "values": {
+    "playerCommandSource": "local-player",
     "playerPrincipal": "galaxy-command.preview/principal/player",
     "standingPolicy": "galaxy-command.preview/standing-policy/default-standing",
     "galaxyLayout": [

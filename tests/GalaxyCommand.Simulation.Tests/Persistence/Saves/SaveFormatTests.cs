@@ -20,7 +20,7 @@ public sealed class SaveFormatTests
         const string edited = """
             {
               "checkpoint": { "engine": { "currentTime": "500" } },
-              "schemaVersion": 1,
+              "schemaVersion": 2,
               "format": "galaxy-command-save"
             }
             """;
@@ -28,7 +28,7 @@ public sealed class SaveFormatTests
         SaveReadResult result = Read(edited);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(1, result.Document!.SchemaVersion);
+        Assert.Equal(2, result.Document!.SchemaVersion);
         Assert.Equal(
             "500",
             result.Document.Root
@@ -52,7 +52,7 @@ public sealed class SaveFormatTests
         Assert.True(result.IsSuccess);
         Assert.Equal(destination.Length, result.BytesWritten);
         string encoded = Encoding.UTF8.GetString(destination.ToArray());
-        Assert.Contains("\n  \"schemaVersion\": 1,", encoded, StringComparison.Ordinal);
+        Assert.Contains("\n  \"schemaVersion\": 2,", encoded, StringComparison.Ordinal);
         Assert.EndsWith("\n", encoded, StringComparison.Ordinal);
         Assert.DoesNotContain("\uFEFF", encoded, StringComparison.Ordinal);
     }
@@ -63,10 +63,10 @@ public sealed class SaveFormatTests
         using JsonDocument parsed = JsonDocument.Parse("""
             {
               "format": "galaxy-command-save",
-              "schemaVersion": 2
+              "schemaVersion": 3
             }
             """);
-        var document = new InertSaveDocument(2, parsed.RootElement);
+        var document = new InertSaveDocument(3, parsed.RootElement);
         using var destination = new MemoryStream();
 
         SaveWriteResult result = SaveJsonCodec.Write(
@@ -133,7 +133,7 @@ public sealed class SaveFormatTests
         const string future = """
             {
               "format": "galaxy-command-save",
-              "schemaVersion": 2
+              "schemaVersion": 3
             }
             """;
 
@@ -244,7 +244,7 @@ public sealed class SaveFormatTests
             [new RejectingMigration()]);
 
         SaveFormatFailure failure = AssertFailure(
-            Read(CurrentDocument(), DefaultLimits, registry));
+            Read(CurrentDocument(1), DefaultLimits, registry));
 
         Assert.Equal(SaveFormatFailureKind.MigrationFailed, failure.Kind);
         Assert.Equal("$.checkpoint", failure.Path);
@@ -258,7 +258,7 @@ public sealed class SaveFormatTests
             [new InconsistentMigration()]);
 
         SaveFormatFailure failure = AssertFailure(
-            Read(CurrentDocument(), DefaultLimits, registry));
+            Read(CurrentDocument(1), DefaultLimits, registry));
 
         Assert.Equal(SaveFormatFailureKind.MigrationFailed, failure.Kind);
         Assert.Equal("$.schemaVersion", failure.Path);
@@ -268,7 +268,7 @@ public sealed class SaveFormatTests
     public void RegistryRejectsSourceVersionThatDisagreesWithEnvelope()
     {
         using JsonDocument parsed = JsonDocument.Parse(CurrentDocument());
-        var source = new InertSaveDocument(2, parsed.RootElement);
+        var source = new InertSaveDocument(1, parsed.RootElement);
         var registry = new SaveMigrationRegistry(
             currentSchemaVersion: 2,
             Array.Empty<ISaveSchemaMigration>());
@@ -284,10 +284,10 @@ public sealed class SaveFormatTests
         Assert.Equal("$.schemaVersion", result.Failure.Path);
     }
 
-    private static string CurrentDocument() => """
+    private static string CurrentDocument(int version = SaveFormat.CurrentSchemaVersion) => $$"""
         {
           "format": "galaxy-command-save",
-          "schemaVersion": 1,
+          "schemaVersion": {{version}},
           "checkpoint": {}
         }
         """;

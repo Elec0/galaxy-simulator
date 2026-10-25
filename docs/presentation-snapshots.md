@@ -35,13 +35,29 @@ observer cross the private boundary. Relationship facts use the same filter,
 and `NextFactCursor` advances past inspected hidden facts without exposing
 their payloads.
 
-Completed `TASK-020` now defines the next presentation boundary: player-owned
-sensor coverage exposes live authoritative contacts, non-owned ships disappear
-outside coverage, and discovered stations or stationary deployables retain a
-typed last-observed view. `TASK-073` will replace the currently complete spatial
-world exposure with that accepted fog-of-war projection.
+Completed `TASK-020` defines player fog of war. `TASK-073` stages 1 and 2 now
+implement its ship boundary: the session's bound player observer receives owned
+ships and current sensor contacts, with no ghost contacts outside coverage.
+`GameSnapshot` remains a complete authoritative diagnostic view. Presentation
+uses `GameObservedShipSnapshot`: owned assets carry their approved
+`GameShipSnapshot` in `OwnedDetail`, while non-owned contacts carry only current
+identity, position, velocity, and heading. Selection and focus resolve through
+that same filtered set.
 
-## Starting point
+Facts cross this boundary as `GamePresentationFactReadResult` containing
+`GamePresentationFactEnvelope` values with sequence, timestamp, and safe typed
+payload, without raw causes. Disclosure is frozen at completed owner boundaries
+and retained with the bounded source facts. A later query advances past hidden
+source facts without exposing or retrospectively replaying their payloads.
+Godot consumes this projection for map, routes, inspector, and activity; internal
+command diagnostic reasons do not enter its status display. The detailed policy
+is in [Fog-of-war and scouting](fog-of-war-and-scouting.md).
+
+Station and stationary-deployable discoveries, stale views, and confirmed
+absence remain open under `TASK-073` stages 3 and 4 after their runtime owners
+provide concrete inputs. Ship implementation does not complete that scope.
+
+## Original foundation
 
 The clean `GameSession` runtime, rather than `PhaseOneScenario`, already
 provides these authoritative read models:
@@ -63,7 +79,7 @@ does not yet expose recent facts.
 | --- | --- | --- |
 | 1 | What remains the canonical world read model? | `GameSnapshot`; do not replace it with a UI-specific aggregate. |
 | 2 | Who owns selection? | The presentation client owns a deterministic set of `ShipId` values and one optional focused member; selection is not simulation state and does not submit a command. |
-| 3 | How is selected-ship detail represented? | Resolve the requested set against one captured `GameSnapshot`, reusing immutable `GameShipSnapshot` values for controller, spatial state, and order detail. |
+| 3 | How is selected-ship detail represented? | Resolve the requested set against one captured `GameSnapshot`, using observed contacts and retaining detailed `GameShipSnapshot` values only for owned assets. |
 | 4 | How are recent facts supplied? | Request a bounded suffix through the existing cursor query, preserve its order and `CursorGap`, filter private relationship payloads, and return the last inspected sequence as `NextFactCursor`. |
 | 5 | Which facts are relevant to selected ships? | Provide a pure direct-reference projection for fact payloads that explicitly carry one of the selected `ShipId` values; never infer relevance from time, event order, or a command's proximity. |
 | 6 | Does presentation interpolate simulation state? | No. The snapshot supplies authoritative current position or motion segment. Rendering may interpolate locally from that segment and must discard the result each refresh. |
@@ -76,9 +92,9 @@ does not yet expose recent facts.
 flowchart LR
     input["Local presentation state\nobserver PrincipalId, selected ships, focus, fact cursor"]
     session["GameSession\nauthoritative read boundary"]
-    world["GameSnapshot\nworld, motion, controller, orders"]
-    facts["GameFactReadResult\nordered bounded suffix"]
-    compose["Presentation facade\nresolve selection set and project direct facts"]
+    world["GameSnapshot\ncomplete diagnostic world"]
+    facts["GameFactReadResult\nbounded suffix and stored disclosure"]
+    compose["Player projection\nfilter contacts, resolve selection, read stored notices"]
     scope["Observer relationship projection\npublic diplomacy, incoming standing, held grants"]
     frame["GamePresentationSnapshot\nsafe world, scoped relationships, selection, facts"]
     view["Godot map, inspector, notification feed\nlocal rendering and interpolation"]
@@ -112,9 +128,9 @@ Output
   world: presentation-safe world without complete relationship diagnostics
   relationships: public identity and diplomacy, incoming standing, and grants
                  issued to the observer
-  selection: requested IDs, resolved GameShipSnapshot values, unresolved IDs,
+  selection: requested IDs, resolved GameObservedShipSnapshot values, unresolved IDs,
              and optional resolved focus
-  facts: observer-visible GameFactReadResult preserving source order and gap semantics
+  facts: GamePresentationFactReadResult preserving source order and gap semantics
   selectedShipFacts: ordered direct-reference subset for the selected set
   nextFactCursor: last source fact inspected, including withheld private facts
 ```
@@ -146,9 +162,9 @@ that lifecycle contract exists.
 
 ## Selected details and fact relevance
 
-Each resolved selection member reuses its `GameShipSnapshot`; the focused
-member supplies inspector detail without creating a competing copy of controller
-or order truth. The inspector can therefore show:
+Each resolved selection member is a `GameObservedShipSnapshot`. Only its owned
+`OwnedDetail` may supply controller, order, or future motion data. A non-owned
+contact supplies current identity and kinematics to the inspector. The inspector can therefore show:
 
 - Base and active controller identity, plus any active override already
   represented by `ActorControlSnapshot`.
@@ -156,7 +172,7 @@ or order truth. The inspector can therefore show:
   suspended orders when the UI chooses to expose them.
 - Authoritative at-position, local-motion, or connector-transit state.
 
-The initial selected-ship fact subset is the union of facts whose payload has
+The initial selected-ship fact subset is the union of facts whose safe payload has
 an explicit `ShipId` in the selected set: order transitions, local-motion start
 and end, and connector-transit start and completion. It preserves the source
 fact sequence rather than grouping by ship. Command accepted and rejected facts

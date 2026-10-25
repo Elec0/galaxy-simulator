@@ -27,6 +27,16 @@ boundaries. `TASK-063` supplies resolved content catalogs and completed
 unavailable until `TASK-037` implements content compatibility and
 saved-reference migration.
 
+`TASK-073` stage 2 advances the save envelope schema to 2 for player-observation
+state. Its internal whole-session checkpoint retains the bound player principal
+and command source, observation policy version, definition sensor radii, and one
+bounded disclosure receipt per retained source fact. Receipts include historical
+subject ownership and their approved safe payload; current sensor geometry is
+rebuilt. Restore rejects missing or inconsistent observation state rather than
+recomputing historical disclosure from current positions. No schema-1 migration
+is registered here because missing radii and disclosure history cannot be
+invented. General encoded session admission still depends on `TASK-037`.
+
 ## Decisions at a glance
 
 | Question | Decision |

@@ -64,6 +64,9 @@ public sealed record InitialShipSetup
 
 /// <summary>
 /// Explicit immutable input used to construct a clean game session.
+/// Relationships supply its registered player observer; every constructor
+/// requires that player's explicit local command source independently of actor
+/// control. Runtime source inference and hidden sensor defaults are not used.
 /// </summary>
 public sealed class GameSessionSetup
 {
@@ -76,7 +79,8 @@ public sealed class GameSessionSetup
         IEnumerable<InitialShipSetup> ships,
         RelationshipSetup relationships,
         RandomRootSeed randomRootSeed,
-        int factRetentionCapacity)
+        int factRetentionCapacity,
+        CommandSource playerCommandSource)
         : this(
             systems,
             ships,
@@ -87,7 +91,8 @@ public sealed class GameSessionSetup
             null,
             relationships,
             randomRootSeed,
-            factRetentionCapacity)
+            factRetentionCapacity,
+            playerCommandSource)
     {
     }
 
@@ -101,7 +106,8 @@ public sealed class GameSessionSetup
         ConnectorTopology connectorTopology,
         RelationshipSetup relationships,
         RandomRootSeed randomRootSeed,
-        int factRetentionCapacity)
+        int factRetentionCapacity,
+        CommandSource playerCommandSource)
         : this(
             systems,
             ships,
@@ -110,7 +116,8 @@ public sealed class GameSessionSetup
             null,
             relationships,
             randomRootSeed,
-            factRetentionCapacity)
+            factRetentionCapacity,
+            playerCommandSource)
     {
     }
 
@@ -125,7 +132,8 @@ public sealed class GameSessionSetup
         IEnumerable<ShipMaterializationPolicy> materializationPolicies,
         RelationshipSetup relationships,
         RandomRootSeed randomRootSeed,
-        int factRetentionCapacity)
+        int factRetentionCapacity,
+        CommandSource playerCommandSource)
         : this(
             systems,
             ships,
@@ -134,7 +142,8 @@ public sealed class GameSessionSetup
             null,
             relationships,
             randomRootSeed,
-            factRetentionCapacity)
+            factRetentionCapacity,
+            playerCommandSource)
     {
     }
 
@@ -151,13 +160,17 @@ public sealed class GameSessionSetup
         GameSessionEconomySetup? economy,
         RelationshipSetup relationships,
         RandomRootSeed randomRootSeed,
-        int factRetentionCapacity)
+        int factRetentionCapacity,
+        CommandSource playerCommandSource)
     {
         ArgumentNullException.ThrowIfNull(systems);
         ArgumentNullException.ThrowIfNull(ships);
         ArgumentNullException.ThrowIfNull(connectorTopology);
         ArgumentNullException.ThrowIfNull(materializationPolicies);
         ArgumentNullException.ThrowIfNull(relationships);
+        ArgumentNullException.ThrowIfNull(playerCommandSource);
+        if (playerCommandSource.Kind != CommandSourceKind.Player)
+            throw new ArgumentException("The presentation command source must be a player source.", nameof(playerCommandSource));
         ArgumentNullException.ThrowIfNull(randomRootSeed);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(
             factRetentionCapacity);
@@ -274,6 +287,7 @@ public sealed class GameSessionSetup
         Relationships = relationships;
         RandomRootSeed = randomRootSeed;
         FactRetentionCapacity = factRetentionCapacity;
+        PlayerCommandSource = playerCommandSource;
     }
 
     public IReadOnlyList<StarSystem> Systems { get; }
@@ -298,6 +312,8 @@ public sealed class GameSessionSetup
     public RandomRootSeed RandomRootSeed { get; }
 
     public int FactRetentionCapacity { get; }
+
+    public CommandSource PlayerCommandSource { get; }
 
     private static void ValidateEconomy(
         GameSessionEconomySetup? economy,

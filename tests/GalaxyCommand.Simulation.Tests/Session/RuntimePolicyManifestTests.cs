@@ -7,6 +7,20 @@ public sealed class RuntimePolicyManifestTests
     private static readonly PrincipalId Principal = new(1);
 
     [Fact]
+    public void RestoreDoesNotInventAMissingSensorRadius()
+    {
+        RuntimePolicyManifestCheckpoint checkpoint = Manifest();
+        MaterializationPolicyCheckpoint policy = checkpoint.MaterializationPolicies[0]!;
+        RuntimePolicyManifestCheckpoint invalid = Copy(checkpoint, policy with
+        {
+            AllowedDesigns = [policy.AllowedDesigns[0]! with { SensorRadiusUnits = null }],
+        });
+        CheckpointResult<ResolvedRuntimePolicies> result = RuntimePolicyManifest.Resolve(invalid, Topology(), [Principal]);
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Value);
+    }
+
+    [Fact]
     public void CaptureAndResolvePreserveRegisteredBehaviorAndMaterializationPolicy()
     {
         WorldTopology topology = Topology();
@@ -41,6 +55,9 @@ public sealed class RuntimePolicyManifestTests
         Assert.Equal(
             materialization.AllowedDesigns.Single().Value.ManeuverCapability,
             restored.AllowedDesigns.Single().Value.ManeuverCapability);
+        Assert.Equal(
+            materialization.AllowedDesigns.Single().Value.SensorRadiusUnits,
+            restored.AllowedDesigns.Single().Value.SensorRadiusUnits);
         var planned = Assert.IsType<NavigationPlanResult.Planned>(
             policies.Navigation.Plan(new NavigationRequest(
                 new ShipId(1),
@@ -240,7 +257,7 @@ public sealed class RuntimePolicyManifestTests
                     [new KeyValuePair<MaterialId, Quantity>(new MaterialId(1), new Quantity(2))],
                     new Work(3)),
                 new Quantity(4),
-                GameSessionTestFixture.ManeuverCapability),
+                GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000),
         ]);
 
     private static WorldTopology Topology() => new(

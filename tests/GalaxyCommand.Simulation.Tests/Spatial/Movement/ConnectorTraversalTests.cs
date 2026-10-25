@@ -346,7 +346,7 @@ public sealed class ConnectorTraversalTests
             "Connector Test Ship",
             new ConstructionRecipe([], new Work(1)),
             new Quantity(10),
-            GameSessionTestFixture.ManeuverCapability);
+            GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000);
         var setup = new GameSessionSetup(
             [
                 new StarSystem(OriginSystem, "Origin"),
@@ -372,7 +372,7 @@ public sealed class ConnectorTraversalTests
                 [design])],
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 256);
+            factRetentionCapacity: 256, playerCommandSource: GameSessionTestFixture.Player);
         return new GameSession(
             setup,
             new HierarchicalNavigationPlanner(

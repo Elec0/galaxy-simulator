@@ -23,7 +23,8 @@ internal sealed record ShipDesignPolicyCheckpoint(
     IReadOnlyList<ConstructionInputPolicyCheckpoint?> Inputs,
     Work RequiredWork,
     Quantity CargoCapacity,
-    ShipManeuverCapabilityCheckpoint? ManeuverCapability);
+    ShipManeuverCapabilityCheckpoint? ManeuverCapability,
+    ulong? SensorRadiusUnits);
 
 internal sealed record MaterializationPolicyCheckpoint(
     FacilityId FacilityId,

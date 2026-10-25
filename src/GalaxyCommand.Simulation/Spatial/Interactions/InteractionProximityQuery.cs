@@ -55,6 +55,13 @@ public static class InteractionProximityQuery
     internal static InteractionPhaseCurve? Instant(InteractionSpatialParticipant? participant, SimulationTime now)
     {
         if (participant?.Spatial.Position is not { } position) return null;
+        if (participant.Spatial.State is ShipSpatialSnapshotState.InteractionControlled controlled)
+        {
+            // The interval remains exact until its owner releases/materializes it.
+            // Rounded snapshot coordinates must not introduce false instant contacts.
+            if (now < controlled.Interval.StartsAt || now > controlled.Interval.EndsAt) return null;
+            return InteractionPhaseCurve.From(controlled.Interval);
+        }
         if (participant.Spatial.Maneuver is not null)
         {
             if (participant.ManeuverPlan is not { } plan)

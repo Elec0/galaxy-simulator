@@ -49,7 +49,7 @@ public sealed class EntityLifecycleTests
                 setupShips,
                 GameSessionTestFixture.Relationships,
                 GameSessionTestFixture.RootSeed,
-                factRetentionCapacity: 256));
+                factRetentionCapacity: 256, playerCommandSource: GameSessionTestFixture.Player));
     }
 
     [Fact]
@@ -373,7 +373,7 @@ public sealed class EntityLifecycleTests
             ],
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 256);
+            factRetentionCapacity: 256, playerCommandSource: GameSessionTestFixture.Player);
         return new GameSession(
             setup,
             new DirectLocalNavigationPlanner(

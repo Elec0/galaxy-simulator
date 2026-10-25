@@ -1,6 +1,6 @@
 {
   "format": "galaxy-command-content-scenario",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "minimal",
   "fallback": "Minimal New Game",
   "references": [
@@ -9,6 +9,7 @@
     "galaxy-command.core/standing-policy/default-standing"
   ],
   "values": {
+    "playerCommandSource": "local-player",
     "playerPrincipal": "galaxy-command.core/principal/player",
     "standingPolicy": "galaxy-command.core/standing-policy/default-standing",
     "galaxyLayout": [

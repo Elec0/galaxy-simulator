@@ -214,7 +214,7 @@ public sealed class GameSessionCheckpointTests
             GameSessionTestFixture.PlayerController)],
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 64);
+            factRetentionCapacity: 64, playerCommandSource: GameSessionTestFixture.Player);
         var session = new GameSession(
             setup,
             new DirectLocalNavigationPlanner(
@@ -422,7 +422,7 @@ public sealed class GameSessionCheckpointTests
                 [GameSessionTestFixture.Design])],
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 64);
+            factRetentionCapacity: 64, playerCommandSource: GameSessionTestFixture.Player);
         return new GameSession(
             setup,
             new DirectLocalNavigationPlanner(
@@ -494,7 +494,7 @@ public sealed class GameSessionCheckpointTests
             economy,
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 64);
+            factRetentionCapacity: 64, playerCommandSource: GameSessionTestFixture.Player);
         return new GameSession(setup, navigation);
     }
 }

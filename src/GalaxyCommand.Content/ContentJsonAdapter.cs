@@ -11,7 +11,7 @@ public static partial class ContentJsonAdapter
 {
     private const string PackageFormat = "galaxy-command-content-package";
     private const int CurrentPackageSchemaVersion = 1;
-    private const int CurrentDocumentSchemaVersion = 2;
+    private const int CurrentDocumentSchemaVersion = 3;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     /// <summary>

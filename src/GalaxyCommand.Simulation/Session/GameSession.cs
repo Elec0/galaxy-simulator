@@ -34,6 +34,8 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         _spatialInteractions = new SpatialInteractionRegistration();
         _facts = new GameFactStore(setup.FactRetentionCapacity);
         _runtime = new ActorOrderRuntimeCoordinator(setup, navigation, _facts);
+        _playerCommandSource = setup.PlayerCommandSource;
+        _runtime.ObservationTimestampCompleted = CompletePlayerDisclosure;
         _random = new DeterministicRandomOwner(setup.RandomRootSeed);
         _commands = new GameplayCommandProcessor(this, _facts);
         _spatialInteractions.AttachMutationGuard(EnsureHealthy);
@@ -50,12 +52,15 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         DeterministicRandomOwner random,
         CommandAdmissionCheckpoint commandAdmission,
         SpatialInteractionRegistration spatialInteractions,
-        InteractionBatchExecution? interactionExecution)
+        InteractionBatchExecution? interactionExecution,
+        PlayerObservationCheckpoint observation)
     {
         InteractionExecution = interactionExecution;
         _spatialInteractions = spatialInteractions;
         _facts = facts;
         _runtime = runtime;
+        _playerCommandSource = observation.PlayerCommandSource;
+        _runtime.ObservationTimestampCompleted = CompletePlayerDisclosure;
         _random = random;
         CheckpointResult<GameplayCommandProcessor> commands =
             GameplayCommandProcessor.RestoreCheckpoint(
@@ -132,7 +137,13 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
     public EntityRemovalResult RemoveEntity(EntityRemovalRequest request)
     {
         EnsureHealthy();
-        return _runtime.RemoveEntity(request);
+        ArgumentNullException.ThrowIfNull(request);
+        // The subject must survive cleanup as observation evidence; coverage
+        // still comes from the completed post-removal source set.
+        GameShipSnapshot? subject = _runtime.CaptureSnapshot().Ships.FirstOrDefault(ship => ship.EntityId == request.EntityId);
+        if (subject is not null) _removedObservationShips[subject.Id] = subject;
+        try { return _runtime.RemoveEntity(request); }
+        finally { CompletePlayerDisclosureIfIdle(); }
     }
 
     /// <summary>
@@ -143,7 +154,9 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         StandingChangeBatch batch)
     {
         EnsureHealthy();
-        return _runtime.CommitStandingChanges(batch);
+        StandingChangeBatchResult result = _runtime.CommitStandingChanges(batch);
+        CompletePlayerDisclosureIfIdle();
+        return result;
     }
 
     /// <summary>
@@ -154,7 +167,9 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         RelationshipPolicyChangeBatch batch)
     {
         EnsureHealthy();
-        return _runtime.CommitRelationshipPolicyChanges(batch);
+        RelationshipPolicyChangeBatchResult result = _runtime.CommitRelationshipPolicyChanges(batch);
+        CompletePlayerDisclosureIfIdle();
+        return result;
     }
 
     /// <summary>
@@ -196,25 +211,37 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
 
     /// <summary>
     /// Captures a presentation-safe world and observer-scoped relationship and
-    /// fact projections after the current authoritative commit boundary.
+    /// fact projections after the current authoritative commit boundary. The
+    /// request must use the bound player principal; selection resolves only
+    /// detected contacts and fact envelopes contain no raw causes.
     /// </summary>
     public GamePresentationSnapshot CapturePresentation(
         GamePresentationRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         GameSnapshot world = CaptureSnapshot();
+        if (request.ObserverPrincipalId != world.Relationships.PlayerPrincipalId)
+            throw new ArgumentException("Player presentation must use the session's bound player principal.", nameof(request));
         GameFactReadResult facts = ReadFactsAfter(
             request.FactCursor,
             request.MaximumFactCount);
-        return GamePresentationSnapshotFactory.Create(world, request, facts);
+        return GamePresentationSnapshotFactory.Create(world, request, facts,
+            _runtime.CaptureShipCoverage(request.ObserverPrincipalId));
     }
 
+    /// <summary>
+    /// Admits gameplay intent and freezes its player disclosure at the completed
+    /// command boundary. Operations nested in scheduled work join at the engine's
+    /// completed timestamp instead of exposing a partially processed phase.
+    /// </summary>
     public GameplayCommandRecord SubmitCommand(
         CommandSource source,
         GameplayCommand command)
     {
         EnsureHealthy();
-        return _commands.Submit(CurrentTime, source, command);
+        GameplayCommandRecord result = _commands.Submit(CurrentTime, source, command);
+        CompletePlayerDisclosureIfIdle();
+        return result;
     }
 
     public GameFactReadResult ReadFactsAfter(
@@ -251,7 +278,8 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             facts,
             _commands.CaptureCheckpoint(),
             value.InventoryCommit,
-            _spatialInteractions.CaptureCheckpoint());
+            _spatialInteractions.CaptureCheckpoint(),
+            new PlayerObservationCheckpoint(1, value.Relationships.PlayerPrincipalId, _playerCommandSource));
         return CheckpointResult<GameSessionCheckpoint>.Success(checkpoint);
     }
 
@@ -397,6 +425,14 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             runtime.Value!.CaptureInteractionReadView());
         if (deliveryFailure is not null) return CheckpointResult<GameSession>.Rejected(deliveryFailure);
 
+        if (checkpoint.PlayerObservation is not { BehaviorVersion: 1 } observation
+            || observation.PlayerCommandSource is not { Kind: CommandSourceKind.Player }
+            || observation.ObserverPrincipalId != checkpoint.Relationships.PlayerPrincipalId
+            || checkpoint.Facts.RetainedFacts.Any(fact => fact is null
+                || !IsValidPlayerDisclosure(fact, checkpoint, observation)))
+            return CheckpointResult<GameSession>.Rejected(new CheckpointValidationFailure(
+                "$.checkpoint.playerObservation", "Player observation binding or retained disclosure receipts are missing or inconsistent."));
+
         try
         {
             return CheckpointResult<GameSession>.Success(
@@ -406,7 +442,8 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
                     random.Value!,
                     checkpoint.CommandAdmission,
                     spatialInteractions.Value!,
-                    interactionExecution));
+                    interactionExecution,
+                    observation));
         }
         catch (InvalidOperationException error)
         {

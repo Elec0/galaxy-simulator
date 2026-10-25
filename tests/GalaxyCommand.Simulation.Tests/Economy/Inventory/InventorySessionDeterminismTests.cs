@@ -168,7 +168,7 @@ public sealed class InventorySessionDeterminismTests
                 [GameSessionTestFixture.Design])],
             GameSessionTestFixture.Relationships,
             GameSessionTestFixture.RootSeed,
-            factRetentionCapacity: 64);
+            factRetentionCapacity: 64, playerCommandSource: GameSessionTestFixture.Player);
         return new GameSession(setup, navigation);
     }
 

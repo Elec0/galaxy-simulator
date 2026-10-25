@@ -109,7 +109,7 @@ public sealed class GameSessionSnapshotTests
                 [ship],
                 GameSessionTestFixture.Relationships,
                 GameSessionTestFixture.RootSeed,
-                factRetentionCapacity: 256));
+                factRetentionCapacity: 256, playerCommandSource: GameSessionTestFixture.Player));
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public sealed class GameSessionSnapshotTests
                 topology,
                 GameSessionTestFixture.Relationships,
                 GameSessionTestFixture.RootSeed,
-                factRetentionCapacity: 256));
+                factRetentionCapacity: 256, playerCommandSource: GameSessionTestFixture.Player));
     }
 
     [Fact]
@@ -162,6 +162,6 @@ public sealed class GameSessionSnapshotTests
                 ],
                 GameSessionTestFixture.Relationships,
                 GameSessionTestFixture.RootSeed,
-                factRetentionCapacity: 0));
+                factRetentionCapacity: 0, playerCommandSource: GameSessionTestFixture.Player));
     }
 }

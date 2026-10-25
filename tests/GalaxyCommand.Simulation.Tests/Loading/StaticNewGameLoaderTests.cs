@@ -1,10 +1,43 @@
 using GalaxyCommand.Content;
 using GalaxyCommand.Simulation;
+using System.Globalization;
 
 namespace GalaxyCommand.Simulation.Tests;
 
 public sealed class StaticNewGameLoaderTests
 {
+    [Theory]
+    [InlineData("0", true)]
+    [InlineData("18446744073709551615", true)]
+    [InlineData("-1", false)]
+    [InlineData("1.5", false)]
+    [InlineData("\"10000\"", false)]
+    [InlineData("18446744073709551616", false)]
+    [InlineData(null, false)]
+    public void SensorRadiusRequiresAnExplicitUnsignedIntegralValue(string? authored, bool accepted)
+    {
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"galaxy-command-sensor-content-{Guid.NewGuid():N}");
+        string packageDirectory = Path.Combine(temporaryRoot, "galaxy-command.core");
+        Directory.CreateDirectory(packageDirectory);
+        try
+        {
+            string sourceDirectory = Path.Combine(FindRepositoryRoot(), "content", "built-in", "galaxy-command.core");
+            foreach (string fileName in new[] { "package.json", "definitions.json", "minimal.json" })
+                File.Copy(Path.Combine(sourceDirectory, fileName), Path.Combine(packageDirectory, fileName));
+            string path = Path.Combine(packageDirectory, "definitions.json");
+            File.WriteAllText(path, File.ReadAllText(path).Replace("\"sensorRadiusMeters\": 10000,",
+                authored is null ? string.Empty : $"\"sensorRadiusMeters\": {authored},", StringComparison.Ordinal));
+            StaticNewGameLoadResult result = BuiltInNewGame.Load(temporaryRoot,
+                GameSessionTestFixture.RootSeed, 64, maximumDegreeOfParallelism: 2);
+            Assert.Equal(accepted, result.IsSuccess);
+            if (accepted)
+                Assert.Equal(ulong.Parse(authored!, CultureInfo.InvariantCulture),
+                    Assert.Single(result.Setup!.Ships).Design.SensorRadiusUnits);
+            else Assert.Null(result.Setup);
+        }
+        finally { Directory.Delete(temporaryRoot, recursive: true); }
+    }
+
     [Fact]
     public void BuiltInMinimalScenarioLoadsThroughProductionPipeline()
     {
@@ -48,6 +81,7 @@ public sealed class StaticNewGameLoaderTests
         Assert.Equal("Starter Ship", ship.Design.Name);
         Assert.Equal(new ConstructionDesignId(1), ship.Design.Id);
         Assert.Equal(new Quantity(100), ship.Design.CargoCapacity);
+        Assert.Equal(10_000UL, ship.Design.SensorRadiusUnits);
         Assert.Equal(10_000UL, ship.Design.ManeuverCapability.BaseMassKilograms);
         Assert.Equal(
             10_000UL,

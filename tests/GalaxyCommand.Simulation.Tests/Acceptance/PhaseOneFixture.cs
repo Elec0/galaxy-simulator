@@ -91,7 +91,7 @@ internal static class PhaseOneFixture
                 ManeuverSpeed.ParseMetersPerSecond("300"),
                 ManeuverSpeed.ParseMetersPerSecond("1000"),
                 ManeuverTurnRate.ParseDegreesPerSecond("45"),
-                new SimulationDuration(10_000)));
+                new SimulationDuration(10_000)), sensorRadiusUnits: 10_000);
         var shipyard = new Shipyard(
             shipyardFacility,
             organization,

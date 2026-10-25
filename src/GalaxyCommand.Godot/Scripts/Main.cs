@@ -30,7 +30,7 @@ public partial class Main : Node
 	private Label _activity = null!;
 	private Button _pauseOrResume = null!;
 	private HBoxContainer _pacingPresets = null!;
-	private readonly List<GameFactEnvelope> _recentFacts = [];
+	private readonly List<GamePresentationFactEnvelope> _recentFacts = [];
 	private ApplicationPacingController _pacing = null!;
 	private ApplicationPacingPreferenceState _pacingPreferences = null!;
 	private ApplicationEventPacingInbox _eventPacingInbox = null!;
@@ -151,13 +151,7 @@ public partial class Main : Node
 
 		GameSessionSetup setup = loaded.Setup!;
 		PrincipalId playerPrincipalId = setup.Relationships.PlayerPrincipalId;
-		CommandSourceId playerSourceId = setup.Ships
-			.Where(ship => ship.PrincipalId == playerPrincipalId)
-			.Select(ship => ship.BaseController)
-			.Where(controller => controller.Kind == ActorControllerKind.Player)
-			.Select(controller => controller.Id)
-			.Distinct()
-			.Single();
+		CommandSourceId playerSourceId = setup.PlayerCommandSource.Id;
 		var session = new GameSession(
 			loaded.Setup!,
 			new HierarchicalNavigationPlanner(
@@ -213,7 +207,7 @@ public partial class Main : Node
 	{
 		ShipOrderSnapshot? current = _presentation.Selection.FocusedShip is { } focused
 			&& focused.Id == shipId
-				? focused.CurrentOrder
+				? focused.OwnedDetail?.CurrentOrder
 				: null;
 		GameplayCommand? command = MapSelectionCommandFactory.CreateCancel(
 			_map.SelectedShipIds,
@@ -350,26 +344,28 @@ public partial class Main : Node
 		_factCursor = _presentation.NextFactCursor;
 
 		GamePresentationWorldSnapshot snapshot = _presentation.World;
-		GameShipSnapshot? selected = _presentation.Selection.FocusedShip;
+		GameObservedShipSnapshot? focused = _presentation.Selection.FocusedShip;
+		GameShipSnapshot? selected = focused?.OwnedDetail;
+		bool externalContact = focused is not null && selected is null;
 		string order = selected?.CurrentOrder is { } current
 			? $"{current.Status} / {current.Reason} / {DescribeDestination(current.Destination)}"
-			: "No current order";
+			: externalContact ? "Order unavailable" : "No current order";
 		string motion = selected?.Motion is { } activeMotion
 			? $"moving until {FormatTime(activeMotion.ArrivesAt)}"
 			: selected?.Transit is { } transit
 				? $"in transit via C{transit.ConnectionId.Value} until {FormatTime(transit.ArrivesAt)}"
-			: "stationary";
+			: externalContact ? "Observed motion" : "stationary";
 		string control = selected is null
-			? "No controller"
+			? externalContact ? "Control unavailable" : "No controller"
 			: $"{selected.Control.ActiveController.Kind}:{selected.Control.ActiveController.Id}";
 		string queue = selected is null
-			? "QUEUE 0"
+			? externalContact ? "QUEUE unavailable" : "QUEUE 0"
 			: $"QUEUE {selected.QueuedOrders.Count}";
 		string facts = _factHistoryTruncated
 			? "FACT HISTORY INCOMPLETE"
 			: $"FACTS {_recentFacts.Count}";
 		_view.Text = $"DEVELOPMENT VISUAL PREVIEW | {_map.ViewDescription}";
-		_inspector.Text = DescribeInspector(selected);
+		_inspector.Text = DescribeInspector(_presentation.Selection.FocusedShip);
 		_activity.Text = DescribeActivity();
 
 		_status.Text =
@@ -378,7 +374,7 @@ public partial class Main : Node
 			$"{order}   |   {motion}   |   {facts}";
 	}
 
-	private void ConsumeFacts(GameFactReadResult facts)
+	private void ConsumeFacts(GamePresentationFactReadResult facts)
 	{
 		if (facts.CursorGap)
 		{
@@ -386,7 +382,7 @@ public partial class Main : Node
 			_factHistoryTruncated = true;
 		}
 
-		foreach (GameFactEnvelope fact in facts.Facts)
+		foreach (GamePresentationFactEnvelope fact in facts.Facts)
 		{
 			_recentFacts.Add(fact);
 		}
@@ -401,7 +397,7 @@ public partial class Main : Node
 	/// Describes only the focused ship record already permitted by the immutable
 	/// presentation capture; the preview does not inspect simulation owners.
 	/// </summary>
-	private static string DescribeInspector(GameShipSnapshot? ship)
+	private static string DescribeInspector(GameObservedShipSnapshot? ship)
 	{
 		if (ship is null)
 		{
@@ -410,12 +406,12 @@ public partial class Main : Node
 
 		string spatial = ship.Position is { } position
 			? $"at {position.SystemId} ({position.Position.X}, {position.Position.Y})"
-			: ship.Transit is { } transit
+			: ship.OwnedDetail?.Transit is { } transit
 				? $"in transit C{transit.ConnectionId.Value} until {FormatTime(transit.ArrivesAt)}"
 				: "spatial state unavailable";
-		string order = ship.CurrentOrder is { } current
+		string order = ship.OwnedDetail?.CurrentOrder is { } current
 			? $"{current.Status} {DescribeDestination(current.Destination)}"
-			: "no current order";
+			: ship.OwnedDetail is null ? "observed contact" : "no current order";
 		return $"INSPECTOR | S{ship.Id.Value} | {spatial} | {order}";
 	}
 
@@ -439,10 +435,11 @@ public partial class Main : Node
 			: $"ACTIVITY | {string.Join("  •  ", recent)}";
 	}
 
+	/// <summary>Shows the approved command outcome code without private diagnostic reasons.</summary>
 	private static string DescribeResult(GameplayCommandRecord record) =>
 		record.Result.Status == CommandResultStatus.Accepted
 			? $"{record.Envelope.Command.Kind} accepted"
-			: $"{record.Result.RejectionCode}: {record.Result.Reason}";
+			: $"Command rejected ({record.Result.RejectionCode})";
 
 	private static string DescribeDestination(NavigationDestination destination) =>
 		destination switch

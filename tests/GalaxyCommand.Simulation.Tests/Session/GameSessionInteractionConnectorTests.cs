@@ -188,7 +188,7 @@ public sealed class GameSessionInteractionConnectorTests
             [new ShipMaterializationPolicy(new FacilityId(1), GameSessionTestFixture.Principal,
                 Position(Origin), GameSessionTestFixture.PlayerController, InitialShipOrderPolicy.NoInitialOrder,
                 [GameSessionTestFixture.Design])],
-            GameSessionTestFixture.Relationships, GameSessionTestFixture.RootSeed, factRetentionCapacity: 64);
+            GameSessionTestFixture.Relationships, GameSessionTestFixture.RootSeed, factRetentionCapacity: 64, playerCommandSource: GameSessionTestFixture.Player);
         return new GameSession(setup, new HierarchicalNavigationPlanner(topology, new ChebyshevLocalTravelTimeEstimator(1)));
     }
 

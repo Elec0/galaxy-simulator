@@ -16,7 +16,7 @@ internal sealed class InteractionSessionBenchmarkScenario(bool batched) : IBench
             ship.BaseController)).ToArray();
         var setup = new GameSessionSetup(ScenarioSetup.CreateSystems(systems), ships,
             ScenarioSetup.Relationships, ScenarioSetup.RootSeed,
-            configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity));
+            configuration.GetInt32(BenchmarkParameterNames.FactRetentionCapacity), playerCommandSource: new CommandSource(CommandSourceKind.Player, new CommandSourceId("benchmark-player")));
         var navigation = new DirectLocalNavigationPlanner(new FixedTravelTimeEstimator(
             new SimulationDuration(configuration.GetUInt64(BenchmarkParameterNames.TravelDurationMilliseconds))));
         // The serial preset exercises the original session entry point, not a one-worker substitute.
