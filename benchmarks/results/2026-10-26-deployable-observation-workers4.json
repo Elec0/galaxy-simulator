@@ -1,0 +1,51 @@
+{
+  "SchemaVersion": 2,
+  "RecordedAtUtc": "2026-10-26T23:38:23.578003+00:00",
+  "Suite": "full",
+  "Machine": {
+    "Framework": ".NET 10.0.10",
+    "OperatingSystem": "macOS 26.7.1",
+    "ProcessArchitecture": "Arm64",
+    "ProcessorCount": 11,
+    "ServerGarbageCollection": false
+  },
+  "Scenarios": [
+    {
+      "Id": "observation.deployable-crossings-batched",
+      "BasePreset": "observation.deployable-crossings-batched",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Parameters": {
+        "batchSize": 1,
+        "destinationDistance": 1000,
+        "measuredIterations": 5,
+        "queryCount": 16,
+        "rangeUnits": 20,
+        "seed": 1,
+        "shipCount": 1024,
+        "simulatedDurationMilliseconds": 10000,
+        "systemCount": 4,
+        "travelDurationMilliseconds": 10000,
+        "warmupIterations": 3,
+        "workerCount": 4
+      },
+      "Digest": "d9620687dd96a0e5",
+      "SimulatedMilliseconds": 10000,
+      "Counts": {
+        "crossingQueries": 16,
+        "sources": 1024,
+        "stationaryTargets": 1024
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 95.9895,
+        "MinimumMilliseconds": 89.1144,
+        "MaximumMilliseconds": 101.4365,
+        "MedianAllocatedBytes": 391754456,
+        "Generation0Collections": 235,
+        "Generation1Collections": 1,
+        "Generation2Collections": 1
+      }
+    }
+  ]
+}

@@ -15,13 +15,15 @@ public sealed partial class GameSession
     }
 
     /// <summary>
-    /// Freezes eligibility and safe payloads using one completed boundary view.
+    /// Commits persistent observations even when there are no pending facts,
+    /// then freezes eligibility and safe payloads using one completed boundary view.
     /// Reads never recompute history from later coverage or relationship state.
     /// Ownership-only policies read only pending subjects; spatial inputs are
     /// prepared once when needed. All receipt proposals precede publication.
     /// </summary>
     private void CompletePlayerDisclosure()
     {
+        CommitDeployableObservations();
         if (!_facts.HasPendingPlayerDisclosure)
         {
             _removedObservationShips.Clear();

@@ -75,7 +75,8 @@ public sealed record GamePresentationRequest
 /// </summary>
 public sealed record GamePresentationWorldSnapshot
 {
-    internal GamePresentationWorldSnapshot(GameSnapshot world, IReadOnlyList<GameObservedShipSnapshot> ships)
+    internal GamePresentationWorldSnapshot(GameSnapshot world, IReadOnlyList<GameObservedShipSnapshot> ships,
+        IReadOnlyList<ObservedSensorDeployableSnapshot> deployables)
     {
         ArgumentNullException.ThrowIfNull(world);
         Time = world.Time;
@@ -83,6 +84,7 @@ public sealed record GamePresentationWorldSnapshot
         ConnectorEndpoints = world.ConnectorEndpoints;
         TransitConnections = world.TransitConnections;
         Ships = ships;
+        Deployables = deployables;
     }
 
     public SimulationTime Time { get; }
@@ -94,6 +96,8 @@ public sealed record GamePresentationWorldSnapshot
     public IReadOnlyList<TransitConnectionSnapshot> TransitConnections { get; }
 
     public IReadOnlyList<GameObservedShipSnapshot> Ships { get; }
+
+    public IReadOnlyList<ObservedSensorDeployableSnapshot> Deployables { get; }
 }
 
 /// <summary>
@@ -229,7 +233,8 @@ internal static class GamePresentationSnapshotFactory
         GameSnapshot world,
         GamePresentationRequest request,
         GameFactReadResult facts,
-        ShipSensorCoverageSnapshot coverage)
+        ShipSensorCoverageSnapshot coverage,
+        IReadOnlyList<ObservedSensorDeployableSnapshot>? deployables = null)
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(request);
@@ -275,7 +280,7 @@ internal static class GamePresentationSnapshotFactory
             : request.FactCursor;
 
         return new GamePresentationSnapshot(
-            new GamePresentationWorldSnapshot(world, ships),
+            new GamePresentationWorldSnapshot(world, ships, deployables ?? Array.AsReadOnly(Array.Empty<ObservedSensorDeployableSnapshot>())),
             CreateRelationshipPresentation(
                 world.Relationships,
                 request.ObserverPrincipalId),

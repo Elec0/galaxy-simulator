@@ -42,4 +42,5 @@ internal sealed record PlayerFactDisclosure(PrincipalId ObserverPrincipalId, Gam
 internal sealed record PlayerObservationCheckpoint(
     int BehaviorVersion,
     PrincipalId ObserverPrincipalId,
-    CommandSource PlayerCommandSource);
+    CommandSource PlayerCommandSource,
+    IReadOnlyList<ObservedSensorDeployableSnapshot>? Deployables = null);

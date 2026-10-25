@@ -1,0 +1,49 @@
+{
+  "SchemaVersion": 2,
+  "RecordedAtUtc": "2026-10-26T23:38:19.252982+00:00",
+  "Suite": "full",
+  "Machine": {
+    "Framework": ".NET 10.0.10",
+    "OperatingSystem": "macOS 26.7.1",
+    "ProcessArchitecture": "Arm64",
+    "ProcessorCount": 11,
+    "ServerGarbageCollection": false
+  },
+  "Scenarios": [
+    {
+      "Id": "observation.deployable-crossings-serial",
+      "BasePreset": "observation.deployable-crossings-serial",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Parameters": {
+        "destinationDistance": 1000,
+        "measuredIterations": 5,
+        "queryCount": 16,
+        "rangeUnits": 20,
+        "seed": 1,
+        "shipCount": 1024,
+        "simulatedDurationMilliseconds": 10000,
+        "systemCount": 4,
+        "travelDurationMilliseconds": 10000,
+        "warmupIterations": 3
+      },
+      "Digest": "d9620687dd96a0e5",
+      "SimulatedMilliseconds": 10000,
+      "Counts": {
+        "crossingQueries": 16,
+        "sources": 1024,
+        "stationaryTargets": 1024
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 283.6789,
+        "MinimumMilliseconds": 282.3099,
+        "MaximumMilliseconds": 288.5732,
+        "MedianAllocatedBytes": 391710144,
+        "Generation0Collections": 234,
+        "Generation1Collections": 1,
+        "Generation2Collections": 1
+      }
+    }
+  ]
+}

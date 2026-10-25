@@ -1,0 +1,94 @@
+[
+  {
+    "mode": "serial",
+    "args": [
+      "dotnet",
+      "run",
+      "-c",
+      "Release",
+      "--no-build",
+      "--no-restore",
+      "--project",
+      "benchmarks/GalaxyCommand.Benchmarks",
+      "--",
+      "--suite",
+      "full",
+      "--preset",
+      "observation.deployable-crossings-serial",
+      "--set",
+      "shipCount=1024",
+      "--set",
+      "warmupIterations=3",
+      "--set",
+      "measuredIterations=5"
+    ],
+    "environment": {
+      "DOTNET_TieredCompilation": "0"
+    },
+    "report": "2026-10-26-deployable-observation-serial.json"
+  },
+  {
+    "mode": "workers1",
+    "args": [
+      "dotnet",
+      "run",
+      "-c",
+      "Release",
+      "--no-build",
+      "--no-restore",
+      "--project",
+      "benchmarks/GalaxyCommand.Benchmarks",
+      "--",
+      "--suite",
+      "full",
+      "--preset",
+      "observation.deployable-crossings-batched",
+      "--set",
+      "shipCount=1024",
+      "--set",
+      "warmupIterations=3",
+      "--set",
+      "measuredIterations=5",
+      "--set",
+      "workerCount=1",
+      "--set",
+      "batchSize=1"
+    ],
+    "environment": {
+      "DOTNET_TieredCompilation": "0"
+    },
+    "report": "2026-10-26-deployable-observation-workers1.json"
+  },
+  {
+    "mode": "workers4",
+    "args": [
+      "dotnet",
+      "run",
+      "-c",
+      "Release",
+      "--no-build",
+      "--no-restore",
+      "--project",
+      "benchmarks/GalaxyCommand.Benchmarks",
+      "--",
+      "--suite",
+      "full",
+      "--preset",
+      "observation.deployable-crossings-batched",
+      "--set",
+      "shipCount=1024",
+      "--set",
+      "warmupIterations=3",
+      "--set",
+      "measuredIterations=5",
+      "--set",
+      "workerCount=4",
+      "--set",
+      "batchSize=1"
+    ],
+    "environment": {
+      "DOTNET_TieredCompilation": "0"
+    },
+    "report": "2026-10-26-deployable-observation-workers4.json"
+  }
+]

@@ -20,6 +20,8 @@ internal static class BenchmarkScenarioFactory
     internal static IBenchmarkScenario Create(string basePreset) =>
         basePreset switch
         {
+            BenchmarkPresets.DeployableObservationSerial => new DeployableObservationBenchmarkScenario(false),
+            BenchmarkPresets.DeployableObservationBatched => new DeployableObservationBenchmarkScenario(true),
             BenchmarkPresets.InteractionSessionSerial => new InteractionSessionBenchmarkScenario(false),
             BenchmarkPresets.InteractionSessionBatched => new InteractionSessionBenchmarkScenario(true),
             BenchmarkPresets.StationarySessionSerial => new InteractionSessionBenchmarkScenario(false, true),

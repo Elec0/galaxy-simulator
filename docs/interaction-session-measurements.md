@@ -2,6 +2,42 @@
 
 [Session execution contract](moving-ship-interactions.md#fixed-session-forecast-execution-settings) · [Pure swept batch measurements](interaction-batch-measurements.md) · [Task list](task-list.md)
 
+## TASK-073 deployable observation crossings
+
+On 2026-10-26, the bounded deployable observation integration added pure
+crossing measurements for moving owned sensors against fixed deployable
+observation positions. The fixture includes 1,024 sources and 1,024 stationary
+positions across four systems, with 16 searches through known 10-second linear
+curves. It measures preparation, system/extent pruning, exact range-boundary
+search and deterministic minimum reduction. It does not measure the complete
+session, presentation drawing, inventory transactions or station integration.
+
+The local Release characterization used .NET 10.0.10 on macOS 26.7.1, Arm64,
+11 reported logical processors and workstation GC. Tiered compilation was
+disabled; each mode ran three warmups followed by five measured iterations.
+Every iteration and mode produced digest `d9620687dd96a0e5`.
+
+| Execution | Median ms | Median allocated MB |
+| --- | ---: | ---: |
+| Original serial path | 283.68 | 391.71 |
+| One worker, batch 1 | 271.50 | 391.71 |
+| Four workers, batch 1 | 95.99 | 391.75 |
+
+These bounded results support the existing explicit opt-in execution binding.
+They select no new default worker count or production-scale timing target.
+Allocation remains substantial; the existing TASK-100 investigation retains
+that concern. Observation effects and fact disclosure still commit serially
+at completed boundaries, after private evaluation results join.
+
+The [manifest](../benchmarks/results/2026-10-26-deployable-observation-manifest.json)
+retains exact commands and environment settings, with separate
+[serial](../benchmarks/results/2026-10-26-deployable-observation-serial.json),
+[one-worker](../benchmarks/results/2026-10-26-deployable-observation-workers1.json)
+and [four-worker](../benchmarks/results/2026-10-26-deployable-observation-workers4.json)
+reports. The presets have no pinned default-workload digest yet; focused tests
+compare their boundary evidence and counts, while exact crossing tests prove
+fractional exits and source-union geometry independently.
+
 ## TASK-095 fixed-position extension
 
 On 2026-10-26, `interaction.stationary-session-serial` and

@@ -8,6 +8,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
 
     internal Action? ObservationTimestampCompleted { get; set; }
 
+    internal Func<SimulationTime, SimulationTime?>? NextObservationBoundary { get; set; }
+
     internal PrincipalId PlayerObserverPrincipalId => _relationships.PlayerPrincipalId;
 
     internal SensorDeployableObservationSnapshot CaptureSensorObservation() => _lifecycle.CaptureSensorObservation(CurrentTime);
@@ -31,10 +33,14 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             if (ship.PrincipalId == observer && geometry.Get(ship.Id) is { } point)
                 sources.Add((point, _sensorRadii[ship.DesignId]));
         }
+        foreach (DeployedSensorSourceSnapshot sensor in CaptureSensorObservation().Sources)
+            if (sensor.PrincipalId == observer)
+                sources.Add((PreparedInteractionPoint.Capture(
+                    InteractionPhaseCurve.Fixed(sensor.Position, CurrentTime, CurrentTime), CurrentTime), sensor.RadiusUnits));
         return new PlayerCoverageBoundary(CurrentTime, sources.ToArray());
     }
 
-    /// <summary>Captures coverage from one complete committed ship roster and immutable geometry.</summary>
+    /// <summary>Captures ship coverage from one complete roster, exact geometry and committed stationary sources.</summary>
     internal ShipSensorCoverageSnapshot CaptureShipCoverage(PrincipalId observer)
     {
         InteractionSpatialReadView view = _movement.CaptureInteractionReadView(CurrentTime);
@@ -44,8 +50,33 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             return new ShipSensorCoverageInput(_lifecycle.Entities.GetEntityId(ship.Id)!.Value,
                 ship.Id, ship.PrincipalId, _sensorRadii[ship.DesignId]);
         }).ToArray();
-        return ShipSensorCoverage.Evaluate(view, observer, inputs,
+        ShipSensorCoverageSnapshot ships = ShipSensorCoverage.Evaluate(view, observer, inputs,
             InteractionPreparationStrategy.BoundingBoxHierarchy(8), 128);
+        DeployedSensorSourceSnapshot[] stationary = CaptureSensorObservation().Sources
+            .Where(source => source.PrincipalId == observer).OrderBy(source => source.EntityId.Value).ToArray();
+        if (stationary.Length == 0) return ships;
+        PreparedInteractionProximityScope scope = InteractionProximityQuery.Prepare(view).PrepareScope(
+            inputs.Select(input => input.ShipId), InteractionPreparationStrategy.BoundingBoxHierarchy(8));
+        var covered = new HashSet<ShipId>(ships.CoveredShipIds);
+        foreach (DeployedSensorSourceSnapshot sensor in stationary)
+            covered.UnionWith(scope.FindStationary(PreparedInteractionPoint.Capture(
+                InteractionPhaseCurve.Fixed(sensor.Position, CurrentTime, CurrentTime), CurrentTime), sensor.RadiusUnits));
+        return ships with
+        {
+            CoveredShipIds = Array.AsReadOnly(covered.OrderBy(id => id.Value).ToArray()),
+            VisibleShipIds = Array.AsReadOnly(covered.Union(ships.OwnedShipIds).OrderBy(id => id.Value).ToArray()),
+        };
+    }
+
+    /// <summary>Reads owned ship capability and exact geometry for pure persistent-target crossing forecasts.</summary>
+    internal SimulationTime? FindNextObservationBoundary(IEnumerable<SystemPosition> positions, SimulationTime through)
+    {
+        InteractionSpatialReadView view = _movement.CaptureInteractionReadView(CurrentTime);
+        ShipSensorCoverageInput[] sources = view.Participants.Select(participant => _lifecycle.GetRequiredShip(participant.Spatial.ShipId))
+            .Where(ship => ship.PrincipalId == PlayerObserverPrincipalId)
+            .Select(ship => new ShipSensorCoverageInput(_lifecycle.Entities.GetEntityId(ship.Id)!.Value,
+                ship.Id, ship.PrincipalId, _sensorRadii[ship.DesignId])).ToArray();
+        return DeployableObservationCrossings.Next(view, sources, positions, through, _interactionSession?.InteractionExecution);
     }
 
     /// <summary>Rejects conflicting definitions rather than letting registration order choose coverage.</summary>
@@ -59,18 +90,5 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             radii[design.Id] = design.SensorRadiusUnits;
         }
         return radii;
-    }
-}
-
-/// <summary>Immutable exact source union for explicit event positions, without a synthetic target entity.</summary>
-internal sealed class PlayerCoverageBoundary(SimulationTime timestamp,
-    (PreparedInteractionPoint Point, ulong Radius)[] sources)
-{
-    /// <summary>Uses inclusive exact distances; removed subjects need no live spatial registration.</summary>
-    internal bool Contains(SystemPosition position)
-    {
-        PreparedInteractionPoint target = PreparedInteractionPoint.Capture(
-            InteractionPhaseCurve.Fixed(position, timestamp, timestamp), timestamp);
-        return sources.Any(source => source.Point.InRange(target, source.Radius));
     }
 }

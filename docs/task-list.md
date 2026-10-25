@@ -32,14 +32,22 @@ source of detailed scope and acceptance criteria.
 ## Current focus
 
 - [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
+  - Resumed by the owner on 2026-10-26 and implemented the deployable portion:
+    satellite coverage, filtered deployable presentation, persistent stale/
+    refresh/confirmed-absence records, checkpoint v2 and safe historical
+    disclosure. Includes exact pass-through/exit boundaries, overlapping-source
+    withdrawal and controlled-motion materialization. TASK-095 remains complete.
+    Verified 1,593 Release tests, a clean solution build, Godot C# build/startup,
+    and serial/worker crossing agreement. TASK-104's known benchmark mismatch
+    is unchanged. See [deployable integration](fog-of-war-and-scouting.md#deployable-observation-integration-2026-10-26).
   - Promoted by the project owner on 2026-10-19. The owner selected a staged
     boundary for review, then implementation of approved stages. The linked
     design now proposes ship coverage, live ship presentation/disclosure,
     persistent observation, and full entity integration stages. The owner
     approved the boundary, stage 1, and then stage 2's live contracts and the
     proposed 10 km starter-ship and preview-courier radii on 2026-10-19.
-    Station/deployable integration stays open under this task, with
-    prerequisites retaining their existing owners.
+    Station integration stays open under this task, with prerequisites
+    retaining their existing owners; the deployable delivery is recorded above.
   - Completed stage 1's pure ship coverage evaluator with explicit fixture
     radii, principal-owned sources, exact geometry, immutable identity sets,
     and deterministic serial source batches across existing spatial indexes.
@@ -50,11 +58,10 @@ source of detailed scope and acceptance criteria.
     All 1,467 solution tests and the Release build pass; headless Godot startup
     passes. Four canonical benchmark presets pass; the connector-navigation
     mismatch also occurs at untouched HEAD and is tracked by `TASK-104`.
-  - Stages 3 and 4 remain open for persistent discoveries and real station/
-    deployable integration. Station design remains `TASK-057`, station runtime
-    is `TASK-105`, and deployable runtime completed under `TASK-095`. Consume its
-    committed views and sources here. Do not mark this task
-    complete until those integrations satisfy the full accepted proof.
+  - The deployable portion of stages 3 and 4 now consumes TASK-095's committed
+    views and sources. Station design remains `TASK-057` and station runtime is
+    `TASK-105`. Station integration and the remaining full-domain proof stay
+    open; this task is not complete.
   - Implement the accepted `TASK-020` contracts for player-owned ship,
     station, and deployable sensor coverage, live authoritative contacts,
     transient ship disappearance, persistent structure discovery, stale

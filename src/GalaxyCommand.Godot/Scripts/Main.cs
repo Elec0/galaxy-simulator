@@ -369,7 +369,7 @@ public partial class Main : Node
 		_activity.Text = DescribeActivity();
 
 		_status.Text =
-			$"SIM {FormatTime(snapshot.Time)}   |   {_map.ViewDescription}   |   SHIPS {snapshot.Ships.Count}   |   " +
+			$"SIM {FormatTime(snapshot.Time)}   |   {_map.ViewDescription}   |   SHIPS {snapshot.Ships.Count}   |   DEPLOYABLE RECORDS {snapshot.Deployables.Count}   |   " +
 			$"{control}   |   {queue}   |   {_lastCommandStatus}   |   " +
 			$"{order}   |   {motion}   |   {facts}";
 	}

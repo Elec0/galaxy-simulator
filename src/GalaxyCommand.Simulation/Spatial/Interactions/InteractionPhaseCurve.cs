@@ -95,9 +95,13 @@ internal sealed record InteractionCurvePiece(InteractionFraction From, Interacti
 /// <summary>Read-only pair evaluation across rational curve pieces and target-position holds.</summary>
 internal static class InteractionPhaseRangeQuery
 {
-    /// <summary>Clips known phases, searches their exact piece overlaps, and samples the full held curves at the due timestamp.</summary>
+    /// <summary>
+    /// Clips known phases and searches exact piece overlaps. Outside searches
+    /// include equality as an exit boundary; callers sample the next integer
+    /// before claiming loss. A constant equality cannot change coverage.
+    /// </summary>
     internal static SweptRangeContact? Find(InteractionPhaseCurve first, InteractionPhaseCurve second,
-        SimulationTime from, SimulationTime through, ulong range, bool includeThrough = true)
+        SimulationTime from, SimulationTime through, ulong range, bool includeThrough = true, bool outside = false)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(through.Milliseconds, from.Milliseconds, nameof(through));
         if (first.System != second.System) return null;
@@ -115,6 +119,8 @@ internal static class InteractionPhaseRangeQuery
             InteractionFraction upper = Min(Min(left.Through, right.Through), InteractionFraction.Integer(end));
             if (upper < lower) continue;
             BigInteger[] predicate = Predicate(left, right, range);
+            if (outside && predicate.All(value => value.IsZero)) continue;
+            if (outside) predicate = predicate.Select(value => -value).ToArray();
             SweptRangeContact? contact = PolynomialRangeQuery.FindFirstContact(predicate, origin,
                 lower - InteractionFraction.Integer(start), upper - InteractionFraction.Integer(start),
                 includeThrough || upper < InteractionFraction.Integer(end));

@@ -6,6 +6,21 @@ public sealed class InteractionSessionBenchmarkTests
 {
     [Theory]
     [InlineData(1, 1)]
+    [InlineData(4, 7)]
+    public void PersistentObservationCrossingBatchesMatchTheSerialReference(int workers, int batch)
+    {
+        var serial = BenchmarkScenarioResolver.ResolvePreset("observation.deployable-crossings-serial");
+        var parallel = BenchmarkScenarioResolver.ResolvePreset("observation.deployable-crossings-batched",
+            new Dictionary<string, long> { ["workerCount"] = workers, ["batchSize"] = batch });
+        ScenarioCorrectnessResult expected = BenchmarkScenarioFactory.Create(serial.BasePreset).Run(serial);
+        ScenarioCorrectnessResult actual = BenchmarkScenarioFactory.Create(parallel.BasePreset).Run(parallel);
+        Assert.True(expected.Counts["crossingQueries"] > 0);
+        Assert.Equal(expected.Digest, actual.Digest);
+        Assert.Equal(expected.Counts, actual.Counts);
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
     [InlineData(4, 16)]
     public void StationaryTargetSessionBenchmarkMatchesItsSerialReference(int workers, int batch)
     {

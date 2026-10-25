@@ -261,6 +261,21 @@ public partial class GalaxyMap : Control
 			DrawString(ThemeDB.FallbackFont, position + new Vector2(10, -8), $"C{endpoint.Id.Value}", fontSize: 11, modulate: new Color("d9b9ef"));
 		}
 
+		foreach (ObservedSensorDeployableSnapshot observation in _snapshot.Deployables.Where(item => item.View.Position.SystemId == system.Id))
+		{
+			SensorDeployableViewSnapshot view = observation.View;
+			Vector2 position = ToSystemView(view.Position.Position);
+			string state = observation.State switch
+			{
+				SensorObservationState.Live => "current",
+				SensorObservationState.Stale => "stale",
+				_ => "confirmed missing",
+			};
+			DrawString(ThemeDB.FallbackFont, position + new Vector2(10, -8),
+				$"D{view.EntityId.Value} {view.DefinitionKey.LocalId.Value} | {state} | observed {view.ObservedAt.Milliseconds / 1000.0:0.###}s",
+				fontSize: 11, modulate: new Color("668ca5"));
+		}
+
 		foreach (GameObservedShipSnapshot ship in _snapshot.Ships.Where(ship => ship.Position?.SystemId == system.Id))
 		{
 			if (ship.Position is not { } systemPosition)

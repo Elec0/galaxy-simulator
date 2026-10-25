@@ -277,6 +277,106 @@ commit-time disclosure and bounded-receipt rules to this mapping. The approval
 changes the accepted future contract, not the implemented stage status. See
 the [TASK-095 decision register](sensor-deployables.md#owner-decisions-and-remaining-inputs).
 
+### Deployable observation integration (2026-10-26)
+
+The owner resumed the requested satellite observation work under TASK-073 after
+review confirmed that TASK-095's runtime/content delivery was complete. This
+bounded delivery consumes that runtime's actual committed views and sources.
+Station composition/runtime remains with TASK-057 and TASK-105; player deploy
+and pickup controls remain TASK-107.
+
+The review found four integration points: the player source union was ship-only,
+the presentation world had no deployable records, the session had no persistent
+discovery owner, and the observation checkpoint retained only player binding and
+fact disclosure receipts. It also identified pass-through discovery between
+ordinary events, overlapping-source withdrawal, and historical disclosure as
+necessary proof for the requested behavior.
+
+Player-owned satellites now contribute their retained definition radii to the
+same exact, inclusive, system-local source union as owned ships. Foreign sources
+do not contribute. Pickup or removal withdraws only that source at its committed
+boundary; an overlapping source continues to supply coverage. A satellite remains
+a real stationary entity, with no synthetic ship, controller or motion actor.
+Stationary-source queries reuse the prepared ship index. Repeated point queries
+for discovery and disclosure use immutable source-region bounds followed by exact
+circle checks.
+
+The session owns external deployable discovery records in stable entity order.
+Only the deployable owner's approved identity, definition, principal, position
+and observation time enter a record. Covered external records are live; losing
+all coverage retains the last observed view as stale. Return refreshes that view.
+Coverage at a remembered position with no resolvable entity confirms absence,
+retaining the old observation time without inferring a removal time or cause.
+Confirmed-missing records survive later coverage loss. Owned deployables always
+come from current committed owner views and disappear when removed.
+
+```mermaid
+flowchart LR
+    owners["Committed ship geometry and deployable views/sources"] --> evaluate["Pure coverage and crossing batches"]
+    evaluate --> join["Completed simulation boundary"]
+    join --> ledger["Session-owned external discovery records"]
+    join --> receipts["Bounded historical disclosure receipts"]
+    ledger --> presentation["Player world: live, stale, confirmed missing"]
+    receipts --> presentation
+    ledger --> checkpoint["Observation checkpoint v2"]
+```
+
+Discovery commits at completed simulation boundaries, including boundaries with
+no pending facts. Presentation reads do not mutate discoveries. The advance loop
+also stops at derived coverage crossings against live and remembered stationary
+positions. It uses exact known motion curves, pruned by system and swept extent,
+and samples the integral boundaries around fractional crossings. This preserves
+the last covered millisecond at exit and detects pass-through discovery without
+requiring a presentation read. Original physical boundaries retain their ordering
+and rounded-position reset semantics. Derived observation stops allocate no agenda
+events or semantic fact sequences and do not replace movement ownership.
+Direct controlled-motion handoffs and releases also join observation after
+materializing their committed positions, including sub-meter rounding at release.
+
+Pure crossing evaluation retains a serial reference path and can use the host's
+existing explicit batch execution binding. Private batch minima join before
+ordered observation publication. Source order, target order and worker completion
+order do not choose the result. Targets and current sensor geometry are rebuilt
+from committed state; no crossing forecast is checkpoint authority.
+
+Observation checkpoint behavior version 2 requires the explicit discovery
+collection, including an empty collection. Restore validates identity uniqueness,
+registered principal/system links, immutable deployment evidence, observation times,
+state validity, current covered-live consistency and retained safe disclosure
+receipts before publishing the session. It restores retained evidence directly,
+including stale records whose entities were removed while hidden. General encoded
+save admission and content migration remain TASK-037.
+
+The Godot preview consumes only the player presentation world's deployable
+records. System-map labels identify the definition and entity, current/stale/
+confirmed-missing state, and last observation time. The record count is explicit;
+these labels add no deploy/pickup interaction or private authoritative inspector.
+Coverage also participates in commit-time external notices. Discovering an entity
+later never replays a hidden deploy/pickup/removal fact, and external disappearance
+notices expose no actor, command, inventory, raw cause or removal reason.
+
+Focused evidence lives in
+[deployable observation tests](../tests/GalaxyCommand.Simulation.Tests/Presentation/DeployableObservationTests.cs),
+[exact crossing and coverage tests](../tests/GalaxyCommand.Simulation.Tests/Spatial/DeployableObservationCrossingTests.cs),
+and [batch benchmark tests](../tests/GalaxyCommand.Benchmarks.Tests/InteractionSessionBenchmarkTests.cs).
+Benchmark presets `observation.deployable-crossings-serial` and
+`observation.deployable-crossings-batched` measure pure crossing evaluation and
+compare ordered boundary evidence. Timing is informational, not a worker-default
+selection or a gameplay rule. The [recorded measurements](interaction-session-measurements.md#task-073-deployable-observation-crossings)
+retain commands, bounded workload details and matching serial/worker digests.
+
+Verification passed all 1,593 Release solution tests and the solution build
+with zero warnings/errors. The Godot C# build and headless preview startup
+passed. The editor's `--build-solutions` invocation could not write its user
+build logs inside the filesystem sandbox; the direct C# build verified the
+same project without requiring editor settings writes. Six existing canonical
+benchmark presets retained their expected digests. TASK-104's known navigation
+mismatch remains `88e79d6112f53750` versus `673c9af7f54a80e4`.
+
+This closes the requested deployable integration, not TASK-073 as a whole.
+Station integration and the remaining full-domain proof still depend on
+TASK-057 and TASK-105.
+
 ## Decisions at a glance
 
 | Question | Decision |

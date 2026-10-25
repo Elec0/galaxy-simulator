@@ -79,6 +79,8 @@ public sealed record BenchmarkPreset
 
 public static class BenchmarkPresets
 {
+    public const string DeployableObservationSerial = "observation.deployable-crossings-serial";
+    public const string DeployableObservationBatched = "observation.deployable-crossings-batched";
     public const string StationarySessionSerial = "interaction.stationary-session-serial";
     public const string StationarySessionBatched = "interaction.stationary-session-batched";
     public const string InteractionSessionSerial = "interaction.session-serial";
@@ -304,8 +306,20 @@ public static class BenchmarkPresets
             new(StationarySessionSerial, true, sessionParameters),
             new(StationarySessionBatched, true, sessionBatchParameters),
         ];
+        var observationParameters = Parameters(
+            (BenchmarkParameterNames.WarmupIterations, 1), (BenchmarkParameterNames.MeasuredIterations, 3),
+            (BenchmarkParameterNames.Seed, 1), (BenchmarkParameterNames.SimulatedDurationMilliseconds, 10000),
+            (BenchmarkParameterNames.ShipCount, 256), (BenchmarkParameterNames.SystemCount, 4),
+            (BenchmarkParameterNames.QueryCount, 16), (BenchmarkParameterNames.RangeUnits, 20),
+            (BenchmarkParameterNames.TravelDurationMilliseconds, 10000), (BenchmarkParameterNames.DestinationDistance, 1000));
+        BenchmarkPreset[] observations =
+        [
+            new(DeployableObservationSerial, true, observationParameters),
+            new(DeployableObservationBatched, true, new Dictionary<string, long>(observationParameters)
+            { [BenchmarkParameterNames.WorkerCount] = 1, [BenchmarkParameterNames.BatchSize] = 1 }),
+        ];
         return new ReadOnlyDictionary<string, BenchmarkPreset>(
-            values.Append(prepared).Concat(indexes).Concat(runtime).Concat(sweeps).Concat(runtimeSweeps).Concat(batchSweeps).Concat(sessions).ToDictionary(value => value.Id, StringComparer.Ordinal));
+            values.Append(prepared).Concat(indexes).Concat(runtime).Concat(sweeps).Concat(runtimeSweeps).Concat(batchSweeps).Concat(sessions).Concat(observations).ToDictionary(value => value.Id, StringComparer.Ordinal));
     }
 
     private static ReadOnlyDictionary<string, long> Parameters(
@@ -551,6 +565,18 @@ public static class BenchmarkScenarioValidator
 
         switch (scenario.BasePreset)
         {
+            case BenchmarkPresets.DeployableObservationBatched:
+                RequireRange(scenario, BenchmarkParameterNames.WorkerCount, 1, 1024);
+                RequireRange(scenario, BenchmarkParameterNames.BatchSize, 1, int.MaxValue);
+                goto case BenchmarkPresets.DeployableObservationSerial;
+            case BenchmarkPresets.DeployableObservationSerial:
+                RequireRange(scenario, BenchmarkParameterNames.ShipCount, 1, 1000000);
+                RequireRange(scenario, BenchmarkParameterNames.SystemCount, 1, 10000);
+                RequireRange(scenario, BenchmarkParameterNames.QueryCount, 1, 10000);
+                RequireRange(scenario, BenchmarkParameterNames.RangeUnits, 0, int.MaxValue);
+                RequireRange(scenario, BenchmarkParameterNames.TravelDurationMilliseconds, 1, 86400000);
+                RequireRange(scenario, BenchmarkParameterNames.DestinationDistance, 1, int.MaxValue);
+                break;
             case BenchmarkPresets.StationarySessionBatched:
             case BenchmarkPresets.InteractionSessionBatched:
                 RequireRange(scenario, BenchmarkParameterNames.WorkerCount, 1, 1024);

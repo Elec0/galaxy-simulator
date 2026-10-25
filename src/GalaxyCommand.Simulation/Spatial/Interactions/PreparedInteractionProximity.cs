@@ -118,6 +118,17 @@ public sealed class PreparedInteractionProximityScope
         }
         return matches is null ? Empty : Array.AsReadOnly(matches.ToArray());
     }
+
+    /// <summary>Queries a real stationary source against the same exact scoped ship index.</summary>
+    internal IReadOnlyList<ShipId> FindStationary(PreparedInteractionPoint source, ulong rangeUnits)
+    {
+        // Query boxes carry no entity identity. The default ID is never registered
+        // as a participant and does not exclude a target from these results.
+        IEnumerable<ShipId> candidates = _index is null ? _targets.Select(target => target.Id)
+            : _index.Query(source.Bounds(default).Expand(rangeUnits)).Candidates;
+        return Array.AsReadOnly(candidates.Where(id => source.InRange(_view.Get(id)!, rangeUnits))
+            .OrderBy(id => id.Value).ToArray());
+    }
 }
 
 /// <summary>Exact point with a common reduced denominator; independent of published position rounding.</summary>

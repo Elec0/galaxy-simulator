@@ -532,6 +532,12 @@ measured worker settings. TASK-104's existing navigation mismatch remains
 `88e79d6112f53750` versus expected `673c9af7f54a80e4`; its baseline was not changed.
 TASK-095 is complete within the approved runtime/content scope.
 
+The owner resumed observation integration under TASK-073 on 2026-10-26.
+Its [deployable integration](fog-of-war-and-scouting.md#deployable-observation-integration-2026-10-26)
+now consumes the committed satellite sources and views for player coverage,
+presentation, stale/refresh/confirmed-absence records and checkpoint continuity.
+TASK-095 remains complete within its original runtime/content scope.
+
 ## Deferred work
 
 `TASK-095` completes the accepted runtime lifecycle and range-order contracts.

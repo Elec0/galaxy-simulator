@@ -58,7 +58,11 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                 if (end < through) through = end;
             }
             if (_agenda.NextEventKey is { } next && next.Timestamp < through) through = next.Timestamp;
+            if (NextObservationBoundary?.Invoke(through) is { } observation && observation < through) through = observation;
             events = checked(events + _engine.RunUntil(through).EventsProcessed);
+            // RunUntil can advance to a derived observation boundary without an
+            // agenda event. Join evidence there after all due physical work.
+            ObservationTimestampCompleted?.Invoke();
         }
         return new RunReport(start, CurrentTime, events);
     }

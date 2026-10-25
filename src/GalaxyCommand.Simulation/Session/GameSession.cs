@@ -36,10 +36,12 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         _runtime = new ActorOrderRuntimeCoordinator(setup, navigation, _facts);
         _playerCommandSource = setup.PlayerCommandSource;
         _runtime.ObservationTimestampCompleted = CompletePlayerDisclosure;
+        _runtime.NextObservationBoundary = FindNextDeployableObservationBoundary;
         _random = new DeterministicRandomOwner(setup.RandomRootSeed);
         _commands = new GameplayCommandProcessor(this, _facts);
         _spatialInteractions.AttachMutationGuard(EnsureHealthy);
         _runtime.AttachSpatialInteractions(_spatialInteractions, this);
+        CommitDeployableObservations();
     }
 
     /// <summary>
@@ -60,7 +62,10 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         _facts = facts;
         _runtime = runtime;
         _playerCommandSource = observation.PlayerCommandSource;
+        foreach (ObservedSensorDeployableSnapshot item in observation.Deployables!)
+            _deployableObservations.Add(item.View.EntityId, item);
         _runtime.ObservationTimestampCompleted = CompletePlayerDisclosure;
+        _runtime.NextObservationBoundary = FindNextDeployableObservationBoundary;
         _random = random;
         CheckpointResult<GameplayCommandProcessor> commands =
             GameplayCommandProcessor.RestoreCheckpoint(
@@ -207,11 +212,14 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
     /// <summary>
     /// Advances through completed timestamps up to target, stopping at the earliest active
     /// controlled interval end until its owning domain explicitly renews or releases motion.
+    /// Reconciles player observation at completed and derived coverage boundaries.
     /// </summary>
     public RunReport AdvanceTo(SimulationTime target)
     {
         EnsureHealthy();
-        return _runtime.AdvanceTo(target);
+        RunReport report = _runtime.AdvanceTo(target);
+        CompletePlayerDisclosureIfIdle();
+        return report;
     }
 
     public GameSnapshot CaptureSnapshot()
@@ -237,7 +245,7 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             request.FactCursor,
             request.MaximumFactCount);
         return GamePresentationSnapshotFactory.Create(world, request, facts,
-            _runtime.CaptureShipCoverage(request.ObserverPrincipalId));
+            _runtime.CaptureShipCoverage(request.ObserverPrincipalId), CaptureObservedDeployables());
     }
 
     /// <summary>
@@ -290,7 +298,8 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             _commands.CaptureCheckpoint(),
             value.InventoryCommit,
             _spatialInteractions.CaptureCheckpoint(),
-            new PlayerObservationCheckpoint(1, value.Relationships.PlayerPrincipalId, _playerCommandSource));
+            new PlayerObservationCheckpoint(2, value.Relationships.PlayerPrincipalId, _playerCommandSource,
+                Array.AsReadOnly(_deployableObservations.Values.OrderBy(item => item.View.EntityId.Value).ToArray())));
         return CheckpointResult<GameSessionCheckpoint>.Success(checkpoint);
     }
 
@@ -439,9 +448,10 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             runtime.Value!.CaptureInteractionReadView());
         if (deliveryFailure is not null) return CheckpointResult<GameSession>.Rejected(deliveryFailure);
 
-        if (checkpoint.PlayerObservation is not { BehaviorVersion: 1 } observation
+        if (checkpoint.PlayerObservation is not { BehaviorVersion: 2 } observation
             || observation.PlayerCommandSource is not { Kind: CommandSourceKind.Player }
             || observation.ObserverPrincipalId != checkpoint.Relationships.PlayerPrincipalId
+            || !IsValidDeployableObservation(checkpoint, observation, runtime.Value!)
             || checkpoint.Facts.RetainedFacts.Any(fact => fact is null
                 || !IsValidPlayerDisclosure(fact, checkpoint, observation)))
             return CheckpointResult<GameSession>.Rejected(new CheckpointValidationFailure(
