@@ -10,6 +10,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
 
     internal PrincipalId PlayerObserverPrincipalId => _relationships.PlayerPrincipalId;
 
+    internal SensorDeployableObservationSnapshot CaptureSensorObservation() => _lifecycle.CaptureSensorObservation(CurrentTime);
+
     /// <summary>Reads only identity/ownership for a pending fact subject, without constructing a world snapshot.</summary>
     internal PrincipalId? CaptureSubjectPrincipal(ShipId ship) => _lifecycle.Entities.GetEntityId(ship) is null
         ? null : _lifecycle.GetRequiredShip(ship).PrincipalId;

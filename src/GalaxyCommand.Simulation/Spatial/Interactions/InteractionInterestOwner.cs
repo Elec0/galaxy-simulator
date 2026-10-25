@@ -1,14 +1,14 @@
 namespace GalaxyCommand.Simulation;
 
 /// <summary>Derived change notice from a domain's authoritative interest commit.</summary>
-public sealed record InteractionInterestChange(InteractionInterestId Id, ShipPairInteractionInterest? Interest);
+public sealed record InteractionInterestChange(InteractionInterestId Id, SpatialInteractionInterest? Interest);
 
 /// <summary>Durable notification history correlated to directed participants in the stable delivery view.</summary>
 internal sealed record InteractionDeliveryCorrelation(InteractionInterestId InterestId,
     EventGeneration Generation, SpatialRevision SourceRevision, SpatialRevision TargetRevision);
 
 internal sealed record InteractionInterestOwnerCheckpoint(
-    string DomainKind, IReadOnlyList<ShipPairInteractionInterest> Interests,
+    string DomainKind, IReadOnlyList<SpatialInteractionInterest> Interests,
     IReadOnlyList<InteractionDeliveryCorrelation>? Deliveries = null);
 
 /// <summary>Reusable interest state composed inside a consuming gameplay domain.</summary>
@@ -18,7 +18,7 @@ public sealed class InteractionInterestOwner
     private bool _evaluationReadOnly;
     private Action? _sessionMutationGuard;
 
-    private readonly Dictionary<InteractionInterestId, ShipPairInteractionInterest> _interests = [];
+    private readonly Dictionary<InteractionInterestId, SpatialInteractionInterest> _interests = [];
     private readonly Dictionary<InteractionInterestId, InteractionInterestChange> _changes = [];
     private readonly Dictionary<InteractionInterestId, InteractionDeliveryCorrelation> _deliveries = [];
 
@@ -35,7 +35,47 @@ public sealed class InteractionInterestOwner
     }
 
     public string DomainKind { get; }
-    public ShipPairInteractionInterest? Get(InteractionInterestId id) => _interests.GetValueOrDefault(id);
+
+    /// <summary>Returns ship-pair intent only; use GetInterest for either target category.</summary>
+    public ShipPairInteractionInterest? Get(InteractionInterestId id) => _interests.GetValueOrDefault(id) as ShipPairInteractionInterest;
+
+    /// <summary>Returns current intent of either target category without resolving domain eligibility.</summary>
+    public SpatialInteractionInterest? GetInterest(InteractionInterestId id) => _interests.GetValueOrDefault(id);
+
+    /// <summary>Captures both ship-pair and stationary interests in session identity order.</summary>
+    public IReadOnlyList<SpatialInteractionInterest> CaptureAllSnapshot() =>
+        Array.AsReadOnly(_interests.Values.OrderBy(interest => interest.Id.Value).ToArray());
+
+    /// <summary>Registers domain-approved fixed target input, consuming an ID only after validation.</summary>
+    public StationaryInteractionInterest RegisterStationary(string purpose, ShipId source,
+        SystemPosition position, ulong rangeUnits, EntityId? entityId = null, SpatialRevision targetRevision = default)
+    {
+        EnsureMutable();
+        // Validate with a nonallocated probe so rejected input cannot advance the shared allocator.
+        _ = new StationaryInteractionInterest(new InteractionInterestId(1), DomainKind, purpose,
+            source, position, rangeUnits, default, entityId, targetRevision);
+        var interest = new StationaryInteractionInterest(_ids.Allocate(), DomainKind, purpose,
+            source, position, rangeUnits, default, entityId, targetRevision);
+        _interests.Add(interest.Id, interest);
+        _changes[interest.Id] = new InteractionInterestChange(interest.Id, interest);
+        return interest;
+    }
+
+    /// <summary>Revises target evidence under the same intent ID and invalidates prior delivery.</summary>
+    public StationaryInteractionInterest UpdateStationary(InteractionInterestId id, ShipId source,
+        SystemPosition position, ulong rangeUnits, EntityId? entityId = null, SpatialRevision targetRevision = default)
+    {
+        EnsureMutable();
+        var current = (StationaryInteractionInterest)_interests[id];
+        if (current.Source == source && current.Position == position && current.RangeUnits == rangeUnits
+            && current.EntityId == entityId && current.Revision == targetRevision) return current;
+        var interest = new StationaryInteractionInterest(id, DomainKind, current.PurposeId,
+            source, position, rangeUnits, current.Generation.Next(), entityId, targetRevision);
+        _interests[id] = interest;
+        _deliveries.Remove(id);
+        _changes[id] = new InteractionInterestChange(id, interest);
+        return interest;
+    }
 
     /// <summary>Commits a new directed interest. Invalid input consumes no session identity.</summary>
     public ShipPairInteractionInterest Register(string purpose, ShipId source, ShipId target, ulong rangeUnits)
@@ -54,7 +94,7 @@ public sealed class InteractionInterestOwner
     public ShipPairInteractionInterest Update(InteractionInterestId id, ShipId source, ShipId target, ulong rangeUnits)
     {
         EnsureMutable();
-        ShipPairInteractionInterest current = _interests[id];
+        ShipPairInteractionInterest current = (ShipPairInteractionInterest)_interests[id];
         if (current.Source == source && current.Target == target && current.RangeUnits == rangeUnits)
             return current;
 
@@ -78,9 +118,9 @@ public sealed class InteractionInterestOwner
         return true;
     }
 
-    /// <summary>Captures immutable interests in session identity order for stable evaluation.</summary>
+    /// <summary>Captures ship-pair interests only; CaptureAllSnapshot includes stationary targets.</summary>
     public IReadOnlyList<ShipPairInteractionInterest> CaptureSnapshot() =>
-        Array.AsReadOnly(_interests.Values.OrderBy(interest => interest.Id.Value).ToArray());
+        Array.AsReadOnly(_interests.Values.OfType<ShipPairInteractionInterest>().OrderBy(interest => interest.Id.Value).ToArray());
 
     /// <summary>Captures the latest unacknowledged change per identity in deterministic order.</summary>
     public IReadOnlyList<InteractionInterestChange> CaptureChanges() =>
@@ -105,29 +145,29 @@ public sealed class InteractionInterestOwner
     }
 
     /// <summary>Tests delivery history against the actual stable-view revisions, including applied completion boundaries.</summary>
-    internal bool HasDelivered(ShipPairInteractionInterest interest, InteractionSpatialReadView view) =>
+    internal bool HasDelivered(SpatialInteractionInterest interest, InteractionSpatialReadView view) =>
         _deliveries.TryGetValue(interest.Id, out InteractionDeliveryCorrelation? delivery)
         && delivery.Generation == interest.Generation
         && view.Get(interest.Source)?.Revision == delivery.SourceRevision
-        && view.Get(interest.Target)?.Revision == delivery.TargetRevision;
+        && interest.TargetRevision(view) == delivery.TargetRevision;
 
     /// <summary>
     /// Acknowledges successful domain evaluation after the complete effect commit.
     /// Uses the evaluation view, preserving later effect changes as fresh triggers.
     /// Canceled or revised interests cannot acquire obsolete delivery history.
     /// </summary>
-    internal void RecordDelivery(ShipPairInteractionInterest interest, InteractionSpatialReadView view)
+    internal void RecordDelivery(SpatialInteractionInterest interest, InteractionSpatialReadView view)
     {
         EnsureMutable();
-        if (Get(interest.Id) != interest) return;
+        if (GetInterest(interest.Id) != interest) return;
         InteractionSpatialParticipant source = view.Get(interest.Source)
             ?? throw new InvalidOperationException("Delivered contact is missing its stable source participant.");
-        InteractionSpatialParticipant target = view.Get(interest.Target)
+        SpatialRevision targetRevision = interest.TargetRevision(view)
             ?? throw new InvalidOperationException("Delivered contact is missing its stable target participant.");
-        _deliveries[interest.Id] = new(interest.Id, interest.Generation, source.Revision, target.Revision);
+        _deliveries[interest.Id] = new(interest.Id, interest.Generation, source.Revision, targetRevision);
     }
 
-    internal InteractionInterestOwnerCheckpoint CaptureCheckpoint() => new(DomainKind, CaptureSnapshot(),
+    internal InteractionInterestOwnerCheckpoint CaptureCheckpoint() => new(DomainKind, CaptureAllSnapshot(),
         Array.AsReadOnly(_deliveries.Values.OrderBy(delivery => delivery.InterestId.Value).ToArray()));
 
     /// <summary>Restores domain intent against the already-restored shared allocator and seeds derived rebuild notices.</summary>
@@ -141,7 +181,7 @@ public sealed class InteractionInterestOwner
 
         var owner = new InteractionInterestOwner(checkpoint.DomainKind, sessionIds);
         ulong? next = sessionIds.CaptureCheckpoint().NextValue;
-        foreach (ShipPairInteractionInterest interest in checkpoint.Interests)
+        foreach (SpatialInteractionInterest interest in checkpoint.Interests)
         {
             if (interest is null || interest.DomainKind != checkpoint.DomainKind ||
                 interest.Id.Value == 0 || (next is { } nextValue && interest.Id.Value >= nextValue) ||
@@ -153,7 +193,7 @@ public sealed class InteractionInterestOwner
 
         foreach (InteractionDeliveryCorrelation delivery in checkpoint.Deliveries ?? [])
         {
-            if (delivery is null || !owner._interests.TryGetValue(delivery.InterestId, out ShipPairInteractionInterest? interest)
+            if (delivery is null || !owner._interests.TryGetValue(delivery.InterestId, out SpatialInteractionInterest? interest)
                 || delivery.Generation != interest.Generation || !owner._deliveries.TryAdd(delivery.InterestId, delivery))
                 return Reject("Delivery history must uniquely reference a live interest at its current generation.");
         }

@@ -25,7 +25,7 @@ source of detailed scope and acceptance criteria.
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` completed the [equipment and ship-slot design](equipment-and-ship-slots.md); `TASK-099` owns implementation. `TASK-055` owns trade balance, pricing, and settlement design. |
-| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract; `TASK-075` completed deployment and pickup range and action-order design. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. `TASK-071` completed shared interaction discovery, timing, deterministic evaluation, and explicit motion handoffs. | `TASK-068` defined installed-equipment capability contributions; `TASK-099` implements them; `TASK-046` retains frozen combat design and `TASK-103` tracks combat activation and active-domain continuation. `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-095` implements deployables and range orders, `TASK-094` owns player order-failure notifications, and `TASK-088` retains late-term spatial authoring guidance. |
+| Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract; `TASK-075` completed deployment and pickup range and action-order design. `TASK-095` completed deployable runtime, range orders, committed observation inputs and checkpoint continuity; `TASK-106` completed independent ship-definition retention. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. `TASK-071` completed shared interaction discovery, timing, deterministic evaluation, and explicit motion handoffs. | `TASK-068` defined installed-equipment capability contributions; `TASK-099` implements them; `TASK-046` retains frozen combat design and `TASK-103` tracks combat activation and active-domain continuation. `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-107` owns player deployment/pickup controls, `TASK-094` owns player order-failure notifications, and `TASK-088` retains late-term spatial authoring guidance. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 | Source-code organization | `TASK-091` reorganized source and tests around the documented simulation authority, client presentation, deterministic execution, and test-harness boundaries without changing simulation behavior or public type identity. | Further namespace or assembly changes require measured need and separately approved work. |
 
@@ -52,7 +52,8 @@ source of detailed scope and acceptance criteria.
     mismatch also occurs at untouched HEAD and is tracked by `TASK-104`.
   - Stages 3 and 4 remain open for persistent discoveries and real station/
     deployable integration. Station design remains `TASK-057`, station runtime
-    is `TASK-105`, and deployable runtime is `TASK-095`. Do not mark this task
+    is `TASK-105`, and deployable runtime completed under `TASK-095`. Consume its
+    committed views and sources here. Do not mark this task
     complete until those integrations satisfy the full accepted proof.
   - Implement the accepted `TASK-020` contracts for player-owned ship,
     station, and deployable sensor coverage, live authoritative contacts,
@@ -122,6 +123,14 @@ source of detailed scope and acceptance criteria.
   - Context: [Time and pacing](time-and-pacing.md)
 
 ## Future parking lot
+
+- [ ] **TASK-107: Design and implement player deployment/pickup controls**
+  - The owner selected runtime/content integration first for TASK-095. Define
+    and review the player interaction before implementing deployable selection,
+    placement and pickup controls through its existing command boundary.
+    Player order-failure notification remains TASK-094, and observation remains
+    TASK-073. This task is not part of TASK-095's runtime delivery.
+  - Context: [Initial deployable delivery](sensor-deployables.md#initial-content-adaptation-and-delivery)
 
 - [ ] **TASK-105: Implement the approved station entity runtime**
   - Begin after `TASK-057` settles station composition and lifecycle design.
@@ -366,17 +375,6 @@ the project-level **Near-term work** section above.
     Equipment destroyed while its ship remains live stays installed and
     nonfunctional under `TASK-068`; this follow-up owns ship-loss disposition.
   - Context: [Equipment and ship slots](equipment-and-ship-slots.md) · [Entity lifecycle](entity-lifecycle.md)
-
-- [ ] **TASK-095: Implement sensor deployables and deployment/pickup orders**
-  - Implement the accepted `TASK-074` and `TASK-075` inventory/entity lifecycle,
-    item-defined deployment range, ship-defined pickup range, and approach
-    orders with moving execution, inclusive bounds, no reservations, terminal
-    failure, and immediate queue progression on success.
-  - Coordinate range-entry timing with `TASK-071` and sensor-source consumption
-    with `TASK-073`. Supply facts, snapshots, checkpoint/save continuity,
-    deterministic contention, and the design's focused verification criteria.
-    Player failure notification remains deferred to `TASK-094`.
-  - Context: [Sensor deployables](sensor-deployables.md) · [Moving-ship interactions](moving-ship-interactions.md)
 
 - [ ] **TASK-094: Define and implement player order-failure notifications**
   - Provide a player-facing notification when an accepted order fails,
@@ -843,6 +841,37 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-095: Implement sensor deployables and deployment/pickup orders**
+  - Completed the owner-approved runtime/content delivery on 2026-10-26:
+    Satellite and Advanced Satellite definitions, explicit initial cargo in the
+    built-in game and development preview, and independent ship pickup ranges.
+  - Implemented atomic item/entity transactions, shared stationary range
+    interests, moving approach execution, ReplaceAll/Append, execution-time
+    revalidation, terminal outcomes and deterministic command-order contention.
+    Actions reserve nothing and execute at most once per ship per evaluation wave.
+  - Added typed committed views/sources, safe historical notices, direct
+    checkpoint continuation and idempotency. TASK-106 records the independent
+    definition retention shared by starting and constructed ships.
+  - Verified 1,570 Release tests, a clean Release build, both content packages,
+    Godot headless build/startup, six existing canonical benchmark digests and
+    stationary serial/worker comparisons. TASK-104's known navigation digest
+    mismatch remains visible and unchanged.
+  - Observation integration remains TASK-073, player controls TASK-107, failure
+    notifications TASK-094, and general encoded save admission TASK-037.
+  - Context: [Runtime delivery and verification](sensor-deployables.md#runtime-delivery-and-verification) · [Shared range measurements](interaction-session-measurements.md#task-095-fixed-position-extension)
+
+- [x] **TASK-106: Retain setup-only ship definitions at the checkpoint boundary**
+  - Completed within TASK-095 on 2026-10-26 after owner approval. One independent
+    catalog retains definitions for starting and constructed ships; construction
+    policies reference design IDs instead of owning post-construction operation.
+  - Proved capture, direct restore, movement and recapture without producing
+    policy, facility aggregate or production history, plus missing/conflicting
+    definition rejection. Initial deployable cargo restores from retained sensor
+    definitions. All 1,500 solution tests pass; general encoded save admission
+    and catalog migration remain TASK-037. TASK-095 records the completed runtime
+    delivery.
+  - Context: [Independent ship definitions](entity-lifecycle.md#construction-materialization-handoff)
 
 - [x] **TASK-071: Implement moving-ship interaction discovery and timing**
   - Completed on 2026-10-17 with owner acceptance of the shared-foundation scope:

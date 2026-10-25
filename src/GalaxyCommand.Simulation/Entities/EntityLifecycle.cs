@@ -5,6 +5,7 @@ namespace GalaxyCommand.Simulation;
 public enum EntityKind
 {
     Ship,
+    SensorDeployable,
 }
 
 public enum InitialShipOrderPolicy
@@ -219,6 +220,10 @@ public abstract record EntityRemovalResult
         ShipId ShipId,
         InventoryId CargoInventoryId) : EntityRemovalResult;
 
+    public sealed record SensorRemoved(
+        EntityRemovalRequest Request,
+        DeployedSensorSnapshot Sensor) : EntityRemovalResult;
+
     public sealed record Rejected(
         EntityRemovalRequest Request,
         EntityRemovalRejectionReason Reason) : EntityRemovalResult;
@@ -249,17 +254,18 @@ internal sealed class GameSessionShipRegistry
 /// </summary>
 public sealed class EntityRegistry
 {
+    private readonly HashSet<EntityId> _sensorDeployables = [];
     private readonly SortedDictionary<EntityId, ShipId> _shipsByEntity =
         new(EntityIdComparer<EntityId>.Instance);
     private readonly SortedDictionary<ShipId, EntityId> _entitiesByShip =
         new(EntityIdComparer<ShipId>.Instance);
 
-    public int Count => _shipsByEntity.Count;
+    public int Count => _shipsByEntity.Count + _sensorDeployables.Count;
 
     public EntityKind? GetKind(EntityId entityId) =>
         _shipsByEntity.ContainsKey(entityId)
             ? EntityKind.Ship
-            : null;
+            : _sensorDeployables.Contains(entityId) ? EntityKind.SensorDeployable : null;
 
     public ShipId? GetShipId(EntityId entityId) =>
         _shipsByEntity.TryGetValue(entityId, out ShipId shipId)
@@ -273,6 +279,7 @@ public sealed class EntityRegistry
 
     internal bool CanAddShip(EntityId entityId, ShipId shipId) =>
         !_shipsByEntity.ContainsKey(entityId)
+        && !_sensorDeployables.Contains(entityId)
         && !_entitiesByShip.ContainsKey(shipId);
 
     internal void ApplyAddShip(EntityId entityId, ShipId shipId)
@@ -295,6 +302,12 @@ public sealed class EntityRegistry
         _entitiesByShip.Remove(shipId);
         return true;
     }
+
+    internal bool CanAddSensorDeployable(EntityId entityId) =>
+        entityId.Value != 0 && !_sensorDeployables.Contains(entityId) && !_shipsByEntity.ContainsKey(entityId);
+
+    internal void ApplyAddSensorDeployable(EntityId entityId) => _sensorDeployables.Add(entityId);
+    internal bool ApplyRemoveSensorDeployable(EntityId entityId) => _sensorDeployables.Remove(entityId);
 }
 
 internal sealed record PreparedEntityRemoval(
@@ -321,7 +334,7 @@ internal abstract record EntityRemovalPreparation
 /// Runtime materialization and removal extend this owner in later TASK-011
 /// slices.
 /// </summary>
-internal sealed class EntityLifecycleOwner
+internal sealed partial class EntityLifecycleOwner
 {
     private readonly ActorControlRegistry _control;
     private readonly EntityRegistry _entities = new();
@@ -344,7 +357,9 @@ internal sealed class EntityLifecycleOwner
         ActorControlRegistry control,
         ShipOrderCoordinator orders,
         IEnumerable<ShipMaterializationPolicy> policies,
-        MaterialInventoryCompatibilityMap? materialCompatibility = null)
+        MaterialInventoryCompatibilityMap? materialCompatibility = null,
+        IEnumerable<SensorDeployableDefinition>? sensorDefinitions = null,
+        IEnumerable<ShipDesign>? shipDefinitions = null)
     {
         _movement = movement ?? throw new ArgumentNullException(nameof(movement));
         _control = control ?? throw new ArgumentNullException(nameof(control));
@@ -357,6 +372,10 @@ internal sealed class EntityLifecycleOwner
         {
             _policies.Add(policy.FacilityId, policy);
         }
+        _sensorDefinitions = (sensorDefinitions ?? []).ToDictionary(definition => definition.Key);
+        _operationalShipDefinitions = new ShipDefinitionCatalog((shipDefinitions ?? [])
+            .Concat(_policies.Values.SelectMany(policy => policy.AllowedDesigns.Values)))
+            .Definitions.ToDictionary(definition => definition.Id);
     }
 
     private EntityLifecycleOwner(
@@ -373,8 +392,10 @@ internal sealed class EntityLifecycleOwner
         SortedDictionary<EntityId, EntityRemovalResult.Removed> removalReceipts,
         GameSessionShipRegistry ships,
         IdSequence<ShipId> shipIds,
-        MaterialInventoryCompatibilityMap? materialCompatibility)
-        : this(movement, control, orders, policies, materialCompatibility)
+        MaterialInventoryCompatibilityMap? materialCompatibility,
+        IEnumerable<SensorDeployableDefinition>? sensorDefinitions = null,
+        IEnumerable<ShipDesign>? shipDefinitions = null)
+        : this(movement, control, orders, policies, materialCompatibility, sensorDefinitions, shipDefinitions)
     {
         _entities = entities;
         _entityIds = entityIds;
@@ -387,6 +408,8 @@ internal sealed class EntityLifecycleOwner
     }
 
     internal EntityRegistry Entities => _entities;
+
+    internal IEnumerable<GameSessionShip> Ships => _ships.Ships;
 
     internal InventoryRegistry Inventories => _inventories;
 
@@ -424,7 +447,8 @@ internal sealed class EntityLifecycleOwner
                 new EntityRemovalReceiptCheckpoint(
                     receipt.Request,
                     receipt.ShipId,
-                    receipt.CargoInventoryId)));
+                    receipt.CargoInventoryId)),
+            CaptureSensorState());
 
     /// <summary>
     /// Validates and directly restores lifecycle identity, inventories,
@@ -486,6 +510,15 @@ internal sealed class EntityLifecycleOwner
             materialCompatibility);
     }
 
+    /// <summary>Restores lifecycle state against independently retained ship and portable-sensor definitions.</summary>
+    internal static CheckpointResult<EntityLifecycleOwner> RestoreCheckpoint(
+        EntityLifecycleCheckpoint checkpoint, SpatialMovement movement, ActorControlRegistry control,
+        ShipOrderCoordinator orders, IEnumerable<ShipMaterializationPolicy> policies,
+        PhysicalDefinitionCatalog? definitions, MaterialInventoryCompatibilityMap? materialCompatibility,
+        IEnumerable<SensorDeployableDefinition> sensorDefinitions, IEnumerable<ShipDesign> shipDefinitions) =>
+        RestoreCheckpointCore(checkpoint, movement, control, orders, policies, definitions,
+            materialCompatibility, sensorDefinitions, shipDefinitions);
+
     private static CheckpointResult<EntityLifecycleOwner> RestoreCheckpointCore(
         EntityLifecycleCheckpoint checkpoint,
         SpatialMovement movement,
@@ -493,7 +526,9 @@ internal sealed class EntityLifecycleOwner
         ShipOrderCoordinator orders,
         IEnumerable<ShipMaterializationPolicy> policies,
         PhysicalDefinitionCatalog? definitions,
-        MaterialInventoryCompatibilityMap? materialCompatibility)
+        MaterialInventoryCompatibilityMap? materialCompatibility,
+        IEnumerable<SensorDeployableDefinition>? sensorDefinitions = null,
+        IEnumerable<ShipDesign>? shipDefinitions = null)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         ArgumentNullException.ThrowIfNull(movement);
@@ -598,8 +633,7 @@ internal sealed class EntityLifecycleOwner
                 materializationFailure);
         }
 
-        return CheckpointResult<EntityLifecycleOwner>.Success(
-            new EntityLifecycleOwner(
+        var restored = new EntityLifecycleOwner(
                 movement,
                 control,
                 orders,
@@ -612,7 +646,11 @@ internal sealed class EntityLifecycleOwner
                 removalReceipts,
                 ships,
                 shipIds.Value!,
-                materialCompatibility));
+                materialCompatibility, sensorDefinitions, shipDefinitions);
+        CheckpointValidationFailure? sensorFailure = restored.RestoreSensorState(checkpoint);
+        return sensorFailure is null
+            ? CheckpointResult<EntityLifecycleOwner>.Success(restored)
+            : CheckpointResult<EntityLifecycleOwner>.Rejected(sensorFailure);
     }
 
     internal GameSessionShip GetRequiredShip(ShipId shipId) =>
@@ -662,6 +700,7 @@ internal sealed class EntityLifecycleOwner
         _inventories.Add(inventory);
     }
 
+    /// <summary>Registers complete initial ships and assigns discrete cargo IDs in ship/key order.</summary>
     internal void RegisterSetup(IReadOnlyList<InitialShipSetup> ships)
     {
         ArgumentNullException.ThrowIfNull(ships);
@@ -693,6 +732,17 @@ internal sealed class EntityLifecycleOwner
             _control.Add(ship.ShipId, ship.BaseController);
             _orders.Add(ship.ShipId);
             _entities.ApplyAddShip(ship.EntityId, ship.ShipId);
+        }
+
+        // Setup is unpublished. The inventory commit owner subsequently derives its high-water
+        // mark from these instances, so runtime pickup can never reuse an initial item identity.
+        var itemIds = new IdSequence<ItemInstanceId>();
+        foreach (InitialShipSetup ship in ships.OrderBy(ship => ship.Id.Value))
+        {
+            Inventory inventory = _inventories.Get(ship.CargoInventoryId)!;
+            foreach (PhysicalDefinition definition in ship.Cargo)
+                if (!inventory.StoreDiscrete(definition, itemIds.Allocate()).IsAccepted)
+                    throw new InvalidOperationException("Prevalidated initial discrete cargo could not be stored.");
         }
     }
 

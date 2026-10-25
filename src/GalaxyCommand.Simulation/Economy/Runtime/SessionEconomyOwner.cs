@@ -271,13 +271,13 @@ internal sealed class SessionEconomyOwner
         EntityLifecycleOwner lifecycle,
         WorldTopology topology,
         ISpatialNavigationPlanner navigation,
-        IEnumerable<ShipMaterializationPolicy> policies)
+        IEnumerable<ShipDesign> shipDefinitions)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         ArgumentNullException.ThrowIfNull(lifecycle);
         ArgumentNullException.ThrowIfNull(topology);
         ArgumentNullException.ThrowIfNull(navigation);
-        ArgumentNullException.ThrowIfNull(policies);
+        ArgumentNullException.ThrowIfNull(shipDefinitions);
         CheckpointResult<SortedDictionary<FacilityId, EconomyFacilityCheckpoint>> facilities =
             RestoreFacilities(checkpoint, lifecycle.Inventories, topology);
         if (!facilities.IsSuccess)
@@ -286,10 +286,7 @@ internal sealed class SessionEconomyOwner
         }
 
         var designs = new ConstructionDesignCatalog();
-        foreach (ShipDesign design in policies
-                     .SelectMany(policy => policy.AllowedDesigns.Values)
-                     .GroupBy(design => design.Id)
-                     .Select(group => group.First()))
+        foreach (ShipDesign design in shipDefinitions)
         {
             designs.Add(design);
         }

@@ -2,6 +2,53 @@
 
 [Session execution contract](moving-ship-interactions.md#fixed-session-forecast-execution-settings) · [Pure swept batch measurements](interaction-batch-measurements.md) · [Task list](task-list.md)
 
+## TASK-095 fixed-position extension
+
+On 2026-10-26, `interaction.stationary-session-serial` and
+`interaction.stationary-session-batched` added the same small advancing-session
+workload with fixed commanded positions instead of target ships. They exercise
+the shared stationary-interest path, including updates, cancellations and stale
+forecasts. They do not measure deployable inventory transactions or TASK-073
+coverage consumption. The existing ship-pair presets and expected digest remain
+unchanged; the new variants have no pinned expected-digest baseline yet.
+
+The fixed-position variants produce digest `4fbb8a2187d6d18b`: 256 registered
+interests, 211 updates, 69 cancellations, 361 delivered effects, 128 stale
+interaction events and 497 total events. Focused tests compare serial execution
+with one and four workers and different batch sizes. Separate sensor-order tests
+compare actual deployment facts, entities, events, sources and restored
+continuation across forecast execution settings.
+
+The following local characterization used .NET 10.0.10, macOS 26.7.1, Arm64,
+11 logical processors and workstation GC. Each configuration ran in a separate
+process with tiered compilation disabled, three warmups and five measured
+iterations, without overlapping builds or tests. Source was the uncommitted
+TASK-095 worktree. Times cover the full synthetic session, including setup and
+digest creation; allocations are total managed bytes, rather than retained
+memory. These measurements do not select a default worker count.
+
+| Execution | Median ms | Minimum / maximum ms | Allocated bytes per iteration |
+| --- | --- | --- | --- |
+| Serial constructor | 16.6337 | 16.3128 / 17.3737 | 25,520,560 |
+| 1 worker, batch 64 | 15.9750 | 15.2405 / 16.4059 | 25,548,944 |
+| 4 workers, batch 16 | 7.4495 | 7.2566 / 8.9051 | 25,572,528 |
+
+Reproduce each configuration after a Release build, substituting the preset and
+worker overrides shown above:
+
+```sh
+DOTNET_TieredCompilation=0 dotnet run --project benchmarks/GalaxyCommand.Benchmarks \
+  --configuration Release --no-build -- --suite full \
+  --preset interaction.stationary-session-serial \
+  --set warmupIterations=3 --set measuredIterations=5
+```
+
+For the batched preset, add `--set workerCount=1 --set batchSize=64` or
+`--set workerCount=4 --set batchSize=16`. All three runs must match digest and
+semantic counts. Timing and allocation remain informational.
+
+## Original ship-pair presets
+
 On 2026-10-13, TASK-071 added version 1 `interaction.session-serial` and
 `interaction.session-batched` benchmark presets. They exercise real session
 advancement with analytic motion replacement, durable-interest updates and

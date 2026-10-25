@@ -1269,6 +1269,15 @@ General save serialization, content-reference compatibility, and migration remai
 TASK-100. Keep these task IDs and ownership boundaries rather than
 creating replacement tasks or reopening combat design here.
 
+On 2026-10-26 the owner accepted a bounded shared spatial extension within
+TASK-095 for ship-to-commanded-position and ship-to-live-stationary-entity
+interests, including durable correlation, invalidation, scheduling, and
+checkpoint validation. The current live runtime remains ship-pair based; this
+approval does not claim stationary-target support is implemented or reopen
+TASK-071. Deployable eligibility and stable command-order contention remain
+with the deployable/order owners. See the [TASK-095 decision
+register](sensor-deployables.md#owner-decisions-and-remaining-inputs).
+
 The accepted completion scope narrows the original evidence requirement
 for restoring active interactions: interest/session continuation and controlled
 movement-component restore are implemented, while full active-domain session

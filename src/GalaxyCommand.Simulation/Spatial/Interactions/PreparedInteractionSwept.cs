@@ -144,6 +144,20 @@ internal sealed record PreparedInteractionTrajectory(InteractionIndexBox Bounds,
     SystemPosition Position, LocalMotionSegment? Linear, ExecutableBoundedTerminalManeuverPlan? Plan,
     AnalyticManeuverSegment? Controlled = null)
 {
+    /// <summary>Tests a fixed point through the same exact mixed-motion solvers without a synthetic target ship.</summary>
+    internal SweptRangeContact? Contact(SystemPosition target, ulong range)
+    {
+        if (Position.SystemId != target.SystemId) return null;
+        if (Controlled is not null)
+            return ManeuverSweptRangeQuery.FindFirstContact(Controlled, target, From, Through, range);
+        if (Plan is not null)
+            return ManeuverSweptRangeQuery.FindFirstContact(Plan, target, From, Through, range);
+        if (Linear is not null)
+            return SweptRangeQuery.FindFirstContact(Linear, target, From, Through, range);
+        return InteractionPhaseRangeQuery.Find(InteractionPhaseCurve.Fixed(Position, From, From),
+            InteractionPhaseCurve.Fixed(target, From, From), From, From, range);
+    }
+
     /// <summary>
     /// Clips requested geometry to known motion and scheduled boundaries. Inserted events limit
     /// search but preserve original plan curves; missing active plans fail rather than falling back

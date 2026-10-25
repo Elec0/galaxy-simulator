@@ -15,7 +15,7 @@ public sealed class InteractionCandidateTests
         Assert.Equal(interest.Id, candidate.Key.InterestId);
         Assert.Equal(new SimulationTime(10), candidate.Key.Timestamp);
         Assert.Equal(new ShipId(8), candidate.Interest.Source);
-        Assert.Equal(new ShipId(3), candidate.Interest.Target);
+        Assert.Equal(new ShipId(3), Assert.IsType<ShipPairInteractionInterest>(candidate.Interest).Target);
         Assert.Equal("test-domain", candidate.Interest.DomainKind);
         Assert.Equal("range-entry", candidate.Interest.PurposeId);
         Assert.Equal<ulong>(5, candidate.Interest.RangeUnits);
@@ -48,7 +48,7 @@ public sealed class InteractionCandidateTests
 
         Assert.Equal(new SimulationTime(8), candidate.Key.Timestamp);
         Assert.Equal(new ShipId(8), candidate.Interest.Source);
-        Assert.Equal(new ShipId(3), candidate.Interest.Target);
+        Assert.Equal(new ShipId(3), Assert.IsType<ShipPairInteractionInterest>(candidate.Interest).Target);
         Assert.True(candidate.Contact.InRangeAtTimestamp);
     }
 

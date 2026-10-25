@@ -9,6 +9,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             return;
         }
 
+        Dictionary<ShipId, SensorActionFailure?> sensorEligibility = CaptureSensorEligibility();
         EconomicReconciliationResult reconciliation = _economy.Runtime.Reconcile(
             now,
             _economy.TransportTiming);
@@ -56,6 +57,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         {
             _ = AgendaCommitOwner.Commit(agenda, proposals);
         }
+        InvalidateSensorEligibility(sensorEligibility);
     }
 
     public void AccrueTo(SimulationTime now)
@@ -68,6 +70,12 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         SimulationTime now,
         EventAgenda<GameEvent> agenda)
     {
+        if (simulationEvent.Payload is GameEvent.SensorActionReevaluation reevaluation)
+        {
+            CommitSensorActions(reevaluation.Work.Select(work => new SensorActionDue(work, simulationEvent.Key)));
+            FlushSensorReevaluations();
+            return ScheduledEventDisposition.Applied;
+        }
         if (simulationEvent.Payload is GameEvent.Economic economic)
         {
             return HandleEconomicEvent(simulationEvent, economic.Event, now, agenda);
@@ -323,6 +331,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                 new GameEventKind.SpatialMovement(spatial.Event),
             GameEvent.Economic economic => new GameEventKind.Economic(economic.Event),
             GameEvent.SpatialInteraction interaction => new GameEventKind.SpatialInteraction(interaction.Forecast.Candidate),
+            GameEvent.SensorActionReevaluation reevaluation => new GameEventKind.SensorActionReevaluation(reevaluation.Work.Count),
             _ => throw new InvalidOperationException(
                 $"Unsupported game event {simulationEvent.Payload.GetType().Name}."),
         };
@@ -350,6 +359,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             return ScheduledEventDisposition.IgnoredMissingReference;
         }
 
+        Dictionary<ShipId, SensorActionFailure?> sensorEligibility = CaptureSensorEligibility();
         EconomicEventCommitResult result = _economy.Runtime.CommitEvent(
             economicEvent,
             simulationEvent.Key,
@@ -380,6 +390,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             }
         }
 
+        InvalidateSensorEligibility(sensorEligibility);
         return result.Disposition;
     }
 

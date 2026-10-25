@@ -1,3 +1,5 @@
+using GalaxyCommand.Content;
+
 namespace GalaxyCommand.Simulation;
 
 /// <summary>Disclosure-safe notice without an authoritative causal payload.</summary>
@@ -11,6 +13,12 @@ public sealed record GamePresentationFactReadResult(
     bool CursorGap);
 
 public enum ObservedShipChangeKind { MotionChanged, Departed, Arrived, Appeared, Disappeared }
+
+public enum ObservedSensorChangeKind { Appeared, Disappeared }
+
+/// <summary>Covered sensor evidence without actor, command, inventory, cause or removal reason.</summary>
+public sealed record ObservedSensorChangeFact(EntityId EntityId, QualifiedContentKey DefinitionKey,
+    PrincipalId PrincipalId, SystemPosition Position, ObservedSensorChangeKind Kind) : GameFact;
 
 /// <summary>The configured player's command result, without source identity or diagnostic cause data.</summary>
 public sealed record PlayerCommandOutcomeFact(

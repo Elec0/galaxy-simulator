@@ -164,6 +164,39 @@ registration and high-water-mark rule under `TASK-014`.
 
 ### Construction materialization handoff
 
+The owner confirmed on 2026-10-26 under TASK-095 that a committed ship is
+operationally independent of its producer. Starting and constructed ships use
+one session-owned retained definition catalog. A construction policy authorizes
+creation and references that catalog; it does not remain the source of the
+ship's movement, sensor, pickup-range, cargo, or restore definition afterward.
+
+Construction commit is the handoff boundary: afterward, operation, saving and
+restoration must not require the producing facility, construction policy or
+production history. Starting ships enter through the same definition-retention
+path as constructed ships; setup-only sessions must not invent a construction
+facility merely to retain their definitions.
+
+Checkpoint capture retains the independent definitions even when there are no
+construction policies. Restore resolves those definitions before live ships,
+and restores construction policies by explicit design-ID references. Missing
+or conflicting definitions reject restoration; a facility or production history
+is never fabricated to recover a ship. Existing idempotency receipts may retain
+their source identities, but live ship operation does not require that source
+aggregate to remain present. General encoded save compatibility remains
+TASK-037.
+
+```mermaid
+flowchart LR
+    definitions["Session-retained ship definitions"] --> starting["Starting ship setup"]
+    definitions --> policy["Construction policy references"]
+    policy --> commit["Construction materialization commit"]
+    starting --> live["Live ship refers to definition ID"]
+    commit --> live
+    definitions --> checkpoint["Independent definition checkpoint"]
+    live --> checkpoint
+    checkpoint --> restore["Resolve definitions, then restore ships"]
+```
+
 Each construction facility has an immutable, authoritative
 `ShipMaterializationPolicy` configured and validated with the facility. It names:
 

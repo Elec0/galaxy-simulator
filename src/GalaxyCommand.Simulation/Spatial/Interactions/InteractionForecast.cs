@@ -5,22 +5,30 @@ namespace GalaxyCommand.Simulation;
 /// <summary>Derived bounded contact and the immutable inputs that produced it.</summary>
 public sealed record InteractionForecast
 {
+    private readonly InteractionSpatialParticipant? _target;
     private InteractionForecast(InteractionCandidate candidate,
-        InteractionSpatialParticipant source, InteractionSpatialParticipant target,
+        InteractionSpatialParticipant source, InteractionSpatialParticipant? target,
         SimulationTime from, SimulationTime through)
     {
         Candidate = candidate;
         Source = source;
-        Target = target;
+        _target = target;
         From = from;
         Through = through;
     }
 
     public InteractionCandidate Candidate { get; }
     public InteractionSpatialParticipant Source { get; }
-    public InteractionSpatialParticipant Target { get; }
+    public InteractionSpatialParticipant Target => _target
+        ?? throw new InvalidOperationException("A stationary target is not a spatial ship participant.");
+    internal SpatialRevision TargetRevision => _target?.Revision
+        ?? ((StationaryInteractionInterest)Candidate.Interest).Revision;
     public SimulationTime From { get; }
     public SimulationTime Through { get; }
+
+    /// <summary>Formats stationary evidence without requesting a fictitious target participant.</summary>
+    public override string ToString() =>
+        $"InteractionForecast {{ Candidate = {Candidate}, Source = {Source}, Target = {_target}, From = {From}, Through = {Through} }}";
 
     /// <summary>
     /// Evaluates an explicit pair over a bounded stable view without scheduling
@@ -119,6 +127,28 @@ public sealed record InteractionForecast
     }
 
     /// <summary>
+    /// Evaluates either target category through the same immutable geometry and agenda path.
+    /// Stationary target liveness belongs to the domain that registers and invalidates its intent.
+    /// </summary>
+    public static InteractionForecast? Evaluate(SpatialInteractionInterest interest,
+        InteractionSpatialReadView view, SimulationTime through)
+    {
+        ArgumentNullException.ThrowIfNull(interest);
+        ArgumentNullException.ThrowIfNull(view);
+        if (interest is ShipPairInteractionInterest pair) return Evaluate(pair, view, through);
+        ArgumentOutOfRangeException.ThrowIfLessThan(through.Milliseconds, view.Timestamp.Milliseconds, nameof(through));
+        if (interest is not StationaryInteractionInterest stationary)
+            throw new ArgumentException("Unsupported interaction target category.", nameof(interest));
+        InteractionSpatialParticipant? source = view.Get(interest.Source);
+        if (source is null || PreparedInteractionTrajectory.Capture(source, view.Timestamp, through) is not { } trajectory
+            || trajectory.Position.SystemId != stationary.Position.SystemId) return null;
+        SweptRangeContact? contact = trajectory.Contact(stationary.Position, interest.RangeUnits);
+        return contact is null ? null : new InteractionForecast(
+            new InteractionCandidate(stationary.Position.SystemId, stationary, contact), source, null,
+            trajectory.From, trajectory.Through);
+    }
+
+    /// <summary>
     /// Copies explicit interest inputs and evaluates them against one captured view with explicit
     /// worker/batch tuning. Reduces complete forecasts by canonical key, rejecting conflicts.
     /// Null inputs and earlier horizons are rejected. Evaluation failures rethrow the earliest
@@ -148,7 +178,7 @@ public sealed record InteractionForecast
     /// evidence, not gameplay eligibility. A matching movement-boundary receipt preserves
     /// swept evidence after physical completion at the due timestamp.
     /// </summary>
-    public ScheduledEventDisposition Validate(ShipPairInteractionInterest? currentInterest,
+    public ScheduledEventDisposition Validate(SpatialInteractionInterest? currentInterest,
         InteractionSpatialReadView view, EventGeneration scheduledGeneration)
     {
         ArgumentNullException.ThrowIfNull(view);
@@ -157,8 +187,12 @@ public sealed record InteractionForecast
         if (currentInterest is null) return ScheduledEventDisposition.IgnoredMissingReference;
         if (currentInterest != Candidate.Interest) return ScheduledEventDisposition.IgnoredStaleGeneration;
         InteractionSpatialParticipant? source = view.Get(currentInterest.Source);
-        InteractionSpatialParticipant? target = view.Get(currentInterest.Target);
-        if (source is null || target is null) return ScheduledEventDisposition.IgnoredMissingReference;
+        if (source is null) return ScheduledEventDisposition.IgnoredMissingReference;
+        if (currentInterest is StationaryInteractionInterest)
+            return Matches(Source, source, view.Timestamp)
+                ? ScheduledEventDisposition.Applied : ScheduledEventDisposition.IgnoredStaleGeneration;
+        InteractionSpatialParticipant? target = view.Get(((ShipPairInteractionInterest)currentInterest).Target);
+        if (target is null) return ScheduledEventDisposition.IgnoredMissingReference;
         return Matches(Source, source, view.Timestamp) && Matches(Target, target, view.Timestamp)
             ? ScheduledEventDisposition.Applied : ScheduledEventDisposition.IgnoredStaleGeneration;
     }

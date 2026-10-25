@@ -11,6 +11,8 @@ public enum LocalMotionEndReason
     SuspendedByScriptedOverride,
     ScriptedOverrideEnded,
     TargetRemoved,
+    ActionCompleted,
+    ActionFailed,
 }
 
 public sealed record ShipLocalMotionStartedFact : GameFact

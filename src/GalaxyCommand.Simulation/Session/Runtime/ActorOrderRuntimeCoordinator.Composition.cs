@@ -16,6 +16,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
     private readonly SessionEconomyOwner? _economy;
     private readonly RelationshipOwner _relationships;
     private readonly GameFactStore _facts;
+    private readonly IReadOnlyList<ShipDesign> _shipDefinitions;
+    private readonly IReadOnlyList<SensorDeployableDefinition> _sensorDeployableDefinitions;
     private readonly IReadOnlyDictionary<ConstructionDesignId, ShipManeuverCapability>
         _maneuverCapabilities;
     private readonly List<GameEventRecord> _eventRecords = [];
@@ -36,19 +38,19 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         _worldTopology = new WorldTopology(setup.Systems, setup.ConnectorTopology);
         _navigation = navigation;
         _facts = facts;
-        _sensorRadii = BuildSensorRadii(setup.Ships.Select(ship => ship.Design)
-            .Concat(setup.MaterializationPolicies.SelectMany(policy => policy.AllowedDesigns.Values)));
-        _maneuverCapabilities = BuildManeuverCapabilities(
-            setup.Ships.Select(ship => ship.Design)
-                .Concat(setup.MaterializationPolicies.SelectMany(
-                    policy => policy.AllowedDesigns.Values)));
+        _shipDefinitions = new ShipDefinitionCatalog(setup.Ships.Select(ship => ship.Design)
+            .Concat(setup.MaterializationPolicies.SelectMany(policy => policy.AllowedDesigns.Values))).Definitions;
+        _sensorDeployableDefinitions = setup.SensorDeployableDefinitions;
+        _sensorRadii = BuildSensorRadii(_shipDefinitions);
+        _maneuverCapabilities = BuildManeuverCapabilities(_shipDefinitions);
         _relationships = new RelationshipOwner(setup.Relationships);
         _lifecycle = new EntityLifecycleOwner(
             _movement,
             _control,
             _orders,
             setup.MaterializationPolicies,
-            setup.Economy?.MaterialCompatibility);
+            setup.Economy?.MaterialCompatibility,
+            _sensorDeployableDefinitions, _shipDefinitions);
 
         _lifecycle.RegisterSetup(setup.Ships);
         _economy = setup.Economy is null
@@ -70,7 +72,9 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         InventoryCommitOwner inventoryCommit,
         RelationshipOwner relationships,
         SessionEconomyOwner? economy,
-        SimulationEngineCheckpoint<GameEvent> engineCheckpoint)
+        SimulationEngineCheckpoint<GameEvent> engineCheckpoint,
+        IReadOnlyList<ShipDesign> shipDefinitions,
+        IReadOnlyList<SensorDeployableDefinition> sensorDeployableDefinitions)
     {
         _facts = facts;
         _worldTopology = worldTopology;
@@ -81,11 +85,11 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         _lifecycle = lifecycle;
         _inventoryCommit = inventoryCommit;
         _relationships = relationships;
-        _sensorRadii = BuildSensorRadii(lifecycle.MaterializationPolicies.SelectMany(policy => policy.AllowedDesigns.Values));
+        _shipDefinitions = shipDefinitions;
+        _sensorDeployableDefinitions = sensorDeployableDefinitions;
+        _sensorRadii = BuildSensorRadii(_shipDefinitions);
         _economy = economy;
-        _maneuverCapabilities = BuildManeuverCapabilities(
-            lifecycle.MaterializationPolicies.SelectMany(
-                policy => policy.AllowedDesigns.Values));
+        _maneuverCapabilities = BuildManeuverCapabilities(_shipDefinitions);
         CheckpointResult<SimulationEngine<GameEvent>> engine =
             SimulationEngine<GameEvent>.RestoreCheckpoint(this, engineCheckpoint);
         if (!engine.IsSuccess)
@@ -108,8 +112,13 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         _lifecycle.Entities.GetEntityId(shipId);
 
     internal InventoryCommitBatchResult CommitInventoryMutations(
-        IEnumerable<InventoryMutationProposal> proposals) =>
-        _inventoryCommit.CommitBatch(proposals);
+        IEnumerable<InventoryMutationProposal> proposals)
+    {
+        Dictionary<ShipId, SensorActionFailure?> before = CaptureSensorEligibility();
+        InventoryCommitBatchResult result = _inventoryCommit.CommitBatch(proposals);
+        InvalidateSensorEligibility(before);
+        return result;
+    }
 
     /// <summary>
     /// Emits one lifecycle fact for a newly applied materialization and emits
@@ -192,7 +201,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                 _worldTopology,
                 _navigation,
                 _lifecycle.MaterializationPolicies,
-                factRetentionCapacity);
+                factRetentionCapacity,
+                _shipDefinitions, _sensorDeployableDefinitions);
         if (!policies.IsSuccess)
         {
             return CheckpointResult<GameSessionRuntimeCheckpoint>.Rejected(policies.Failure!);
@@ -303,6 +313,20 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
             return CheckpointResult<ActorOrderRuntimeCoordinator>.Rejected(policies.Failure!);
         }
 
+        // A deployable's physical meaning is saved with its independent definition.
+        // Explicit caller catalogs may add other inventory kinds but cannot replace that meaning.
+        if (policies.Value!.SensorDeployableDefinitions.Count != 0)
+        {
+            foreach (SensorDeployableDefinition sensor in policies.Value.SensorDeployableDefinitions)
+                if (definitions?.Get(sensor.Key) is { } provided && provided != sensor.Physical)
+                    return CheckpointResult<ActorOrderRuntimeCoordinator>.Rejected(new CheckpointValidationFailure(
+                        "$.checkpoint.runtimePolicies.sensorDeployableDefinitions",
+                        "The supplied physical catalog conflicts with the retained sensor definition."));
+            definitions = new PhysicalDefinitionCatalog((definitions?.Definitions ?? [])
+                .Concat(policies.Value.SensorDeployableDefinitions.Where(sensor => definitions?.Get(sensor.Key) is null)
+                    .Select(sensor => sensor.Physical)));
+        }
+
         CheckpointResult<SpatialMovement> movement = SpatialMovement.RestoreCheckpoint(
             checkpoint.Movement,
             checkpoint.Engine.Agenda.CurrentTime);
@@ -325,29 +349,10 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
             return CheckpointResult<ActorOrderRuntimeCoordinator>.Rejected(orders.Failure!);
         }
 
-        CheckpointResult<EntityLifecycleOwner> lifecycle = definitions is null
-            ? EntityLifecycleOwner.RestoreCheckpoint(
-                checkpoint.Lifecycle,
-                movement.Value!,
-                control.Value!,
-                orders.Value!,
-                policies.Value!.MaterializationPolicies)
-            : materialCompatibility is not null
-                ? EntityLifecycleOwner.RestoreCheckpoint(
-                    checkpoint.Lifecycle,
-                    movement.Value!,
-                    control.Value!,
-                    orders.Value!,
-                    policies.Value!.MaterializationPolicies,
-                    definitions,
-                    materialCompatibility)
-            : EntityLifecycleOwner.RestoreCheckpoint(
-                checkpoint.Lifecycle,
-                movement.Value!,
-                control.Value!,
-                orders.Value!,
-                policies.Value!.MaterializationPolicies,
-                definitions);
+        CheckpointResult<EntityLifecycleOwner> lifecycle = EntityLifecycleOwner.RestoreCheckpoint(
+            checkpoint.Lifecycle, movement.Value!, control.Value!, orders.Value!,
+            policies.Value!.MaterializationPolicies, definitions, materialCompatibility,
+            policies.Value.SensorDeployableDefinitions, policies.Value.ShipDefinitions);
         if (!lifecycle.IsSuccess)
         {
             return CheckpointResult<ActorOrderRuntimeCoordinator>.Rejected(lifecycle.Failure!);
@@ -381,7 +386,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                     lifecycle.Value!,
                     topology.Value!,
                     policies.Value.Navigation,
-                    policies.Value.MaterializationPolicies);
+                    policies.Value.ShipDefinitions);
             if (!economyResult.IsSuccess)
             {
                 return CheckpointResult<ActorOrderRuntimeCoordinator>.Rejected(
@@ -415,7 +420,9 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                     ?? new InventoryCommitOwner(lifecycle.Value!.Inventories),
                 relationships.Value!,
                 economy,
-                checkpoint.Engine);
+                checkpoint.Engine,
+                policies.Value.ShipDefinitions,
+                policies.Value.SensorDeployableDefinitions);
         }
         catch (InvalidOperationException error)
         {
@@ -468,11 +475,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         HashSet<PrincipalId> principals = checkpoint.Relationships.Principals
             .Select(principal => principal!.Id)
             .ToHashSet();
-        HashSet<ConstructionDesignId> designs = checkpoint.RuntimePolicies
-            .MaterializationPolicies
-            .SelectMany(policy => policy!.AllowedDesigns)
-            .Select(design => design!.Id)
-            .ToHashSet();
+        var designs = (checkpoint.RuntimePolicies.ShipDefinitions ?? []).ToDictionary(design => design!.Id, design => design!);
+        var inventories = checkpoint.Lifecycle.Inventories.Inventories.ToDictionary(inventory => inventory.Id);
         for (int index = 0; index < checkpoint.Lifecycle.LiveShips.Count; index++)
         {
             EntityLifecycleShipCheckpoint ship = checkpoint.Lifecycle.LiveShips[index]!;
@@ -483,12 +487,15 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                     "A live ship references an unregistered principal.");
             }
 
-            if (!designs.Contains(ship.DesignId))
+            if (!designs.TryGetValue(ship.DesignId, out ShipDesignPolicyCheckpoint? definition))
             {
                 return new CheckpointValidationFailure(
                     $"$.checkpoint.lifecycle.liveShips[{index}].designId",
                     "A live ship references a design absent from the runtime policy manifest.");
             }
+            if (inventories[ship.CargoInventoryId].Capacity != definition.CargoCapacity)
+                return new CheckpointValidationFailure($"$.checkpoint.lifecycle.liveShips[{index}].cargoInventoryId",
+                    "A live cargo capacity disagrees with its independently retained ship definition.");
         }
 
         return null;
@@ -524,6 +531,15 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                     scheduled.Key.Phase == EventPhase.StateUpdate
                     && scheduled.Key.Timestamp == interaction.Forecast.Candidate.Key.Timestamp
                     && scheduled.Generation == interaction.Forecast.Candidate.Interest.Generation,
+                GameEvent.SensorActionReevaluation reevaluation =>
+                    scheduled.Key.Phase is EventPhase.StateUpdate or EventPhase.Decision
+                    && reevaluation.Work is { Count: > 0 }
+                    && reevaluation.Work.All(work => work is not null)
+                    && reevaluation.Work.Select(work => work.Ship).Distinct().Count() == reevaluation.Work.Count
+                    && reevaluation.Work.All(work =>
+                        work.Ship.Value != 0 && work.Order.Value != 0 && work.Command.Value != 0
+                        && (checkpoint.Orders.OrderIds.NextValue is null
+                            || work.Order.Value < checkpoint.Orders.OrderIds.NextValue)),
                 _ => false,
             };
             if (!resolved)

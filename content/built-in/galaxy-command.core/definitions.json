@@ -1,6 +1,6 @@
 {
   "format": "galaxy-command-content-definitions",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "definitions": [
     {
       "kind": "principal",
@@ -23,7 +23,8 @@
         "movingSpoolDurationMilliseconds": 10000,
         "requiredWork": 1,
         "sensorRadiusMeters": 10000,
-        "turnRateDegreesPerSecond": "45"
+        "turnRateDegreesPerSecond": "45",
+        "pickupRangeMeters": 5000
       }
     },
     {
@@ -39,6 +40,28 @@
         "neutralThreshold": 0,
         "favorableThreshold": 50,
         "alliedThreshold": 90
+      }
+    },
+    {
+      "kind": "sensor-deployable",
+      "id": "satellite",
+      "fallback": "Satellite",
+      "references": [],
+      "values": {
+        "capacityCost": 1,
+        "deploymentRangeMeters": 2500,
+        "sensorRadiusMeters": 30000
+      }
+    },
+    {
+      "kind": "sensor-deployable",
+      "id": "advanced-satellite",
+      "fallback": "Advanced Satellite",
+      "references": [],
+      "values": {
+        "capacityCost": 1,
+        "deploymentRangeMeters": 2500,
+        "sensorRadiusMeters": 75000
       }
     }
   ]

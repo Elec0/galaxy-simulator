@@ -22,6 +22,8 @@ internal static class BenchmarkScenarioFactory
         {
             BenchmarkPresets.InteractionSessionSerial => new InteractionSessionBenchmarkScenario(false),
             BenchmarkPresets.InteractionSessionBatched => new InteractionSessionBenchmarkScenario(true),
+            BenchmarkPresets.StationarySessionSerial => new InteractionSessionBenchmarkScenario(false, true),
+            BenchmarkPresets.StationarySessionBatched => new InteractionSessionBenchmarkScenario(true, true),
             BenchmarkPresets.InteractionBatchSweptScan => new InteractionRuntimeSweptBenchmarkScenario("scan", batched: true),
             BenchmarkPresets.InteractionBatchSweptGrid => new InteractionRuntimeSweptBenchmarkScenario("grid", batched: true),
             BenchmarkPresets.InteractionBatchSweptHierarchy => new InteractionRuntimeSweptBenchmarkScenario("hierarchy", batched: true),
@@ -324,7 +326,7 @@ internal static class ScenarioSetup
             ManeuverSpeed.ParseMetersPerSecond("300"),
             ManeuverSpeed.ParseMetersPerSecond("1000"),
             ManeuverTurnRate.ParseDegreesPerSecond("45"),
-            new SimulationDuration(10_000)), sensorRadiusUnits: 10_000);
+            new SimulationDuration(10_000)), sensorRadiusUnits: 10_000, pickupRangeUnits: 5_000);
 
     internal static CommandSource AutonomousSource { get; } =
         new(CommandSourceKind.Autonomous, BenchmarkSourceId);

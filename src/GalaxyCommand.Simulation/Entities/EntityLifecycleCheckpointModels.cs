@@ -39,6 +39,11 @@ internal sealed record EntityRemovalReceiptCheckpoint(
     ShipId ShipId,
     InventoryId CargoInventoryId);
 
+internal sealed record SensorDeployableStateCheckpoint(
+    IReadOnlyList<DeployedSensorSnapshot?> Live,
+    IReadOnlyList<SensorActionReceipt?> Receipts,
+    IReadOnlyList<SensorRemovalReceipt?>? Removals = null);
+
 internal sealed class EntityLifecycleCheckpoint
 {
     internal EntityLifecycleCheckpoint(
@@ -48,7 +53,8 @@ internal sealed class EntityLifecycleCheckpoint
         InventoryRegistryCheckpoint inventories,
         IEnumerable<EntityLifecycleShipCheckpoint?> liveShips,
         IEnumerable<EntityMaterializationReceiptCheckpoint?> materializationReceipts,
-        IEnumerable<EntityRemovalReceiptCheckpoint?> removalReceipts)
+        IEnumerable<EntityRemovalReceiptCheckpoint?> removalReceipts,
+        SensorDeployableStateCheckpoint? sensorDeployables = null)
     {
         ArgumentNullException.ThrowIfNull(entityIds);
         ArgumentNullException.ThrowIfNull(shipIds);
@@ -69,6 +75,7 @@ internal sealed class EntityLifecycleCheckpoint
         RemovalReceipts =
             new ReadOnlyCollection<EntityRemovalReceiptCheckpoint?>(
                 removalReceipts.ToArray());
+        SensorDeployables = sensorDeployables ?? new SensorDeployableStateCheckpoint([], []);
     }
 
     internal IdSequenceCheckpoint EntityIds { get; }
@@ -86,5 +93,7 @@ internal sealed class EntityLifecycleCheckpoint
     { get; }
 
     internal ReadOnlyCollection<EntityRemovalReceiptCheckpoint?> RemovalReceipts { get; }
+
+    internal SensorDeployableStateCheckpoint SensorDeployables { get; }
 }
 

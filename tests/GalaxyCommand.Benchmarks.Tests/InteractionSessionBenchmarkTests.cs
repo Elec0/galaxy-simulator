@@ -6,6 +6,24 @@ public sealed class InteractionSessionBenchmarkTests
 {
     [Theory]
     [InlineData(1, 1)]
+    [InlineData(4, 16)]
+    public void StationaryTargetSessionBenchmarkMatchesItsSerialReference(int workers, int batch)
+    {
+        var serial = BenchmarkScenarioResolver.ResolvePreset("interaction.stationary-session-serial");
+        var batched = BenchmarkScenarioResolver.ResolvePreset("interaction.stationary-session-batched",
+            new Dictionary<string, long> { ["workerCount"] = workers, ["batchSize"] = batch });
+        ScenarioCorrectnessResult expected = BenchmarkScenarioFactory.Create(serial.BasePreset).Run(serial);
+        ScenarioCorrectnessResult actual = BenchmarkScenarioFactory.Create(batched.BasePreset).Run(batched);
+        Assert.True(expected.Counts.GetValueOrDefault("stationaryInterests") > 0);
+        Assert.True(expected.Counts["effects"] > 0);
+        Assert.True(expected.Counts["interestsUpdated"] > 0);
+        Assert.True(expected.Counts["interestsCanceled"] > 0);
+        Assert.Equal(expected.Digest, actual.Digest);
+        Assert.Equal(expected.Counts.OrderBy(pair => pair.Key), actual.Counts.OrderBy(pair => pair.Key));
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
     [InlineData(2, 7)]
     [InlineData(4, 64)]
     [InlineData(8, 16)]

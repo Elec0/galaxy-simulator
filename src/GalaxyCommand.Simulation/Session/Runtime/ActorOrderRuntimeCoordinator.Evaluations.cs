@@ -8,7 +8,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         NavigationDestination Destination,
         OrderPlacement Placement,
         ShipHeading? RequestedHeading,
-        TravelPlan? Plan);
+        TravelPlan? Plan,
+        ShipActionIntent? Action = null);
 
     private sealed record MoveOrderEvaluation(
         MoveOrderProposal? Proposal,

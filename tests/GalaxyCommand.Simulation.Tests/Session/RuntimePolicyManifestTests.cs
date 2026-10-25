@@ -7,14 +7,43 @@ public sealed class RuntimePolicyManifestTests
     private static readonly PrincipalId Principal = new(1);
 
     [Fact]
-    public void RestoreDoesNotInventAMissingSensorRadius()
+    public void RestoreRejectsMissingIndependentDefinitionsInsteadOfInferringFromAProducer()
+    {
+        RuntimePolicyManifestCheckpoint invalid = Manifest() with { ShipDefinitions = null };
+        Assert.False(RuntimePolicyManifest.Resolve(invalid, Topology(), [Principal]).IsSuccess);
+    }
+
+    [Fact]
+    public void ConstructionPolicyMustReferenceAnExistingIndependentDefinition()
     {
         RuntimePolicyManifestCheckpoint checkpoint = Manifest();
         MaterializationPolicyCheckpoint policy = checkpoint.MaterializationPolicies[0]!;
-        RuntimePolicyManifestCheckpoint invalid = Copy(checkpoint, policy with
+        RuntimePolicyManifestCheckpoint invalid = Copy(checkpoint,
+            policy with { AllowedDesignIds = [new ConstructionDesignId(99)] });
+        Assert.False(RuntimePolicyManifest.Resolve(invalid, Topology(), [Principal]).IsSuccess);
+    }
+
+    [Fact]
+    public void CaptureRejectsConflictingMeaningsForOneRetainedDesignId()
+    {
+        ShipDesign original = GameSessionTestFixture.Design;
+        var conflicting = new ShipDesign(original.Id, original.Name, original.Recipe,
+            original.CargoCapacity, original.ManeuverCapability, original.SensorRadiusUnits + 1, original.PickupRangeUnits);
+        CheckpointResult<RuntimePolicyManifestCheckpoint> result = RuntimePolicyManifest.Capture(Topology(),
+            new DirectLocalNavigationPlanner(new ChebyshevLocalTravelTimeEstimator(1)), [], 64,
+            [original, conflicting]);
+        Assert.False(result.IsSuccess);
+        Assert.Equal("$.checkpoint.runtimePolicies.shipDefinitions", result.Failure!.Path);
+    }
+
+    [Fact]
+    public void RestoreDoesNotInventAMissingSensorRadius()
+    {
+        RuntimePolicyManifestCheckpoint checkpoint = Manifest();
+        RuntimePolicyManifestCheckpoint invalid = checkpoint with
         {
-            AllowedDesigns = [policy.AllowedDesigns[0]! with { SensorRadiusUnits = null }],
-        });
+            ShipDefinitions = [checkpoint.ShipDefinitions![0]! with { SensorRadiusUnits = null }],
+        };
         CheckpointResult<ResolvedRuntimePolicies> result = RuntimePolicyManifest.Resolve(invalid, Topology(), [Principal]);
         Assert.False(result.IsSuccess);
         Assert.Null(result.Value);
@@ -185,17 +214,15 @@ public sealed class RuntimePolicyManifestTests
             MaterializationPolicies = [policy, policy],
         };
         ShipDesignPolicyCheckpoint design = Assert.IsType<ShipDesignPolicyCheckpoint>(
-            Assert.Single(policy.AllowedDesigns));
-        var duplicateDesign = Copy(
-            checkpoint,
-            policy with { AllowedDesigns = [design, design] });
+            Assert.Single(checkpoint.ShipDefinitions!));
+        var duplicateDesign = checkpoint with { ShipDefinitions = [design, design] };
 
         Assert.Equal(
             "$.checkpoint.runtimePolicies.materializationPolicies[1].facilityId",
             RuntimePolicyManifest.Resolve(duplicateFacility, Topology(), [Principal])
                 .Failure!.Path);
         Assert.Equal(
-            "$.checkpoint.runtimePolicies.materializationPolicies[0].allowedDesigns[1].id",
+            "$.checkpoint.runtimePolicies.shipDefinitions[1].id",
             RuntimePolicyManifest.Resolve(duplicateDesign, Topology(), [Principal])
                 .Failure!.Path);
     }
@@ -207,27 +234,19 @@ public sealed class RuntimePolicyManifestTests
         MaterializationPolicyCheckpoint policy = Assert.IsType<MaterializationPolicyCheckpoint>(
             Assert.Single(checkpoint.MaterializationPolicies));
         ShipDesignPolicyCheckpoint design = Assert.IsType<ShipDesignPolicyCheckpoint>(
-            Assert.Single(policy.AllowedDesigns));
+            Assert.Single(checkpoint.ShipDefinitions!));
         ShipManeuverCapabilityCheckpoint capability =
             Assert.IsType<ShipManeuverCapabilityCheckpoint>(design.ManeuverCapability);
-        RuntimePolicyManifestCheckpoint invalid = Copy(
-            checkpoint,
-            policy with
-            {
-                AllowedDesigns =
-                [
-                    design with
-                    {
-                        ManeuverCapability = capability with { BehaviorVersion = 2 },
-                    },
-                ],
-            });
+        RuntimePolicyManifestCheckpoint invalid = checkpoint with
+        {
+            ShipDefinitions = [design with { ManeuverCapability = capability with { BehaviorVersion = 2 } }],
+        };
 
         CheckpointResult<ResolvedRuntimePolicies> result =
             RuntimePolicyManifest.Resolve(invalid, Topology(), [Principal]);
 
         Assert.Equal(
-            "$.checkpoint.runtimePolicies.materializationPolicies[0].allowedDesigns[0].maneuverCapability.behaviorVersion",
+            "$.checkpoint.runtimePolicies.shipDefinitions[0].maneuverCapability.behaviorVersion",
             result.Failure!.Path);
     }
 
@@ -257,7 +276,7 @@ public sealed class RuntimePolicyManifestTests
                     [new KeyValuePair<MaterialId, Quantity>(new MaterialId(1), new Quantity(2))],
                     new Work(3)),
                 new Quantity(4),
-                GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000),
+                GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000, pickupRangeUnits: 5_000),
         ]);
 
     private static WorldTopology Topology() => new(

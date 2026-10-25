@@ -1,12 +1,14 @@
 {
   "format": "galaxy-command-content-scenario",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "id": "minimal",
   "fallback": "Minimal New Game",
   "references": [
     "galaxy-command.core/principal/player",
     "galaxy-command.core/ship-design/starter-ship",
-    "galaxy-command.core/standing-policy/default-standing"
+    "galaxy-command.core/standing-policy/default-standing",
+    "galaxy-command.core/sensor-deployable/satellite",
+    "galaxy-command.core/sensor-deployable/advanced-satellite"
   ],
   "values": {
     "playerCommandSource": "local-player",
@@ -33,7 +35,12 @@
         "system": "initial-system",
         "x": 0,
         "y": 0,
-        "controllerSource": "local-player"
+        "controllerSource": "local-player",
+        "cargo": [
+          "galaxy-command.core/sensor-deployable/satellite",
+          "galaxy-command.core/sensor-deployable/satellite",
+          "galaxy-command.core/sensor-deployable/advanced-satellite"
+        ]
       }
     ]
   }

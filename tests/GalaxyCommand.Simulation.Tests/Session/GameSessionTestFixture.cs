@@ -47,7 +47,7 @@ internal static class GameSessionTestFixture
         "Test Ship",
         new ConstructionRecipe([], new Work(1)),
         new Quantity(10),
-        ManeuverCapability, sensorRadiusUnits: 10_000);
+        ManeuverCapability, sensorRadiusUnits: 10_000, pickupRangeUnits: 5_000);
 
     internal static CommandSource Player { get; } = new(
         CommandSourceKind.Player,

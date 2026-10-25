@@ -6,6 +6,63 @@ namespace GalaxyCommand.Simulation.Tests;
 public sealed class GameSessionCheckpointTests
 {
     [Fact]
+    public void StartingShipOperatesAfterRestoreWithoutConstructionPolicies()
+    {
+        using GameSession session = GameSessionTestFixture.Create(navigation:
+            new DirectLocalNavigationPlanner(new ChebyshevLocalTravelTimeEstimator(1)));
+        CheckpointResult<GameSessionCheckpoint> captured = session.CaptureCheckpoint();
+        Assert.True(captured.IsSuccess, captured.Failure?.Message);
+        Assert.Empty(captured.Value!.RuntimePolicies.MaterializationPolicies);
+        CheckpointResult<GameSession> restored = GameSession.RestoreCheckpoint(captured.Value);
+        Assert.True(restored.IsSuccess, restored.Failure?.Message);
+        using GameSession resumed = restored.Value!;
+        Assert.Equal(CommandResultStatus.Accepted, resumed.SubmitCommand(GameSessionTestFixture.Player,
+            new MoveShipCommand(GameSessionTestFixture.Ship, GameSessionTestFixture.Destination(100, 0),
+                OrderPlacement.ReplaceAll)).Result.Status);
+        GameSessionTestFixture.AdvanceUntilOrderTerminal(resumed);
+        Assert.Equal(GameSessionTestFixture.Position(100, 0), Assert.Single(resumed.CaptureSnapshot().Ships).Position);
+        Assert.True(resumed.CaptureCheckpoint().IsSuccess);
+    }
+
+    [Fact]
+    public void ConstructedShipRestoresAndMovesWithoutItsProducingPolicyOrHistory()
+    {
+        using GameSession session = CreateEconomySession();
+        session.AdvanceTo(new SimulationTime(10_000));
+        GameSessionCheckpoint checkpoint = Capture(session);
+        Assert.Equal(2, checkpoint.Lifecycle.LiveShips.Count);
+        Assert.Single(checkpoint.RuntimePolicies.ShipDefinitions!);
+        CheckpointResult<GameSession> withHistory = GameSession.RestoreCheckpoint(checkpoint with
+        {
+            RuntimePolicies = checkpoint.RuntimePolicies with { MaterializationPolicies = [] },
+        });
+        Assert.True(withHistory.IsSuccess, withHistory.Failure?.Message);
+        withHistory.Value!.Dispose();
+        // Exclude the producer aggregate and its receipts to prove that operation follows
+        // the retained ship definition rather than reconstructing from production history.
+        var lifecycle = checkpoint.Lifecycle;
+        var cargoIds = lifecycle.LiveShips.Select(ship => ship!.CargoInventoryId).ToHashSet();
+        var independentLifecycle = new EntityLifecycleCheckpoint(lifecycle.EntityIds,
+            lifecycle.ShipIds, lifecycle.InventoryIds,
+            new InventoryRegistryCheckpoint(lifecycle.Inventories.Inventories.Where(inventory => cargoIds.Contains(inventory.Id))),
+            lifecycle.LiveShips, [], lifecycle.RemovalReceipts);
+        CheckpointResult<GameSession> restored = GameSession.RestoreCheckpoint(checkpoint with
+        {
+            RuntimePolicies = checkpoint.RuntimePolicies with { MaterializationPolicies = [] },
+            Economy = null,
+            Lifecycle = independentLifecycle,
+        });
+        Assert.True(restored.IsSuccess, restored.Failure?.Message);
+        using GameSession resumed = restored.Value!;
+        ShipId constructed = new(2);
+        Assert.Equal(CommandResultStatus.Accepted, resumed.SubmitCommand(GameSessionTestFixture.Player,
+            new MoveShipCommand(constructed, GameSessionTestFixture.Destination(100, 0), OrderPlacement.ReplaceAll)).Result.Status);
+        GameSessionTestFixture.AdvanceUntilOrderTerminal(resumed, constructed);
+        Assert.Equal(GameSessionTestFixture.Position(100, 0), resumed.CaptureSnapshot().Ships.Single(ship => ship.Id == constructed).Position);
+        Assert.True(resumed.CaptureCheckpoint().IsSuccess);
+    }
+
+    [Fact]
     public void GeneralizedInventoryCommitRoundTripsThroughSessionOwner()
     {
         PhysicalDefinition ore = new(
@@ -200,7 +257,7 @@ public sealed class GameSessionCheckpointTests
     }
 
     [Fact]
-    public void CaptureRejectsLiveDesignAbsentFromRuntimeManifest()
+    public void RestoreRejectsLiveDesignAbsentFromIndependentManifest()
     {
         var setup = new GameSessionSetup(
             [new StarSystem(GameSessionTestFixture.System, "Test System")],
@@ -220,7 +277,11 @@ public sealed class GameSessionCheckpointTests
             new DirectLocalNavigationPlanner(
                 new ChebyshevLocalTravelTimeEstimator(100)));
 
-        CheckpointResult<GameSessionCheckpoint> result = session.CaptureCheckpoint();
+        GameSessionCheckpoint checkpoint = Capture(session);
+        CheckpointResult<GameSession> result = GameSession.RestoreCheckpoint(checkpoint with
+        {
+            RuntimePolicies = checkpoint.RuntimePolicies with { ShipDefinitions = [] },
+        });
 
         Assert.False(result.IsSuccess);
         Assert.Equal("$.checkpoint.lifecycle.liveShips[0].designId", result.Failure!.Path);

@@ -1,12 +1,14 @@
 {
   "format": "galaxy-command-content-scenario",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "id": "visual-preview",
   "fallback": "Development Visual Preview",
   "references": [
     "galaxy-command.preview/principal/player",
     "galaxy-command.preview/ship-design/preview-courier",
-    "galaxy-command.preview/standing-policy/default-standing"
+    "galaxy-command.preview/standing-policy/default-standing",
+    "galaxy-command.preview/sensor-deployable/satellite",
+    "galaxy-command.preview/sensor-deployable/advanced-satellite"
   ],
   "values": {
     "playerCommandSource": "local-player",
@@ -103,7 +105,12 @@
         "system": "aster",
         "x": -100,
         "y": -40,
-        "controllerSource": "preview-player"
+        "controllerSource": "preview-player",
+        "cargo": [
+          "galaxy-command.preview/sensor-deployable/satellite",
+          "galaxy-command.preview/sensor-deployable/satellite",
+          "galaxy-command.preview/sensor-deployable/advanced-satellite"
+        ]
       },
       {
         "id": "scout",
@@ -112,7 +119,12 @@
         "system": "borealis",
         "x": 30,
         "y": 70,
-        "controllerSource": "preview-player"
+        "controllerSource": "preview-player",
+        "cargo": [
+          "galaxy-command.preview/sensor-deployable/satellite",
+          "galaxy-command.preview/sensor-deployable/satellite",
+          "galaxy-command.preview/sensor-deployable/advanced-satellite"
+        ]
       }
     ]
   }

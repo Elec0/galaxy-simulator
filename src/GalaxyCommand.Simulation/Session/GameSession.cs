@@ -87,18 +87,22 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         return _spatialInteractions.Register(domainKind);
     }
 
-    /// <summary>Finds a registered domain store so consumers can rebind after checkpoint restoration.</summary>
+    /// <summary>Finds a consumer-owned domain store for rebind after restore. Managed action stores reject external mutation access.</summary>
     public InteractionInterestOwner? GetSpatialInteractionDomain(string domainKind)
     {
         EnsureHealthy();
+        if (_runtime.IsManagedSpatialDomain(domainKind))
+            throw new InvalidOperationException("The sensor action owner retains exclusive mutation authority over its interests.");
         return _spatialInteractions.Get(domainKind);
     }
 
-    /// <summary>Binds a pure domain evaluator and its buffered effects to a registered store, including after restore.</summary>
+    /// <summary>Binds an external pure evaluator to a consumer-owned store, including after restore. Managed action domains reject replacement.</summary>
     public void BindSpatialInteractionDomain(string domainKind, ISpatialInteractionDomainEvaluator evaluator)
     {
         EnsureHealthy();
         ArgumentNullException.ThrowIfNull(evaluator);
+        if (_runtime.IsManagedSpatialDomain(domainKind))
+            throw new InvalidOperationException("The sensor action owner supplies its own evaluation behavior.");
         _spatialInteractions.Bind(domainKind, evaluator);
     }
 
@@ -128,6 +132,13 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
     {
         EnsureHealthy();
         return _runtime.CommitInventoryMutations(proposals);
+    }
+
+    /// <summary>Captures committed deployable views and sources for the observation owner; this is an authoritative diagnostic surface.</summary>
+    public SensorDeployableObservationSnapshot CaptureSensorDeployableObservation()
+    {
+        EnsureHealthy();
+        return _runtime.CaptureSensorObservation();
     }
 
     /// <summary>
@@ -420,6 +431,9 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         {
             return CheckpointResult<GameSession>.Rejected(runtime.Failure!);
         }
+
+        CheckpointValidationFailure? sensorFailure = ValidateSensorCheckpoint(checkpoint);
+        if (sensorFailure is not null) return CheckpointResult<GameSession>.Rejected(sensorFailure);
 
         CheckpointValidationFailure? deliveryFailure = spatialInteractions.Value!.ValidateDeliveryHistory(
             runtime.Value!.CaptureInteractionReadView());

@@ -121,7 +121,7 @@ internal sealed class SimulationWorld
         ConstructionRecipe recipe,
         Quantity cargoCapacity,
         ShipManeuverCapability maneuverCapability,
-        ulong sensorRadiusUnits)
+        ulong sensorRadiusUnits, ulong pickupRangeUnits)
     {
         var design = new ShipDesign(
             ConstructionDesignIds.Allocate(),
@@ -129,7 +129,7 @@ internal sealed class SimulationWorld
             recipe,
             cargoCapacity,
             maneuverCapability,
-            sensorRadiusUnits);
+            sensorRadiusUnits, pickupRangeUnits);
         ConstructionDesigns.Add(design);
         return design;
     }
@@ -217,8 +217,8 @@ internal sealed class SimulationWorld
             ConstructionRecipe recipe,
             Quantity cargoCapacity,
             ShipManeuverCapability maneuverCapability,
-            ulong sensorRadiusUnits) =>
-            World.AddShipDesign(name, recipe, cargoCapacity, maneuverCapability, sensorRadiusUnits);
+            ulong sensorRadiusUnits, ulong pickupRangeUnits) =>
+            World.AddShipDesign(name, recipe, cargoCapacity, maneuverCapability, sensorRadiusUnits, pickupRangeUnits);
 
         internal ConstructionOrderId EnqueueConstruction(
             Shipyard shipyard,

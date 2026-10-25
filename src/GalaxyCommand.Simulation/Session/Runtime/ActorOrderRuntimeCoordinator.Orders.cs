@@ -11,6 +11,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         ArgumentNullException.ThrowIfNull(factProposals);
         while (_orders.GetActive(shipId) is { } active)
         {
+            if (PrepareSensorApproach(shipId, active, transitions)) return;
             SystemPosition? availablePosition = _movement.PositionAt(
                 shipId,
                 CurrentTime);

@@ -9,7 +9,8 @@ namespace GalaxyCommand.Simulation;
 public sealed record InitialShipSetup
 {
     /// <summary>
-    /// Creates validated initial state for one principal-owned ship.
+    /// Creates validated initial state and optional discrete cargo for one principal-owned ship.
+    /// Cargo is copied in definition order and rejected if its checked capacity exceeds the hull.
     /// </summary>
     public InitialShipSetup(
         EntityId entityId,
@@ -19,7 +20,8 @@ public sealed record InitialShipSetup
         ShipDesign design,
         SystemPosition position,
         ActorController baseController,
-        ShipHeading? heading = null)
+        ShipHeading? heading = null,
+        IEnumerable<PhysicalDefinition>? cargo = null)
     {
         ArgumentOutOfRangeException.ThrowIfZero(entityId.Value);
         ArgumentOutOfRangeException.ThrowIfZero(id.Value);
@@ -43,6 +45,19 @@ public sealed record InitialShipSetup
         Position = position;
         BaseController = baseController;
         Heading = heading ?? ShipHeading.Zero;
+        PhysicalDefinition[] cargoValues = (cargo ?? []).ToArray();
+        foreach (PhysicalDefinition definition in cargoValues)
+        {
+            ArgumentNullException.ThrowIfNull(definition);
+            if (definition.HoldingKind != PhysicalHoldingKind.Discrete)
+                throw new ArgumentException("Initial discrete cargo requires discrete definitions.", nameof(cargo));
+        }
+        ulong used = 0;
+        foreach (PhysicalDefinition definition in cargoValues)
+            used = checked(used + definition.CapacityCost.Units);
+        if (used > design.CargoCapacity.Units)
+            throw new ArgumentException("Initial cargo exceeds the ship's capacity.", nameof(cargo));
+        Cargo = Array.AsReadOnly(cargoValues.OrderBy(definition => definition.Key.ToString(), StringComparer.Ordinal).ToArray());
     }
 
     public EntityId EntityId { get; }
@@ -60,6 +75,9 @@ public sealed record InitialShipSetup
     public ActorController BaseController { get; }
 
     public ShipHeading Heading { get; }
+
+    /// <summary>Gets one explicit definition per initially stored discrete item, in canonical order.</summary>
+    public IReadOnlyList<PhysicalDefinition> Cargo { get; }
 }
 
 /// <summary>
@@ -149,8 +167,8 @@ public sealed class GameSessionSetup
 
     /// <summary>
     /// Validates and canonicalizes complete initial state, including optional
-    /// session-owned economic configuration and the required resolved random
-    /// seed.
+    /// session-owned economic configuration, explicit deployable definitions,
+    /// and the required resolved random seed. Duplicate definition keys reject setup.
     /// </summary>
     public GameSessionSetup(
         IEnumerable<StarSystem> systems,
@@ -161,7 +179,8 @@ public sealed class GameSessionSetup
         RelationshipSetup relationships,
         RandomRootSeed randomRootSeed,
         int factRetentionCapacity,
-        CommandSource playerCommandSource)
+        CommandSource playerCommandSource,
+        IEnumerable<SensorDeployableDefinition>? sensorDeployableDefinitions = null)
     {
         ArgumentNullException.ThrowIfNull(systems);
         ArgumentNullException.ThrowIfNull(ships);
@@ -288,6 +307,11 @@ public sealed class GameSessionSetup
         RandomRootSeed = randomRootSeed;
         FactRetentionCapacity = factRetentionCapacity;
         PlayerCommandSource = playerCommandSource;
+        SensorDeployableDefinitions = Array.AsReadOnly((sensorDeployableDefinitions ?? [])
+            .OrderBy(definition => definition.Key.ToString(), StringComparer.Ordinal).ToArray());
+        if (SensorDeployableDefinitions.Select(definition => definition.Key).Distinct().Count()
+            != SensorDeployableDefinitions.Count)
+            throw new ArgumentException("Deployable definition keys must be unique.", nameof(sensorDeployableDefinitions));
     }
 
     public IReadOnlyList<StarSystem> Systems { get; }
@@ -314,6 +338,9 @@ public sealed class GameSessionSetup
     public int FactRetentionCapacity { get; }
 
     public CommandSource PlayerCommandSource { get; }
+
+    /// <summary>Gets the resolved portable sensor definitions in qualified-key order.</summary>
+    public IReadOnlyList<SensorDeployableDefinition> SensorDeployableDefinitions { get; }
 
     private static void ValidateEconomy(
         GameSessionEconomySetup? economy,

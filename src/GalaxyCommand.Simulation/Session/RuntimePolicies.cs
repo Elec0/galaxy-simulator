@@ -1,11 +1,14 @@
 using System.Collections.ObjectModel;
+using GalaxyCommand.Content;
 
 namespace GalaxyCommand.Simulation;
 
 internal sealed record ResolvedRuntimePolicies(
     ISpatialNavigationPlanner Navigation,
     IReadOnlyList<ShipMaterializationPolicy> MaterializationPolicies,
-    int FactRetentionCapacity);
+    int FactRetentionCapacity,
+    IReadOnlyList<ShipDesign> ShipDefinitions,
+    IReadOnlyList<SensorDeployableDefinition> SensorDeployableDefinitions);
 
 /// <summary>
 /// Stable capture and resolution boundary for injected behavior that can alter
@@ -27,7 +30,9 @@ internal static class RuntimePolicyManifest
         WorldTopology topology,
         ISpatialNavigationPlanner navigation,
         IEnumerable<ShipMaterializationPolicy> materializationPolicies,
-        int factRetentionCapacity)
+        int factRetentionCapacity,
+        IEnumerable<ShipDesign>? shipDefinitions = null,
+        IEnumerable<SensorDeployableDefinition>? sensorDeployableDefinitions = null)
     {
         ArgumentNullException.ThrowIfNull(topology);
         ArgumentNullException.ThrowIfNull(navigation);
@@ -71,7 +76,18 @@ internal static class RuntimePolicyManifest
                 "The travel-time implementation is not registered for save compatibility.");
         }
 
-        MaterializationPolicyCheckpoint[] policies = materializationPolicies
+        ShipMaterializationPolicy[] sourcePolicies = materializationPolicies.ToArray();
+        ShipDefinitionCatalog retained;
+        try
+        {
+            retained = new ShipDefinitionCatalog((shipDefinitions ?? [])
+                .Concat(sourcePolicies.SelectMany(policy => policy.AllowedDesigns.Values)));
+        }
+        catch (ArgumentException error)
+        {
+            return RejectedManifest($"{Path}.shipDefinitions", error.Message);
+        }
+        MaterializationPolicyCheckpoint[] policies = sourcePolicies
             .OrderBy(policy => policy.FacilityId.Value)
             .Select(CaptureMaterializationPolicy)
             .ToArray();
@@ -85,7 +101,11 @@ internal static class RuntimePolicyManifest
                     CurrentBehaviorVersion,
                     chebyshev.MillisecondsPerMapUnit),
                 new ReadOnlyCollection<MaterializationPolicyCheckpoint?>(policies),
-                factRetentionCapacity));
+                factRetentionCapacity,
+                Array.AsReadOnly(retained.Definitions.Select(CaptureShipDesign).ToArray()),
+                Array.AsReadOnly((sensorDeployableDefinitions ?? []).OrderBy(definition => definition.Key.ToString(), StringComparer.Ordinal)
+                    .Select(definition => new SensorDeployableDefinitionCheckpoint(definition.Key, definition.Name,
+                        definition.Physical.CapacityCost, definition.DeploymentRangeUnits, definition.SensorRadiusUnits)).ToArray())));
     }
 
     /// <summary>
@@ -126,8 +146,12 @@ internal static class RuntimePolicyManifest
 
         HashSet<SystemId> systems = topology.Systems.Select(system => system.Id).ToHashSet();
         HashSet<PrincipalId> principals = registeredPrincipals.ToHashSet();
+        CheckpointResult<IReadOnlyList<ShipDesign>> definitions = ResolveDesigns(checkpoint.ShipDefinitions);
+        if (!definitions.IsSuccess) return CheckpointResult<ResolvedRuntimePolicies>.Rejected(definitions.Failure!);
+        CheckpointResult<IReadOnlyList<SensorDeployableDefinition>> sensors = ResolveSensorDeployableDefinitions(checkpoint.SensorDeployableDefinitions);
+        if (!sensors.IsSuccess) return CheckpointResult<ResolvedRuntimePolicies>.Rejected(sensors.Failure!);
         CheckpointResult<IReadOnlyList<ShipMaterializationPolicy>> materializationResult =
-            ResolveMaterializationPolicies(checkpoint, systems, principals);
+            ResolveMaterializationPolicies(checkpoint, systems, principals, definitions.Value!);
         if (!materializationResult.IsSuccess)
         {
             return CheckpointResult<ResolvedRuntimePolicies>.Rejected(
@@ -138,7 +162,8 @@ internal static class RuntimePolicyManifest
             new ResolvedRuntimePolicies(
                 navigationResult.Value!,
                 materializationResult.Value!,
-                checkpoint.FactRetentionCapacity));
+                checkpoint.FactRetentionCapacity,
+                definitions.Value!, sensors.Value!));
     }
 
     private static MaterializationPolicyCheckpoint CaptureMaterializationPolicy(
@@ -152,28 +177,30 @@ internal static class RuntimePolicyManifest
             policy.BaseController.Kind,
             policy.BaseController.Id.Value,
             policy.InitialOrderPolicy,
-            new ReadOnlyCollection<ShipDesignPolicyCheckpoint?>(policy.AllowedDesigns.Values
-                .Select(design => new ShipDesignPolicyCheckpoint(
-                    design.Id,
-                    design.Name,
-                    new ReadOnlyCollection<ConstructionInputPolicyCheckpoint?>(
-                        design.Recipe.Inputs.Select(input =>
-                            new ConstructionInputPolicyCheckpoint(
-                                input.Key,
-                                input.Value)).ToArray()),
-                    design.Recipe.RequiredWork,
-                    design.CargoCapacity,
-                    new ShipManeuverCapabilityCheckpoint(
-                        ShipManeuverCapability.CurrentBehaviorVersion,
-                        design.ManeuverCapability.BaseMassKilograms,
-                        design.ManeuverCapability.BaseAcceleration,
-                        design.ManeuverCapability.CustomPassiveDeceleration,
-                        design.ManeuverCapability.MaximumSubCruiseSpeed,
-                        design.ManeuverCapability.CruiseSpeed,
-                        design.ManeuverCapability.TurnRate,
-                        design.ManeuverCapability.MovingSpoolDuration),
-                    design.SensorRadiusUnits))
-                .ToArray()));
+            Array.AsReadOnly(policy.AllowedDesigns.Keys.OrderBy(id => id.Value).ToArray()));
+
+    /// <summary>Captures exact operational definition meaning independently of any construction policy.</summary>
+    private static ShipDesignPolicyCheckpoint CaptureShipDesign(ShipDesign design) => new(
+        design.Id,
+        design.Name,
+        new ReadOnlyCollection<ConstructionInputPolicyCheckpoint?>(
+            design.Recipe.Inputs.Select(input =>
+                new ConstructionInputPolicyCheckpoint(
+                    input.Key,
+                    input.Value)).ToArray()),
+        design.Recipe.RequiredWork,
+        design.CargoCapacity,
+        new ShipManeuverCapabilityCheckpoint(
+            ShipManeuverCapability.CurrentBehaviorVersion,
+            design.ManeuverCapability.BaseMassKilograms,
+            design.ManeuverCapability.BaseAcceleration,
+            design.ManeuverCapability.CustomPassiveDeceleration,
+            design.ManeuverCapability.MaximumSubCruiseSpeed,
+            design.ManeuverCapability.CruiseSpeed,
+            design.ManeuverCapability.TurnRate,
+            design.ManeuverCapability.MovingSpoolDuration),
+        design.SensorRadiusUnits,
+        design.PickupRangeUnits);
 
     /// <summary>
     /// Resolves the closed travel-time vocabulary without using runtime type names.
@@ -243,7 +270,8 @@ internal static class RuntimePolicyManifest
         ResolveMaterializationPolicies(
             RuntimePolicyManifestCheckpoint checkpoint,
             HashSet<SystemId> systems,
-            HashSet<PrincipalId> principals)
+            HashSet<PrincipalId> principals,
+            IReadOnlyList<ShipDesign> definitions)
     {
         if (checkpoint.MaterializationPolicies is null)
         {
@@ -289,12 +317,18 @@ internal static class RuntimePolicyManifest
                     "The controller or initial-order policy is invalid.");
             }
 
-            CheckpointResult<IReadOnlyList<ShipDesign>> designsResult =
-                ResolveDesigns(policy, policyPath);
-            if (!designsResult.IsSuccess)
+            if (policy.AllowedDesignIds is null || policy.AllowedDesignIds.Count == 0)
+                return RejectedMaterialization($"{policyPath}.allowedDesignIds", "A construction policy requires explicit retained design references.");
+            var allowed = new List<ShipDesign>();
+            var seen = new HashSet<ConstructionDesignId>();
+            for (int designIndex = 0; designIndex < policy.AllowedDesignIds.Count; designIndex++)
             {
-                return CheckpointResult<IReadOnlyList<ShipMaterializationPolicy>>.Rejected(
-                    designsResult.Failure!);
+                ConstructionDesignId id = policy.AllowedDesignIds[designIndex];
+                ShipDesign? definition = definitions.FirstOrDefault(candidate => candidate.Id == id);
+                if (definition is null || !seen.Add(id))
+                    return RejectedMaterialization($"{policyPath}.allowedDesignIds[{designIndex}]",
+                        "Allowed designs must uniquely reference retained ship definitions.");
+                allowed.Add(definition);
             }
 
             policies.Add(new ShipMaterializationPolicy(
@@ -307,7 +341,7 @@ internal static class RuntimePolicyManifest
                     policy.BaseControllerKind,
                     new CommandSourceId(policy.BaseControllerId)),
                 policy.InitialOrderPolicy,
-                designsResult.Value!));
+                allowed));
         }
 
         policies.Sort((left, right) => left.FacilityId.Value.CompareTo(right.FacilityId.Value));
@@ -319,22 +353,21 @@ internal static class RuntimePolicyManifest
     /// Restores complete ship design definitions with unique ordered material inputs.
     /// </summary>
     private static CheckpointResult<IReadOnlyList<ShipDesign>> ResolveDesigns(
-        MaterializationPolicyCheckpoint policy,
-        string policyPath)
+        IReadOnlyList<ShipDesignPolicyCheckpoint?>? savedDefinitions)
     {
-        if (policy.AllowedDesigns is null || policy.AllowedDesigns.Count == 0)
+        if (savedDefinitions is null)
         {
             return RejectedDesigns(
-                $"{policyPath}.allowedDesigns",
-                "At least one allowed ship design is required.");
+                $"{Path}.shipDefinitions",
+                "Independent ship definitions are required.");
         }
 
         var ids = new HashSet<ConstructionDesignId>();
         var designs = new List<ShipDesign>();
-        for (int index = 0; index < policy.AllowedDesigns.Count; index++)
+        for (int index = 0; index < savedDefinitions.Count; index++)
         {
-            ShipDesignPolicyCheckpoint? design = policy.AllowedDesigns[index];
-            string designPath = $"{policyPath}.allowedDesigns[{index}]";
+            ShipDesignPolicyCheckpoint? design = savedDefinitions[index];
+            string designPath = $"{Path}.shipDefinitions[{index}]";
             if (design is null || design.Id.Value == 0 || !ids.Add(design.Id))
             {
                 return RejectedDesigns(
@@ -351,7 +384,7 @@ internal static class RuntimePolicyManifest
                     "The maneuver behavior version is unavailable.");
             }
 
-            if (design.SensorRadiusUnits is null
+            if (design.SensorRadiusUnits is null || design.PickupRangeUnits is null
                 || string.IsNullOrWhiteSpace(design.Name)
                 || design.Inputs is null
                 || !TryResolveManeuverCapability(
@@ -381,12 +414,32 @@ internal static class RuntimePolicyManifest
                 new ConstructionRecipe(inputs, design.RequiredWork),
                 design.CargoCapacity,
                 maneuverCapability!,
-                design.SensorRadiusUnits!.Value));
+                design.SensorRadiusUnits!.Value,
+                design.PickupRangeUnits!.Value));
         }
 
         designs.Sort((left, right) => left.Id.Value.CompareTo(right.Id.Value));
         return CheckpointResult<IReadOnlyList<ShipDesign>>.Success(
             new ReadOnlyCollection<ShipDesign>(designs));
+    }
+
+    /// <summary>Restores explicit sensor definition values before any inventory or deployable owner is published.</summary>
+    private static CheckpointResult<IReadOnlyList<SensorDeployableDefinition>> ResolveSensorDeployableDefinitions(
+        IReadOnlyList<SensorDeployableDefinitionCheckpoint?>? savedDefinitions)
+    {
+        if (savedDefinitions is null)
+            return Rejected<IReadOnlyList<SensorDeployableDefinition>>($"{Path}.sensorDeployableDefinitions", "Sensor definition collection is required.");
+        var keys = new HashSet<QualifiedContentKey>();
+        var definitions = new List<SensorDeployableDefinition>();
+        foreach (SensorDeployableDefinitionCheckpoint? saved in savedDefinitions)
+        {
+            if (saved?.Key is null || saved.Key.ContentKind.Value != "sensor-deployable"
+                || string.IsNullOrWhiteSpace(saved.Name) || saved.CapacityCost == Quantity.Zero || !keys.Add(saved.Key))
+                return Rejected<IReadOnlyList<SensorDeployableDefinition>>($"{Path}.sensorDeployableDefinitions", "A sensor definition is incomplete or duplicated.");
+            definitions.Add(new SensorDeployableDefinition(saved.Key, saved.Name, saved.CapacityCost,
+                saved.DeploymentRangeUnits, saved.SensorRadiusUnits));
+        }
+        return CheckpointResult<IReadOnlyList<SensorDeployableDefinition>>.Success(Array.AsReadOnly(definitions.ToArray()));
     }
 
     /// <summary>

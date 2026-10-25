@@ -267,6 +267,16 @@ station design, `TASK-105` owns its approved runtime implementation, and
 `TASK-095` owns deployables. Full `TASK-073` completion remains open until those
 owners supply the concrete inputs required by its accepted proof.
 
+On 2026-10-26 the owner accepted TASK-095's bounded stationary-range extension
+and deployable notice proposal. Owned assets retain approved detailed notices;
+covered non-owned deployables receive appearance/disappearance notices with
+approved entity view fields and committed position, omitting acting ship,
+source command, inventory, private cause, and unobserved removal reason.
+Disappearance alone does not identify pickup. TASK-073 applies the existing
+commit-time disclosure and bounded-receipt rules to this mapping. The approval
+changes the accepted future contract, not the implemented stage status. See
+the [TASK-095 decision register](sensor-deployables.md#owner-decisions-and-remaining-inputs).
+
 ## Decisions at a glance
 
 | Question | Decision |

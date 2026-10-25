@@ -34,7 +34,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                     transition.PreviousStatus,
                     transition.NextStatus,
                     transition.Reason,
-                    transition.RequestedHeading)));
+                    transition.RequestedHeading,
+                    transition.Action)));
             ordinal = checked(ordinal + 1);
         }
     }
@@ -226,9 +227,9 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         if (destination is NavigationDestination.Entity entity)
         {
             ShipId? targetShipId = _lifecycle.Entities.GetShipId(entity.EntityId);
-            SystemPosition? targetPosition = targetShipId is { } target
+            SystemPosition? targetPosition = _lifecycle.GetDeployedSensor(entity.EntityId)?.Position ?? (targetShipId is { } target
                 ? _movement.PositionAt(target, CurrentTime)
-                : null;
+                : null);
             if (targetPosition is null)
             {
                 return new NavigationPlanResult.Unreachable(
@@ -328,8 +329,10 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             NavigationDestination.System system =>
                 current.SystemId == system.SystemId,
             NavigationDestination.Entity entity =>
-                _lifecycle.Entities.GetShipId(entity.EntityId) is { } targetShipId
-                && _movement.PositionAt(targetShipId, CurrentTime) == current,
+                _lifecycle.GetDeployedSensor(entity.EntityId) is { } sensor
+                    ? current == sensor.Position
+                    : _lifecycle.Entities.GetShipId(entity.EntityId) is { } targetShipId
+                        && _movement.PositionAt(targetShipId, CurrentTime) == current,
             _ => false,
         };
 

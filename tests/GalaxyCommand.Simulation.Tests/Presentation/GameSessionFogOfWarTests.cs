@@ -270,7 +270,7 @@ public sealed class GameSessionFogOfWarTests
              new PrincipalDefinition(new PrincipalId(2), new PrincipalContentId("other"), "Other")],
             new PrincipalId(1), GameSessionTestFixture.StandingPolicy, []);
         ShipDesign design = new(new ConstructionDesignId(1), "Zero radius",
-            new ConstructionRecipe([], new Work(1)), new Quantity(1), GameSessionTestFixture.ManeuverCapability, 0);
+            new ConstructionRecipe([], new Work(1)), new Quantity(1), GameSessionTestFixture.ManeuverCapability, 0, 5_000);
         var other = new CommandSource(CommandSourceKind.Autonomous, new CommandSourceId("other"));
         var setup = new GameSessionSetup([new StarSystem(system1, "Origin"), new StarSystem(system2, "Destination")],
             [new InitialShipSetup(new EntityId(1), new ShipId(1), new InventoryId(1), new PrincipalId(1),
@@ -305,7 +305,7 @@ public sealed class GameSessionFogOfWarTests
     internal static GameSession Create(long otherX, ulong radius = 10_000, int factRetentionCapacity = 256)
     {
         ShipDesign ownedDesign = new(new ConstructionDesignId(1), "Sensor ship",
-            new ConstructionRecipe([], new Work(1)), new Quantity(10), GameSessionTestFixture.ManeuverCapability, radius);
+            new ConstructionRecipe([], new Work(1)), new Quantity(10), GameSessionTestFixture.ManeuverCapability, radius, 5_000);
         var relationships = new RelationshipSetup(
             [new PrincipalDefinition(new PrincipalId(1), new PrincipalContentId("player"), "Player"),
              new PrincipalDefinition(new PrincipalId(2), new PrincipalContentId("other"), "Other")],

@@ -24,7 +24,7 @@ public sealed class InteractionForecastScheduler
 
     /// <summary>Validates due work against this owner's latest pending correlation.</summary>
     public ScheduledEventDisposition ValidateDue(InteractionForecast forecast,
-        ShipPairInteractionInterest? currentInterest, InteractionSpatialReadView view,
+        SpatialInteractionInterest? currentInterest, InteractionSpatialReadView view,
         EventGeneration scheduledGeneration)
     {
         ArgumentNullException.ThrowIfNull(forecast);
@@ -37,7 +37,7 @@ public sealed class InteractionForecastScheduler
 
     /// <summary>Validates the exact committed agenda envelope before accepting contact evidence.</summary>
     public ScheduledEventDisposition ValidateDue(ScheduledEvent<InteractionForecast> scheduled,
-        ShipPairInteractionInterest? currentInterest, InteractionSpatialReadView view)
+        SpatialInteractionInterest? currentInterest, InteractionSpatialReadView view)
     {
         ArgumentNullException.ThrowIfNull(scheduled);
         ArgumentNullException.ThrowIfNull(view);
@@ -125,5 +125,5 @@ public sealed class InteractionForecastScheduler
     /// </summary>
     private static bool SameCorrelation(InteractionForecast first, InteractionForecast second) =>
         first.Candidate.Key == second.Candidate.Key && first.Candidate.Interest == second.Candidate.Interest
-        && first.Source.Revision == second.Source.Revision && first.Target.Revision == second.Target.Revision;
+        && first.Source.Revision == second.Source.Revision && first.TargetRevision == second.TargetRevision;
 }

@@ -15,7 +15,7 @@ public sealed class ConstructionTests
             "Freighter",
             recipe,
             new Quantity(5),
-            GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000);
+            GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000, pickupRangeUnits: 5_000);
         var catalog = new ConstructionDesignCatalog();
 
         catalog.Add(first);

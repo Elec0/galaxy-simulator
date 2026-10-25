@@ -56,7 +56,7 @@ public sealed record ShipOrderTransitionFact : GameFact
 {
     /// <summary>
     /// Captures one lifecycle transition together with the immutable terminal
-    /// destination and optional final-heading intent of its order.
+    /// destination, optional final-heading intent and original action payload of its order.
     /// </summary>
     public ShipOrderTransitionFact(
         ShipId shipId,
@@ -66,7 +66,8 @@ public sealed record ShipOrderTransitionFact : GameFact
         ShipOrderStatus? previousStatus,
         ShipOrderStatus nextStatus,
         ShipOrderReason reason,
-        ShipHeading? requestedHeading = null)
+        ShipHeading? requestedHeading = null,
+        ShipActionIntent? action = null)
     {
         ArgumentOutOfRangeException.ThrowIfZero(shipId.Value);
         ArgumentOutOfRangeException.ThrowIfZero(orderId.Value);
@@ -101,6 +102,7 @@ public sealed record ShipOrderTransitionFact : GameFact
         Source = source;
         Destination = destination;
         RequestedHeading = requestedHeading;
+        Action = action;
         PreviousStatus = previousStatus;
         NextStatus = nextStatus;
         Reason = reason;
@@ -121,5 +123,9 @@ public sealed record ShipOrderTransitionFact : GameFact
     public ShipOrderStatus NextStatus { get; }
 
     public ShipOrderReason Reason { get; }
+
+    public ShipActionIntent? Action { get; }
+
+    public ShipOrderKind Kind => Action?.Kind ?? ShipOrderKind.Move;
 }
 

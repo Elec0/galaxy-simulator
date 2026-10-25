@@ -294,7 +294,7 @@ public sealed class GameSessionEconomySetupTests
                 [new KeyValuePair<MaterialId, Quantity>(material, new Quantity(1))],
                 new Work(1)),
             new Quantity(10),
-            GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000);
+            GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000, pickupRangeUnits: 5_000);
         var setup = new GameSessionSetup(
             [new StarSystem(GameSessionTestFixture.System, "Test System")],
             [CreateInitialShip()],

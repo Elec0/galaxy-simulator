@@ -32,6 +32,16 @@ public enum ShipOrderReason
     WaitingForConnectorTransitCompletion,
     DestinationBecameUnreachable,
     TargetRemoved,
+    AwaitingActionExecution,
+    ActionCompleted,
+    ActionItemUnavailable,
+    ActionItemReserved,
+    ActionCapacityUnavailable,
+    ActionUnauthorized,
+    ActionInvalidSpatialState,
+    ActionDefinitionUnavailable,
+    ActionIdentifierExhausted,
+    ActionActorRemoved,
 }
 
 public sealed record ShipOrderSnapshot(
@@ -40,7 +50,11 @@ public sealed record ShipOrderSnapshot(
     NavigationDestination Destination,
     ShipOrderStatus Status,
     ShipOrderReason Reason,
-    ShipHeading? RequestedHeading = null);
+    ShipHeading? RequestedHeading = null,
+    ShipActionIntent? Action = null)
+{
+    public ShipOrderKind Kind => Action?.Kind ?? ShipOrderKind.Move;
+}
 
 internal enum CancelOrderDisposition
 {
@@ -57,7 +71,8 @@ internal sealed record ShipOrderTransition(
     ShipHeading? RequestedHeading,
     ShipOrderStatus? PreviousStatus,
     ShipOrderStatus NextStatus,
-    ShipOrderReason Reason);
+    ShipOrderReason Reason,
+    ShipActionIntent? Action = null);
 
 internal sealed record TargetedShipOrder(
     ShipId ShipId,
@@ -65,7 +80,7 @@ internal sealed record TargetedShipOrder(
     EntityId TargetEntityId,
     bool WasCurrentActive);
 
-internal sealed class ShipOrderCoordinator
+internal sealed partial class ShipOrderCoordinator
 {
     private readonly SortedDictionary<ShipId, ActorOrders> _actors =
         new(EntityIdComparer<ShipId>.Instance);
@@ -193,7 +208,8 @@ internal sealed class ShipOrderCoordinator
     internal ShipOrder Create(
         CommandSource source,
         NavigationDestination destination,
-        ShipHeading? requestedHeading = null)
+        ShipHeading? requestedHeading = null,
+        ShipActionIntent? action = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(destination);
@@ -201,7 +217,7 @@ internal sealed class ShipOrderCoordinator
             _ids.Allocate(),
             source,
             destination,
-            requestedHeading);
+            requestedHeading, action);
     }
 
     internal ShipOrder? GetActive(ShipId shipId) =>
@@ -423,7 +439,8 @@ internal sealed class ShipOrderCoordinator
     internal void CompleteActive(
         ShipId shipId,
         ShipOrderId orderId,
-        ICollection<ShipOrderTransition> transitions)
+        ICollection<ShipOrderTransition> transitions,
+        ShipOrderReason reason = ShipOrderReason.DestinationReached)
     {
         ArgumentNullException.ThrowIfNull(transitions);
         WorkSet work = CurrentWork(GetRequired(shipId));
@@ -433,7 +450,7 @@ internal sealed class ShipOrderCoordinator
             work,
             active,
             ShipOrderStatus.Completed,
-            ShipOrderReason.DestinationReached,
+            reason,
             transitions);
         Promote(shipId, work, transitions);
     }
@@ -441,7 +458,8 @@ internal sealed class ShipOrderCoordinator
     internal void FailActive(
         ShipId shipId,
         ShipOrderId orderId,
-        ICollection<ShipOrderTransition> transitions)
+        ICollection<ShipOrderTransition> transitions,
+        ShipOrderReason reason = ShipOrderReason.DestinationBecameUnreachable)
     {
         ArgumentNullException.ThrowIfNull(transitions);
         WorkSet work = CurrentWork(GetRequired(shipId));
@@ -451,7 +469,7 @@ internal sealed class ShipOrderCoordinator
             work,
             active,
             ShipOrderStatus.Failed,
-            ShipOrderReason.DestinationBecameUnreachable,
+            reason,
             transitions);
         Promote(shipId, work, transitions);
     }
@@ -679,7 +697,7 @@ internal sealed class ShipOrderCoordinator
             order.NextLegIndex,
             order.MotionId,
             order.TransitId,
-            order.RequestedHeading);
+            order.RequestedHeading, order.Action, order.Action?.Kind ?? ShipOrderKind.Move);
 
     /// <summary>
     /// Restores one work set while preserving FIFO queue order and enforcing
@@ -831,6 +849,9 @@ internal sealed class ShipOrderCoordinator
                 "An order destination is missing or invalid.");
         }
 
+        if (!Enum.IsDefined(checkpoint.Kind) || checkpoint.Kind != (checkpoint.Action?.Kind ?? ShipOrderKind.Move))
+            return OrderRejected($"{path}.kind", "Order kind and action payload disagree.");
+
         if (checkpoint.Status is not { } status || !Enum.IsDefined(status))
         {
             return OrderRejected(
@@ -862,7 +883,7 @@ internal sealed class ShipOrderCoordinator
             checkpoint.Id,
             checkpoint.Source!,
             checkpoint.Destination!,
-            checkpoint.RequestedHeading)
+            checkpoint.RequestedHeading, checkpoint.Action)
         {
             Status = status,
             Reason = reason,
@@ -918,6 +939,9 @@ internal sealed class ShipOrderCoordinator
 
         if (checkpoint.Plan is not { } plan || plan.Legs.Count == 0)
         {
+            if (checkpoint.Action is not null && checkpoint.Reason == ShipOrderReason.AwaitingActionExecution
+                && checkpoint.Plan is null && checkpoint.NextLegIndex == 0
+                && checkpoint.MotionId is null && checkpoint.TransitId is null) return null;
             return new CheckpointValidationFailure(
                 $"{path}.plan",
                 "An active order requires a non-empty travel plan.");
@@ -1030,20 +1054,23 @@ internal sealed class ShipOrderCoordinator
                 reason == ShipOrderReason.QueuedBehindActiveOrder,
             ShipOrderStatus.Active =>
                 reason is ShipOrderReason.MovingToDestination
-                    or ShipOrderReason.ResumingAfterScriptedOverride,
+                    or ShipOrderReason.ResumingAfterScriptedOverride or ShipOrderReason.AwaitingActionExecution,
             ShipOrderStatus.Waiting =>
                 reason == ShipOrderReason.WaitingForConnectorTransitCompletion,
             ShipOrderStatus.Suspended =>
                 reason == ShipOrderReason.SuspendedByScriptedOverride,
             ShipOrderStatus.Completed =>
-                reason == ShipOrderReason.DestinationReached,
+                reason is ShipOrderReason.DestinationReached or ShipOrderReason.ActionCompleted,
             ShipOrderStatus.Cancelled =>
                 reason is ShipOrderReason.CancelledByCommand
                     or ShipOrderReason.ReplacedByCommand
                     or ShipOrderReason.ScriptedOverrideEnded,
             ShipOrderStatus.Failed =>
                 reason is ShipOrderReason.DestinationBecameUnreachable
-                    or ShipOrderReason.TargetRemoved,
+                    or ShipOrderReason.TargetRemoved or ShipOrderReason.ActionItemUnavailable or ShipOrderReason.ActionItemReserved
+                    or ShipOrderReason.ActionCapacityUnavailable or ShipOrderReason.ActionUnauthorized
+                    or ShipOrderReason.ActionInvalidSpatialState or ShipOrderReason.ActionDefinitionUnavailable
+                    or ShipOrderReason.ActionIdentifierExhausted or ShipOrderReason.ActionActorRemoved,
             _ => false,
         };
 
@@ -1291,7 +1318,8 @@ internal sealed class ShipOrderCoordinator
             order.RequestedHeading,
             previousStatus,
             status,
-            reason));
+            reason,
+            order.Action));
     }
 
     private ShipOrder GetRequiredActive(
@@ -1333,7 +1361,7 @@ internal sealed class ShipOrderCoordinator
                 order.Reason
                     ?? throw new InvalidOperationException(
                         $"Order {order.Id} has no lifecycle reason."),
-                order.RequestedHeading);
+                order.RequestedHeading, order.Action);
 
     private static ReadOnlyCollection<ShipOrderSnapshot> CopySnapshots(
         IEnumerable<ShipOrder> orders) =>
@@ -1380,12 +1408,14 @@ internal sealed class ShipOrder
         ShipOrderId id,
         CommandSource source,
         NavigationDestination destination,
-        ShipHeading? requestedHeading = null)
+        ShipHeading? requestedHeading = null,
+        ShipActionIntent? action = null)
     {
         Id = id;
         Source = source;
         Destination = destination;
         RequestedHeading = requestedHeading;
+        Action = action;
     }
 
     internal ShipOrderId Id { get; }
@@ -1395,6 +1425,7 @@ internal sealed class ShipOrder
     internal NavigationDestination Destination { get; }
 
     internal ShipHeading? RequestedHeading { get; }
+    internal ShipActionIntent? Action { get; }
 
     internal ShipOrderStatus? Status { get; set; }
 

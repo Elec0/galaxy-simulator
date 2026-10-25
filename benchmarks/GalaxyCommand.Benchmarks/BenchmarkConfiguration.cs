@@ -79,6 +79,8 @@ public sealed record BenchmarkPreset
 
 public static class BenchmarkPresets
 {
+    public const string StationarySessionSerial = "interaction.stationary-session-serial";
+    public const string StationarySessionBatched = "interaction.stationary-session-batched";
     public const string InteractionSessionSerial = "interaction.session-serial";
     public const string InteractionSessionBatched = "interaction.session-batched";
     public const string InteractionBatchSweptScan = "interaction.batch-swept-scan";
@@ -299,6 +301,8 @@ public static class BenchmarkPresets
         [
             new(InteractionSessionSerial, true, sessionParameters, "1079ca5a77a8341f"),
             new(InteractionSessionBatched, true, sessionBatchParameters, "1079ca5a77a8341f"),
+            new(StationarySessionSerial, true, sessionParameters),
+            new(StationarySessionBatched, true, sessionBatchParameters),
         ];
         return new ReadOnlyDictionary<string, BenchmarkPreset>(
             values.Append(prepared).Concat(indexes).Concat(runtime).Concat(sweeps).Concat(runtimeSweeps).Concat(batchSweeps).Concat(sessions).ToDictionary(value => value.Id, StringComparer.Ordinal));
@@ -547,10 +551,12 @@ public static class BenchmarkScenarioValidator
 
         switch (scenario.BasePreset)
         {
+            case BenchmarkPresets.StationarySessionBatched:
             case BenchmarkPresets.InteractionSessionBatched:
                 RequireRange(scenario, BenchmarkParameterNames.WorkerCount, 1, 1024);
                 RequireRange(scenario, BenchmarkParameterNames.BatchSize, 1, int.MaxValue);
                 goto case BenchmarkPresets.InteractionSessionSerial;
+            case BenchmarkPresets.StationarySessionSerial:
             case BenchmarkPresets.InteractionSessionSerial:
                 RequireRange(scenario, BenchmarkParameterNames.SystemCount, 1, 10000);
                 RequireRange(scenario, BenchmarkParameterNames.ShipCount, 2, 1000000);

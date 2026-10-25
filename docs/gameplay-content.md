@@ -34,6 +34,17 @@ built-in starter ship and development preview courier use the owner-approved
 10,000-meter radius. Missing older capabilities are rejected rather than given
 implicit defaults; historical content/save compatibility remains `TASK-037`.
 
+TASK-095 advances definition and scenario documents to schema 4 while retaining
+package manifest schema 1. Ship definitions require an explicit unsigned
+`pickupRangeMeters` independently of sensor radius. Sensor-deployable definitions
+declare `capacityCost`, `deploymentRangeMeters`, and `sensorRadiusMeters` under
+the `sensor-deployable` kind. A ship's optional `cargo` array names one selected
+qualified deployable definition per initial discrete item, including repeated
+keys for multiple instances. Initial cargo must fit before setup is published.
+No stock or capability is inferred from omitted fields. The actual initial
+satellite content and its reference sources are recorded in the
+[deployable design](sensor-deployables.md#initial-content-adaptation-and-delivery).
+
 ## Decisions at a glance
 
 | Question | Decision |

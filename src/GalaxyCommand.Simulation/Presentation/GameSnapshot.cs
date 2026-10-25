@@ -11,7 +11,11 @@ public sealed record GameSnapshot(
     IReadOnlyList<ConnectorEndpointSnapshot> ConnectorEndpoints,
     IReadOnlyList<TransitConnectionSnapshot> TransitConnections,
     RelationshipSnapshot Relationships,
-    IReadOnlyList<GameShipSnapshot> Ships);
+    IReadOnlyList<GameShipSnapshot> Ships)
+{
+    /// <summary>Gets complete authoritative stationary sensor state for diagnostic consumers.</summary>
+    public IReadOnlyList<DeployedSensorSnapshot> DeployedSensors { get; init; } = [];
+}
 
 public sealed record GameSystemSnapshot(
     SystemId Id,

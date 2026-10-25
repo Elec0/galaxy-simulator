@@ -3,7 +3,7 @@ using GalaxyCommand.Simulation;
 namespace GalaxyCommand.Benchmarks;
 
 /// <summary>Measures complete advancing sessions; only forecast execution varies between presets.</summary>
-internal sealed class InteractionSessionBenchmarkScenario(bool batched) : IBenchmarkScenario
+internal sealed class InteractionSessionBenchmarkScenario(bool batched, bool stationaryTargets = false) : IBenchmarkScenario
 {
     public ScenarioCorrectnessResult Run(ResolvedBenchmarkScenario configuration)
     {
@@ -29,7 +29,7 @@ internal sealed class InteractionSessionBenchmarkScenario(bool batched) : IBench
         session.BindSpatialInteractionDomain("benchmark", domain);
         int interestCount = configuration.GetInt32(BenchmarkParameterNames.InterestCount);
         ulong range = configuration.GetUInt64(BenchmarkParameterNames.RangeUnits);
-        var interests = new ShipPairInteractionInterest[interestCount];
+        var interests = new SpatialInteractionInterest[interestCount];
         var targetsBySystem = ships.Skip(active).GroupBy(ship => ship.Position.SystemId)
             .ToDictionary(group => group.Key, group => group.ToArray());
         for (int i = 0; i < interests.Length; i++)
@@ -37,7 +37,9 @@ internal sealed class InteractionSessionBenchmarkScenario(bool batched) : IBench
             var source = ships[i % active];
             var targets = targetsBySystem[source.Position.SystemId];
             var target = targets[i / active % targets.Length];
-            interests[i] = owner.Register($"contact-{i}", source.Id, target.Id, range);
+            interests[i] = stationaryTargets
+                ? owner.RegisterStationary($"contact-{i}", source.Id, target.Position, range)
+                : owner.Register($"contact-{i}", source.Id, target.Id, range);
         }
         long updates = 0, cancellations = 0;
         int replans = configuration.GetInt32(BenchmarkParameterNames.ReplanCount);
@@ -48,7 +50,7 @@ internal sealed class InteractionSessionBenchmarkScenario(bool batched) : IBench
             if (wave > 0) session.AdvanceTo(new SimulationTime(checked((ulong)wave * interval)));
             if (wave > 0)
             {
-                foreach (var interest in owner.CaptureSnapshot())
+                foreach (var interest in owner.CaptureAllSnapshot())
                 {
                     if ((interest.Id.Value + (ulong)wave) % 11 == 0)
                     {
@@ -56,7 +58,9 @@ internal sealed class InteractionSessionBenchmarkScenario(bool batched) : IBench
                     }
                     else if ((interest.Id.Value + (ulong)wave) % 3 == 0)
                     {
-                        owner.Update(interest.Id, interest.Source, interest.Target, range + (ulong)(wave % 2));
+                        if (interest is StationaryInteractionInterest fixedTarget)
+                            owner.UpdateStationary(interest.Id, interest.Source, fixedTarget.Position, range + (ulong)(wave % 2));
+                        else owner.Update(interest.Id, interest.Source, ((ShipPairInteractionInterest)interest).Target, range + (ulong)(wave % 2));
                         updates++;
                     }
                 }
@@ -73,6 +77,7 @@ internal sealed class InteractionSessionBenchmarkScenario(bool batched) : IBench
         var result = ScenarioResult.Create(session, configuration);
         var digest = new DeterministicDigest();
         digest.Add(result.Digest);
+        if (stationaryTargets) digest.Add("stationary-targets");
         // Include semantic workload parameters and serial delivery evidence, excluding execution and harness tuning.
         foreach (var parameter in configuration.Parameters.Where(p => p.Key is not ("workerCount" or "batchSize" or "warmupIterations" or "measuredIterations")))
         {
@@ -82,11 +87,17 @@ internal sealed class InteractionSessionBenchmarkScenario(bool batched) : IBench
         {
             digest.Add(contact.SystemId.Value); digest.Add(contact.Interest.Id.Value);
             digest.Add(contact.Interest.Generation.Value); digest.Add(contact.Interest.Source.Value);
-            digest.Add(contact.Interest.Target.Value); digest.Add(contact.Interest.RangeUnits);
+            if (contact.Interest is ShipPairInteractionInterest pair) digest.Add(pair.Target.Value);
+            else
+            {
+                SystemPosition position = ((StationaryInteractionInterest)contact.Interest).Position;
+                digest.Add(position.SystemId.Value); digest.Add(position.Position.X.Units); digest.Add(position.Position.Y.Units);
+            }
+            digest.Add(contact.Interest.RangeUnits);
             digest.Add(contact.Contact.Timestamp.Milliseconds); digest.Add(contact.Contact.InRangeAtTimestamp);
             digest.Add(contact.Contact.AlreadyInRange);
         }
-        foreach (var interest in owner.CaptureSnapshot())
+        foreach (var interest in owner.CaptureAllSnapshot())
         {
             digest.Add(interest.Id.Value); digest.Add(interest.Generation.Value); digest.Add(interest.RangeUnits);
         }
@@ -97,10 +108,11 @@ internal sealed class InteractionSessionBenchmarkScenario(bool batched) : IBench
             ["interestsRegistered"] = interestCount,
             ["interestsUpdated"] = updates,
             ["interestsCanceled"] = cancellations,
-            ["interestsRemaining"] = owner.CaptureSnapshot().Count,
+            ["interestsRemaining"] = owner.CaptureAllSnapshot().Count,
             ["interactionEventsIgnored"] = session.EventRecords.Count(e => e.Kind is GameEventKind.SpatialInteraction && e.Disposition != ScheduledEventDisposition.Applied),
             ["interactionEventsApplied"] = session.EventRecords.Count(e => e.Kind is GameEventKind.SpatialInteraction && e.Disposition == ScheduledEventDisposition.Applied),
         };
+        if (stationaryTargets) counts["stationaryInterests"] = interestCount;
         return new ScenarioCorrectnessResult(digest.ToString(), result.SimulatedMilliseconds, counts);
     }
 

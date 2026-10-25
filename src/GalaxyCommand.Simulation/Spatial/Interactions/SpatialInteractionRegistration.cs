@@ -74,9 +74,9 @@ internal sealed class SpatialInteractionRegistration
         {
             foreach (InteractionDeliveryCorrelation delivery in owner.CaptureCheckpoint().Deliveries ?? [])
             {
-                ShipPairInteractionInterest interest = owner.Get(delivery.InterestId)!;
+                SpatialInteractionInterest interest = owner.GetInterest(delivery.InterestId)!;
                 if ((view.Get(interest.Source) is { } source && delivery.SourceRevision.Value > source.Revision.Value)
-                    || (view.Get(interest.Target) is { } target && delivery.TargetRevision.Value > target.Revision.Value))
+                    || (interest.TargetRevision(view) is { } target && delivery.TargetRevision.Value > target.Value))
                     return new CheckpointValidationFailure("$.checkpoint.spatialInteractions.deliveries",
                         "Delivery history cannot reference a future spatial revision.");
             }
@@ -101,7 +101,7 @@ internal sealed class SpatialInteractionRegistration
                 return Reject("Registered domains must be nonnull and have distinct stable names.");
             CheckpointResult<InteractionInterestOwner> owner = InteractionInterestOwner.RestoreCheckpoint(domain, ids.Value!);
             if (!owner.IsSuccess) return Reject(owner.Failure!.Message);
-            if (owner.Value!.CaptureSnapshot().Any(interest => !seen.Add(interest.Id)))
+            if (owner.Value!.CaptureAllSnapshot().Any(interest => !seen.Add(interest.Id)))
                 return Reject("Interest identities must be unique across all registered domains.");
             registration._domains.Add(domain.DomainKind, owner.Value!);
         }

@@ -346,7 +346,7 @@ public sealed class ConnectorTraversalTests
             "Connector Test Ship",
             new ConstructionRecipe([], new Work(1)),
             new Quantity(10),
-            GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000);
+            GameSessionTestFixture.ManeuverCapability, sensorRadiusUnits: 10_000, pickupRangeUnits: 5_000);
         var setup = new GameSessionSetup(
             [
                 new StarSystem(OriginSystem, "Origin"),

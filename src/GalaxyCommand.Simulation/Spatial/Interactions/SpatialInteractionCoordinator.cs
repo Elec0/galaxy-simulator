@@ -1,13 +1,13 @@
 namespace GalaxyCommand.Simulation;
 
-/// <summary>Derived participant index and transition-triggered forecast waves for domain-owned pair interests.</summary>
+/// <summary>Derived participant index and shared forecast waves for domain-owned ship and fixed-target interests.</summary>
 public sealed class SpatialInteractionCoordinator : IDisposable
 {
     private readonly SpatialMovement _movement;
     private readonly List<InteractionInterestOwner> _owners;
     private readonly SpatialInteractionChanges _movementChanges;
     private readonly Dictionary<InteractionInterestId, InteractionInterestOwner> _identityOwners = [];
-    private readonly Dictionary<InteractionInterestId, ShipPairInteractionInterest> _interests = [];
+    private readonly Dictionary<InteractionInterestId, SpatialInteractionInterest> _interests = [];
     private readonly Dictionary<ShipId, HashSet<InteractionInterestId>> _participants = [];
     private readonly HashSet<InteractionInterestId> _dirty = [];
     private bool _disposed;
@@ -23,7 +23,7 @@ public sealed class SpatialInteractionCoordinator : IDisposable
             throw new ArgumentException("Interest owners must be distinct and nonnull.", nameof(owners));
         foreach (InteractionInterestOwner owner in _owners)
         {
-            foreach (ShipPairInteractionInterest interest in owner.CaptureSnapshot())
+            foreach (SpatialInteractionInterest interest in owner.CaptureAllSnapshot())
             {
                 ApplyChange(owner, new InteractionInterestChange(interest.Id, interest));
                 _dirty.Add(interest.Id);
@@ -38,11 +38,11 @@ public sealed class SpatialInteractionCoordinator : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(owner);
         if (_owners.Contains(owner)) return;
-        IReadOnlyList<ShipPairInteractionInterest> interests = owner.CaptureSnapshot();
+        IReadOnlyList<SpatialInteractionInterest> interests = owner.CaptureAllSnapshot();
         if (interests.Any(interest => _identityOwners.ContainsKey(interest.Id)))
             throw new InvalidOperationException("New domain interests reuse a registered session identity.");
         _owners.Add(owner);
-        foreach (ShipPairInteractionInterest interest in interests)
+        foreach (SpatialInteractionInterest interest in interests)
         {
             ApplyChange(owner, new InteractionInterestChange(interest.Id, interest));
             _dirty.Add(interest.Id);
@@ -63,7 +63,7 @@ public sealed class SpatialInteractionCoordinator : IDisposable
             throw new ArgumentException("Due events must be distinct StateUpdate envelopes at the wave timestamp.", nameof(events));
         InteractionSpatialReadView view = _movement.CaptureInteractionReadView(now);
         var interests = inputs.Select(scheduled => scheduled.Payload.Candidate.Interest.Id).Distinct()
-            .ToDictionary(id => id, id => _identityOwners.GetValueOrDefault(id)?.Get(id));
+            .ToDictionary(id => id, id => _identityOwners.GetValueOrDefault(id)?.GetInterest(id));
         InteractionDueResult[] results = inputs.OrderBy(scheduled => scheduled.Payload.Candidate.Key)
             .ThenBy(scheduled => scheduled.Key)
             .Select(scheduled => new InteractionDueResult(scheduled,
@@ -73,7 +73,7 @@ public sealed class SpatialInteractionCoordinator : IDisposable
 
     /// <summary>Suppresses a contact already delivered for this stable state without changing pending correlations.</summary>
     private ScheduledEventDisposition ValidateDueDelivery(ScheduledEvent<InteractionForecast> scheduled,
-        ShipPairInteractionInterest? interest, InteractionSpatialReadView view)
+        SpatialInteractionInterest? interest, InteractionSpatialReadView view)
     {
         ScheduledEventDisposition disposition = Scheduler.ValidateDue(scheduled, interest, view);
         return disposition == ScheduledEventDisposition.Applied && interest is not null
@@ -143,7 +143,7 @@ public sealed class SpatialInteractionCoordinator : IDisposable
             InteractionSpatialReadView view = _movement.CaptureInteractionReadView(now);
             if (execution is null)
             {
-                foreach (ShipPairInteractionInterest interest in EligibleInterests(view))
+                foreach (SpatialInteractionInterest interest in EligibleInterests(view))
                     if (InteractionForecast.Evaluate(interest, view, Boundary(interest, view)) is { } forecast)
                         forecasts.Add(forecast);
             }
@@ -167,10 +167,10 @@ public sealed class SpatialInteractionCoordinator : IDisposable
     }
 
     /// <summary>Reads current intent and delivery history only on the coordinator thread in stable interest order.</summary>
-    private IEnumerable<ShipPairInteractionInterest> EligibleInterests(InteractionSpatialReadView view)
+    private IEnumerable<SpatialInteractionInterest> EligibleInterests(InteractionSpatialReadView view)
     {
         foreach (InteractionInterestId id in _dirty.OrderBy(id => id.Value))
-            if (_interests.TryGetValue(id, out ShipPairInteractionInterest? interest)
+            if (_interests.TryGetValue(id, out SpatialInteractionInterest? interest)
                 && !_identityOwners[id].HasDelivered(interest, view)) yield return interest;
     }
 
@@ -188,10 +188,9 @@ public sealed class SpatialInteractionCoordinator : IDisposable
         if (_identityOwners.TryGetValue(change.Id, out InteractionInterestOwner? existing) && existing != owner)
             throw new InvalidOperationException("Interaction identity is shared by distinct domain owners.");
         _identityOwners[change.Id] = owner;
-        if (_interests.Remove(change.Id, out ShipPairInteractionInterest? previous))
+        if (_interests.Remove(change.Id, out SpatialInteractionInterest? previous))
         {
-            RemoveParticipant(previous.Source, change.Id);
-            RemoveParticipant(previous.Target, change.Id);
+            foreach (ShipId ship in previous.Ships) RemoveParticipant(ship, change.Id);
         }
         if (change.Interest is not { } interest)
         {
@@ -199,8 +198,7 @@ public sealed class SpatialInteractionCoordinator : IDisposable
             return;
         }
         _interests.Add(change.Id, interest);
-        AddParticipant(interest.Source, change.Id);
-        AddParticipant(interest.Target, change.Id);
+        foreach (ShipId ship in interest.Ships) AddParticipant(ship, change.Id);
     }
 
     /// <summary>Creates membership only for ships with live explicit interests.</summary>
@@ -220,10 +218,10 @@ public sealed class SpatialInteractionCoordinator : IDisposable
     }
 
     /// <summary>Uses the owner-selected next motion boundary, avoiding an unrenewed short query horizon.</summary>
-    private static SimulationTime Boundary(ShipPairInteractionInterest interest, InteractionSpatialReadView view)
+    private static SimulationTime Boundary(SpatialInteractionInterest interest, InteractionSpatialReadView view)
     {
         SimulationTime? first = NextBoundary(view.Get(interest.Source));
-        SimulationTime? second = NextBoundary(view.Get(interest.Target));
+        SimulationTime? second = interest is ShipPairInteractionInterest pair ? NextBoundary(view.Get(pair.Target)) : null;
         return first is { } a && second is { } b ? (a < b ? a : b) : first ?? second ?? view.Timestamp;
     }
     private static SimulationTime? NextBoundary(InteractionSpatialParticipant? participant) =>

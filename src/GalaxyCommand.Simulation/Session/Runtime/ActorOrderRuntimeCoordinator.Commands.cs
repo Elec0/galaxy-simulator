@@ -74,7 +74,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         ShipOrder order = _orders.Create(
             proposal.Source,
             proposal.Destination,
-            proposal.RequestedHeading);
+            proposal.RequestedHeading,
+            proposal.Action);
         switch (proposal.Placement)
         {
             case OrderPlacement.ReplaceAll:

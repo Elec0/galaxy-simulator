@@ -4,7 +4,7 @@ namespace GalaxyCommand.Simulation;
 /// Immutable range-interest input from its authoritative domain. Source and
 /// target retain their directed meaning independent of canonical discovery order.
 /// </summary>
-public sealed record ShipPairInteractionInterest
+public sealed record ShipPairInteractionInterest : SpatialInteractionInterest
 {
     /// <summary>
     /// Captures a domain's explicit range question for two distinct ship identities.
@@ -14,26 +14,17 @@ public sealed record ShipPairInteractionInterest
     public ShipPairInteractionInterest(
         InteractionInterestId id, string domainKind, string purposeId,
         ShipId source, ShipId target, ulong rangeUnits, EventGeneration generation)
+        : base(id, domainKind, purposeId, source, rangeUnits, generation)
     {
         ArgumentOutOfRangeException.ThrowIfZero(id.Value);
         ArgumentException.ThrowIfNullOrWhiteSpace(domainKind);
         ArgumentException.ThrowIfNullOrWhiteSpace(purposeId);
         _ = new InteractionShipPair(source, target);
 
-        Id = id;
-        DomainKind = domainKind;
-        PurposeId = purposeId;
-        Source = source;
         Target = target;
-        RangeUnits = rangeUnits;
-        Generation = generation;
     }
 
-    public InteractionInterestId Id { get; }
-    public string DomainKind { get; }
-    public string PurposeId { get; }
-    public ShipId Source { get; }
     public ShipId Target { get; }
-    public ulong RangeUnits { get; }
-    public EventGeneration Generation { get; }
+    internal override IEnumerable<ShipId> Ships => [Source, Target];
+    internal override SpatialRevision? TargetRevision(InteractionSpatialReadView view) => view.Get(Target)?.Revision;
 }

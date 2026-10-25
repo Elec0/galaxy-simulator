@@ -8,7 +8,10 @@ internal sealed class PlayerFactProjector(CommandSource playerCommandSource, Gam
     internal GameFact? Project(GameFact fact)
     {
         PrincipalId observer = world.Relationships.PlayerPrincipalId;
-        PrincipalId? subjectPrincipal = fact is EntityMaterializedFact materialized ? materialized.PrincipalId
+        PrincipalId? subjectPrincipal = fact is SensorDeployedFact deployed ? deployed.Sensor.PrincipalId
+            : fact is SensorPickedUpFact pickedUp ? pickedUp.Sensor.PrincipalId
+            : fact is SensorRemovedFact sensorRemoval ? sensorRemoval.Sensor.PrincipalId
+            : fact is EntityMaterializedFact materialized ? materialized.PrincipalId
             : GamePresentationSnapshotFactory.GetShipId(fact) is { } subject
                 ? ships.GetValueOrDefault(subject)?.PrincipalId : null;
         if (TryProjectWithoutCoverage(fact, observer, playerCommandSource, subjectPrincipal, out GameFact? direct)) return direct;
@@ -19,6 +22,15 @@ internal sealed class PlayerFactProjector(CommandSource playerCommandSource, Gam
 
         return fact switch
         {
+            SensorDeployedFact appearance => coverage.Contains(appearance.Sensor.Position)
+                ? new ObservedSensorChangeFact(appearance.Sensor.EntityId, appearance.Sensor.DefinitionKey,
+                    appearance.Sensor.PrincipalId, appearance.Sensor.Position, ObservedSensorChangeKind.Appeared) : null,
+            SensorPickedUpFact disappearance => coverage.Contains(disappearance.Sensor.Position)
+                ? new ObservedSensorChangeFact(disappearance.Sensor.EntityId, disappearance.Sensor.DefinitionKey,
+                    disappearance.Sensor.PrincipalId, disappearance.Sensor.Position, ObservedSensorChangeKind.Disappeared) : null,
+            SensorRemovedFact disappearance => coverage.Contains(disappearance.Sensor.Position)
+                ? new ObservedSensorChangeFact(disappearance.Sensor.EntityId, disappearance.Sensor.DefinitionKey,
+                    disappearance.Sensor.PrincipalId, disappearance.Sensor.Position, ObservedSensorChangeKind.Disappeared) : null,
             ShipLocalMotionStartedFact started => Spatial(started.ShipId, started.Motion.Origin, ObservedShipChangeKind.MotionChanged),
             ShipLocalMotionEndedFact ended => Spatial(ended.ShipId, ended.FinalPosition, ObservedShipChangeKind.MotionChanged),
             ShipCruiseEnteredFact entered => Spatial(entered.ShipId, entered.Position, ObservedShipChangeKind.MotionChanged),
@@ -82,5 +94,6 @@ internal sealed class PlayerFactProjector(CommandSource playerCommandSource, Gam
     internal static bool IsOwnedAssetFact(GameFact fact) => fact is
         ShipOrderTransitionFact or ShipWaypointArrivedFact or ShipLocalMotionStartedFact or ShipLocalMotionEndedFact
         or ShipCruiseEnteredFact or ShipCruiseDroppedOutFact or ShipConnectorTransitStartedFact
-        or ShipConnectorTransitCompletedFact or EntityMaterializedFact or EntityRemovedFact;
+        or ShipConnectorTransitCompletedFact or EntityMaterializedFact or EntityRemovedFact
+        or SensorDeployedFact or SensorPickedUpFact or SensorRemovedFact;
 }

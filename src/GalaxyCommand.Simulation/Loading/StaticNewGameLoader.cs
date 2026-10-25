@@ -93,12 +93,14 @@ public static class StaticNewGameLoader
     private const string PrincipalKind = "principal";
     private const string ShipDesignKind = "ship-design";
     private const string StandingPolicyKind = "standing-policy";
+    private const string SensorDeployableKind = "sensor-deployable";
 
     private static readonly ContentKindRegistry SupportedKinds = new(
         [
             ContentKind.Create(PrincipalKind),
             ContentKind.Create(ShipDesignKind),
             ContentKind.Create(StandingPolicyKind),
+            ContentKind.Create(SensorDeployableKind),
         ]);
 
     /// <summary>
@@ -189,6 +191,7 @@ public static class StaticNewGameLoader
             ComposePrincipals(catalog, scenario, source, diagnostics);
         Dictionary<QualifiedContentKey, ShipDesign> designs =
             ComposeShipDesigns(catalog, scenario, source, diagnostics);
+        SensorDeployableDefinition[] deployables = ComposeSensorDeployables(catalog, scenario, diagnostics);
         if (!TryDefinitionReference(
                 scenario.Values,
                 "playerPrincipal",
@@ -234,6 +237,7 @@ public static class StaticNewGameLoader
             systems,
             principals,
             designs,
+            deployables.ToDictionary(definition => definition.Key),
             diagnostics);
         if (!TryString(scenario.Values, "playerCommandSource", source, "$scenario.values.playerCommandSource",
                 diagnostics, out string? playerCommandSource)
@@ -248,6 +252,8 @@ public static class StaticNewGameLoader
                 systems.Values,
                 ships,
                 connectorTopology,
+                [],
+                null,
                 new RelationshipSetup(
                     principals.Values,
                     principals[playerKey!].Id,
@@ -255,13 +261,38 @@ public static class StaticNewGameLoader
                     []),
                 randomRootSeed,
                 factRetentionCapacity,
-                new CommandSource(CommandSourceKind.Player, new CommandSourceId(playerCommandSource!)));
+                new CommandSource(CommandSourceKind.Player, new CommandSourceId(playerCommandSource!)),
+                deployables);
         }
         catch (Exception exception) when (exception is ArgumentException or OverflowException)
         {
             diagnostics.Add(Diagnostic(source, "$scenario.values", "The static scenario violates clean-session invariants."));
             return null;
         }
+    }
+
+    /// <summary>Resolves explicit portable sensor capabilities without inventing tuning or item stock.</summary>
+    private static SensorDeployableDefinition[] ComposeSensorDeployables(
+        ResolvedContentCatalog catalog, StaticScenarioSource scenario, List<ContentDiagnostic> diagnostics)
+    {
+        var definitions = new List<SensorDeployableDefinition>();
+        foreach (QualifiedContentKey key in scenario.References.Where(key => key.ContentKind.Value == SensorDeployableKind)
+            .OrderBy(key => key.ToString(), StringComparer.Ordinal))
+        {
+            ContentDefinitionSource definition = catalog.Definitions[key];
+            if (!TryObjectProperties(definition.Values,
+                    ["capacityCost", "deploymentRangeMeters", "sensorRadiusMeters"], key.ToString(), "$definition.values", diagnostics)
+                || !TryPositiveUInt64(definition.Values, "capacityCost", key.ToString(),
+                    "$definition.values.capacityCost", diagnostics, out ulong capacity)
+                || !TryUInt64(definition.Values, "deploymentRangeMeters", key.ToString(),
+                    "$definition.values.deploymentRangeMeters", diagnostics, out ulong deploymentRange)
+                || !TryUInt64(definition.Values, "sensorRadiusMeters", key.ToString(),
+                    "$definition.values.sensorRadiusMeters", diagnostics, out ulong sensorRadius))
+                continue;
+            definitions.Add(new SensorDeployableDefinition(key, definition.InvariantFallback,
+                new Quantity(capacity), deploymentRange, sensorRadius));
+        }
+        return definitions.ToArray();
     }
 
     /// <summary>
@@ -335,6 +366,7 @@ public static class StaticNewGameLoader
                 || !TryUInt64(definition!.Values, "cargoCapacity", key.ToString(), "$definition.values.cargoCapacity", diagnostics, out ulong capacity)
                 || !TryUInt64(definition.Values, "requiredWork", key.ToString(), "$definition.values.requiredWork", diagnostics, out ulong work)
                 || !TryUInt64(definition.Values, "sensorRadiusMeters", key.ToString(), "$definition.values.sensorRadiusMeters", diagnostics, out ulong sensorRadius)
+                || !TryUInt64(definition.Values, "pickupRangeMeters", key.ToString(), "$definition.values.pickupRangeMeters", diagnostics, out ulong pickupRange)
                 || !TryComposeManeuverCapability(
                     definition.Values,
                     key.ToString(),
@@ -354,7 +386,8 @@ public static class StaticNewGameLoader
                     new ConstructionRecipe([], new Work(work)),
                     new Quantity(capacity),
                     maneuverCapability!,
-                    sensorRadius));
+                    sensorRadius,
+                    pickupRange));
         }
 
         return designs;
@@ -379,6 +412,7 @@ public static class StaticNewGameLoader
             "movingSpoolDurationMilliseconds",
             "requiredWork",
             "sensorRadiusMeters",
+            "pickupRangeMeters",
             "turnRateDegreesPerSecond",
         ];
         string[] properties = value?.Properties.ContainsKey(
@@ -830,6 +864,7 @@ public static class StaticNewGameLoader
         Dictionary<string, StarSystem> systems,
         IReadOnlyDictionary<QualifiedContentKey, PrincipalDefinition> principals,
         IReadOnlyDictionary<QualifiedContentKey, ShipDesign> designs,
+        IReadOnlyDictionary<QualifiedContentKey, SensorDeployableDefinition> deployables,
         List<ContentDiagnostic> diagnostics)
     {
         if (!TryArray(scenario, "ships", source, "$scenario.values.ships", diagnostics, out ContentArrayValue? array))
@@ -845,6 +880,8 @@ public static class StaticNewGameLoader
                 && candidate.Properties.ContainsKey("headingDegrees")
                 ? ["controllerSource", "design", "headingDegrees", "id", "principal", "system", "x", "y"]
                 : ["controllerSource", "design", "id", "principal", "system", "x", "y"];
+            if (array.Items[index] is ContentObjectValue cargoCandidate && cargoCandidate.Properties.ContainsKey("cargo"))
+                properties = [.. properties, "cargo"];
             if (array.Items[index] is not ContentObjectValue item
                 || !TryObjectProperties(item, properties, source, path, diagnostics)
                 || !TryString(item, "id", source, $"{path}.id", diagnostics, out string? id))
@@ -905,7 +942,8 @@ public static class StaticNewGameLoader
                         system!.Id,
                         new SpatialPosition(new SpatialCoordinate(x), new SpatialCoordinate(y))),
                     new ActorController(ActorControllerKind.Player, new CommandSourceId(controllerSource!)),
-                    heading));
+                    heading,
+                    ComposeInitialCargo(item, deployables, design!.CargoCapacity, source, path, diagnostics)));
             runtimeId++;
         }
 
@@ -915,6 +953,41 @@ public static class StaticNewGameLoader
         }
 
         return ships;
+    }
+
+    /// <summary>Resolves one definition per discrete item; no count expansion or implicit stock is admitted.</summary>
+    private static List<PhysicalDefinition> ComposeInitialCargo(ContentObjectValue ship,
+        IReadOnlyDictionary<QualifiedContentKey, SensorDeployableDefinition> definitions,
+        Quantity capacity, string source, string path, List<ContentDiagnostic> diagnostics)
+    {
+        if (!ship.Properties.ContainsKey("cargo")) return [];
+        if (!TryArray(ship, "cargo", source, $"{path}.cargo", diagnostics, out ContentArrayValue? cargo)) return [];
+        var result = new List<PhysicalDefinition>();
+        Quantity used = Quantity.Zero;
+        for (int index = 0; index < cargo!.Items.Count; index++)
+        {
+            if (cargo.Items[index] is ContentStringValue text)
+            {
+                try
+                {
+                    QualifiedContentKey key = QualifiedContentKey.Parse(text.Value);
+                    if (definitions.TryGetValue(key, out SensorDeployableDefinition? definition))
+                    {
+                        if (definition.Physical.CapacityCost > capacity.Subtract(used))
+                        {
+                            diagnostics.Add(Diagnostic(source, $"{path}.cargo[{index}]", "Initial cargo exceeds the ship's capacity."));
+                            continue;
+                        }
+                        result.Add(definition.Physical);
+                        used = used.Add(definition.Physical.CapacityCost);
+                        continue;
+                    }
+                }
+                catch (ArgumentException) { /* Report the same stable diagnostic for malformed and unavailable keys. */ }
+            }
+            diagnostics.Add(Diagnostic(source, $"{path}.cargo[{index}]", "Cargo must name a selected sensor-deployable definition."));
+        }
+        return result;
     }
 
     /// <summary>Reads one optional exact scenario heading and canonicalizes 360 degrees.</summary>

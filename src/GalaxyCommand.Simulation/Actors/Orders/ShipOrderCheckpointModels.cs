@@ -13,7 +13,9 @@ internal sealed record ShipOrderCheckpoint(
     int NextLegIndex,
     MotionId? MotionId,
     ConnectorTransitId? TransitId,
-    ShipHeading? RequestedHeading = null);
+    ShipHeading? RequestedHeading = null,
+    ShipActionIntent? Action = null,
+    ShipOrderKind Kind = ShipOrderKind.Move);
 
 internal sealed class ShipOrderWorkSetCheckpoint
 {

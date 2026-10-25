@@ -44,6 +44,13 @@ public sealed partial class GameSession
         {
             PrincipalId? principal = GamePresentationSnapshotFactory.GetShipId(envelope.Fact) is { } subject
                 ? principals[subject] : null;
+            principal = envelope.Fact switch
+            {
+                SensorDeployedFact deployed => deployed.Sensor.PrincipalId,
+                SensorPickedUpFact pickedUp => pickedUp.Sensor.PrincipalId,
+                SensorRemovedFact removed => removed.Sensor.PrincipalId,
+                _ => principal,
+            };
             if (PlayerFactProjector.TryProjectWithoutCoverage(envelope.Fact, observer, _playerCommandSource, principal, out GameFact? direct))
                 proposals.Add(envelope.Sequence, new PlayerFactDisclosure(observer, direct, principal));
             else spatial.Add((envelope, principal));
@@ -104,12 +111,30 @@ public sealed partial class GameSession
                 RelationshipGrantRevokedFact revoked => checkpoint.Relationships.Grants.Any(grant =>
                     grant?.Id == revoked.Id && grant.HolderPrincipalId == observer),
                 EntityMaterializedFact ownedAppearance => ownedAppearance.PrincipalId == observer && receipt.SubjectPrincipalId == observer,
+                SensorDeployedFact deployed => deployed.Sensor.PrincipalId == observer && receipt.SubjectPrincipalId == observer,
+                SensorPickedUpFact pickedUp => pickedUp.Sensor.PrincipalId == observer && receipt.SubjectPrincipalId == observer,
+                SensorRemovedFact removed => removed.Sensor.PrincipalId == observer && receipt.SubjectPrincipalId == observer,
                 ObservedShipChangeFact => false,
                 _ => PlayerFactProjector.IsOwnedAssetFact(envelope.Fact)
                     && subject is not null && receipt.SubjectPrincipalId == observer,
             };
         }
 
+        if (receipt.Fact is ObservedSensorChangeFact sensorNotice)
+        {
+            DeployedSensorSnapshot? sensor = envelope.Fact switch
+            {
+                SensorDeployedFact deployed when sensorNotice.Kind == ObservedSensorChangeKind.Appeared => deployed.Sensor,
+                SensorPickedUpFact pickedUp when sensorNotice.Kind == ObservedSensorChangeKind.Disappeared => pickedUp.Sensor,
+                SensorRemovedFact removed when sensorNotice.Kind == ObservedSensorChangeKind.Disappeared => removed.Sensor,
+                _ => null,
+            };
+            return sensor is not null && sensor.PrincipalId != observer
+                && receipt.SubjectPrincipalId == sensor.PrincipalId && sensorNotice.EntityId == sensor.EntityId
+                && sensorNotice.DefinitionKey == sensor.DefinitionKey && sensorNotice.PrincipalId == sensor.PrincipalId
+                && sensorNotice.Position == sensor.Position
+                && checkpoint.WorldTopology.Systems.Any(system => system?.Id == sensor.Position.SystemId);
+        }
         if (receipt.Fact is not ObservedShipChangeFact notice || notice.ShipId != subject
             || receipt.SubjectPrincipalId is null || receipt.SubjectPrincipalId == observer
             || !checkpoint.WorldTopology.Systems.Any(system => system?.Id == notice.Position.SystemId)) return false;

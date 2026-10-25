@@ -24,7 +24,8 @@ internal sealed record ShipDesignPolicyCheckpoint(
     Work RequiredWork,
     Quantity CargoCapacity,
     ShipManeuverCapabilityCheckpoint? ManeuverCapability,
-    ulong? SensorRadiusUnits);
+    ulong? SensorRadiusUnits,
+    ulong? PickupRangeUnits = null);
 
 internal sealed record MaterializationPolicyCheckpoint(
     FacilityId FacilityId,
@@ -35,11 +36,17 @@ internal sealed record MaterializationPolicyCheckpoint(
     ActorControllerKind BaseControllerKind,
     string? BaseControllerId,
     InitialShipOrderPolicy InitialOrderPolicy,
-    IReadOnlyList<ShipDesignPolicyCheckpoint?> AllowedDesigns);
+    IReadOnlyList<ConstructionDesignId> AllowedDesignIds);
+
+internal sealed record SensorDeployableDefinitionCheckpoint(
+    QualifiedContentKey? Key, string? Name, Quantity CapacityCost,
+    ulong DeploymentRangeUnits, ulong SensorRadiusUnits);
 
 internal sealed record RuntimePolicyManifestCheckpoint(
     NavigationPolicyCheckpoint? Navigation,
     TravelTimePolicyCheckpoint? TravelTime,
     IReadOnlyList<MaterializationPolicyCheckpoint?> MaterializationPolicies,
-    int FactRetentionCapacity);
+    int FactRetentionCapacity,
+    IReadOnlyList<ShipDesignPolicyCheckpoint?>? ShipDefinitions = null,
+    IReadOnlyList<SensorDeployableDefinitionCheckpoint?>? SensorDeployableDefinitions = null);
 

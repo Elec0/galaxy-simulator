@@ -293,7 +293,7 @@ internal sealed class InventoryCommitOwnerCheckpoint
 /// Single authoritative commit owner for generalized inventory mutations and
 /// the identity sequences those mutations consume.
 /// </summary>
-public sealed class InventoryCommitOwner
+public sealed partial class InventoryCommitOwner
 {
     private readonly InventoryRegistry _inventories;
     private readonly IdSequence<ItemInstanceId> _itemInstanceIds;

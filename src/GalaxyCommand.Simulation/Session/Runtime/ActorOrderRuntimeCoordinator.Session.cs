@@ -72,15 +72,18 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                     _orders.CaptureCurrent(ship.ShipId),
                     _orders.CaptureQueue(ship.ShipId),
                     _orders.CaptureSuspended(ship.ShipId));
-            })));
+            }))) { DeployedSensors = _lifecycle.CaptureDeployedSensors() };
     }
 
+    /// <summary>Admits commands and synchronizes changed action intent without executing an action during admission.</summary>
     internal GameplayCommandHandlingResult Handle(
         GameplayCommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(envelope);
-        return envelope.Command switch
+        GameplayCommandHandlingResult result = envelope.Command switch
         {
+            DeploySensorCommand deploy => HandleDeploySensor(envelope, deploy),
+            PickupSensorCommand pickup => HandlePickupSensor(envelope, pickup),
             MoveShipCommand move => HandleMove(envelope.Source, move),
             MoveShipGroupCommand groupMove => HandleGroupMove(envelope.Source, groupMove),
             CancelShipOrderCommand cancel => HandleCancel(envelope.Source, cancel),
@@ -94,6 +97,11 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                     CommandRejectionCodes.UnsupportedCommand,
                     $"Gameplay command '{envelope.Command.Kind}' is not supported yet.")),
         };
+        foreach (ShipId ship in result.FactProposals.Select(proposal => proposal.Fact).OfType<ShipOrderTransitionFact>()
+            .Select(fact => fact.ShipId).Distinct().OrderBy(ship => ship.Value))
+            SynchronizeSensorInterest(ship);
+        FlushSensorReevaluations();
+        return result;
     }
 
     /// <summary>
@@ -104,6 +112,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     internal EntityRemovalResult RemoveEntity(EntityRemovalRequest request)
     {
         ThrowIfUnhealthy();
+        if (_lifecycle.IsSensorRemovalReference(request.EntityId)) return RemoveSensorEntity(request);
         EntityRemovalPreparation preparation = _lifecycle.PrepareRemoval(
             request,
             permitOwnerReleasedCommitments: _economy is not null);
@@ -169,6 +178,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
 
         var transitions = new List<ShipOrderTransition>();
         var factProposals = new List<GameFactProposal>();
+        _orders.FailActionsForActorRemoval(removal.ShipId, transitions);
         TargetedShipOrder[] applyOrder = removal.InboundOrders
             .OrderBy(targeted => targeted.WasCurrentActive)
             .ThenBy(targeted => targeted.ShipId.Value)
@@ -219,6 +229,9 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             CurrentTime,
             new EntityRemovalFactCause(removed.Request),
             factProposals);
+        SynchronizeSensorInterest(removal.ShipId);
+        foreach (TargetedShipOrder targeted in removal.InboundOrders) SynchronizeSensorInterest(targeted.ShipId);
+        FlushSensorReevaluations();
         return result;
     }
 

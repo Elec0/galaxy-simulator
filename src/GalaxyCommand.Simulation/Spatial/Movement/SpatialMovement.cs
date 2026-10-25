@@ -739,7 +739,11 @@ public sealed partial class SpatialMovement
     /// boundary. No movement commit may interleave with this capture.
     /// </summary>
     public InteractionSpatialReadView CaptureInteractionReadView(SimulationTime now) =>
-        new(now, CaptureSnapshot(now).Select(snapshot =>
+        CaptureInteractionReadView(now, CaptureSnapshot(now));
+
+    /// <summary>Joins immutable scoped snapshots with their exact movement-owned correlation evidence.</summary>
+    private InteractionSpatialReadView CaptureInteractionReadView(SimulationTime now, IEnumerable<ShipSpatialSnapshot> snapshots) =>
+        new(now, snapshots.Select(snapshot =>
             new InteractionSpatialParticipant(snapshot, _actors[snapshot.ShipId].SpatialRevision,
                 _actors[snapshot.ShipId].Completion is { } receipt && receipt.Timestamp == now
                     ? receipt : null,
@@ -747,6 +751,11 @@ public sealed partial class SpatialMovement
                 Array.AsReadOnly(_actors[snapshot.ShipId].ManeuverReceipts.Where(receipt => receipt.Timestamp == now).ToArray()),
                 _actors[snapshot.ShipId].InteractionReceipts is { Count: > 0 } receipts && receipts[0].Timestamp == now
                     ? Array.AsReadOnly(receipts.ToArray()) : null)));
+
+    /// <summary>Captures an explicit live scope for action revalidation without preparing unrelated spatial actors.</summary>
+    internal InteractionSpatialReadView CaptureInteractionReadView(SimulationTime now, IEnumerable<ShipId> scope) =>
+        CaptureInteractionReadView(now, CaptureSnapshot(now, scope.Distinct().OrderBy(ship => ship.Value)
+            .Where(_actors.ContainsKey).Select(ship => new KeyValuePair<ShipId, ActorState>(ship, _actors[ship]))));
 
     public SystemPosition? PositionAt(ShipId shipId, SimulationTime time)
     {
@@ -1350,10 +1359,13 @@ public sealed partial class SpatialMovement
         }
     }
 
-    public IReadOnlyList<ShipSpatialSnapshot> CaptureSnapshot(SimulationTime now)
+    public IReadOnlyList<ShipSpatialSnapshot> CaptureSnapshot(SimulationTime now) => CaptureSnapshot(now, _actors);
+
+    /// <summary>Materializes only the supplied stable actor scope; callers retain capture/commit exclusion.</summary>
+    private static ReadOnlyCollection<ShipSpatialSnapshot> CaptureSnapshot(SimulationTime now, IEnumerable<KeyValuePair<ShipId, ActorState>> actors)
     {
-        var snapshots = new List<ShipSpatialSnapshot>(_actors.Count);
-        foreach ((ShipId shipId, ActorState actor) in _actors)
+        var snapshots = new List<ShipSpatialSnapshot>(actors.TryGetNonEnumeratedCount(out int count) ? count : 0);
+        foreach ((ShipId shipId, ActorState actor) in actors)
         {
             switch (actor.State)
             {

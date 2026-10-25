@@ -30,6 +30,21 @@ Coverage and geometry are rebuilt after restore. Persistent structure discovery
 records remain open under `TASK-073` stages 3 and 4; this ship boundary does not
 claim station or deployable persistence or enable general encoded save admission.
 
+Under the owner's 2026-10-26 TASK-095 decision, runtime policy capture retains
+ship definitions independently of construction facilities and policies. Starting
+and constructed ships use the same retained definitions, including exact
+maneuver, sensor, cargo and pickup-range values. Construction policies save
+design-ID references; they are not needed to restore a committed ship. Portable
+sensor definitions also retain their physical capacity and range meaning so
+their stored instances can restore without inferring a replacement definition.
+This is internal checkpoint continuity, not TASK-037's general encoded save
+admission or content migration.
+
+The same independence applies to capture and subsequent operation: removing a
+ship's producing facility, construction policy or production history must not
+prevent saving or restoring that ship with its exact retained definition.
+Starting ships use this same path without a fabricated producer.
+
 ## Boundary at a glance
 
 The save boundary contains every value whose absence could change a later
