@@ -187,7 +187,7 @@ public static class BenchmarkPresets
                     (BenchmarkParameterNames.FactRetentionCapacity, 100_000),
                     (BenchmarkParameterNames.TravelDurationMilliseconds, 100),
                     (BenchmarkParameterNames.DestinationDistance, 100)),
-                "673c9af7f54a80e4",
+                "88e79d6112f53750",
                 version: 2),
             new(
                 FactsRetentionAndRead,

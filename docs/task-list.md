@@ -149,15 +149,6 @@ source of detailed scope and acceptance criteria.
     come from the approved station design, without inheriting ship tuning.
   - Context: [Station design ownership](#mid-term) · [Fog-of-war stages](fog-of-war-and-scouting.md#approved-stages-and-completion-boundaries)
 
-- [ ] **TASK-104: Reconcile the connector-navigation benchmark expectation**
-  - The canonical `navigation.connector-volume` fixture produces
-    `88e79d6112f53750` while its registered expectation is `673c9af7f54a80e4`.
-    TASK-073 verification reproduced the same mismatch from an untouched
-    `1a5a3d1` HEAD snapshot on 2026-10-19, independently of observation changes.
-  - Investigate intended fixture behavior and digest coverage before updating
-    the expectation or changing navigation. Preserve this as a visible failing
-    benchmark rather than replacing its expected hash merely to pass.
-  - Context: [Scale and benchmark targets](scale-and-benchmark-targets.md)
 
 - [ ] **TASK-103: Implement combat activation and active-domain continuation**
   - Added when TASK-071 closed on 2026-10-17 to track runtime work not covered
@@ -848,6 +839,16 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-104: Reconcile the connector-navigation benchmark expectation**
+  - Completed on 2026-10-26 after owner review of the historical investigation.
+    Isolated the divergence to `e11b43b`'s intentional turn-before-acceleration
+    change, then corrected the version 2 expected digest to `88e79d6112f53750`
+    and updated its configuration assertion without changing navigation.
+  - Verified the canonical benchmark across five measured iterations and all
+    92 Release benchmark tests. Earlier mismatch references describe historical
+    verification before this correction.
+  - Context: [Investigation evidence](scale-and-benchmark-targets.md#task-104-connector-navigation-investigation-2026-10-26)
 
 - [x] **TASK-095: Implement sensor deployables and deployment/pickup orders**
   - Completed the owner-approved runtime/content delivery on 2026-10-26:

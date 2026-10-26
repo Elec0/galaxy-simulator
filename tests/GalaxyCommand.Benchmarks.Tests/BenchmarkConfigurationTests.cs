@@ -69,7 +69,7 @@ public sealed class BenchmarkConfigurationTests
         Assert.Equal(
             1_000_000,
             preset.Parameters[BenchmarkParameterNames.SimulatedDurationMilliseconds]);
-        Assert.Equal("673c9af7f54a80e4", preset.ExpectedDigest);
+        Assert.Equal("88e79d6112f53750", preset.ExpectedDigest);
     }
 
     [Fact]

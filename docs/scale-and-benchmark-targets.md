@@ -385,3 +385,71 @@ The following remain outside `TASK-024`:
 - Final save serialization for benchmark scenarios
 
 Those decisions require benchmark evidence or later gameplay contracts.
+
+## TASK-104 connector-navigation investigation (2026-10-26)
+
+Before the baseline correction, the canonical version 2
+`navigation.connector-volume` run failed at commit `034244b`: it produces `88e79d6112f53750` against registered expectation
+`673c9af7f54a80e4`. The fixture sends 1,000 ships from system 1 through a
+31-connection chain to system 32, then advances to 1,000,000 milliseconds.
+The fixed 100-millisecond estimator participates in planning; connector
+approaches execute through the analytic maneuver runtime.
+
+Historical source snapshots isolate the divergence to `e11b43b` ("Fix ships
+always keeping heading instead of turning to accelerate"). The expectation
+was introduced with version 2 in `82c48fc`. Snapshot `8746d69` still produces
+that expected digest in a full canonical run; the intervening changes between it and `e11b43b`'s parent
+are documentation only. A full canonical run at `e11b43b` reproduces the
+current failure after its warmup and five matching measured iterations.
+
+| Source snapshot | Digest | Events | Committed facts | Retained facts |
+| --- | --- | --- | --- | --- |
+| `82c48fc` | `673c9af7f54a80e4` | 94,674 | 126,998 | 100,000 |
+| `8746d69` | `673c9af7f54a80e4` | 94,674 | 126,998 | 100,000 |
+| `e11b43b` | `88e79d6112f53750` | 94,696 | 126,998 | 100,000 |
+
+Temporary diagnostic instrumentation in historical copies separated the
+existing digest into its four input sections:
+
+| Section | `8746d69` | `e11b43b` |
+| --- | --- | --- |
+| Snapshot | `bd1461d32f0d429e` | `bd1461d32f0d429e` |
+| Commands | `fb24c557f9ba9958` | `fb24c557f9ba9958` |
+| Events | `03a155bf0812ce12` | `2bdaf929710d8cc2` |
+| Retained facts | `4a3f360b173fb765` | `af593a6df6cd3da1` |
+
+All 1,000 ships are at positions in system 32 in both historical diagnostic
+runs. Both runs record 31,000 connector emergence events. Ships 151 through 161
+each gain two maneuver phase-boundary events, accounting for all 22 additional
+events. They begin at x=150 through x=160 with the first connector at x=100.
+The changed planner requires a course turn for off-heading moves of at least
+50 meters and can select a turn followed by precision translation. For example,
+ship 151's first approach previously completed at 14,142 milliseconds; afterward
+it completes at 14,494 milliseconds, following boundaries at 4,000 and 4,954
+milliseconds. Subsequent event creation sequences and fact timing/order change.
+
+The evidence supports a stale benchmark expectation following the intentional
+maneuver change. It does not establish complete equivalence of simulation
+state: the snapshot digest includes positions, selected motion fields, control,
+and selected order fields, but omits some authoritative fields. Event hashing
+includes scheduling metadata and event type names; fact hashing includes
+sequence, timestamp, cause type, and fact type, rather than full payloads.
+Matching final snapshot hashes therefore do not prove matching headings or
+matching full fact payloads. The retained fact window also omits the earliest
+26,998 committed facts.
+
+The owner accepted the investigation and authorized the hash correction on
+2026-10-26. The registered expectation and configuration assertion now use
+`88e79d6112f53750`. The fixture remains version 2 because its parameters and
+digest coverage have not changed; this corrects its stale expectation for the
+existing maneuver behavior. Navigation implementation remains unchanged.
+The corrected canonical run passes all five measured iterations with the
+accepted digest and 94,696 events; all 92 Release benchmark tests pass.
+
+Reproduction uses `dotnet run -c Release --project
+benchmarks/GalaxyCommand.Benchmarks -- --suite full --preset
+navigation.connector-volume`. Historical diagnostic runs override only
+`warmupIterations=0` and `measuredIterations=1`; these runs are explicitly
+noncanonical and retain every simulation parameter. Temporary instrumentation
+and historical source copies live outside the repository and are not benchmark
+timing evidence.
