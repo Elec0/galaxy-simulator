@@ -35,6 +35,13 @@ work and implementation status.
 
 ## Architecture documentation
 
+Do not store dates in project documentation. Use Git history for chronology.
+
+Do not record routine successful test, build, startup, formatting, or validation
+runs in project documentation, including passing-test totals and zero-warning
+summaries. Keep verification requirements, test coverage, known failures, and
+substantive benchmark measurements.
+
 Architecture documents are reviewed directly by the project owner. Write them
 for a human reader rather than as agent-to-agent notes: establish the problem
 and context, explain the chosen boundaries and terminology, make decisions and

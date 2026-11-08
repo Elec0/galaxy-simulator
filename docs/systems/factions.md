@@ -15,7 +15,7 @@ and have relationships. It does not decide whether a power is ultimately called
 an organization, faction, polity, company, government, or something else. It
 also does not decide whether those terms describe one concept or several.
 
-**Decision status:** Accepted by the project owner on 2026-08-05.
+**Decision status:** Accepted by the project owner.
 
 **Implementation status:** No implementation was added by `TASK-035`. `TASK-012`
 is translating this gameplay contract in
@@ -395,7 +395,7 @@ other relationship if the act is observed and attributed.
 
 ## Accepted project-owner decisions
 
-The project owner accepted the following initial answers on 2026-08-05. These
+The project owner accepted the following initial answers. These
 decisions establish the first gameplay model without choosing its code shape.
 
 ### Q1. What kinds of participant should exist at the start?

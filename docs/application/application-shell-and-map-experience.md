@@ -11,7 +11,7 @@ application is a consumer of immutable presentation snapshots and semantic
 facts. It does not own galaxy state, derive simulation outcomes from rendered
 positions, or repair failed authoritative state.
 
-The project owner approved the initial `TASK-049` baseline on 2026-08-21:
+The project owner approved the initial `TASK-049` baseline:
 
 - one local active session at a time, with explicit new-game, load-game, and
   leave-session flows;
@@ -25,14 +25,14 @@ The project owner approved the initial `TASK-049` baseline on 2026-08-21:
 For the initial map application, every system and declared connection in the
 static scenario is player-visible from session creation. Fog-of-war governs
 entities and their state, not the static topology. The project owner approved
-this initial boundary on 2026-08-24.
+this initial boundary.
 
 Nonpublic topology and connector discovery are planned future work. They need
 their own observation, persistence, and presentation contract in `TASK-076`;
 the initial shell must not imply that a public topology settles that later
 exploration model.
 
-**Decision status:** Accepted by the project owner on 2026-08-24. `TASK-049`
+**Decision status:** Accepted by the project owner. `TASK-049`
 completed the design. `TASK-077` owns implementation after its stated
 dependencies are available.
 

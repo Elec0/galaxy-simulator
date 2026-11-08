@@ -9,9 +9,9 @@ save and load, submit ordinary gameplay intent, and present localized authored
 text without making Godot or rendered prose authoritative.
 
 This document completes the design work approved by the project owner for
-`TASK-016` on 2026-08-17. `TASK-065` owns implementation.
+`TASK-016`. `TASK-065` owns implementation.
 
-**Decision status:** Accepted by the project owner on 2026-08-17.
+**Decision status:** Accepted by the project owner.
 
 ## Decisions at a glance
 

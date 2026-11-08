@@ -10,10 +10,10 @@ simulation currently performs no random draws, so the ownership contract can
 be established before a subsystem depends on accidental behavior.
 
 This document completes the design work approved by the project owner for
-`TASK-021` on 2026-08-17. Completed `TASK-066` provides the shared
+`TASK-021`. Completed `TASK-066` provides the shared
 implementation and focused proof.
 
-**Decision status:** Accepted by the project owner on 2026-08-17.
+**Decision status:** Accepted by the project owner.
 
 ## Decisions at a glance
 

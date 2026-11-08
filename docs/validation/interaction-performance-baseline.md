@@ -49,7 +49,7 @@ warmup does not establish a precise steady-state cost.
 
 ## Prepared geometry comparison
 
-On 2026-10-08 the owner selected immutable geometry preparation once per view
+The owner selected immutable geometry preparation once per view
 and caller-scope preparation once for repeated queries. The sibling
 `interaction.prepared-proximity` preset uses the same fixtures, parameters,
 version 1 canonical digest, and result digest inputs as the reference preset.

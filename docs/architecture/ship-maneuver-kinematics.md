@@ -4,7 +4,7 @@
 
 ## Decision status
 
-**Decision status:** Confirmed by the project owner on 2026-09-16.
+**Decision status:** Confirmed by the project owner.
 
 `TASK-089` is a completed design task. This document establishes the ship
 maneuver contract. It does not itself authorize implementation changes to

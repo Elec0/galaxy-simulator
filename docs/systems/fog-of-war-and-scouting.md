@@ -12,13 +12,13 @@ transient contacts disappear outside coverage, and discovered permanent
 structures retain a stale last-observed view until sensors return.
 
 This document completes the design work approved by the project owner for
-`TASK-020` on 2026-08-20. `TASK-073` owns implementation.
+`TASK-020`. `TASK-073` owns implementation.
 
-**Decision status:** Accepted by the project owner on 2026-08-20.
+**Decision status:** Accepted by the project owner.
 
 ## TASK-073 implementation scope review
 
-The owner promoted `TASK-073` on 2026-10-19. The accepted observation behavior
+The owner promoted `TASK-073`. The accepted observation behavior
 above remains unchanged. Review of the current simulation found three gaps
 that prevent implementing the complete contract without an owner decision:
 
@@ -31,14 +31,14 @@ that prevent implementing the complete contract without an owner decision:
   This design requires a definition-supplied radius but does not settle its
   initial content values, validation, or integration with ship definitions.
 
-On 2026-10-19 the owner selected a staged implementation boundary for review,
+The owner selected a staged implementation boundary for review,
 followed by implementation of approved stages. Station and deployable
 integration remains open. The owner subsequently approved the boundary and
 stage 1, then approved stage 2, decisions S1 through S9, and the proposed 10 km
 content radii. Those approvals authorize ship observation implementation. They
 do not complete the full ship, station, and deployable acceptance scope.
 
-On 2026-10-29 the owner completed TASK-057's [station design](stations.md),
+The owner completed TASK-057's [station design](stations.md),
 including observable exterior fields, module targeting handles, sensor
 composition, lifecycle, and checkpoint contracts. This resolves the station
 design gap identified above. TASK-105 still owns concrete station runtime;
@@ -74,7 +74,7 @@ flowchart LR
 
 ### Contract decision register
 
-The owner approved the following contracts on 2026-10-19. Stage 1 supplies the
+The owner approved the following contracts. Stage 1 supplies the
 serial coverage evaluator; stage 2 integrates the live ship boundary. New sensor
 worker execution still requires deterministic proof and benchmark evidence.
 
@@ -129,8 +129,6 @@ the shared instant query; rounded published positions cannot create a false
 zero-radius contact. There is no worker execution or performance claim in this
 stage, and no future crossing is scheduled by this instantaneous evaluator.
 
-On 2026-10-19, all 24 coverage cases and the full 1,430-test solution suite
-passed. The Release solution build also passed with zero warnings or errors.
 Coverage cases include exact range limits, all moving/stationary
 combinations, immediate contact loss, overlap, transit/emergence, lifecycle,
 ownership changes, analytic boundaries, controlled intervals, immutable results,
@@ -140,7 +138,7 @@ disclosure, persistence, and missing entity integration remain open.
 ### Stage 2 live contracts
 
 **Decision status:** S1 through S9 and the 10 km starter-ship and
-preview-courier sensor radii below were approved by the owner on 2026-10-19.
+preview-courier sensor radii below were approved by the owner.
 Stage 2 implementation is authorized. Worker execution still requires measured
 evidence, and station/deployable integration remains open under stages 3 and 4.
 
@@ -241,10 +239,6 @@ station/deployable integration remain stages 3 and 4.
 
 ### Stage 2 validation and remaining scope
 
-On 2026-10-19, all 1,467 solution tests passed in Debug and Release. The Release
-solution build had zero warnings/errors, and the Godot development preview
-started successfully in a headless smoke run with an isolated temporary log.
-This validates startup and adapter admission, not a visual layout review.
 Focused tests cover every existing spatial fact mapping, exact command-source
 binding, private order/waypoint exclusion, hidden history, delayed disclosure,
 owned and non-owned removal, grant revocation, bounded retention/cursors,
@@ -252,8 +246,6 @@ malformed receipt rejection, and uninterrupted/restored continuation. Simultaneo
 emergence is tested in both event orders, and the engine join is tested after
 all same-time phases and follow-up work drain.
 
-Canonical `spatial.many-quiet`, `spatial.one-crowded`,
-`facts.retention-and-read`, and `maneuver.repeated-replanning` benchmarks pass.
 `navigation.connector-volume` produces `88e79d6112f53750` against registered
 `673c9af7f54a80e4` in both this worktree and an independently built, untouched
 `1a5a3d1` HEAD snapshot. The existing mismatch remains visible under `TASK-104`;
@@ -273,7 +265,7 @@ station design, `TASK-105` owns its approved runtime implementation, and
 `TASK-095` owns deployables. Full `TASK-073` completion remains open until those
 owners supply the concrete inputs required by its accepted proof.
 
-On 2026-10-26 the owner accepted TASK-095's bounded stationary-range extension
+The owner accepted TASK-095's bounded stationary-range extension
 and deployable notice proposal. Owned assets retain approved detailed notices;
 covered non-owned deployables receive appearance/disappearance notices with
 approved entity view fields and committed position, omitting acting ship,
@@ -283,7 +275,7 @@ commit-time disclosure and bounded-receipt rules to this mapping. The approval
 changes the accepted future contract, not the implemented stage status. See
 the [TASK-095 decision register](sensor-deployables.md#owner-decisions-and-remaining-inputs).
 
-### Deployable observation integration (2026-10-26)
+### Deployable observation integration
 
 The owner resumed the requested satellite observation work under TASK-073 after
 review confirmed that TASK-095's runtime/content delivery was complete. This
@@ -371,13 +363,9 @@ compare ordered boundary evidence. Timing is informational, not a worker-default
 selection or a gameplay rule. The [recorded measurements](../validation/interaction-session-measurements.md#task-073-deployable-observation-crossings)
 retain commands, bounded workload details and matching serial/worker digests.
 
-Verification passed all 1,593 Release solution tests and the solution build
-with zero warnings/errors. The Godot C# build and headless preview startup
-passed. The editor's `--build-solutions` invocation could not write its user
-build logs inside the filesystem sandbox; the direct C# build verified the
-same project without requiring editor settings writes. Six existing canonical
-benchmark presets retained their expected digests. TASK-104's known navigation
-mismatch remains `88e79d6112f53750` versus `673c9af7f54a80e4`.
+The editor's `--build-solutions` invocation could not write its user build logs
+inside the filesystem sandbox. TASK-104's known navigation mismatch remains
+`88e79d6112f53750` versus `673c9af7f54a80e4`.
 
 This closes the requested deployable integration, not TASK-073 as a whole.
 Station integration and the remaining full-domain proof still depend on

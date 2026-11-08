@@ -10,9 +10,9 @@ discrete physical items without turning every item into a material unit or
 breaking production and transport behavior before its callers can migrate.
 
 This document completes the design approved by the project owner for
-`TASK-041` on 2026-08-19. `TASK-069` owns implementation.
+`TASK-041`. `TASK-069` owns implementation.
 
-**Decision status:** Accepted by the project owner on 2026-08-19.
+**Decision status:** Accepted by the project owner.
 
 ## Decisions at a glance
 

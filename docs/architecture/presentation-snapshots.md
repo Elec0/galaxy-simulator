@@ -18,9 +18,9 @@ alongside the world snapshot.
 This is a single-player local presentation contract. It is not a replication
 protocol, a multiplayer authority model, an event log, or a save format.
 
-**Decision status:** Accepted by the project owner on 2026-07-31.
+**Decision status:** Accepted by the project owner.
 
-**Implementation status:** Completed by `TASK-010` on 2026-07-31.
+**Implementation status:** Completed by `TASK-010`.
 `GamePresentationRequest` canonicalizes client selection and cursor input;
 `GameSession.CapturePresentation` returns the immutable presentation-safe world,
 selection resolution, cursor-based fact read, and selected-ship fact subset.

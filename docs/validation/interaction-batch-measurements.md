@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md) · [Task list](../task-list.md) · [Interaction execution contract](../architecture/moving-ship-interactions.md#opt-in-pure-batch-execution) · [Public swept baseline](interaction-runtime-swept-measurements.md)
 
-On 2026-10-12, TASK-071 added opt-in coarse batches for pure forecasts and
+TASK-071 added opt-in coarse batches for pure forecasts and
 prepared instant/swept queries. Callers explicitly supply positive maximum
 worker capacity and batch size. The backend uses bounded .NET parallel execution
 on the shared thread pool. One worker uses a direct serial loop. Domain callbacks,
@@ -18,7 +18,7 @@ A failed pure evaluation returns no partial collection and rethrows the
 exception at the earliest caller-input position with its original stack.
 Input enumeration and common argument validation occur before worker dispatch.
 
-Fourteen focused simulation tests compare exact forecast evidence and committed
+Focused simulation tests compare exact forecast evidence and committed
 agenda keys at maximum worker capacities 1, 2, 4, and 8, with batch sizes 1, 3,
 7, and 16. They compare all prepared index strategies, retain immutable results,
 reject invalid tuning and conflicts, and cover empty inputs. A synchronized
@@ -32,8 +32,7 @@ and `interaction.batch-swept-hierarchy` presets exercise the public swept batch
 API. Reduced tests compare their digests to ordinary public queries. Canonical
 presets retain `418f5c9774f5bbdc`, recorded in the
 [canonical report](../../benchmarks/results/2026-10-12-batch-swept-canonical.json).
-The solution passes 1,295 tests; the Release solution build has zero warnings
-or errors. Those tests prove pure API results and a subsequent serial agenda
+The focused tests cover pure API results and a subsequent serial agenda
 commit, not concurrent live session reevaluation or domain effects.
 
 ## Timed scope and controlled results

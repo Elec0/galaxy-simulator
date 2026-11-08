@@ -10,9 +10,9 @@ changes, and what happens when construction is interrupted or a station is
 removed. A station also needs a concrete observable identity before player
 fog-of-war can discover it, remember it, or use its sensors.
 
-**Design owner:** TASK-057, begun at the owner's request on 2026-10-29.
+**Design owner:** TASK-057, begun at the owner's request.
 
-**Decision status:** Accepted by the project owner on 2026-10-29, including
+**Decision status:** Accepted by the project owner, including
 Q01-Q58 and the [closing technical contract](#accepted-technical-contract),
 R01-R05. TASK-057 design review is complete. Runtime implementation remains
 TASK-105; station observation integration remains TASK-073.
@@ -42,7 +42,7 @@ station identity, ownership, disclosure, or lifecycle semantics.
 
 ## Accepted foundation decisions
 
-The owner accepted these foundation decisions on 2026-10-29. They establish the
+The owner accepted these foundation decisions. They establish the
 model before defining records, commands, or content fields.
 
 | Review ID | Question | Decision and consequence | Status |
@@ -183,8 +183,7 @@ commit. Existing inventory behavior does not create salvage objects implicitly.
 TASK-108 owns the shared policy and collectible-cargo design and implementation,
 including recovery fractions, placement, identity, collection, observation,
 persistence, and deterministic execution. The owner approved the complete
-[TASK-108 cargo contract](cargo-disposition-and-collection.md#accepted-technical-contract-2026-11-09)
-on 2026-11-09. Its design dependency is resolved; shared runtime delivery remains
+[TASK-108 cargo contract](cargo-disposition-and-collection.md#accepted-technical-contract). Its design dependency is resolved; shared runtime delivery remains
 pending. TASK-057 retains the proportional storage-loss contract and its
 integration with station inventory and reservations.
 
@@ -378,7 +377,7 @@ unobserved cause or removal time. Owned stations remain current.
 
 ## Accepted technical contract
 
-**Status:** R01-R05 accepted by the project owner on 2026-10-29. These settle
+**Status:** R01-R05 accepted by the project owner. These settle
 TASK-057's accounting and runtime handoff contract. TASK-105 implements the
 contract; deferred service domains retain their own implementation owners.
 
@@ -594,7 +593,7 @@ approved delivery contract in this document and has begun the independent
 arithmetic foundation described below. TASK-073 station integration follows
 concrete runtime delivery; fixtures alone do not complete it.
 
-## Initial arithmetic implementation (2026-10-29)
+## Initial arithmetic implementation
 
 TASK-105 now supplies two internal pure evaluators under
 `Entities/Stations`. They calculate proposed quantities without changing any

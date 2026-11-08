@@ -452,7 +452,7 @@ coverage.
 
 ## Approved Phase 1 acceptance mapping
 
-**Decision status:** Accepted by the project owner on 2026-08-10.
+**Decision status:** Accepted by the project owner.
 
 `TASK-031` migrates the bounded Phase 1 acceptance fixture without treating a
 legacy `LocationId` as a future gameplay identity. The fixture maps each legacy

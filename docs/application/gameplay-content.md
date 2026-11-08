@@ -15,7 +15,7 @@ format-neutral loading boundary, stable authored identity, deterministic
 package composition, validation behavior, and trust boundary selected by
 `TASK-023`.
 
-**Decision status:** Accepted by the project owner on 2026-08-13.
+**Decision status:** Accepted by the project owner.
 
 **Implementation status:** `TASK-023` completed the design. `TASK-063` completed
 the format-neutral loading pipeline, JSON adapter, common production

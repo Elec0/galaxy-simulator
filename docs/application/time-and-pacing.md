@@ -5,10 +5,9 @@
 ## Decision status
 
 **Decision status:** Accepted. The project owner accepted the `TASK-013`
-contract on 2026-08-06 and revised it on 2026-08-25 so Faster and Slower adjust
+contract and revised it so Faster and Slower adjust
 the remembered speed while paused rather than resuming the simulation. The
-project owner accepted the `TASK-064` event-responsive pacing contract on
-2026-08-26.
+project owner accepted the `TASK-064` event-responsive pacing contract.
 
 `TASK-013` defines the local single-player pause, speed, and input-timing
 contract. `TASK-038` owns implementation when the application is ready to
@@ -43,9 +42,8 @@ authoritative simulation state.
 
 ### Accepted policy action vocabulary
 
-The project owner accepted the initial per-category policy model on
-2026-08-25. Each supported disclosed-event category maps to exactly one local
-pacing action:
+The project owner accepted the initial per-category policy model. Each supported
+disclosed-event category maps to exactly one local pacing action:
 
 - **Ignore:** leave the current pacing state unchanged.
 - **Pause:** enter the local paused state at the next permitted boundary.
@@ -90,7 +88,7 @@ effects, or notification text before that combat contract exists.
 ### Accepted conflict, lifetime, and override behavior
 
 The project owner accepted the general event-response conflict and override
-model on 2026-08-25. The application evaluates every eligible notice available
+model. The application evaluates every eligible notice available
 at one completed timestamp boundary as one batch:
 
 1. Ignore actions contribute no requested change.
@@ -120,8 +118,7 @@ whether the application reapplies a local pacing action; it does not alter
 simulation time, authoritative outcomes, event disclosure, or deterministic
 commit. Suppressed pacing responses may still produce visible explanations.
 
-The project owner accepted the grouping and sliding-window behavior on
-2026-08-26:
+The project owner accepted the grouping and sliding-window behavior:
 
 - Each supported category defines a stable subject identity. The grace key is
   the category plus that subject identity; a category cannot participate until
@@ -142,8 +139,7 @@ pacing response.
 
 ### Accepted persistence and load behavior
 
-The project owner accepted the event-responsive pacing persistence contract on
-2026-08-26:
+The project owner accepted the event-responsive pacing persistence contract:
 
 - Per-category actions and selected configured speed caps persist in the
   versioned device-local preference store defined by `TASK-050`. They apply to

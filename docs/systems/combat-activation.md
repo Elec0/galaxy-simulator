@@ -4,7 +4,7 @@
 
 ## Purpose and decision status
 
-On 2026-10-13 the owner selected combat as the first consuming domain for
+The owner selected combat as the first consuming domain for
 TASK-071's fine-grained movement activation handoff. TASK-046 owns this combat
 contract; TASK-071 implements the shared discovery, timing, and movement
 handoff. Collision and docking decisions are deferred with TASK-072 and
@@ -17,7 +17,7 @@ therefore establishes ownership and lifecycle requirements before implementation
 This document records accepted choices and identifies the remaining decisions;
 it is not approval of a combat algorithm or a complete runtime API.
 
-The owner froze further combat design on 2026-10-16 to resume TASK-071
+The owner froze further combat design to resume TASK-071
 implementation. The decisions below remain accepted and the open questions
 remain with TASK-046. This freeze does not require the shared motion-handoff
 implementation to wait for every combat mechanic or expand it with placeholder
@@ -114,7 +114,7 @@ handoff; their eligibility is still to be defined.
 
 ## Combat intent and admission correlation
 
-On 2026-10-13 the owner selected order-backed combat intent, explicit complete
+The owner selected order-backed combat intent, explicit complete
 claims and create/join targets, and the smallest contributing canonical contact
 key as the admission origin. Combat intent uses its authorizing combat order's
 identity and generation; it does not introduce a separate intent allocator.
@@ -129,7 +129,7 @@ order representation must coordinate with TASK-037.
 
 ### First combat-order command and participant authority
 
-On 2026-10-14 the owner selected a first combat command containing one acting
+The owner selected a first combat command containing one acting
 ship, one explicit target ship, and the existing `OrderPlacement` choices
 `ReplaceAll` and `Append`. The command source remains submission attribution;
 it must match the acting ship's current controller under the existing command
@@ -182,7 +182,7 @@ an implicit transfer or merger.
 
 #### Current order-runtime boundary
 
-The 2026-10-14 source review found that `ShipOrderCoordinator.BeginOverride`
+The source review found that `ShipOrderCoordinator.BeginOverride`
 suspends base work with `SuspendedByScriptedOverride` and installs a separate
 override work set. Its release path restores that base work. The ordinary
 `Cancel` path finishes current work and immediately promotes its queue. These
@@ -211,7 +211,7 @@ and movement owner extensions.
 
 #### Defender hold, response, and release
 
-On 2026-10-14 the owner accepted suspension of the target's current ordinary
+The owner accepted suspension of the target's current ordinary
 work with a combat-specific reason, retention of its queue and controller,
 defender-owned versioned response policy without an automatic attack order,
 and exact-state revalidation on release.
@@ -277,7 +277,7 @@ resumption; it does not restore canceled work or select idle behavior.
 
 #### Scripted override and combat-hold composition
 
-On 2026-10-14 the owner accepted override begin/end during combat with authority
+The owner accepted override begin/end during combat with authority
 revalidation, current-override-only work resumption on combat release, and base
 controller/work restoration without ordinary navigation resumption when combat
 remains authorized. The existing one non-nesting scripted override limit remains.
@@ -400,7 +400,7 @@ and payload policies still require TASK-046 decisions.
 
 ### Intent lifecycle and authorization revocation
 
-On 2026-10-13 the owner selected Active-only authorization. An Active combat
+The owner selected Active-only authorization. An Active combat
 order may authorize admission and continued combat only when its identity,
 generation, controller authority, target, and combat eligibility are current.
 Active status is necessary, not sufficient. Queued, Waiting, Suspended,
@@ -490,7 +490,7 @@ sufficient for combat admission is a combat eligibility decision.
 ### Simultaneous admission and complete claims
 
 The owner selected first-valid admission in the existing canonical contact/effect
-order on 2026-10-13. Admission proposals are evaluated from the common stable
+order. Admission proposals are evaluated from the common stable
 view. Combat then validates and commits complete participant claims serially in
 that order. A proposal must identify its complete intended claim before commit;
 it cannot discover extra members by mutating ownership while evaluation runs.
@@ -537,7 +537,7 @@ unobserved engagements.
 
 ### Entry-anchored cadence
 
-The owner selected immediate motion evaluation at entry on 2026-10-13. If entry
+The owner selected immediate motion evaluation at entry. If entry
 commits at time E and the explicit duration is D, the initial evaluation at E
 chooses control for the first interval. Later evaluations are due at E + D,
 E + 2D, and so on while the engagement remains active. There is no alignment to
@@ -570,7 +570,7 @@ lets the ordinary planner build from that committed state.
 
 ### Exact-time exit between steps
 
-The owner selected exact-time materialization on 2026-10-13. A participant exiting
+The owner selected exact-time materialization. A participant exiting
 at time X between due steps materializes the motion curve already committed for
 that interval at X. The handoff preserves that evaluated position, velocity,
 and heading. It does not wait for the next combat boundary, snap to the prior
@@ -600,7 +600,7 @@ policy before they can be admitted.
 
 ## Participant membership and engagement termination
 
-On 2026-10-13 the owner selected immediate motion reevaluation for a surviving
+The owner selected immediate motion reevaluation for a surviving
 engagement after a mid-interval join or departure, previous-interval settlement
 before scheduled-boundary roster changes, and termination when no authorized
 combat pair remains.
@@ -740,7 +740,7 @@ flowchart TD
 
 ### Queued-step cleanup on termination
 
-On 2026-10-16 the owner accepted removal of every queued step envelope belonging
+The owner accepted removal of every queued step envelope belonging
 to a terminating engagement before its authoritative state is removed. Cleanup
 covers its current pending step and any stale-generation step envelopes left
 from earlier revisions. Canceling only the current scheduling reference is not
@@ -792,7 +792,7 @@ The following cases distinguish runtime stale work from an inconsistent save:
 
 ### Entry range and continuation are different questions
 
-The owner selected a separate combat-policy continuation condition on 2026-10-13.
+The owner selected a separate combat-policy continuation condition.
 The contact range asks whether an authorized admission may begin. Leaving that
 entry range alone neither revokes combat intent nor decides departure. While
 combat remains active, its domain-owned continuation condition determines which
@@ -851,7 +851,7 @@ conditions disagree.
 
 ### Current checkpoint boundary
 
-The 2026-10-14 source review found that order checkpoints already retain separate
+The source review found that order checkpoints already retain separate
 base and override work sets, while control checkpoints retain base/override
 controller references and `ActorControlRevision`. Movement checkpoints own
 velocity, heading, spatial revision, and the existing position, local-motion,
@@ -869,7 +869,7 @@ save compatibility remains TASK-037.
 
 ### Authoritative owner-state model
 
-On 2026-10-14 the owner approved a single combat-membership binding with derived
+The owner approved a single combat-membership binding with derived
 order holds, projection of all applicable blocking causes, and preservation of
 exact pending step keys. Each value that controls continuation has one owning
 authority. References and validation correlations do not become independently
@@ -958,7 +958,7 @@ remain TASK-037 and the existing save owners.
 For a live engagement, a structurally valid stale-generation envelope can remain
 a deterministic no-op under the existing agenda contract. It is distinct from
 the one matching current step and cannot substitute for a missing current
-envelope. On 2026-10-16 the owner approved cancellation of all queued step events
+envelope. The owner approved cancellation of all queued step events
 before engagement state is removed. A queued step naming an absent engagement
 therefore invalidates restore, even if its generation would otherwise be stale.
 Restore does not repair this by deleting the event, resurrecting an engagement,

@@ -4,7 +4,7 @@
 
 ## Decision status
 
-**Decision status:** Confirmed by the project owner on 2026-09-15.
+**Decision status:** Confirmed by the project owner.
 
 `TASK-087` is a completed design task. This document establishes the accepted
 system-local coordinate-scale contract. It does not itself implement or

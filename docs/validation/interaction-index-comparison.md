@@ -1,6 +1,6 @@
 # Spatial interaction index prototype comparison
 
-Historical measurement record: on 2026-10-09 the owner approved
+Historical measurement record: the owner approved
 [caller-selected instant preparation](../architecture/moving-ship-interactions.md#caller-selected-instant-preparation)
 with scan as the default and explicit tuning. The runtime and benchmark adapters
 now share the immutable index implementations. The measurements below retain
@@ -9,7 +9,7 @@ their original workload and tuning.
 [Documentation index](../README.md) · [Task list](../task-list.md) · [Interaction design](../architecture/moving-ship-interactions.md#spatial-index-evaluation-for-owner-selection) · [Prepared scan measurements](interaction-performance-baseline.md)
 
 The owner approved comparing a sparse grid and an immutable bounding-box
-hierarchy on 2026-10-08 within `TASK-071`. Both implementations live in the
+hierarchy within `TASK-071`. Both implementations live in the
 benchmark project. The production interaction path still uses its existing
 reference and prepared scans. No runtime index, tuning policy, or worker
 execution has been adopted.

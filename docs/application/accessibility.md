@@ -14,7 +14,7 @@ This document completes the design work in `TASK-061`. It records the project
 owner's accepted cross-cutting accessibility behavior and separates it from
 later audio, motion, flashing, and application implementation work.
 
-**Decision status:** Accepted by the project owner on 2026-08-27.
+**Decision status:** Accepted by the project owner.
 
 ## Inherited constraints
 
@@ -180,7 +180,7 @@ properties that cannot be established by automation.
 
 ### Basic test matrix
 
-The project owner accepted this initial matrix on 2026-08-27.
+The project owner accepted this initial matrix.
 
 | Evidence slice | Windows | macOS | Automation boundary |
 | --- | --- | --- | --- |
@@ -209,7 +209,7 @@ player or specialist who uses the relevant accommodation.
 
 ## Detailed behavioral contract
 
-The project owner accepted the following behavior on 2026-08-27.
+The project owner accepted the following behavior.
 
 ### Screen-reader semantics and announcements
 

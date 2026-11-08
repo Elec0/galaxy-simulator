@@ -66,7 +66,7 @@ properties as the item that created the deployable. It removes the deployed
 entity and does not restore its identity. A later deployment therefore creates
 a new entity.
 
-The owner accepted the TASK-095 scope proposals on 2026-10-26: deployment takes
+The owner accepted the TASK-095 scope proposals: deployment takes
 its item from the acting ship's cargo inventory, and pickup returns the item to
 that same ship's cargo inventory. Control of another inventory alone does not
 authorize using it for either operation.
@@ -91,7 +91,7 @@ live acting ship and live target in the same system; a cross-system pickup
 approach is not admitted. Pickup admission rejects insufficient cargo capacity and execution checks it
 again. At most one action executes per ship in each evaluation wave; immediate
 queue progression may start another wave at the same timestamp. These decisions
-were confirmed by the owner on 2026-10-26.
+were confirmed by the owner.
 
 The initial contract adds no occupancy, minimum-separation, collision,
 avoidance, terrain, or other physical-placement rule. Independent deployables
@@ -112,7 +112,7 @@ per evaluation wave; queue progression may create another wave at the same time.
 
 ### Deployment and pickup range design (TASK-075)
 
-**Decision status:** Confirmed by the project owner on 2026-10-01. The
+**Decision status:** Confirmed by the project owner. The
 completed `TASK-075` design establishes the range values, definition owners,
 move-into-range behavior, execution while
 moving, no reservations, inclusive boundaries, and terminal failure on lost
@@ -253,7 +253,7 @@ expose its source inventory, authorization state, or combat details. This is
 the typed view retained by the `TASK-020` persistent-discovery contract when a
 non-owned stationary deployable leaves coverage.
 
-The owner accepted the TASK-095 fact-disclosure proposal on 2026-10-26. Owned
+The owner accepted the TASK-095 fact-disclosure proposal. Owned
 assets retain their approved detailed notices. Covered non-owned deployables
 receive appearance/disappearance notices with approved entity view fields and
 committed position, without acting ship, source command, inventory, private
@@ -289,8 +289,8 @@ own placement, inventory, command, or lifecycle transitions.
 
 ## TASK-095 implementation-scope review
 
-**Review date:** 2026-10-26. The owner requested a bounded review of the
-implementation scope. The owner accepted the concrete proposals on 2026-10-26
+The owner requested a bounded review of the
+implementation scope. The owner accepted the concrete proposals
 and requested documentation updates followed by a stop. The accepted extensions
 are recorded below alongside the questions for which no concrete answer had
 been proposed. The approved TASK-074 and TASK-075 behavior above remains the
@@ -361,18 +361,18 @@ silently become a different contention policy.
 
 ### Owner decisions and remaining inputs
 
-The owner accepted the concrete proposals below on 2026-10-26. Acceptance does
+The owner accepted the concrete proposals below. Acceptance does
 not supply values or select between alternatives where the review only asked
 a question. Those remaining inputs are explicit in the final column.
 
 | ID | Area | Accepted contract | Remaining input |
 | --- | --- | --- | --- |
 | R1 | Stationary range extension | TASK-095 includes a bounded shared spatial extension for ship-to-commanded-position and ship-to-live-stationary-entity interests, with durable correlation, invalidation, scheduling, and checkpoint validation. Action eligibility and command-order contention remain with the deployable/order owners. Do not create fake stationary ships or a second movement/scheduling loop. TASK-071 remains complete; a separate prerequisite task is not selected. | None for this scope boundary. Interface and implementation details must satisfy the accepted ownership and determinism contracts. |
-| R2 | Inventory locality | Both operations initially use only the acting ship's cargo inventory. Other inventories require a separately defined locality or transfer contract. Execution revalidates capacity and respects other workflows' commitments; later capacity loss fails an accepted order under TASK-075. | Resolved on 2026-10-26: reject insufficient pickup capacity at submission and recheck at execution. |
-| R3 | Action admission and queue placement | Support ReplaceAll and Append through the existing order coordinator. Initial pickup requires a live actor and target in the same system; cross-system pickup approaches are excluded. Initial deployment during transit remains rejected. Immediate queue progression after success remains required. | Resolved on 2026-10-26: one execution per ship per evaluation wave, with immediate queue progression into subsequent waves allowed at the same timestamp. |
+| R2 | Inventory locality | Both operations initially use only the acting ship's cargo inventory. Other inventories require a separately defined locality or transfer contract. Execution revalidates capacity and respects other workflows' commitments; later capacity loss fails an accepted order under TASK-075. | Resolved: reject insufficient pickup capacity at submission and recheck at execution. |
+| R3 | Action admission and queue placement | Support ReplaceAll and Append through the existing order coordinator. Initial pickup requires a live actor and target in the same system; cross-system pickup approaches are excluded. Initial deployment during transit remains rejected. Immediate queue progression after success remains required. | Resolved: one execution per ship per evaluation wave, with immediate queue progression into subsequent waves allowed at the same timestamp. |
 | R4 | Deployment/pickup notice policy | Preserve approved detailed notices for owned assets. Covered non-owned deployables receive appearance/disappearance notices with approved entity view fields and committed position, omitting acting ship, source command, inventory, private cause, and unobserved removal reason. A disappearance alone does not identify pickup. Hidden events remain hidden on later discovery. Apply this mapping through TASK-073's commit-time disclosure and bounded-receipt boundary. | None for the proposed disclosure boundary. The authoritative facts retain their approved full payload independently of these safe notices. |
-| R5 | Initial content and delivery surface | Deployment range remains 2,500 meters and pickup range remains 5,000 meters. Content must supply an explicit qualified key/display text, positive per-item cargo-capacity cost, nonnegative sensor radius in meters, and explicit starting quantities. | Resolved on 2026-10-26: the owner requested two basic X4 deployables with project-appropriate adjustments and selected runtime/content integration first. The concrete adaptation is recorded below. Player controls remain outside this delivery; TASK-073 retains persistent observation ownership. |
-| R6 | Independent ship-definition retention | Include independent definition retention within TASK-095. Once construction commits, ship operation, saving and restoration must not depend on the producing facility, construction policy or production history. Starting and constructed ships use the same retention path; no construction facility is invented for setup-only ships. | Resolved by the owner on 2026-10-26. See [Construction materialization handoff](../architecture/entity-lifecycle.md#construction-materialization-handoff) and [Authoritative save boundary](../architecture/authoritative-save-boundary.md). |
+| R5 | Initial content and delivery surface | Deployment range remains 2,500 meters and pickup range remains 5,000 meters. Content must supply an explicit qualified key/display text, positive per-item cargo-capacity cost, nonnegative sensor radius in meters, and explicit starting quantities. | Resolved: the owner requested two basic X4 deployables with project-appropriate adjustments and selected runtime/content integration first. The concrete adaptation is recorded below. Player controls remain outside this delivery; TASK-073 retains persistent observation ownership. |
+| R6 | Independent ship-definition retention | Include independent definition retention within TASK-095. Once construction commits, ship operation, saving and restoration must not depend on the producing facility, construction policy or production history. Starting and constructed ships use the same retention path; no construction facility is invented for setup-only ships. | Resolved by the owner. See [Construction materialization handoff](../architecture/entity-lifecycle.md#construction-materialization-handoff) and [Authoritative save boundary](../architecture/authoritative-save-boundary.md). |
 
 No default sensor radius, cargo cost, item count, unanswered admission rule, or
 new UI interaction should be inferred from the ship sensor implementation. These
@@ -382,7 +382,7 @@ TASK-095 must retain typed failures and semantic order outcomes independently.
 
 ### Initial content adaptation and delivery
 
-On 2026-10-26 the owner asked to use two basic X4 deployables, adjusted to fit
+The owner asked to use two basic X4 deployables, adjusted to fit
 this project, and selected runtime/content integration before player controls.
 The initial pair is Satellite and Advanced Satellite. Their keys are
 `galaxy-command.core/sensor-deployable/satellite` and
@@ -444,12 +444,13 @@ remain informational; worker execution requires its own measured evidence.
 
 This review used source and test inspection only. It did not execute tests or
 revalidate the historical test counts recorded elsewhere. The owner subsequently
-authorized TASK-095 implementation and resolved the remaining inputs on 2026-10-26. Implementation remains subject to the full
+authorized TASK-095 implementation and resolved the remaining inputs.
+Implementation remains subject to the full
 verification requirements above and TASK-073's separate entity-integration scope.
 
 ### Implementation progress and checkpoint scope gap
 
-Implementation began on 2026-10-26 after the owner's instruction to implement
+Implementation began after the owner's instruction to implement
 TASK-095. The first foundation admitted sensor-deployable definitions and explicit
 initial cargo, required independent ship pickup range, and extended the existing
 interest/coordinator/scheduler path with fixed positions and stationary entity
@@ -459,7 +460,7 @@ or revises its interests when targets change or disappear.
 
 The initial cargo checkpoint test exposed a runtime-manifest gap, recorded as
 TASK-106. The owner explicitly included independent ship-definition retention
-within TASK-095 on 2026-10-26: after construction commits, operation, checkpoint
+within TASK-095: after construction commits, operation, checkpoint
 capture and restore must not depend on the producing facility, construction
 policy or production history. Starting and constructed ships use the same path.
 
@@ -470,8 +471,8 @@ Portable sensor definitions retain their own capacity and range values for
 inventory restoration, rejecting conflicts with a supplied physical catalog.
 Tests prove capture, restore, movement and recapture after removing producer
 policy, facility aggregate and production history, as well as initial cargo
-continuation and missing/conflicting definition rejection. All 1,500 solution
-tests pass. TASK-106 is complete within this work; no producer is fabricated.
+continuation and missing/conflicting definition rejection. TASK-106 is complete
+within this work; no producer is fabricated.
 
 ### Runtime delivery and verification
 
@@ -523,17 +524,13 @@ resource loss, suspension, cancellation, removal, replay, direct restore and
 historical disclosure. Shared stationary-range benchmark evidence is recorded
 with the [advancing-session measurements](../validation/interaction-session-measurements.md).
 
-Verification on 2026-10-26 passed all 1,570 Release tests and the full solution
-Release build with zero warnings or errors. Both shipped content packages passed
-the production validator. The Godot headless build and preview startup passed.
-Six existing canonical benchmark presets retained their expected digests;
-stationary-target serial and batched variants matched each other across the
-measured worker settings. TASK-104's existing navigation mismatch remains
+Stationary-target serial and batched benchmark variants matched each other
+across the measured worker settings. TASK-104's existing navigation mismatch remains
 `88e79d6112f53750` versus expected `673c9af7f54a80e4`; its baseline was not changed.
 TASK-095 is complete within the approved runtime/content scope.
 
-The owner resumed observation integration under TASK-073 on 2026-10-26.
-Its [deployable integration](fog-of-war-and-scouting.md#deployable-observation-integration-2026-10-26)
+The owner resumed observation integration under TASK-073.
+Its [deployable integration](fog-of-war-and-scouting.md#deployable-observation-integration)
 now consumes the committed satellite sources and views for player coverage,
 presentation, stale/refresh/confirmed-absence records and checkpoint continuity.
 TASK-095 remains complete within its original runtime/content scope.

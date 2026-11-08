@@ -18,7 +18,7 @@ These decisions do not add multiplayer authority, authentication, remote
 control, prediction, or replication. All control is local single-player
 simulation state.
 
-**Decision status:** Accepted by the project owner on 2026-07-27.
+**Decision status:** Accepted by the project owner.
 
 ## Implementation status
 

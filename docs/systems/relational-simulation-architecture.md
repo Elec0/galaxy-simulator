@@ -18,9 +18,9 @@ The first implementation must answer four questions consistently:
 - Which state, facts, and read models are required for deterministic play and
   eventual save restoration?
 
-**Decision status:** Accepted by the project owner on 2026-08-06.
+**Decision status:** Accepted by the project owner.
 
-**Implementation status:** Completed by `TASK-012` on 2026-08-06.
+**Implementation status:** Completed by `TASK-012`.
 The implementation provides principal identity and definitions, standing policy
 and setup validation, a session relationship owner, complete diagnostic
 standing snapshots, and clean-session asset ownership through `PrincipalId`.

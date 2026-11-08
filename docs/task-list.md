@@ -33,7 +33,7 @@ source of detailed scope and acceptance criteria.
 ## Current focus
 
 - [ ] **TASK-108: Design and implement shared cargo disposition and collection**
-  - Design begun at the owner's request on 2026-10-29. Accepted gameplay covers
+  - Design begun at the owner's request. Accepted gameplay covers
     cause-dependent survival (initial destruction recovery 50% floored per type
     per causal commit), unclaimed identity-preserving cargo, deterministic scatter,
     merged destruction fields, timed object/field collection, live-only coverage,
@@ -46,7 +46,7 @@ source of detailed scope and acceptance criteria.
   - Accepted terminal rules: partial object pickup succeeds; no room fails;
     targets taken by another ship fail object orders or advance field orders.
     Merged fields never split; expiry destroys remaining cargo without outputs.
-  - Design completed and approved by the owner on 2026-11-09, including
+  - Design completed and approved by the owner, including
     C01-C12, R01-R09 as drafted, and R10's closing behavior. Implementation
     remains pending. Deliver the full approved runtime, controls, content,
     checkpoints, deterministic proof, and live station-to-collection integration
@@ -54,7 +54,7 @@ source of detailed scope and acceptance criteria.
   - Context: [Cargo disposition and collection design](systems/cargo-disposition-and-collection.md) · [Station cargo disposition](systems/stations.md#shared-cargo-disposition-policy) · [Inventory and cargo](systems/inventory-and-cargo.md)
 
 - [ ] **TASK-105: Implement the approved station entity runtime**
-  - Promoted by the project owner on 2026-10-29. Started independent exact
+  - Promoted by the project owner. Started independent exact
     construction and storage-loss calculations under Q49 and R01. These are
     internal, pure evaluators, not a live station domain. The owner directed
     independent work to proceed and to stop at TASK-108's cargo-disposition
@@ -62,12 +62,11 @@ source of detailed scope and acceptance criteria.
     awaits its shared runtime objects and transactions.
   - Added greatest-affordable incremental construction consumption, exact
     threshold/overflow-credit calculations, and whole-unit overflow counts.
-    All 36 focused tests pass, including exhaustive small affordability cases,
-    every update partition of a sample recipe, and arithmetic boundary values.
-    All 1,629 Release solution tests and the solution/Godot C# build pass with
-    zero build warnings. Runtime delivery and R05 proof remain incomplete.
-    See [initial implementation](systems/stations.md#initial-arithmetic-implementation-2026-10-29).
-  - TASK-057 completed design approval on 2026-10-29. Implement its full accepted
+    Coverage includes exhaustive small affordability cases, every update
+    partition of a sample recipe, and arithmetic boundary values. Runtime
+    delivery and R05 proof remain incomplete.
+    See [initial implementation](systems/stations.md#initial-arithmetic-implementation).
+  - TASK-057 completed design approval. Implement its full accepted
     station identity, composition, shared inventory/facility links, construction,
     builder assignments, upgrades, dismantling, protected capacity, cargo-loss
     accounting, authority, lifecycle, facts, checkpoints, and explicit scenario
@@ -82,32 +81,28 @@ source of detailed scope and acceptance criteria.
   - Context: [Accepted station contract](systems/stations.md#accepted-technical-contract) · [Fog-of-war stages](systems/fog-of-war-and-scouting.md#approved-stages-and-completion-boundaries)
 
 - [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
-  - Resumed by the owner on 2026-10-26 and implemented the deployable portion:
+  - Resumed by the owner and implemented the deployable portion:
     satellite coverage, filtered deployable presentation, persistent stale/
     refresh/confirmed-absence records, checkpoint v2 and safe historical
     disclosure. Includes exact pass-through/exit boundaries, overlapping-source
     withdrawal and controlled-motion materialization. TASK-095 remains complete.
-    Verified 1,593 Release tests, a clean solution build, Godot C# build/startup,
-    and serial/worker crossing agreement. TASK-104's known benchmark mismatch
-    is unchanged. See [deployable integration](systems/fog-of-war-and-scouting.md#deployable-observation-integration-2026-10-26).
-  - Promoted by the project owner on 2026-10-19. The owner selected a staged
+    TASK-104's known benchmark mismatch is unchanged. See [deployable integration](systems/fog-of-war-and-scouting.md#deployable-observation-integration).
+  - Promoted by the project owner. The owner selected a staged
     boundary for review, then implementation of approved stages. The linked
     design now proposes ship coverage, live ship presentation/disclosure,
     persistent observation, and full entity integration stages. The owner
     approved the boundary, stage 1, and then stage 2's live contracts and the
-    proposed 10 km starter-ship and preview-courier radii on 2026-10-19.
+    proposed 10 km starter-ship and preview-courier radii.
     Station integration stays open under this task, with prerequisites
     retaining their existing owners; the deployable delivery is recorded above.
   - Completed stage 1's pure ship coverage evaluator with explicit fixture
     radii, principal-owned sources, exact geometry, immutable identity sets,
     and deterministic serial source batches across existing spatial indexes.
-    All 24 coverage cases pass across existing index and batch layouts.
   - Completed stage 2's explicit sensor definitions and player binding,
     filtered ship presentation/selection, safe commit-time notices, bounded
     disclosure receipts, checkpoint/restore validation, and Godot consumption.
-    All 1,467 solution tests and the Release build pass; headless Godot startup
-    passes. Four canonical benchmark presets pass; the connector-navigation
-    mismatch also occurs at untouched HEAD and is tracked by `TASK-104`.
+    The connector-navigation mismatch also occurs at untouched HEAD and is
+    tracked by `TASK-104`.
   - The deployable portion of stages 3 and 4 now consumes TASK-095's committed
     views and sources. Station design remains `TASK-057` and station runtime is
     `TASK-105`. Station integration and the remaining full-domain proof stay
@@ -181,8 +176,13 @@ source of detailed scope and acceptance criteria.
 
 ## Future parking lot
 
+- [ ] **TASK-113: Repair the task-list link to TASK-037**
+  - Link validation found that the version-content-catalogs reference points to
+    a heading fragment, but TASK-037 is a list entry without that anchor. Define
+    a stable target and update the reference.
+
 - [ ] **TASK-110: Design and implement voluntary cargo-ejection commands and controls**
-  - Deferred by the owner during TASK-108 review on 2026-10-29. Define player
+  - Deferred by the owner during TASK-108 review. Define player
     selection, authorization, quantities/instances, reservation handling, and
     atomic ejection through commands and map controls. Successful ejection by a
     functional entity preserves cargo fully and creates standalone collectible
@@ -207,7 +207,7 @@ source of detailed scope and acceptance criteria.
 
 
 - [ ] **TASK-103: Implement combat activation and active-domain continuation**
-  - Added when TASK-071 closed on 2026-10-17 to track runtime work not covered
+  - Added when TASK-071 closed to track runtime work not covered
     by TASK-046's design scope. Begin only after the relevant TASK-046 contracts
     are settled and approved; its design remains frozen until owner resumption.
   - Build on completed TASK-071: implement order-backed authorized admission,
@@ -229,11 +229,11 @@ source of detailed scope and acceptance criteria.
   - Context: [Combat activation](systems/combat-activation.md) · [Shared runtime and deferred scope](architecture/moving-ship-interactions.md#closure-recommendation-and-deferred-scope)
 
 - [ ] **TASK-046: Define combat resolution**
-  - Design frozen by the owner on 2026-10-16 for later resumption under this
+  - Design frozen by the owner for later resumption under this
     task. Accepted contracts below remain recorded; do not continue combat design
     as a prerequisite to the shared foundation completed by TASK-071. Runtime
     activation and active-domain continuation are now tracked by TASK-103.
-  - Started the combat activation design slice on 2026-10-13 after owner
+  - Started the combat activation design slice after owner
     selection as TASK-071's first consuming domain. Accepted multi-ship engagement
     membership with one engagement controlling each ship, dedicated session-wide
     EngagementId, explicit fixed step preserved through restore, authorized intent
@@ -241,58 +241,58 @@ source of detailed scope and acceptance criteria.
     admission. TASK-101 revisits the last decision later.
   - Accepted immediate entry motion evaluation with cadence anchored to entry,
     first-valid complete admission in canonical contact/effect order, and exact-time
-    materialization from the committed interval curve on exit on 2026-10-13.
+    materialization from the committed interval curve on exit.
   - Accepted immediate surviving-engagement motion reevaluation on mid-interval
     roster changes, prior-interval settlement before scheduled-boundary membership
-    changes, and termination when no authorized combat pair remains on 2026-10-13.
+    changes, and termination when no authorized combat pair remains.
     Survivors release through the exact-time handoff; original cadence is retained
     while the engagement remains viable.
   - Accepted order-backed combat intent with identity/generation, explicit complete
     create/join claims, smallest contributing eligible contact key as origin,
-    and exactly-once elapsed settlement before roster changes with a durable cursor
-    on 2026-10-13. Current order records are movement-only and lack a generation;
+        and exactly-once elapsed settlement before roster changes with a durable
+    cursor. Current order records are movement-only and lack a generation;
     define the combat-order/revision extension here and coordinate saved schema
     changes with TASK-037 rather than assuming existing fields.
   - Accepted Active-only combat authorization, a separate continuation condition
     that preserves intent beyond entry range, and ordinary-navigation pursuit for
-    a still-valid Active combat order after disengagement on 2026-10-13. Waiting,
+    a still-valid Active combat order after disengagement. Waiting,
     suspension, and terminal work grant no authorization; replacement work wins
     and terminal orders are never revived.
-  - Accepted one-actor/one-target-ship combat commands using ReplaceAll/Append
-    on 2026-10-14. Combat policy may admit the hostile target without its own
+    - Accepted one-actor/one-target-ship combat commands using
+  ReplaceAll/Append. Combat policy may admit the hostile target without its own
     order; the attacker gains no controller or steering authority over it. Each
     additional ally requires an independent current Active combat order and
     validated controller authority, retained in complete-claim correlation.
     TASK-102 defers group/area targeting.
-  - Reviewed defender-order integration on 2026-10-14: current suspension is
+  - Reviewed defender-order integration: current suspension is
     script-override-specific and cancellation promotes queued work immediately.
     A combat hold/release must explicitly integrate with these owners and preserve
     controller/override authority.
   - Accepted defender work suspension with a combat-specific reason, retained
     queue/controller, defender-owned versioned response policy without an automatic
-    attack order, and exact-state release revalidation on 2026-10-14. Valid retained
+    attack order, and exact-state release revalidation. Valid retained
     work gets a fresh plan; recoverably blocked work waits with a reason/wake;
     unachievable work fails. Canceled or replaced work is never revived.
-  - Reviewed override handlers on 2026-10-14: begin/end directly end local motion,
+  - Reviewed override handlers: begin/end directly end local motion,
     and override end immediately resumes ordinary work after control restoration.
     Reconcile those paths and current ActorControlRevision validation with combat
     ownership.
-  - Accepted override transitions during combat with current authority revalidation
-    on 2026-10-14. Combat release resumes only eligible current override work while
+    - Accepted override transitions during combat with current authority
+  revalidation. Combat release resumes only eligible current override work while
     an override remains; override release restores base control/work but retains
     ordinary-motion hold while combat remains authorized. Each release clears only
     its own constraint; stale authority cannot resume work.
-  - Reviewed checkpoint owner boundaries on 2026-10-14: orders already retain
+  - Reviewed checkpoint owner boundaries: orders already retain
     base/override work, control retains ActorControlRevision, and movement owns
     kinematics, but session/movement checkpoints have no active-combat component
     or combat movement variant.
   - Accepted a single combat-membership binding with derived order holds, full
-    structured blocking-cause projection, and preserved exact pending step keys
-    on 2026-10-14. Defined cross-owner liveness, authorization, spatial, cadence,
+        structured blocking-cause projection, and preserved exact pending step
+    keys. Defined cross-owner liveness, authorization, spatial, cadence,
     settlement, and agenda-allocation restore invariants; compiled record layouts
     remain open.
   - Accepted cancellation of all queued engagement steps before removing engagement
-    state on 2026-10-16, including old-generation envelopes. Defined restore rejection
+    state, including old-generation envelopes. Defined restore rejection
     for any queued step naming an absent engagement, live-engagement stale no-ops,
     preservation of unrelated keys/allocators, and in-flight stale-work guards.
     Concrete cleanup bookkeeping, step payload, and runtime proofs remain open.
@@ -317,7 +317,7 @@ source of detailed scope and acceptance criteria.
   - Context: [Combat activation and movement handoff](systems/combat-activation.md) · [Ship and fleet balance direction](systems/ship-and-fleet-balance.md)
 
 - [ ] **TASK-102: Define group and area combat targeting**
-  - The owner's 2026-10-14 first combat command is one acting ship against one
+  - The owner's first combat command is one acting ship against one
     explicit target ship using ordinary placement. Keep group and area targeting
     out of that initial TASK-046 payload.
   - Later define explicit-selection/group admission, controller validation,
@@ -328,7 +328,7 @@ source of detailed scope and acceptance criteria.
   - Context: [Combat command and participant authority](systems/combat-activation.md#first-combat-order-command-and-participant-authority) · [Group commands](systems/group-and-fleet-commands.md).
 
 - [ ] **TASK-101: Revisit competing combat-engagement admission**
-  - Added at the owner's request on 2026-10-13. The initial TASK-046 contract
+  - Added at the owner's request. The initial TASK-046 contract
     rejects admission of an engaged ship to a different engagement; each ship
     retains one movement-controlling engagement.
   - Revisit the gameplay need for admission rejection, deliberate transfer,
@@ -657,7 +657,7 @@ the project-level **Near-term work** section above.
   - Context: [Authoritative save boundary](architecture/authoritative-save-boundary.md) · [Version content catalogs](task-list.md#task-037-version-content-catalogs-and-migrate-saved-content-references)
 
 - [ ] **TASK-051: Define docking, undocking, and berth capacity**
-  - Owner explicitly deferred docking decisions on 2026-10-13 while combat
+  - Owner explicitly deferred docking decisions while combat
     defines the first TASK-071 activation contract. Preserve this task for later.
   - Define approach, access validation, berth or docking-capacity allocation,
     queueing, arrival, docked state, undocking, cancellation, and failure for
@@ -847,7 +847,7 @@ the project-level **Near-term work** section above.
   - Context: [Time and pacing](application/time-and-pacing.md)
 
 - [ ] **TASK-072: Define ship geometry, physical collision, and avoidance**
-  - Owner explicitly deferred collision and avoidance decisions on 2026-10-13
+  - Owner explicitly deferred collision and avoidance decisions
     while combat defines the first TASK-071 activation contract.
   - Decide whether ships remain point positions for generic movement or have
     authoritative two-dimensional occupied geometry, and whether ships may
@@ -880,17 +880,28 @@ the project-level **Near-term work** section above.
 
 ## Completed foundations
 
+- [x] **TASK-114: Keep routine test and build success reports out of documentation**
+  - Added repository guidance and removed routine successful test, build,
+    startup, formatting, and validation reports. Retained verification
+    requirements, coverage descriptions, known failures, and benchmark data.
+  - Context: [Documentation guidance](../AGENTS.md#architecture-documentation)
+
+- [x] **TASK-112: Remove unnecessary documentation dates**
+  - Removed approval, review, implementation, and completion dates from design
+    prose, headings, and task records. Retained decision status, task ownership,
+    and dated benchmark evidence references; updated affected heading links.
+  - An existing unrelated task-list fragment issue is recorded under TASK-113.
+  - Context: [Documentation guidance](../AGENTS.md#architecture-documentation)
+
 - [x] **TASK-111: Organize documentation into shallow topic folders**
   - Applied the owner-approved direction, architecture, systems, application,
     and validation folders, with no further nesting. Added a grouped index,
     shortened document navigation, and updated repository references while
     preserving filenames and the canonical task-list path.
-  - Verified all 917 local project links resolve, all 51 existing documents
-    appear in the index, and moved document bodies retain their original prose.
   - Context: [Documentation index](README.md)
 
 - [x] **TASK-057: Define station composition, construction, and expansion**
-  - Completed owner design review on 2026-10-29, accepting Q01-Q58 and R01-R05
+  - Completed owner design review, accepting Q01-Q58 and R01-R05
     in the [station design](systems/stations.md). Defined persistent identity and modules,
     shared inventory, construction/expansion, upgrades/dismantling, capacity safety,
     proportional cargo loss with a configurable 1% cutoff, authority, sensors,
@@ -901,17 +912,16 @@ the project-level **Near-term work** section above.
   - Context: [Station design](systems/stations.md)
 
 - [x] **TASK-104: Reconcile the connector-navigation benchmark expectation**
-  - Completed on 2026-10-26 after owner review of the historical investigation.
+  - Completed after owner review of the historical investigation.
     Isolated the divergence to `e11b43b`'s intentional turn-before-acceleration
     change, then corrected the version 2 expected digest to `88e79d6112f53750`
     and updated its configuration assertion without changing navigation.
-  - Verified the canonical benchmark across five measured iterations and all
-    92 Release benchmark tests. Earlier mismatch references describe historical
-    verification before this correction.
-  - Context: [Investigation evidence](validation/scale-and-benchmark-targets.md#task-104-connector-navigation-investigation-2026-10-26)
+  - Earlier mismatch references describe historical verification before this
+    correction.
+  - Context: [Investigation evidence](validation/scale-and-benchmark-targets.md#task-104-connector-navigation-investigation)
 
 - [x] **TASK-095: Implement sensor deployables and deployment/pickup orders**
-  - Completed the owner-approved runtime/content delivery on 2026-10-26:
+  - Completed the owner-approved runtime/content delivery:
     Satellite and Advanced Satellite definitions, explicit initial cargo in the
     built-in game and development preview, and independent ship pickup ranges.
   - Implemented atomic item/entity transactions, shared stationary range
@@ -921,28 +931,25 @@ the project-level **Near-term work** section above.
   - Added typed committed views/sources, safe historical notices, direct
     checkpoint continuation and idempotency. TASK-106 records the independent
     definition retention shared by starting and constructed ships.
-  - Verified 1,570 Release tests, a clean Release build, both content packages,
-    Godot headless build/startup, six existing canonical benchmark digests and
-    stationary serial/worker comparisons. TASK-104's known navigation digest
-    mismatch remains visible and unchanged.
+  - TASK-104's known navigation digest mismatch remains visible and unchanged.
   - Observation integration remains TASK-073, player controls TASK-107, failure
     notifications TASK-094, and general encoded save admission TASK-037.
   - Context: [Runtime delivery and verification](systems/sensor-deployables.md#runtime-delivery-and-verification) · [Shared range measurements](validation/interaction-session-measurements.md#task-095-fixed-position-extension)
 
 - [x] **TASK-106: Retain setup-only ship definitions at the checkpoint boundary**
-  - Completed within TASK-095 on 2026-10-26 after owner approval. One independent
+  - Completed within TASK-095 after owner approval. One independent
     catalog retains definitions for starting and constructed ships; construction
     policies reference design IDs instead of owning post-construction operation.
   - Proved capture, direct restore, movement and recapture without producing
     policy, facility aggregate or production history, plus missing/conflicting
     definition rejection. Initial deployable cargo restores from retained sensor
-    definitions. All 1,500 solution tests pass; general encoded save admission
-    and catalog migration remain TASK-037. TASK-095 records the completed runtime
+    definitions. General encoded save admission and catalog migration remain
+    TASK-037. TASK-095 records the completed runtime
     delivery.
   - Context: [Independent ship definitions](architecture/entity-lifecycle.md#construction-materialization-handoff)
 
 - [x] **TASK-071: Implement moving-ship interaction discovery and timing**
-  - Completed on 2026-10-17 with owner acceptance of the shared-foundation scope:
+  - Completed with owner acceptance of the shared-foundation scope:
     exact continuous and instant discovery, durable session-wide interests,
     invalidation and completion correlation, canonical candidate reduction,
     deterministic scheduling, stable domain evaluation, and serial effects.
@@ -952,8 +959,7 @@ the project-level **Near-term work** section above.
   - Added exact controlled intervals, atomic participant entry/update/release and
     analytic cancellation handoff, component checkpoints, guarded session APIs,
     interval-end advancement stops, mutation exclusion, and snapshot projection.
-  - All 1,406 solution tests pass; Release build has zero warnings/errors.
-    Active-domain scheduling, gameplay membership/order policy, and full active
+  - Active-domain scheduling, gameplay membership/order policy, and full active
     session persistence are not implemented here: design stays frozen under
     TASK-046 and implementation is tracked by TASK-103. Save compatibility stays
     TASK-037; allocation investigation stays TASK-100. TASK-101/TASK-102 retain
@@ -961,7 +967,7 @@ the project-level **Near-term work** section above.
   - Context: [Shared-runtime acceptance and deferred scope](architecture/moving-ship-interactions.md#closure-recommendation-and-deferred-scope)
 
 - [x] **TASK-068: Define equipment, ship slots, installation, and removal**
-  - Completed the owner-approved design on 2026-10-06: discrete equipment
+  - Completed the owner-approved design: discrete equipment
     identity, grouped stable hull slots, exact-size multi-slot occupancy,
     explicit removal policy, mandatory-group validation, and reservation-free
     atomic refitting with one final loadout publication.
@@ -974,7 +980,7 @@ the project-level **Near-term work** section above.
   - Context: [Equipment and ship slots](systems/equipment-and-ship-slots.md)
 
 - [x] **TASK-075: Define deployable deployment and pickup ranges**
-  - Confirmed on 2026-10-01: item-defined 2,500-meter deployment range and
+  - Confirmed: item-defined 2,500-meter deployment range and
     ship-defined 5,000-meter pickup range, both inclusive, with out-of-range
     orders moving into range before acting.
   - Defined moving execution, revalidation without reservations, terminal
@@ -1000,7 +1006,7 @@ the project-level **Near-term work** section above.
     existing screen-coordinate projection, without changing simulation state
     or ship selection behavior.
   - Added framework-independent client geometry coverage for all cardinal
-    headings. Client tests, the Godot build, and headless preview startup pass.
+    headings.
   - Context: [Presentation snapshots](architecture/presentation-snapshots.md) · [Source-code organization](architecture/source-code-organization.md)
 
 - [x] **TASK-091: Reorganize source and tests by ownership boundary**
@@ -1013,10 +1019,8 @@ the project-level **Near-term work** section above.
     and created dedicated client, validator, and benchmark test projects with
     direct production references and no linked-source compilation.
   - Split the large fact, relationship, spatial-navigation, checkpoint, and
-    runtime-coordinator files along their documented responsibilities. Final
-    validation passed all 976 tests, including deterministic simulation and
-    benchmark-configuration coverage, plus the Godot build and headless
-    startup. No follow-up task remains.
+    runtime-coordinator files along their documented responsibilities. No
+    follow-up task remains.
   - Context: [Source-code organization](architecture/source-code-organization.md)
 
 - [x] **TASK-090: Implement ship thrust, maneuver kinematics, and short moves**
@@ -1069,8 +1073,7 @@ the project-level **Near-term work** section above.
     no group identity, group order, or history exists.
   - Godot now snapshots local multi-selection for replacement move and
     current-order cancellation, while Shift-append remains focused-ship-only.
-    Focused simulation and client tests plus the Godot build passed. `TASK-086`
-    owns any future persistent group or fleet lifecycle.
+    `TASK-086` owns any future persistent group or fleet lifecycle.
   - Context: [Group and fleet commands](systems/group-and-fleet-commands.md) · [Presentation snapshots](architecture/presentation-snapshots.md) · [Actor control and order lifecycle](systems/actor-control-and-orders.md)
 
 - [x] **TASK-083: Build a development-only Godot visual preview and scenario**
@@ -1083,9 +1086,8 @@ the project-level **Near-term work** section above.
     presentation snapshots and validated layout without adding a second
     simulation authority, save/load, recovery, final accessibility/settings,
     audio, or fog-of-war behavior.
-  - Added focused coordinate-transform and loader proof. Simulation and
-    Godot-side suites, Godot build, content validation, headless startup, and
-    project-owner interactive visual review passed.
+  - Added focused coordinate-transform and loader coverage. The project owner
+    accepted the interactive visual preview.
   - Context: [Application shell and map experience](application/application-shell-and-map-experience.md) · [Presentation snapshots](architecture/presentation-snapshots.md) · [Gameplay content](application/gameplay-content.md) · [Time and pacing](application/time-and-pacing.md)
 
 - [x] **TASK-085: Reconcile the built-in starter-ship position acceptance**
@@ -1171,8 +1173,7 @@ the project-level **Near-term work** section above.
     resolved content set beside the composed setup for `TASK-037`, and rejected
     malformed scenario mappings without publishing content or setup.
   - Replaced the Godot client's hard-coded starting definitions and instances
-    with the shipped package path. Three focused tests, the full 580-test suite,
-    Release build, scoped formatting, and a Godot headless startup smoke pass.
+    with the shipped package path.
   - Content-version compatibility and saved-reference migration remain
     `TASK-037`; procedural generation remains `TASK-047`.
   - Context: [Gameplay content and static new-game composition](application/gameplay-content.md) · [Gameplay integration](architecture/gameplay-integration.md) · [Save format and migration](architecture/save-format-and-migration.md)
@@ -1292,9 +1293,7 @@ the project-level **Near-term work** section above.
     clear before retirement without retaining retired-key tombstones.
   - Proved golden vectors, root and namespace isolation, unbiased sampling,
     rejected-work non-consumption, retirement safety, exact continuation, and
-    worker, batch, and partition independence with 55 focused test cases. The
-    full 423-test simulation suite, 27 content tests, Release build, formatting,
-    Godot headless build, and all canonical benchmark digests pass.
+    worker, batch, and partition independence.
   - Script use remains `TASK-017`, procedural generation remains `TASK-047`,
     and broader cross-platform and cross-version compatibility remains
     `TASK-060`.
@@ -1349,9 +1348,7 @@ the project-level **Near-term work** section above.
   - Added a Godot-free production validator with stable diagnostic codes and
     optional package-order, qualified-key, and fingerprint inspection.
   - Proved stable catalogs, fingerprints, and diagnostics across package and
-    document order and worker counts with 27 focused tests. The full 395-test
-    suite, Release build, formatting verification, Godot headless build, and all
-    four canonical benchmark digests pass.
+    document order and worker counts.
   - Built-in content and static new-game integration were completed by
     `TASK-048`; catalog compatibility and saved-reference migration remain
     `TASK-037`.
@@ -1429,7 +1426,7 @@ the project-level **Near-term work** section above.
   - Added atomic same-directory file publication with durable file and directory
     synchronization, one explicit backup, portable validated slot identifiers,
     symbolic-link rejection, and cleanup that preserves the prior committed
-    primary across pre-publication failures. The full 368-test suite passes.
+    primary across pre-publication failures.
   - `TASK-063` supplies resolved content catalogs and `TASK-048` supplies static
     new-game composition. General saved sessions remain unavailable until
     `TASK-037` adds catalog compatibility and saved-reference migration.
@@ -1687,9 +1684,8 @@ the project-level **Near-term work** section above.
   - Normal unit tests retain only fast configuration and smoke correctness
     coverage. Heavy Phase 1, spatial, connector-navigation, and fact-retention
     scenarios require explicit `--suite full` selection.
-  - The canonical Release full suite passed all five committed digests across
-    repeated iterations on 2026-07-28. Concurrent worker-count and long-running
-    suites remain future work under `TASK-029`.
+  - Concurrent worker-count and long-running suites remain future work under
+    `TASK-029`.
   - Context: [Scale targets and benchmark architecture](validation/scale-and-benchmark-targets.md)
 
 - [x] **TASK-028: Establish hierarchical system-space navigation**

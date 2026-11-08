@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md) · [Task list](../task-list.md) · [Prepared swept contract](../architecture/moving-ship-interactions.md#prepared-swept-runtime-contract) · [Whole-plan prototypes](interaction-swept-index-comparison.md)
 
-On 2026-10-12, TASK-071 added version 1 `interaction.runtime-swept-scan`,
+TASK-071 added version 1 `interaction.runtime-swept-scan`,
 `interaction.runtime-swept-grid`, and `interaction.runtime-swept-hierarchy`
 presets. These call `InteractionSweptQuery.Prepare`, `PrepareScope`, and `Find`
 over real movement-owner captures. They exercise the accepted next-boundary
@@ -86,8 +86,7 @@ uses normal runtime compilation settings and checks correctness rather than
 providing a controlled timing comparison. Tests compare mixed and linear
 captured fixtures against exact boundary-clipped interest forecasts, including
 sources outside scope, and enforce valid tuning and heavy-suite opt-in.
-All 1,278 solution tests pass, and the Release solution build has zero warnings
-or errors. No timing thresholds are asserted in tests.
+No timing thresholds are asserted in tests.
 
 ```sh
 dotnet build benchmarks/GalaxyCommand.Benchmarks -c Release

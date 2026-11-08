@@ -20,7 +20,7 @@ ownership, deterministic evaluation waves, buffered effects, event and fact
 commit, measurement boundaries, and the continuing role of the Phase 1
 acceptance harness.
 
-**Decision status:** Accepted by the project owner on 2026-07-29.
+**Decision status:** Accepted by the project owner.
 
 **Implementation status:** Complete. Production and construction readiness
 now use immutable ordered facility batches, typed reservation proposals,
@@ -639,8 +639,7 @@ TASK-009 implementation is complete when:
 
 ## Accepted implementation decisions
 
-The project owner approved these implementation-shaping decisions on
-2026-07-29:
+The project owner approved these implementation-shaping decisions:
 
 1. Use a fixed coordinator with domain-specific contracts rather than one
    general simulation-system interface.

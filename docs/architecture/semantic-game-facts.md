@@ -26,9 +26,9 @@ The design remains strictly local and single-player. Facts are not network
 messages, replication records, remote events, or an event-sourcing replacement
 for authoritative world state.
 
-**Decision status:** Accepted by the project owner on 2026-07-28.
+**Decision status:** Accepted by the project owner.
 
-**Implementation status:** Completed by `TASK-008` on 2026-07-28. `TASK-010`
+**Implementation status:** Completed by `TASK-008`. `TASK-010`
 completed the presentation facade and cursor consumption. Persistent-script,
 save/load, and explanation-history integration remain with their owning
 follow-up tasks.

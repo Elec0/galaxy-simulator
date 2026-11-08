@@ -10,11 +10,11 @@ domain must account for that survival, physical presence, and eventual
 transfer into another inventory without duplicating cargo or silently deleting
 it.
 
-**Task:** TASK-108. Design begun at the owner's request on 2026-10-29.
+**Task:** TASK-108. Design begun at the owner's request.
 
-**Status:** Design complete and accepted by the project owner on 2026-11-09,
+**Status:** Design complete and accepted by the project owner,
 including C01-C12 and R01-R10. The owner approved R01-R03, R04-R06, and
-R07-R09 as drafted; R10's closing behavior was separately accepted that day.
+R07-R09 as drafted; R10's closing behavior was separately accepted.
 Implementation remains pending under TASK-108. TASK-105's design dependency is
 resolved; its live cargo-loss commits still require the shared cargo runtime.
 
@@ -75,7 +75,7 @@ support already exists.
 
 ## Accepted foundation decisions
 
-The owner selected the following behavior on 2026-10-29:
+The owner selected the following behavior:
 
 - **Cause-dependent survival:** Destruction uses a configurable recovery fraction
   per loss cause. When a functional entity ejects an item, successful ejection
@@ -220,7 +220,7 @@ follows the approved start-time size basis.
 ## Accepted decision register
 
 The project owner accepted the gameplay choices during the initial review and
-their complete technical/control contracts on 2026-11-09.
+their complete technical/control contracts.
 
 | ID | Accepted decision | Contract |
 | --- | --- | --- |
@@ -267,9 +267,9 @@ fields cannot repeat survival calculation or create new contents. Rejection
 changes no holding, reservation, accounting credit, allocator, committed
 random state, or fact. A repeated accepted cause returns its receipt.
 
-## Accepted technical contract (2026-11-09)
+## Accepted technical contract
 
-**Decision status:** R01-R09 accepted by the project owner on 2026-11-09 as
+**Decision status:** R01-R09 accepted by the project owner as
 drafted. R10 records the separately accepted closing behavior. Type names
 below identify approved responsibilities; runtime APIs remain to be implemented.
 
@@ -656,7 +656,7 @@ digests across supported worker/batch/partition layouts. Timing stays
 informational; a correctness mismatch blocks completion. Concurrent execution
 requires measured benefit.
 
-### R10. Accepted closing behavior (2026-11-09)
+### R10. Accepted closing behavior
 
 The owner resolved the three behavior choices identified during technical
 review. These choices are accepted independently of R01-R09's accepted technical

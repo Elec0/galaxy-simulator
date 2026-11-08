@@ -17,9 +17,9 @@ not expose a mutable world or promote fixture helpers into a public spawn API.
 Ships are the only runtime-materializable entity in this task. Other kinds use
 the same boundary only after their design and component requirements exist.
 
-**Decision status:** Accepted by the project owner on 2026-08-04.
+**Decision status:** Accepted by the project owner.
 
-**Implementation status:** Completed by `TASK-011` on 2026-08-05. The clean
+**Implementation status:** Completed by `TASK-011`. The clean
 `GameSession` now has
 session-wide entity identity, prepared setup registration, explicit setup ID
 high-water marks, and complete ship identity in snapshots. Construction now
@@ -164,7 +164,7 @@ registration and high-water-mark rule under `TASK-014`.
 
 ### Construction materialization handoff
 
-The owner confirmed on 2026-10-26 under TASK-095 that a committed ship is
+The owner confirmed under TASK-095 that a committed ship is
 operationally independent of its producer. Starting and constructed ships use
 one session-owned retained definition catalog. A construction policy authorizes
 creation and references that catalog; it does not remain the source of the

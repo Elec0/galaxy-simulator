@@ -5,15 +5,13 @@
 ## Status
 
 This document is the accepted `TASK-024` architecture. The project owner
-accepted the initial scale envelope and informational simulation-speed goals on
-2026-07-28.
+accepted the initial scale envelope and informational simulation-speed goals.
 
 Implementation now includes a dedicated headless runner, explicit smoke and
 full-suite gating, versioned JSON scenario files, validated numeric overrides,
 machine-readable results, fast configuration coverage in the normal unit-test
-suite, and the four remaining initial single-thread scenario shapes. The canonical
-Release full suite passed all committed digests across repeated iterations on
-2026-07-28, completing `TASK-024`.
+suite, and the four remaining initial single-thread scenario shapes. This
+completes `TASK-024`.
 
 The benchmark execution and enforcement policy is accepted:
 
@@ -386,7 +384,7 @@ The following remain outside `TASK-024`:
 
 Those decisions require benchmark evidence or later gameplay contracts.
 
-## TASK-104 connector-navigation investigation (2026-10-26)
+## TASK-104 connector-navigation investigation
 
 Before the baseline correction, the canonical version 2
 `navigation.connector-volume` run failed at commit `034244b`: it produces `88e79d6112f53750` against registered expectation
@@ -438,13 +436,13 @@ Matching final snapshot hashes therefore do not prove matching headings or
 matching full fact payloads. The retained fact window also omits the earliest
 26,998 committed facts.
 
-The owner accepted the investigation and authorized the hash correction on
-2026-10-26. The registered expectation and configuration assertion now use
+The owner accepted the investigation and authorized the hash correction. The
+registered expectation and configuration assertion now use
 `88e79d6112f53750`. The fixture remains version 2 because its parameters and
 digest coverage have not changed; this corrects its stale expectation for the
 existing maneuver behavior. Navigation implementation remains unchanged.
-The corrected canonical run passes all five measured iterations with the
-accepted digest and 94,696 events; all 92 Release benchmark tests pass.
+The corrected canonical run records the accepted digest and 94,696 events
+across five measured iterations.
 
 Reproduction uses `dotnet run -c Release --project
 benchmarks/GalaxyCommand.Benchmarks -- --suite full --preset

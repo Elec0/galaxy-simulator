@@ -13,9 +13,9 @@ one-shot group command or a durable fleet can exist.
 This document records the accepted initial one-shot command contract. It makes
 no persistent group or fleet behavior authoritative.
 
-**Decision status:** Accepted by the project owner on 2026-09-03.
+**Decision status:** Accepted by the project owner.
 
-**Implementation status:** Completed by `TASK-033` on 2026-09-03. The
+**Implementation status:** Completed by `TASK-033`. The
 authoritative one-shot group move and current-order cancellation commands use
 the initial formation resolver. Godot snapshots its local multi-selection for
 replacement move and current-order cancellation, while Shift-append remains

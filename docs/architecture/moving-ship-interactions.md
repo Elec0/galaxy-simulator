@@ -4,7 +4,7 @@
 
 ## Decision status
 
-**Decision status:** Accepted by the project owner on 2026-08-20.
+**Decision status:** Accepted by the project owner.
 
 `TASK-019` defines the shared physical substrate for discovering and timing
 interactions while ships remain on authoritative local-motion segments. It does
@@ -339,9 +339,9 @@ handled separately from this narrow-phase query.
 
 ## Explicit pair interests and candidate reduction
 
-The project owner selected a session-wide nonzero `InteractionInterestId` on
-2026-10-07, following the existing typed identity and deterministic sequence
-contract. Its allocation belongs at owner commit, never in evaluation workers.
+The project owner selected a session-wide nonzero `InteractionInterestId`,
+following the existing typed identity and deterministic sequence contract. Its
+allocation belongs at owner commit, never in evaluation workers.
 Domain-owned interests retain that identity through reevaluation. The session
 registration boundary now captures their stores and the shared allocator.
 Gameplay-specific payload and active-interaction checkpoints remain domain-owned.
@@ -372,7 +372,7 @@ an indexed broad phase, which remain pending within `TASK-071`.
 
 ## Spatial revisions and completion receipts
 
-On 2026-10-07, the project owner selected a dedicated spatial revision for
+The project owner selected a dedicated spatial revision for
 forecast correlation, leaving movement completion-event generations unchanged.
 `SpatialRevision` advances on committed departures, replanning, cancellation,
 arrival, transit transitions, and analytic maneuver transitions. A revision
@@ -452,7 +452,7 @@ reduces and submits events deterministically. Notices are acknowledged only
 after successful evaluation and agenda submission; failures retain work for
 retry. The coordinator does not own domain intent or interaction outcomes.
 
-On 2026-10-07 the owner selected the next known motion boundary as the automatic
+The owner selected the next known motion boundary as the automatic
 forecast horizon. For a supported linear pair this is the earliest active
 arrival; two stationary participants use an instant check. The arrival or other
 spatial transition wakes the affected interests again. This avoids a short
@@ -475,7 +475,7 @@ analytic next-boundary times to drive affected-interest reevaluation.
 
 ## Analytic swept-range foundation
 
-On 2026-10-07 the owner selected continuous unrounded kinematic curves within
+The owner selected continuous unrounded kinematic curves within
 each phase, with resets to the committed rounded state at phase boundaries.
 Contact does not follow rounded integer-millisecond position samples. The owner
 also selected that a deceleration curve stops at its exact target-speed point
@@ -528,7 +528,7 @@ that existed only at an uncommitted endpoint. Swept contact before a boundary
 still rounds up to that boundary and retains its evidence even when the reset
 moves the ship out of range.
 
-On 2026-10-07 the owner selected preservation of the underlying curve across
+The owner selected preservation of the underlying curve across
 inserted waypoint events. These events split the observable schedule without
 creating a kinematic reset. They still provide a timestamp at which a domain
 can evaluate interaction effects against the stable state of either participant.
@@ -595,7 +595,7 @@ wrong phases, and mismatched timestamps are rejected before evaluation. A wave
 can only be completed by its originating coordinator.
 
 This is component integration. The live session has no gameplay consumer yet.
-On 2026-10-07 the owner selected a domain-neutral registration extension point;
+The owner selected a domain-neutral registration extension point;
 registration and authoritative intent checkpoints are now implemented below.
 The live StateUpdate evaluation and buffered-effect boundary is now implemented
 below.
@@ -638,7 +638,7 @@ order. Work created by that commit drains in a subsequent wave at the same
 timestamp before Decision begins. Runtimes without this interface retain their
 existing per-event path.
 
-On 2026-10-07 the owner selected same-timestamp domain evaluation followed by
+The owner selected same-timestamp domain evaluation followed by
 deterministic buffered-effect commit. The session now implements this interface
 and attaches its registered interest owners to the derived forecast coordinator.
 
@@ -697,7 +697,7 @@ bindings before consuming events. Rebinding itself commits no gameplay effects.
 
 ## Durable last-delivered correlation
 
-On 2026-10-07 the owner selected durable last-delivered correlation for live
+The owner selected durable last-delivered correlation for live
 interests. Each domain store now owns delivery history alongside intent. A
 correlation records the interest identity and generation plus the directed
 source and target spatial revisions in the stable delivery view. It contains no
@@ -775,7 +775,7 @@ an actual between-millisecond crossing.
 
 ## Caller-scoped instant proximity
 
-On 2026-10-08 the owner selected continuous motion curves for instant proximity
+The owner selected continuous motion curves for instant proximity
 and an explicit caller-supplied candidate ship scope. The one-time query reads a
 captured spatial view at its timestamp, searches only those ship identities,
 and returns unique matching targets in ship identity order. It excludes the
@@ -872,7 +872,7 @@ validation work.
 
 ## Spatial-index evaluation for owner selection
 
-On 2026-10-08, immutable point and scope preparation completed the first
+Immutable point and scope preparation completed the first
 allocation optimization. Index selection remains unresolved. The following
 comparison led to owner approval of benchmark-only sparse-grid and immutable
 bounding-box hierarchy prototypes. It does not adopt a runtime index, cell
@@ -945,7 +945,7 @@ hierarchy tests a structure that also accommodates large swept bounds without
 cell duplication. Defer a hierarchical grid until evidence shows that the
 uniform grid's range or swept-box scaling warrants that added complexity.
 
-The owner approved this comparison on 2026-10-08. The slice adds reduced
+The owner approved this comparison. The slice adds reduced
 reference-equivalence tests first, then
 benchmark-only prototypes and versioned workloads. It would preserve the
 current runtime path. Test and measurement coverage would include:
@@ -1025,14 +1025,14 @@ The [swept comparison](../validation/interaction-swept-index-comparison.md) reco
 contracts, raw reports, timing and allocation limits, and the proposed runtime
 selection contract. Prepared scans win low-volume and tested long-sweep
 workloads; indexes can amortize across many short-sweep queries. Selection
-ownership was settled on 2026-10-09 for instant queries as recorded below.
+ownership was settled for instant queries as recorded below.
 Swept runtime preparation was subsequently implemented under the fixed-interval
 contract below. No automatic
 threshold, authoritative index state, or worker execution is added.
 
 ## Caller-selected instant preparation
 
-On 2026-10-09 the owner selected explicit caller strategy selection, retaining
+The owner selected explicit caller strategy selection, retaining
 scan as the default, integrating instant queries first, and requiring explicit
 index tuning. `PreparedInteractionProximityView.PrepareScope(scope)` retains the
 existing scan. Its overload accepts an immutable `InteractionPreparationStrategy`:
@@ -1068,8 +1068,7 @@ while retaining their original explicit experimental settings. Runtime swept
 preparation was subsequently implemented below. Measured concurrent execution
 remains later work within TASK-071.
 
-Validation for this slice passed all 1,253 solution tests and the Release
-solution build with zero warnings or errors. Focused coverage compares public
+Focused coverage compares public
 strategies with the exact reference, including caller/owner mutation, source
 lookup outside scope, transit exclusion, empty scopes, reversed partitions,
 fractional curves, and coordinate/range limits. All six canonical Release
@@ -1085,7 +1084,7 @@ They include fixture and digest costs rather than isolating phase timings.
 
 ## Prepared swept runtime contract
 
-On 2026-10-09 the owner selected a fixed interval per preparation and geometry
+The owner selected a fixed interval per preparation and geometry
 that stops at each participant's next scheduled movement boundary. This extends
 the accepted immutable-view and caller-scope preparation model to swept
 discovery. It does not promote the benchmark adapter's whole-plan horizon into
@@ -1197,14 +1196,12 @@ whole-plan swept benchmarks remain useful geometry evidence but do not prove
 next-boundary runtime preparation. Public runtime measurement follows semantic
 equivalence, with no timing thresholds or automatic selector added.
 
-The implementation slice passes 12 focused prepared-swept tests. All strategies
-agree with existing exact forecasts over identical clipped intervals and with
-ordered reductions of reversed scope batches. Separate cases prove inserted
+Focused prepared-swept tests compare all strategies with existing exact
+forecasts over identical clipped intervals and with ordered reductions of
+reversed scope batches. Separate cases cover inserted
 boundary cutoff and unchanged continuation, brief rounded contact without
 receipt replay, fractional braking and committed endpoint resets, immutable
-caller/owner inputs, missing-plan rejection, and coordinate/range limits. All
-1,271 solution tests pass, and the Release solution build has zero warnings or
-errors. These checks prove read-only query equivalence. The subsequent
+caller/owner inputs, missing-plan rejection, and coordinate/range limits. The subsequent
 [public swept measurements](../validation/interaction-runtime-swept-measurements.md) use real
 movement-owner captures and preserve ordered contacts across 15 controlled
 comparisons. They include setup and digest costs and retain explicit selection
@@ -1213,7 +1210,7 @@ remain outside those measurements.
 
 ## Remaining implementation review
 
-The 2026-10-17 review checks the shared implementation against the focused tests
+The review checks the shared implementation against the focused tests
 and retained measurement reports. Discovery, bounded forecasts, interest ownership,
 serial effect commit, explicit index selection, pure worker batches, and existing
 interest/session continuation have evidence. The new controlled-motion components
@@ -1223,16 +1220,14 @@ inventing activity steps.
 
 The controlled-motion snapshot projection gap and owner-approved cross-owner
 rejection guards are implemented. The owner accepted the shared-foundation
-completion scope and closed TASK-071 on 2026-10-17.
+completion scope and closed TASK-071.
 Domain roster validation, automatic steps, order holds and pursuit, and active
 domain persistence are not demonstrated by these shared APIs. The owner froze
-combat design under TASK-046 on 2026-10-16, then explicitly deferred interval-end
-callbacks and step scheduling on 2026-10-17. Those decisions remain in force;
+combat design under TASK-046, then explicitly deferred interval-end
+callbacks and step scheduling. Those decisions remain in force;
 this review does not expand the shared runtime into combat policy.
 
-The most recent implementation validation passed all 1,406 solution tests and a
-Release build with zero warnings/errors. This review changes documentation only;
-its focused rerun is recorded in the canonical tracker. Earlier benchmark counts
+This review changes documentation only. Earlier benchmark counts
 and timings below remain measurements of their stated fixtures and revisions,
 not a fresh performance measurement of the session advancement guard.
 
@@ -1259,7 +1254,7 @@ snapshot position. The review has not identified a further shared implementation
 gap after the mutation-guard and projection fixes. This is a bounded source and
 test review, not a claim that every future consuming domain is already supported.
 
-On 2026-10-17 the owner accepted TASK-071 as the shared discovery, timing, and
+The owner accepted TASK-071 as the shared discovery, timing, and
 explicit motion-handoff foundation and authorized closure. Domain roster
 validation, authorized admission, automatic steps, order holds, outcomes, pursuit, and the matching
 active-domain checkpoint state remain consuming-domain work. TASK-046 retains
@@ -1269,7 +1264,7 @@ General save serialization, content-reference compatibility, and migration remai
 TASK-100. Keep these task IDs and ownership boundaries rather than
 creating replacement tasks or reopening combat design here.
 
-On 2026-10-26 the owner accepted a bounded shared spatial extension within
+The owner accepted a bounded shared spatial extension within
 TASK-095 for ship-to-commanded-position and ship-to-live-stationary-entity
 interests, including durable correlation, invalidation, scheduling, and
 checkpoint validation. The current live runtime remains ship-pair based; this
@@ -1295,7 +1290,7 @@ parking lot rather than being promoted by this bookkeeping change.
 
 ### Controlled-owner mutation guards
 
-The 2026-10-17 source review found that scripted overrides and entity removal
+The source review found that scripted overrides and entity removal
 bypassed the navigation exclusion guard. The owner selected rejection until
 explicit release. These paths now preflight controlled ownership without
 introducing an exit callback or choosing domain policy.
@@ -1314,13 +1309,11 @@ order, lifecycle, or removal-receipt mutation. No removal fact is published for
 the rejected operation. Explicit release allows a retry, and successful removal
 retains existing idempotence. Five session regressions cover begin/end override,
 direct removal, and active/queued inbound-order removal, preserving state on
-rejection and proving successful retry after release. All 14 guarded-session
-cases and all 1,403 solution tests pass. Release build has zero warnings/errors
-using the writable temporary NuGet HTTP cache.
+rejection and covering retry after release.
 
 ### Controlled-motion snapshot position
 
-The 2026-10-17 guard review found that `GameShipSnapshot.Position` lacked a case
+The guard review found that `GameShipSnapshot.Position` lacked a case
 for `ShipSpatialSnapshotState.InteractionControlled` and threw when public
 snapshot consumers read that property. The accessor now returns the controlled
 snapshot's captured `CurrentState.Position`, matching ordinary analytic motion
@@ -1330,16 +1323,14 @@ or extend the snapshot's horizon.
 Three new session cases cover entry, an intermediate timestamp, and the exact
 interval end. Each compares the public position, velocity, and heading with the
 original curve and the interaction view, then releases and advances the session
-to prove that earlier snapshots retain their captured values. All 17 controlled
-session-motion cases and all 1,406 solution tests pass. Release build has zero
-warnings/errors using the writable temporary NuGet HTTP cache. Domain scheduling
+to check that earlier snapshots retain their captured values. Domain scheduling
 and active-domain saves remain deferred; this projection fix changes no gameplay
 policy.
 
 ### Accepted concurrency boundary
 
-The owner selected opt-in coarse batches of pure query/forecast evaluation first
-on 2026-10-12. Domain evaluator callbacks remain serial. The current
+The owner selected opt-in coarse batches of pure query/forecast evaluation first.
+Domain evaluator callbacks remain serial. The current
 `ISpatialInteractionDomainEvaluator` contract requires pure evaluation but does
 not promise thread safety, reentrancy, or that splitting a domain's contact list
 preserves its conflict policy. Registration alone cannot authorize parallel
@@ -1375,7 +1366,7 @@ TASK-071 retains the shared activation handoff and determinism work already
 listed in the tracker. Combat, collision/avoidance, docking, and sensor behavior
 remain with their existing owner tasks. The implementation must stop for owner
 feedback when required activation semantics are missing; a generic tick or
-placeholder gameplay interaction is not a substitute. On 2026-10-13 the owner
+placeholder gameplay interaction is not a substitute. The owner
 selected combat as the first domain, with multi-ship engagement ownership,
 separate engagement identity, explicit restored step duration, authorized combat
 intent, exit before replacement navigation, and rejection of competing admission.
@@ -1388,7 +1379,7 @@ accepts explicit order-backed create/join claims, smallest eligible origin key,
 and exactly-once elapsed settlement through a durable cursor. The subsequent
 lifecycle slice accepts Active-only order authority, continuation eligibility
 separate from entry range, and ordinary pursuit for valid intent after release.
-On 2026-10-14 the owner accepted the single-actor/single-target command payload,
+The owner accepted the single-actor/single-target command payload,
 combat-domain authority for hostile target admission, and independently
 authorized Active orders for each additional ally. TASK-102 defers group/area
 targeting. The owner subsequently accepted preservation of defender ordinary
@@ -1398,7 +1389,7 @@ scripted override transitions with authority revalidation: combat release preser
 an active override, and override release preserves a still-authorized combat
 motion hold. The owner then approved single-authority combat membership, derived
 order holds and structured blocking causes, and exact pending-step-key restore
-validation. On 2026-10-16 the owner approved canceling every queued step before
+validation. The owner approved canceling every queued step before
 removing engagement state; restore rejects queued steps naming absent engagements
 while preserving valid stale-generation no-ops for live engagements. Compiled
 owner/checkpoint layouts remain to be settled.
@@ -1409,7 +1400,7 @@ docking decisions remain deferred; the shared handoff remains TASK-071 work.
 ## Opt-in pure batch execution
 
 The owner selected explicit maximum worker capacity and batch size, bounded
-shared-thread-pool execution, and earliest-input failure ordering on 2026-10-12.
+shared-thread-pool execution, and earliest-input failure ordering.
 `InteractionBatchExecution(maximumWorkers, batchSize)` validates positive values.
 The public opt-in APIs are `InteractionForecast.EvaluateBatch` and `FindBatch`
 on prepared instant/swept scopes. Existing scalar calls and default session runtime execution remain serial;
@@ -1452,7 +1443,7 @@ coordinator or live session failure handling.
 
 ## Opt-in coordinator reevaluation
 
-On 2026-10-12, the coordinator gained a `Reevaluate` overload that accepts an
+The coordinator gained a `Reevaluate` overload that accepts an
 explicit `InteractionBatchExecution` for one affected-interest wave. The original
 three-argument call retains serial evaluation. The existing GameSession runtime
 continues to use that original call; this slice does not introduce a session-wide
@@ -1516,10 +1507,8 @@ any event. Exhaustion leaves pending events and the next sequence unchanged; an
 empty wave remains valid at exhaustion, and the last available sequence can
 still be consumed. Coordinator proof includes rejection of a 120-forecast wave
 with only 119 slots, followed by a successful retry against a valid agenda.
-The original seven coordinator tests also pass.
 
-All 1,309 solution tests pass and the Release solution build has zero warnings
-or errors. The [pure batch measurements](../validation/interaction-batch-measurements.md)
+The [pure batch measurements](../validation/interaction-batch-measurements.md)
 establish shared-backend query evidence; they do not measure this coordinator's
 capture/commit overhead or advancing invalidation workload. Session-level opt-in configuration and continuation proof were subsequently
 implemented below. Advancing-session measurement and domain fine-grained
@@ -1527,7 +1516,7 @@ activation remain subsequent work.
 
 ## Fixed session forecast execution settings
 
-On 2026-10-13 the owner selected execution settings fixed at session creation or
+The owner selected execution settings fixed at session creation or
 restore, kept outside authoritative checkpoints. The three-argument
 `GameSession` constructor accepts an optional `InteractionBatchExecution`.
 The original two-argument constructor and a null execution binding retain serial
@@ -1583,8 +1572,7 @@ admission, facts, interests, and durable delivery history agree with serial
 execution. Restoring after delivery produces no duplicate notification without
 a new state change.
 
-All 1,322 solution tests pass, and the Release solution build has zero warnings
-or errors. Existing public query batch measurements establish backend evidence;
+Existing public query batch measurements establish backend evidence;
 this slice does not measure advancing-session throughput, invalidation churn,
 or worker scaling of the complete session. Those measurements and consuming-domain
 fine-grained activation remain later TASK-071 work. General serialized
@@ -1592,7 +1580,7 @@ save compatibility remains TASK-037.
 
 ## Advancing-session measurement
 
-The subsequent 2026-10-13 slice adds serial and explicitly batched session
+The subsequent slice adds serial and explicitly batched session
 benchmarks that advance through analytic replanning and durable-interest churn.
 They exercise real stale-event rejection and serial effect delivery. Ordered
 contact digests and semantic counts agree across worker capacities and batch
@@ -1606,7 +1594,7 @@ remains separate work, and TASK-100 retains allocation profiling.
 
 ## Shared batch analytic handoff
 
-On 2026-10-16 the owner froze further TASK-046 design and resumed TASK-071
+The owner froze further TASK-046 design and resumed TASK-071
 implementation. The first bounded shared handoff slice adds
 `SpatialMovement.TryInterruptTerminalManeuvers`. It extends the existing singular
 analytic interruption contract to an explicit collection of ships. No combat
@@ -1642,15 +1630,14 @@ duplicate/empty selections, notices, and one-time wrapper preparation. Tests
 use real analytic plans and the shared agenda. Active-domain ownership,
 caller-supplied interval motion, mixed-mode entry, exit/replanning, and their
 checkpoint continuation remain subsequent implementation slices. Domain policy
-remains with its owner; TASK-046 design is frozen. All 1,341 solution tests pass
-and the Release solution build has zero warnings/errors. Both checks use a
-writable temporary NuGet HTTP cache after the default audit-cache permission
-error; these results exercise the current shared implementation, not active
-combat behavior.
+remains with its owner; TASK-046 design is frozen. Default audit-cache access
+encountered a permission error; verification uses a writable temporary NuGet HTTP
+cache. These regressions cover the shared implementation, not active combat
+behavior.
 
 ## Caller-owned controlled intervals
 
-On 2026-10-16 the owner selected a domain kind plus domain-owned nonzero activity
+The owner selected a domain kind plus domain-owned nonzero activity
 ID for shared movement binding, and one existing `AnalyticManeuverSegment` for
 the first caller-supplied interval. These are TASK-071 boundary decisions; the
 combat design remains frozen under TASK-046. Movement allocates no domain IDs
@@ -1699,8 +1686,7 @@ Thirteen focused tests prove owner/revision rejection, exact intermediate
 release, no extrapolation, ordinary navigation exclusion, component restore and
 corruption rejection, analytic interruption followed by controlled entry,
 continuous swept contact, exact completion versus interruption receipts, and
-mixed-motion/index equivalence. All 1,354 solution tests pass. Release build
-passes with zero warnings/errors using the writable temporary NuGet HTTP cache.
+mixed-motion/index equivalence.
 Work remains serial and owner-committed;
 this slice adds no new concurrent mutation path or performance claim.
 
@@ -1738,9 +1724,6 @@ TASK-046.
 Nine additional focused cases cover mixed entry/update in both input orders,
 stale revision, competing owner, invalid start, future overflow, exhausted
 revision/generation capacity, missing actors, and duplicate/zero/empty input.
-All 22 controlled-motion tests and all 1,363 solution tests pass. The Release
-build passes with zero warnings/errors using the writable temporary NuGet HTTP
-cache.
 
 ## Atomic controlled-motion release
 
@@ -1769,9 +1752,7 @@ between participant commits.
 Ten focused cases prove equivalent results across input orders, exact-time
 kinematics, immutable results, exact completion versus intermediate release,
 missing/stale/conflicting/stationary participant rejection, exhausted counters,
-out-of-bounds evaluation, invalid/throwing input, and empty batches. All 32
-controlled-motion tests and all 1,373 solution tests pass. Release build has zero
-warnings/errors using the writable temporary NuGet HTTP cache. Combined analytic
+out-of-bounds evaluation, invalid/throwing input, and empty batches. Combined analytic
 cancellation and controlled entry are implemented below. Domain-roster validation
 and session step/restore integration remain separate implementation work. Combat
 design stays frozen under TASK-046.
@@ -1817,16 +1798,14 @@ agenda work, adapter call counts, stale/missing claims, missing/mismatched/share
 cancellation envelopes, adapter and geometry failures, both counter increments,
 pending-boundary rejection, duplicate/zero input, time mismatch, and empty input.
 The shared-key regression also covers standalone batch analytic interruption,
-which now returns Mismatch before mutation for aliased envelopes. All 48
-controlled-motion tests and all 1,389 solution tests pass. Release build has zero
-warnings/errors using the writable temporary NuGet HTTP cache.
+which now returns Mismatch before mutation for aliased envelopes.
 Domain-roster validation and session scheduling/restore integration remain work;
 combat design stays frozen under TASK-046. No concurrent mutation or performance
 claim is introduced.
 
 ## Guarded session controlled-motion APIs
 
-On 2026-10-17 the owner selected guarded session APIs while deferring interval-end
+The owner selected guarded session APIs while deferring interval-end
 callbacks and step scheduling. The owner also selected stopping `AdvanceTo` at the
 earliest active interval end, returning that timestamp in `RunReport`, so the
 caller can renew or release before continuing. No automatic renewal or gameplay
@@ -1870,8 +1849,7 @@ Nine focused session cases cover renewal/release continuation, earliest-particip
 boundaries, analytic cancellation and registration rejection, healthy checkpoint
 rejection, admission from initial and future contact effects, event-count
 preservation, evaluation/disposal guards, navigation exclusion, and atomic
-rejection without a lingering boundary. All 1,398 solution tests pass. Release
-build has zero warnings/errors using the writable temporary NuGet HTTP cache.
+rejection without a lingering boundary.
 Step scheduling stays deferred by owner decision, and combat design remains frozen.
 
 ## Implementation evidence required

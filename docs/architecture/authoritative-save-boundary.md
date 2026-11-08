@@ -30,7 +30,7 @@ Coverage and geometry are rebuilt after restore. Persistent structure discovery
 records remain open under `TASK-073` stages 3 and 4; this ship boundary does not
 claim station or deployable persistence or enable general encoded save admission.
 
-Under the owner's 2026-10-26 TASK-095 decision, runtime policy capture retains
+Under the owner's TASK-095 decision, runtime policy capture retains
 ship definitions independently of construction facilities and policies. Starting
 and constructed ships use the same retained definitions, including exact
 maneuver, sensor, cargo and pickup-range values. Construction policies save

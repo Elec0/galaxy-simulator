@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md) · [Task list](../task-list.md) · [Interaction design](../architecture/moving-ship-interactions.md#caller-selected-instant-preparation) · [Prototype comparison](interaction-index-comparison.md)
 
-On 2026-10-09, TASK-071 added version 1 `interaction.runtime-scan`,
+TASK-071 added version 1 `interaction.runtime-scan`,
 `interaction.runtime-grid`, and `interaction.runtime-hierarchy` presets. These
 call the public `InteractionProximityQuery.Prepare`, `PrepareScope`, and `Find`
 APIs, using the same two-dimensional fixture and digest inputs as the existing
@@ -66,15 +66,14 @@ portable crossover threshold or a universally preferred index.
 
 ## Correctness and reproduction
 
-All three unmodified canonical presets pass the existing expected digest
+All three unmodified canonical presets record the same expected digest
 `b75076796115dc88`; the
 [canonical report](../../benchmarks/results/2026-10-09-runtime-instant-canonical.json)
 uses the normal runtime compilation settings and is a correctness check,
 not a controlled timing comparison. Reduced tests compare public-runtime
 presets against the reference fixture for sparse, dense, clustered, scoped,
 and multi-system queries, and reject invalid tuning before execution.
-The solution passes 1,259 tests; the Release solution build has zero warnings
-or errors. Timings remain informational and have no test thresholds.
+Timings remain informational and have no test thresholds.
 
 ```sh
 dotnet build benchmarks/GalaxyCommand.Benchmarks -c Release

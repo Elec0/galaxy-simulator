@@ -4,7 +4,7 @@
 
 ## TASK-073 deployable observation crossings
 
-On 2026-10-26, the bounded deployable observation integration added pure
+The bounded deployable observation integration added pure
 crossing measurements for moving owned sensors against fixed deployable
 observation positions. The fixture includes 1,024 sources and 1,024 stationary
 positions across four systems, with 16 searches through known 10-second linear
@@ -40,7 +40,7 @@ fractional exits and source-union geometry independently.
 
 ## TASK-095 fixed-position extension
 
-On 2026-10-26, `interaction.stationary-session-serial` and
+`interaction.stationary-session-serial` and
 `interaction.stationary-session-batched` added the same small advancing-session
 workload with fixed commanded positions instead of target ships. They exercise
 the shared stationary-interest path, including updates, cancellations and stale
@@ -85,7 +85,7 @@ semantic counts. Timing and allocation remain informational.
 
 ## Original ship-pair presets
 
-On 2026-10-13, TASK-071 added version 1 `interaction.session-serial` and
+TASK-071 added version 1 `interaction.session-serial` and
 `interaction.session-batched` benchmark presets. They exercise real session
 advancement with analytic motion replacement, durable-interest updates and
 cancellations, stale-event rejection, and serial domain effects. The serial
@@ -119,7 +119,7 @@ summary, semantic workload parameters, ordered delivered contact evidence
 (system, interest identity/generation, directed roles, range, timestamp, and
 contact flags), and remaining interest identities/generations/ranges. Worker
 settings and harness iteration counts do not participate. All measured runs
-within each fixture agree on digest and semantic counts. Twelve focused tests
+within each fixture agree on digest and semantic counts. Focused tests
 compare worker capacities 1, 2, 4, and 8 with different batch sizes, enforce the
 canonical digest, reject invalid workloads, and show that changing the number
 of replacement waves changes churn evidence and the digest. Existing session
@@ -169,9 +169,8 @@ allocation investigation parked as TASK-100. Medium four-worker runs vary from
 explicit opt-in settings and do not select a universal worker count or batch
 size. Domain callbacks and authoritative commits remain serial.
 
-All 1,334 solution tests pass. The Release solution build passes with zero
-warnings and errors using a writable temporary NuGet HTTP cache; the initial
-build was blocked by the default audit cache's filesystem permissions. Raw
+The initial build was blocked by the default audit cache's filesystem
+permissions. Reproduction uses a writable temporary NuGet HTTP cache. Raw
 [controlled reports and exact commands](../../benchmarks/results/2026-10-13-session-manifest.json)
 and the [canonical report](../../benchmarks/results/2026-10-13-session-canonical.json)
 are retained. The matrix proves agreement for these two workloads, not a

@@ -13,20 +13,26 @@ understandable for a player who operates one ship throughout the game.
 
 **Design owner:** `TASK-068`.
 
-**Decision status:** Accepted. The owner approved all remaining recommendations
-on 2026-10-06. There are no unresolved in-scope owner decisions in this design.
+**Decision status:** Accepted. The owner approved all remaining recommendations.
+There are no unresolved in-scope owner decisions in this design.
 Station service details, fitting-screen UI, repair execution, and ship-loss
 handling retain the downstream owners listed below.
 
 **Implementation status:** `TASK-068` completed this design. `TASK-099` owns
 equipment and refit implementation. No implementation is started by this approval.
 
-| Accepted on | Decision record |
-| --- | --- |
-| 2026-10-06 | Q26, Q30, Q31, and Q32: facts, saved authority, deterministic ownership and contention, and atomic publication. |
-| 2026-10-06 | Mandatory-group validation, definition-selected damage behavior, cancellation of later orders after capability failure, and restoration of prior pause/speed state. |
-| 2026-10-06 | Q02 and Q15: discrete equipment identity and reservation-free refit admission with atomic execution-time validation. |
-| 2026-10-06 | Stable slots and removal policy, exact damage evaluation and fact cadence, bounded modification profiles and typed keys, control-override invalidation, and equipment disclosure. |
+Accepted decision records:
+
+- Q26, Q30, Q31, and Q32: facts, saved authority, deterministic ownership and
+contention, and atomic publication.
+- Mandatory-group validation, definition-selected damage behavior, cancellation
+of later orders after capability failure, and restoration of prior pause/speed
+state.
+- Q02 and Q15: discrete equipment identity and reservation-free refit admission
+with atomic execution-time validation.
+- Stable slots and removal policy, exact damage evaluation and fact cadence,
+bounded modification profiles and typed keys, control-override invalidation, and
+equipment disclosure.
 
 The design body states the behavioral contract. The question-and-answer register
 retains all 32 review IDs and records the answers behind that contract.
@@ -656,7 +662,7 @@ an ordinary discrete item gain equipment metadata, or should equipment have its
 own definition kind referencing the physical item? Can an item serve a cargo or
 deployable purpose as well as being installable?
 
-**Answer:** Accepted on 2026-10-06: use a dedicated equipment content kind that
+**Answer:** Accepted: use a dedicated equipment content kind that
 follows the existing discrete physical-item contract, with one ItemInstanceId
 and one QualifiedContentKey. Installed instances have unique custody and retain
 their condition and modifications. Dismantling retires identity; subsequent
@@ -829,7 +835,7 @@ exact incoming item, target slots, old equipment, return cargo capacity,
 materials, or service capacity? When are these released or consumed, and which
 actions may still move or use a committed item?
 
-**Answer:** Accepted on 2026-10-06: draft editing and queued refit admission
+**Answer:** Accepted: draft editing and queued refit admission
 create no advance reservations. At execution, prepare and revalidate the entire
 loadout, resource, capacity, and settlement transaction; respect other
 workflows' reservations and resolve contention in Q31's stable order. Commit
@@ -1049,7 +1055,7 @@ consumed inputs, capability revisions, pending event keys, and receipts for
 repeat requests? Which values are derived on restore, and what mismatches must
 reject restoration rather than invent replacements?
 
-**Answer:** Accepted on 2026-10-06: save installed identity, definition,
+**Answer:** Accepted: save installed identity, definition,
 occupancy, durability, modifications, revisions, allocators/receipts, queued
 refit intent, and any policy-approved commitments. Restore privately against
 compatible definitions and validate all owner links. Drafts and local pause are
@@ -1065,7 +1071,7 @@ the atomic inventory, equipment, workflow, and maneuver changes? Existing
 command and agenda order may be used where appropriate, but worker completion
 order may never select a winner.
 
-**Answer:** Accepted on 2026-10-06: order lifecycle belongs to the order
+**Answer:** Accepted: order lifecycle belongs to the order
 coordinator, installed state to its owner, and atomic refit coordination to
 GameSession. Evaluate immutable inputs into private proposals. Order
 simultaneous eligible refits by original command sequence, then ship and order
@@ -1082,7 +1088,7 @@ operation publish one final loadout? How should fitting completion, activation,
 cancellation, and ship removal at that timestamp be ordered within the
 established event phases?
 
-**Answer:** Accepted on 2026-10-06: publish one final loadout per atomic refit,
+**Answer:** Accepted: publish one final loadout per atomic refit,
 with one loadout revision and one capability revision/replan when maneuver
 values change. Independent commands are not merged solely because their
 timestamps match. Preserve existing physical-completion, state-update, decision,
