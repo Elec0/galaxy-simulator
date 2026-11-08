@@ -60,5 +60,5 @@ task-per-entity designs, pervasive locks, or sequence allocation based on
 concurrent completion order. Retain a single-thread reference path and add
 concurrent execution only with focused deterministic tests and benchmark
 evidence. Follow
-[`docs/concurrency-and-performance.md`](docs/concurrency-and-performance.md)
+[`docs/architecture/concurrency-and-performance.md`](docs/architecture/concurrency-and-performance.md)
 for the full contract.

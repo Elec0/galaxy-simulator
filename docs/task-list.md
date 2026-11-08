@@ -1,6 +1,6 @@
 # Project task list
 
-[Project index](../README.md) · [Gameplay integration](gameplay-integration.md) · [Inventory and cargo](inventory-and-cargo.md) · [Sensor deployables](sensor-deployables.md) · [Dialogue](dialogue.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Deterministic randomness](deterministic-randomness.md) · [Accessibility](accessibility.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Individual NPC scope](individual-npc-scope.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md) · [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Group and fleet commands](group-and-fleet-commands.md) · [Ship maneuver kinematics](ship-maneuver-kinematics.md) · [Source-code organization](source-code-organization.md) · [Scale targets and benchmarks](scale-and-benchmark-targets.md) · [Initial roadmap](roadmap.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+[Documentation index](README.md) · [Roadmap](direction/roadmap.md)
 
 This is the canonical list of project work. Design documents explain goals,
 constraints, and decisions; this file records whether implementation work is
@@ -24,9 +24,9 @@ source of detailed scope and acceptance criteria.
 | Dialogue and randomness | `TASK-016` completed dialogue design. `TASK-021` and `TASK-066` completed deterministic-randomness design and implementation. | `TASK-065` implements dialogue. |
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
-| Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` completed the [equipment and ship-slot design](equipment-and-ship-slots.md); `TASK-099` owns implementation. `TASK-055` owns trade balance, pricing, and settlement design. |
+| Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` completed the [equipment and ship-slot design](systems/equipment-and-ship-slots.md); `TASK-099` owns implementation. `TASK-055` owns trade balance, pricing, and settlement design. |
 | Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract; `TASK-075` completed deployment and pickup range and action-order design. `TASK-095` completed deployable runtime, range orders, committed observation inputs and checkpoint continuity; `TASK-106` completed independent ship-definition retention. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. `TASK-071` completed shared interaction discovery, timing, deterministic evaluation, and explicit motion handoffs. | `TASK-068` defined installed-equipment capability contributions; `TASK-099` implements them; `TASK-046` retains frozen combat design and `TASK-103` tracks combat activation and active-domain continuation. `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-107` owns player deployment/pickup controls, `TASK-094` owns player order-failure notifications, and `TASK-088` retains late-term spatial authoring guidance. |
-| Stations | `TASK-057` completed the [station design](stations.md), including composition, construction, expansion, loss accounting, lifecycle, observation, and persistence. | `TASK-105` implements stations; `TASK-073` integrates observation; `TASK-108` owns cargo recovery and collection; `TASK-109` retains future ownership changes. |
+| Stations | `TASK-057` completed the [station design](systems/stations.md), including composition, construction, expansion, loss accounting, lifecycle, observation, and persistence. | `TASK-105` implements stations; `TASK-073` integrates observation; `TASK-108` owns cargo recovery and collection; `TASK-109` retains future ownership changes. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 | Source-code organization | `TASK-091` reorganized source and tests around the documented simulation authority, client presentation, deterministic execution, and test-harness boundaries without changing simulation behavior or public type identity. | Further namespace or assembly changes require measured need and separately approved work. |
 
@@ -51,7 +51,7 @@ source of detailed scope and acceptance criteria.
     remains pending. Deliver the full approved runtime, controls, content,
     checkpoints, deterministic proof, and live station-to-collection integration
     under R09; retain serial-reference and worker/batch equivalence checks.
-  - Context: [Cargo disposition and collection design](cargo-disposition-and-collection.md) · [Station cargo disposition](stations.md#shared-cargo-disposition-policy) · [Inventory and cargo](inventory-and-cargo.md)
+  - Context: [Cargo disposition and collection design](systems/cargo-disposition-and-collection.md) · [Station cargo disposition](systems/stations.md#shared-cargo-disposition-policy) · [Inventory and cargo](systems/inventory-and-cargo.md)
 
 - [ ] **TASK-105: Implement the approved station entity runtime**
   - Promoted by the project owner on 2026-10-29. Started independent exact
@@ -66,7 +66,7 @@ source of detailed scope and acceptance criteria.
     every update partition of a sample recipe, and arithmetic boundary values.
     All 1,629 Release solution tests and the solution/Godot C# build pass with
     zero build warnings. Runtime delivery and R05 proof remain incomplete.
-    See [initial implementation](stations.md#initial-arithmetic-implementation-2026-10-29).
+    See [initial implementation](systems/stations.md#initial-arithmetic-implementation-2026-10-29).
   - TASK-057 completed design approval on 2026-10-29. Implement its full accepted
     station identity, composition, shared inventory/facility links, construction,
     builder assignments, upgrades, dismantling, protected capacity, cargo-loss
@@ -79,7 +79,7 @@ source of detailed scope and acceptance criteria.
     not implement deferred trade, docking, repair, combat, or refitting domains.
   - Meet R05's full proof boundary, including serial-reference determinism,
     worker/batch comparisons before concurrency, and appropriate benchmarks.
-  - Context: [Accepted station contract](stations.md#accepted-technical-contract) · [Fog-of-war stages](fog-of-war-and-scouting.md#approved-stages-and-completion-boundaries)
+  - Context: [Accepted station contract](systems/stations.md#accepted-technical-contract) · [Fog-of-war stages](systems/fog-of-war-and-scouting.md#approved-stages-and-completion-boundaries)
 
 - [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
   - Resumed by the owner on 2026-10-26 and implemented the deployable portion:
@@ -89,7 +89,7 @@ source of detailed scope and acceptance criteria.
     withdrawal and controlled-motion materialization. TASK-095 remains complete.
     Verified 1,593 Release tests, a clean solution build, Godot C# build/startup,
     and serial/worker crossing agreement. TASK-104's known benchmark mismatch
-    is unchanged. See [deployable integration](fog-of-war-and-scouting.md#deployable-observation-integration-2026-10-26).
+    is unchanged. See [deployable integration](systems/fog-of-war-and-scouting.md#deployable-observation-integration-2026-10-26).
   - Promoted by the project owner on 2026-10-19. The owner selected a staged
     boundary for review, then implementation of approved stages. The linked
     design now proposes ship coverage, live ship presentation/disclosure,
@@ -133,7 +133,7 @@ source of detailed scope and acceptance criteria.
     equipment contributions with `TASK-068`,
     and the application surface with `TASK-049`. Do not invent either missing
     entity domain inside sensor implementation.
-  - Context: [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Presentation snapshots](presentation-snapshots.md) · [Concurrency and performance](concurrency-and-performance.md)
+  - Context: [Fog-of-war and scouting](systems/fog-of-war-and-scouting.md) · [Moving-ship interactions](architecture/moving-ship-interactions.md) · [Presentation snapshots](architecture/presentation-snapshots.md) · [Concurrency and performance](architecture/concurrency-and-performance.md)
 
 ## Near-term work
 
@@ -177,7 +177,7 @@ source of detailed scope and acceptance criteria.
     informational dialogue remains with `TASK-065` and combat start remains with
     `TASK-046`. Keep persisted pacing overrides in the shared device-local
     preference store completed by `TASK-084`, not a separate pacing-only file.
-  - Context: [Time and pacing](time-and-pacing.md)
+  - Context: [Time and pacing](application/time-and-pacing.md)
 
 ## Future parking lot
 
@@ -187,7 +187,7 @@ source of detailed scope and acceptance criteria.
     atomic ejection through commands and map controls. Successful ejection by a
     functional entity preserves cargo fully and creates standalone collectible
     objects, without a destruction field. Reuse TASK-108's shared cargo contract.
-  - Context: [Cargo disposition and collection](cargo-disposition-and-collection.md)
+  - Context: [Cargo disposition and collection](systems/cargo-disposition-and-collection.md)
 
 - [ ] **TASK-109: Define station capture and ownership transfer**
   - Added by owner approval during TASK-057 review. Define voluntary transfer
@@ -195,7 +195,7 @@ source of detailed scope and acceptance criteria.
     station modules, inventory custody, projects, builder assignments, service
     access, external commitments, and observation. Do not infer rights from
     faction standing or add transfer behavior to the initial station runtime.
-  - Context: [Station design](stations.md) · [Territory and political expansion](task-list.md#far-term)
+  - Context: [Station design](systems/stations.md) · [Territory and political expansion](task-list.md#far-term)
 
 - [ ] **TASK-107: Design and implement player deployment/pickup controls**
   - The owner selected runtime/content integration first for TASK-095. Define
@@ -203,7 +203,7 @@ source of detailed scope and acceptance criteria.
     placement and pickup controls through its existing command boundary.
     Player order-failure notification remains TASK-094, and observation remains
     TASK-073. This task is not part of TASK-095's runtime delivery.
-  - Context: [Initial deployable delivery](sensor-deployables.md#initial-content-adaptation-and-delivery)
+  - Context: [Initial deployable delivery](systems/sensor-deployables.md#initial-content-adaptation-and-delivery)
 
 
 - [ ] **TASK-103: Implement combat activation and active-domain continuation**
@@ -226,7 +226,7 @@ source of detailed scope and acceptance criteria.
     engagement persistence or persist derived indexes and host worker settings.
   - Keep TASK-101/TASK-102's admission/targeting extensions separate and retain
     a serial reference path with deterministic batch/worker equivalence tests.
-  - Context: [Combat activation](combat-activation.md) · [Shared runtime and deferred scope](moving-ship-interactions.md#closure-recommendation-and-deferred-scope)
+  - Context: [Combat activation](systems/combat-activation.md) · [Shared runtime and deferred scope](architecture/moving-ship-interactions.md#closure-recommendation-and-deferred-scope)
 
 - [ ] **TASK-046: Define combat resolution**
   - Design frozen by the owner on 2026-10-16 for later resumption under this
@@ -314,7 +314,7 @@ source of detailed scope and acceptance criteria.
   - Use the owner-selected VRO reference for complementary ship roles,
     target-specific weapons, and fleet support. Exact mechanics and tuning
     remain for owner review.
-  - Context: [Combat activation and movement handoff](combat-activation.md) · [Ship and fleet balance direction](ship-and-fleet-balance.md)
+  - Context: [Combat activation and movement handoff](systems/combat-activation.md) · [Ship and fleet balance direction](systems/ship-and-fleet-balance.md)
 
 - [ ] **TASK-102: Define group and area combat targeting**
   - The owner's 2026-10-14 first combat command is one acting ship against one
@@ -325,7 +325,7 @@ source of detailed scope and acceptance criteria.
     order correlation, and deterministic outcomes before extending combat commands.
     Preserve independent per-ship order ownership and TASK-101's separate review
     of engagement transfer/merging; do not infer either from a selection UI.
-  - Context: [Combat command and participant authority](combat-activation.md#first-combat-order-command-and-participant-authority) · [Group commands](group-and-fleet-commands.md).
+  - Context: [Combat command and participant authority](systems/combat-activation.md#first-combat-order-command-and-participant-authority) · [Group commands](systems/group-and-fleet-commands.md).
 
 - [ ] **TASK-101: Revisit competing combat-engagement admission**
   - Added at the owner's request on 2026-10-13. The initial TASK-046 contract
@@ -336,7 +336,7 @@ source of detailed scope and acceptance criteria.
     evidence. Define deterministic membership conflicts, kinematic handoff,
     queued-step invalidation, intent continuity, and checkpoint continuation for
     any approved change. Do not introduce shared motion ownership implicitly.
-  - Context: [Combat activation](combat-activation.md#accepted-owner-decisions).
+  - Context: [Combat activation](systems/combat-activation.md#accepted-owner-decisions).
 
 - [ ] **TASK-100: Investigate repeated exact maneuver-query allocations**
   - Profile the dense mixed swept-query fixture, which allocates about one GB
@@ -344,7 +344,7 @@ source of detailed scope and acceptance criteria.
     boundary preparation costs before choosing an optimization. Preserve exact
     continuous geometry, committed resets, contact flags, immutable ownership,
     and worker-count invariance; measure allocation as well as time.
-  - Context: [Interaction batch measurements](interaction-batch-measurements.md).
+  - Context: [Interaction batch measurements](validation/interaction-batch-measurements.md).
 
 These items are intentionally retained without implying that they should be
 worked on now. Promote an item to current or near-term work when its
@@ -369,7 +369,7 @@ the project-level **Near-term work** section above.
   - Retain single-thread execution and prove identical state, IDs, resources,
     order outcomes, motion, facts, and save continuation across supported worker,
     partition, and batch layouts; enable concurrency only with benchmark evidence.
-  - Context: [Equipment and ship slots](equipment-and-ship-slots.md)
+  - Context: [Equipment and ship slots](systems/equipment-and-ship-slots.md)
 
 - [ ] **TASK-098: Design the fitting-screen UI**
   - Design the selected-ship/station refit screen, which opens immediately when
@@ -391,7 +391,7 @@ the project-level **Near-term work** section above.
     with `TASK-094`, observer-safe fields with `TASK-073`, and localization and
     accessibility with their accepted contracts. Keep UI design separate from
     equipment implementation; detailed interactions require owner review.
-  - Context: [Equipment and ship slots](equipment-and-ship-slots.md) · [Time and pacing](time-and-pacing.md) · [Accessibility](accessibility.md)
+  - Context: [Equipment and ship slots](systems/equipment-and-ship-slots.md) · [Time and pacing](application/time-and-pacing.md) · [Accessibility](application/accessibility.md)
 
 - [ ] **TASK-097: Design station refitting and equipment reclamation services**
   - Own station details moved out of `TASK-068`: ships refit only at stations
@@ -419,7 +419,7 @@ the project-level **Near-term work** section above.
     typed outcomes, facts, checkpoints,
     restoration, and deterministic contention without silently adding advance
     reservations or work duration. UI remains `TASK-098`.
-  - Context: [Equipment and ship slots](equipment-and-ship-slots.md) · [Inventory and cargo](inventory-and-cargo.md) · [Economy](economy.md)
+  - Context: [Equipment and ship slots](systems/equipment-and-ship-slots.md) · [Inventory and cargo](systems/inventory-and-cargo.md) · [Economy](systems/economy.md)
 
 - [ ] **TASK-096: Define installed-equipment disposition on ship destruction**
   - After ship destruction is implemented through combat and lifecycle work,
@@ -428,7 +428,7 @@ the project-level **Near-term work** section above.
   - Preserve atomic owner cleanup, causal facts, and checkpoint continuity.
     Equipment destroyed while its ship remains live stays installed and
     nonfunctional under `TASK-068`; this follow-up owns ship-loss disposition.
-  - Context: [Equipment and ship slots](equipment-and-ship-slots.md) · [Entity lifecycle](entity-lifecycle.md)
+  - Context: [Equipment and ship slots](systems/equipment-and-ship-slots.md) · [Entity lifecycle](architecture/entity-lifecycle.md)
 
 - [ ] **TASK-094: Define and implement player order-failure notifications**
   - Provide a player-facing notification when an accepted order fails,
@@ -437,7 +437,7 @@ the project-level **Near-term work** section above.
     order outcomes and typed failure reasons.
   - Defer notification policy and presentation until owner review; preserve
     semantic failure facts and terminal order state independently of this UI.
-  - Context: [Sensor deployables](sensor-deployables.md#execution-and-failure) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Semantic game facts](semantic-game-facts.md)
+  - Context: [Sensor deployables](systems/sensor-deployables.md#execution-and-failure) · [Actor control and order lifecycle](systems/actor-control-and-orders.md) · [Semantic game facts](architecture/semantic-game-facts.md)
 
 
 - [ ] **TASK-032: Define semantic economy facts**
@@ -447,7 +447,7 @@ the project-level **Near-term work** section above.
     `TASK-011`; do not expose Phase 1 diagnostic records as semantic facts.
   - Preserve typed causes, deterministic proposal ordering, bounded retention,
     and the existing distinction between facts and internal effects.
-  - Context: [Semantic game facts](semantic-game-facts.md) · [Runtime orchestration](runtime-orchestration.md)
+  - Context: [Semantic game facts](architecture/semantic-game-facts.md) · [Runtime orchestration](architecture/runtime-orchestration.md)
 
 - [ ] **TASK-065: Implement dialogue state and presentation**
   - Implement the accepted authored-definition, validation, authoritative
@@ -463,7 +463,7 @@ the project-level **Near-term work** section above.
     `TASK-048`, pacing with `TASK-038` and `TASK-064`, the application shell
     with `TASK-049`, station identity with `TASK-057`, and the narrow
     fog-of-war predicates accepted by completed `TASK-020`.
-  - Context: [Dialogue](dialogue.md) · [Gameplay content](gameplay-content.md) · [Time and pacing](time-and-pacing.md) · [Concurrency and performance](concurrency-and-performance.md)
+  - Context: [Dialogue](systems/dialogue.md) · [Gameplay content](application/gameplay-content.md) · [Time and pacing](application/time-and-pacing.md) · [Concurrency and performance](architecture/concurrency-and-performance.md)
 
 - [ ] **TASK-042: Define NPC skills and bounded decision quality**
   - Decide which NPC categories, if any, have skills, competencies, preferences,
@@ -489,7 +489,7 @@ the project-level **Near-term work** section above.
     `TASK-034`; retain the authoritative autonomous-read boundary accepted by
     completed `TASK-020`, and coordinate faction objectives with `TASK-026`
     and bounded competence with `TASK-042`.
-  - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Runtime orchestration](runtime-orchestration.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
+  - Context: [Vision](direction/vision.md) · [Player experience](direction/player-experience.md) · [Runtime orchestration](architecture/runtime-orchestration.md) · [Actor control and order lifecycle](systems/actor-control-and-orders.md)
 
 ### Mid term
 
@@ -501,7 +501,7 @@ the project-level **Near-term work** section above.
   - Build on completed `TASK-033` one-shot commands and `TASK-006` per-ship
     order ownership. Do not introduce a second order queue, networking,
     replication, remote authority, prediction, or rollback behavior.
-  - Context: [Group and fleet commands](group-and-fleet-commands.md) · [Actor control and order lifecycle](actor-control-and-orders.md) · [Presentation snapshots](presentation-snapshots.md)
+  - Context: [Group and fleet commands](systems/group-and-fleet-commands.md) · [Actor control and order lifecycle](systems/actor-control-and-orders.md) · [Presentation snapshots](architecture/presentation-snapshots.md)
 
 - [ ] **TASK-067: Add player-visible save names to the strict save envelope**
   - Extend the versioned `TASK-022` save envelope with the non-authoritative,
@@ -512,7 +512,7 @@ the project-level **Near-term work** section above.
   - Keep the display name separate from slot-path validation, save identity,
     and all authoritative checkpoint state. Coordinate discovery and stale-file
     revision tokens with the application implementation of `TASK-050`.
-  - Context: [Save slots, autosave, and local preferences](save-slots-and-local-preferences.md) · [Save format and migration](save-format-and-migration.md)
+  - Context: [Save slots, autosave, and local preferences](application/save-slots-and-local-preferences.md) · [Save format and migration](architecture/save-format-and-migration.md)
 
 - [ ] **TASK-077: Implement the desktop application shell and minimal map**
   - Implement the accepted `TASK-049` application contract in the Godot client:
@@ -535,7 +535,7 @@ the project-level **Near-term work** section above.
     pacing checkpoints, and `TASK-073` provides fog-of-war presentation
     records. Consume `TASK-040` recovery outcomes and `TASK-061` accessibility
     behavior without redefining either contract.
-  - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Presentation snapshots](presentation-snapshots.md) · [Gameplay content](gameplay-content.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Time and pacing](time-and-pacing.md)
+  - Context: [Application shell and map experience](application/application-shell-and-map-experience.md) · [Presentation snapshots](architecture/presentation-snapshots.md) · [Gameplay content](application/gameplay-content.md) · [Fog-of-war and scouting](systems/fog-of-war-and-scouting.md) · [Time and pacing](application/time-and-pacing.md)
 
 - [ ] **TASK-078: Define the initial supplemental audio presentation**
   - Define the non-authoritative audio categories, visible-event mapping,
@@ -547,7 +547,7 @@ the project-level **Near-term work** section above.
     accessibility boundary with `TASK-061`.
   - `TASK-079` implements the accepted foundation. `TASK-080` separately owns
     optional accessibility audio cues after that implementation exists.
-  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Save slots and local preferences](save-slots-and-local-preferences.md)
+  - Context: [Accessibility](application/accessibility.md) · [Application shell and map experience](application/application-shell-and-map-experience.md) · [Save slots and local preferences](application/save-slots-and-local-preferences.md)
 
 - [ ] **TASK-079: Implement the initial supplemental audio presentation**
   - Implement the accepted `TASK-078` categories, visible-event mapping,
@@ -558,7 +558,7 @@ the project-level **Near-term work** section above.
   - Coordinate application integration with `TASK-077` and preference storage
     with completed `TASK-050`. Do not absorb the optional accessibility cue
     decisions retained by `TASK-080`.
-  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Save slots and local preferences](save-slots-and-local-preferences.md)
+  - Context: [Accessibility](application/accessibility.md) · [Application shell and map experience](application/application-shell-and-map-experience.md) · [Save slots and local preferences](application/save-slots-and-local-preferences.md)
 
 - [ ] **TASK-080: Define supplemental accessibility audio cues**
   - After `TASK-079` provides the initial audio foundation, decide which visual
@@ -570,7 +570,7 @@ the project-level **Near-term work** section above.
   - Coordinate screen-reader output with `TASK-061` and future event owners so
     cues do not duplicate, mask, or disclose information unavailable through
     the accepted presentation boundary.
-  - Context: [Accessibility](accessibility.md) · [Semantic game facts](semantic-game-facts.md) · [Presentation snapshots](presentation-snapshots.md)
+  - Context: [Accessibility](application/accessibility.md) · [Semantic game facts](architecture/semantic-game-facts.md) · [Presentation snapshots](architecture/presentation-snapshots.md)
 
 - [ ] **TASK-017: Design deterministic scripted events**
   - Define time-, location-, threshold-, and fact-based triggers.
@@ -611,7 +611,7 @@ the project-level **Near-term work** section above.
   - Begin only when a concrete gameplay system can own availability or access;
     faction relationships in `TASK-012` and scripted behavior in `TASK-017`
     may supply those requirements.
-  - Context: [Navigation and spatial architecture](navigation-architecture.md)
+  - Context: [Navigation and spatial architecture](architecture/navigation-architecture.md)
 
 - [ ] **TASK-036: Define piracy and its relationship consequences**
   - Define which acts count as piracy and distinguish piracy from ordinary
@@ -624,7 +624,7 @@ the project-level **Near-term work** section above.
   - Coordinate with combat in `TASK-046`, player visibility from completed
     `TASK-020`, and the accepted relational gameplay model before choosing
     simulation state or commands.
-  - Context: [Relational gameplay model](factions.md)
+  - Context: [Relational gameplay model](systems/factions.md)
 
 - [ ] **TASK-037: Version content catalogs and migrate saved content references**
   - Begin after `TASK-022` selects save versioning, `TASK-023` selects the
@@ -639,7 +639,7 @@ the project-level **Near-term work** section above.
   - Define compatibility and migration for the qualified maneuver-design
     references saved by completed `TASK-090`, rejecting an incompatible
     reference before session publication.
-  - Context: [Relational simulation architecture](relational-simulation-architecture.md)
+  - Context: [Relational simulation architecture](systems/relational-simulation-architecture.md)
 
 - [ ] **TASK-040: Define player-safe recovery from corrupted sessions and content failures**
   - Decide the player-facing flow for a poisoned live session, failed
@@ -654,7 +654,7 @@ the project-level **Near-term work** section above.
     future load and preserving an already-running authoritative session.
   - Add focused failure-injection and continuity tests once the recovery
     contract is accepted. Depends on `TASK-022`, `TASK-023`, and `TASK-037`.
-  - Context: [Authoritative save boundary](authoritative-save-boundary.md) · [Version content catalogs](task-list.md#task-037-version-content-catalogs-and-migrate-saved-content-references)
+  - Context: [Authoritative save boundary](architecture/authoritative-save-boundary.md) · [Version content catalogs](task-list.md#task-037-version-content-catalogs-and-migrate-saved-content-references)
 
 - [ ] **TASK-051: Define docking, undocking, and berth capacity**
   - Owner explicitly deferred docking decisions on 2026-10-13 while combat
@@ -668,7 +668,7 @@ the project-level **Near-term work** section above.
   - Build on the moving-ship interaction timing from completed `TASK-019`;
     coordinate access with `TASK-030`, group intent with `TASK-033`, and station
     ownership with `TASK-057`.
-  - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Navigation architecture](navigation-architecture.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
+  - Context: [Player experience](direction/player-experience.md) · [Economy](systems/economy.md) · [Navigation architecture](architecture/navigation-architecture.md) · [Actor control and order lifecycle](systems/actor-control-and-orders.md)
 
 - [ ] **TASK-052: Define standing orders and player-configurable automation**
   - Define recurring trade, mining, patrol, defense, and route intent without
@@ -679,7 +679,7 @@ the project-level **Near-term work** section above.
   - Build on `TASK-006`; coordinate group targets with `TASK-033`, player-facing
     fog-of-war with completed `TASK-020`, and domain-specific orders with their
     owning tasks.
-  - Context: [Player experience](player-experience.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
+  - Context: [Player experience](direction/player-experience.md) · [Actor control and order lifecycle](systems/actor-control-and-orders.md)
 
 - [ ] **TASK-054: Define general resource acquisition and deposits**
   - Evolve the acceptance-only mining source into production gameplay with
@@ -692,7 +692,7 @@ the project-level **Near-term work** section above.
     completed `TASK-069`, equipment with `TASK-068`, resource discoverability
     with completed `TASK-020`, completed movement-interaction design from
     `TASK-019`, and autonomous selection with `TASK-053`.
-  - Context: [Economy](economy.md) · [Simulation architecture](simulation-architecture.md) · [Runtime orchestration](runtime-orchestration.md)
+  - Context: [Economy](systems/economy.md) · [Simulation architecture](architecture/simulation-architecture.md) · [Runtime orchestration](architecture/runtime-orchestration.md)
 
 - [ ] **TASK-055: Define trade, contracts, Credits, prices, and markets**
   - Define purchase, sale, procurement, and transport agreements for player and
@@ -707,7 +707,7 @@ the project-level **Near-term work** section above.
     and their implementation in completed `TASK-069`; coordinate logistics
     with `TASK-009`, docking with `TASK-051`, stale observed market state with
     completed `TASK-020`, and economic facts with `TASK-032`.
-  - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Factions](factions.md)
+  - Context: [Player experience](direction/player-experience.md) · [Economy](systems/economy.md) · [Factions](systems/factions.md)
 
 ### Far term
 
@@ -722,7 +722,7 @@ the project-level **Near-term work** section above.
   - Complete before any affected visual effect is accepted for release. Keep
     implementation with the task that owns each effect rather than creating a
     second presentation owner.
-  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Time and pacing](time-and-pacing.md)
+  - Context: [Accessibility](application/accessibility.md) · [Application shell and map experience](application/application-shell-and-map-experience.md) · [Time and pacing](application/time-and-pacing.md)
 
 - [ ] **TASK-082: Define flashing and photosensitivity safeguards**
   - Before an owning task introduces blinking, flashing, strobing, or rapid
@@ -733,7 +733,7 @@ the project-level **Near-term work** section above.
     change simulation timing, semantic facts, authoritative state, or saves.
   - Complete before any affected effect is accepted for release, with
     implementation remaining in the task that owns that effect.
-  - Context: [Accessibility](accessibility.md) · [Application shell and map experience](application-shell-and-map-experience.md)
+  - Context: [Accessibility](application/accessibility.md) · [Application shell and map experience](application/application-shell-and-map-experience.md)
 
 - [ ] **TASK-088: Define late-term system-local coordinate authoring guidance**
   - After the coordinate-scale contract and its principal gameplay consumers
@@ -747,7 +747,7 @@ the project-level **Near-term work** section above.
   - Build on `TASK-087` and measured experience from `TASK-071`, `TASK-072`,
     `TASK-073`, and `TASK-075`; do not block those tasks on late-term authoring
     guidance.
-  - Context: [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Gameplay content](gameplay-content.md)
+  - Context: [Authoritative system-local coordinate scale](architecture/system-local-coordinate-scale.md) · [Gameplay content](application/gameplay-content.md)
 
 - [ ] **TASK-027: Evaluate a broader entity storage model**
   - Reconsider ECS or another indexed model only when concrete query or scale
@@ -769,7 +769,7 @@ the project-level **Near-term work** section above.
     completed `TASK-066` provides the deterministic-randomness foundation designed by
     completed `TASK-021`. Procedural generation is intentionally deferred until
     later gameplay and world-shape requirements provide concrete constraints.
-  - Context: [Gameplay content](gameplay-content.md) · [Deterministic randomness](deterministic-randomness.md) · [Simulation architecture](simulation-architecture.md) · [Initial roadmap](roadmap.md)
+  - Context: [Gameplay content](application/gameplay-content.md) · [Deterministic randomness](architecture/deterministic-randomness.md) · [Simulation architecture](architecture/simulation-architecture.md) · [Initial roadmap](direction/roadmap.md)
 
 - [ ] **TASK-056: Define ship acquisition, replacement, and upgrades**
   - Define how the player and autonomous principals purchase, receive,
@@ -780,9 +780,9 @@ the project-level **Near-term work** section above.
     snapshots, checkpoints, and the viability of continued one-ship play.
   - Begin after `TASK-068` defines equipment and `TASK-055` defines exchange;
     coordinate construction with `TASK-034` and combat losses with `TASK-046`.
-  - Balance reference: [Ship and fleet roles](ship-and-fleet-balance.md),
+  - Balance reference: [Ship and fleet roles](systems/ship-and-fleet-balance.md),
     preserving continued one-ship viability alongside fleet specialization.
-  - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md)
+  - Context: [Player experience](direction/player-experience.md) · [Economy](systems/economy.md) · [Entity lifecycle](architecture/entity-lifecycle.md)
 
 - [ ] **TASK-058: Define repair and maintenance**
   - Define damage states that can be repaired, required facilities or field
@@ -793,7 +793,7 @@ the project-level **Near-term work** section above.
   - Begin after damage in `TASK-046`, generalized inventory in `TASK-041`,
     equipment in `TASK-068`, and station capabilities in `TASK-057`; coordinate
     docking with `TASK-051`.
-  - Context: [Economy](economy.md) · [Player experience](player-experience.md)
+  - Context: [Economy](systems/economy.md) · [Player experience](direction/player-experience.md)
 
 - [ ] **TASK-059: Define territory claiming and political expansion**
   - Define territory identities, boundaries, controlling authority, claim and
@@ -806,7 +806,7 @@ the project-level **Near-term work** section above.
   - Begin after fog-of-war implementation in `TASK-073`, station expansion in
     `TASK-057`, and combat in `TASK-046`; coordinate strategic ownership with
     `TASK-026` and mutable connector access with `TASK-030`.
-  - Context: [Player experience](player-experience.md) · [Relational gameplay model](factions.md) · [Relational simulation architecture](relational-simulation-architecture.md)
+  - Context: [Player experience](direction/player-experience.md) · [Relational gameplay model](systems/factions.md) · [Relational simulation architecture](systems/relational-simulation-architecture.md)
 
 - [ ] **TASK-060: Define deterministic compatibility across platforms and versions**
   - Decide the supported reproducibility guarantee across operating systems,
@@ -819,7 +819,7 @@ the project-level **Near-term work** section above.
     and use implementation evidence from completed `TASK-066` plus broader evidence from
     `TASK-029`; coordinate save and content compatibility with `TASK-022` and
     `TASK-037`.
-  - Context: [Technical direction](technical-direction.md) · [Deterministic randomness](deterministic-randomness.md) · [Simulation architecture](simulation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Save format and migration](save-format-and-migration.md)
+  - Context: [Technical direction](direction/technical-direction.md) · [Deterministic randomness](architecture/deterministic-randomness.md) · [Simulation architecture](architecture/simulation-architecture.md) · [Concurrency and performance](architecture/concurrency-and-performance.md) · [Save format and migration](architecture/save-format-and-migration.md)
 
 - [ ] **TASK-062: Define personnel, crew, and person-level simulation if required**
   - Begin only when a concrete gameplay need cannot be expressed through the
@@ -833,7 +833,7 @@ the project-level **Near-term work** section above.
   - Coordinate dialogue with `TASK-016`, NPC decision quality with `TASK-042`,
     factions with `TASK-026`, and inventory or passenger cargo only if their
     owning contracts require it.
-  - Context: [Individual NPC scope](individual-npc-scope.md) · [Vision](vision.md) · [Player experience](player-experience.md)
+  - Context: [Individual NPC scope](systems/individual-npc-scope.md) · [Vision](direction/vision.md) · [Player experience](direction/player-experience.md)
 
 - [ ] **TASK-070: Evaluate sub-`1x` player-controlled simulation speeds**
   - Revisit whether the configurable running-speed ladder should permit
@@ -844,7 +844,7 @@ the project-level **Near-term work** section above.
     pacing requests before changing the accepted `TASK-013` contract.
   - The current accepted minimum running speed remains `1x` unless this task is
     promoted and approved.
-  - Context: [Time and pacing](time-and-pacing.md)
+  - Context: [Time and pacing](application/time-and-pacing.md)
 
 - [ ] **TASK-072: Define ship geometry, physical collision, and avoidance**
   - Owner explicitly deferred collision and avoidance decisions on 2026-10-13
@@ -860,7 +860,7 @@ the project-level **Near-term work** section above.
   - Build on the moving-range and swept-path contract from completed `TASK-019`
     and its implementation in `TASK-071`. Do not widen either task with
     collision policy before this task is promoted and approved.
-  - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md)
+  - Context: [Moving-ship interactions](architecture/moving-ship-interactions.md) · [Navigation architecture](architecture/navigation-architecture.md) · [Concurrency and performance](architecture/concurrency-and-performance.md)
 
 - [ ] **TASK-076: Define nonpublic galaxy topology and connector discovery**
   - Define which system and connector identities, names, presentation
@@ -876,20 +876,29 @@ the project-level **Near-term work** section above.
     implementation, scenario content completed by `TASK-048`, and saved-content
     compatibility with `TASK-037`. Do not change the initial public map until
     this task is promoted and accepted.
-  - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
+  - Context: [Application shell and map experience](application/application-shell-and-map-experience.md) · [Fog-of-war and scouting](systems/fog-of-war-and-scouting.md) · [Gameplay content](application/gameplay-content.md) · [Presentation snapshots](architecture/presentation-snapshots.md)
 
 ## Completed foundations
 
+- [x] **TASK-111: Organize documentation into shallow topic folders**
+  - Applied the owner-approved direction, architecture, systems, application,
+    and validation folders, with no further nesting. Added a grouped index,
+    shortened document navigation, and updated repository references while
+    preserving filenames and the canonical task-list path.
+  - Verified all 917 local project links resolve, all 51 existing documents
+    appear in the index, and moved document bodies retain their original prose.
+  - Context: [Documentation index](README.md)
+
 - [x] **TASK-057: Define station composition, construction, and expansion**
   - Completed owner design review on 2026-10-29, accepting Q01-Q58 and R01-R05
-    in the [station design](stations.md). Defined persistent identity and modules,
+    in the [station design](systems/stations.md). Defined persistent identity and modules,
     shared inventory, construction/expansion, upgrades/dismantling, capacity safety,
     proportional cargo loss with a configurable 1% cutoff, authority, sensors,
     observation, atomic lifecycle commits, deterministic work, and persistence.
   - TASK-105 implements the full accepted contract; TASK-073 integrates station
     observation. TASK-108 owns shared cargo ejection/collection, TASK-109 future
     capture/ownership transfer, and TASK-097 refit/reclamation services.
-  - Context: [Station design](stations.md)
+  - Context: [Station design](systems/stations.md)
 
 - [x] **TASK-104: Reconcile the connector-navigation benchmark expectation**
   - Completed on 2026-10-26 after owner review of the historical investigation.
@@ -899,7 +908,7 @@ the project-level **Near-term work** section above.
   - Verified the canonical benchmark across five measured iterations and all
     92 Release benchmark tests. Earlier mismatch references describe historical
     verification before this correction.
-  - Context: [Investigation evidence](scale-and-benchmark-targets.md#task-104-connector-navigation-investigation-2026-10-26)
+  - Context: [Investigation evidence](validation/scale-and-benchmark-targets.md#task-104-connector-navigation-investigation-2026-10-26)
 
 - [x] **TASK-095: Implement sensor deployables and deployment/pickup orders**
   - Completed the owner-approved runtime/content delivery on 2026-10-26:
@@ -918,7 +927,7 @@ the project-level **Near-term work** section above.
     mismatch remains visible and unchanged.
   - Observation integration remains TASK-073, player controls TASK-107, failure
     notifications TASK-094, and general encoded save admission TASK-037.
-  - Context: [Runtime delivery and verification](sensor-deployables.md#runtime-delivery-and-verification) · [Shared range measurements](interaction-session-measurements.md#task-095-fixed-position-extension)
+  - Context: [Runtime delivery and verification](systems/sensor-deployables.md#runtime-delivery-and-verification) · [Shared range measurements](validation/interaction-session-measurements.md#task-095-fixed-position-extension)
 
 - [x] **TASK-106: Retain setup-only ship definitions at the checkpoint boundary**
   - Completed within TASK-095 on 2026-10-26 after owner approval. One independent
@@ -930,7 +939,7 @@ the project-level **Near-term work** section above.
     definitions. All 1,500 solution tests pass; general encoded save admission
     and catalog migration remain TASK-037. TASK-095 records the completed runtime
     delivery.
-  - Context: [Independent ship definitions](entity-lifecycle.md#construction-materialization-handoff)
+  - Context: [Independent ship definitions](architecture/entity-lifecycle.md#construction-materialization-handoff)
 
 - [x] **TASK-071: Implement moving-ship interaction discovery and timing**
   - Completed on 2026-10-17 with owner acceptance of the shared-foundation scope:
@@ -949,7 +958,7 @@ the project-level **Near-term work** section above.
     TASK-046 and implementation is tracked by TASK-103. Save compatibility stays
     TASK-037; allocation investigation stays TASK-100. TASK-101/TASK-102 retain
     later admission and targeting decisions; collision/docking remain TASK-072/TASK-051.
-  - Context: [Shared-runtime acceptance and deferred scope](moving-ship-interactions.md#closure-recommendation-and-deferred-scope)
+  - Context: [Shared-runtime acceptance and deferred scope](architecture/moving-ship-interactions.md#closure-recommendation-and-deferred-scope)
 
 - [x] **TASK-068: Define equipment, ship slots, installation, and removal**
   - Completed the owner-approved design on 2026-10-06: discrete equipment
@@ -962,7 +971,7 @@ the project-level **Near-term work** section above.
   - Implementation remains `TASK-099`; station services are `TASK-097`,
     fitting-screen UI is `TASK-098`, repair remains `TASK-058`, and ship-loss
     equipment disposition remains `TASK-096`.
-  - Context: [Equipment and ship slots](equipment-and-ship-slots.md)
+  - Context: [Equipment and ship slots](systems/equipment-and-ship-slots.md)
 
 - [x] **TASK-075: Define deployable deployment and pickup ranges**
   - Confirmed on 2026-10-01: item-defined 2,500-meter deployment range and
@@ -973,7 +982,7 @@ the project-level **Near-term work** section above.
     deterministic contention, and facts, snapshot, checkpoint/save, and
     verification requirements. Implementation remains `TASK-095`; player
     failure notification remains deferred to `TASK-094`.
-  - Context: [Sensor deployables](sensor-deployables.md#deployment-and-pickup-range-design-task-075)
+  - Context: [Sensor deployables](systems/sensor-deployables.md#deployment-and-pickup-range-design-task-075)
 
 - [x] **TASK-093: Apply a provisional course-turn threshold**
   - Added a temporary 50-meter Euclidean threshold for exact-rest off-heading
@@ -983,7 +992,7 @@ the project-level **Near-term work** section above.
   - Kept sub-50-meter precision adjustments heading-preserving. The threshold
     is explicitly provisional and will be replaced by a ship-size-derived rule
     when `TASK-072` defines ship geometry.
-  - Context: [Ship thrust, maneuver kinematics, and short moves](ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](system-local-coordinate-scale.md)
+  - Context: [Ship thrust, maneuver kinematics, and short moves](architecture/ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](architecture/system-local-coordinate-scale.md)
 
 - [x] **TASK-092: Render heading-aware Godot ship glyphs**
   - Replaced each system-map ship dot with a centered equilateral triangle.
@@ -992,7 +1001,7 @@ the project-level **Near-term work** section above.
     or ship selection behavior.
   - Added framework-independent client geometry coverage for all cardinal
     headings. Client tests, the Godot build, and headless preview startup pass.
-  - Context: [Presentation snapshots](presentation-snapshots.md) · [Source-code organization](source-code-organization.md)
+  - Context: [Presentation snapshots](architecture/presentation-snapshots.md) · [Source-code organization](architecture/source-code-organization.md)
 
 - [x] **TASK-091: Reorganize source and tests by ownership boundary**
   - Reorganized simulation production and tests around kernel, session, actor,
@@ -1008,7 +1017,7 @@ the project-level **Near-term work** section above.
     validation passed all 976 tests, including deterministic simulation and
     benchmark-configuration coverage, plus the Godot build and headless
     startup. No follow-up task remains.
-  - Context: [Source-code organization](source-code-organization.md)
+  - Context: [Source-code organization](architecture/source-code-organization.md)
 
 - [x] **TASK-090: Implement ship thrust, maneuver kinematics, and short moves**
   - Completed fixed-point authored and effective base capabilities, heading and
@@ -1020,7 +1029,7 @@ the project-level **Near-term work** section above.
     contributions, interaction-owned fine-grained activation, observer-safe
     projection, and saved-reference migration remain with `TASK-068`,
     `TASK-071`, `TASK-073`, and `TASK-037`, respectively.
-  - Context: [Ship thrust, maneuver kinematics, and short moves](ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
+  - Context: [Ship thrust, maneuver kinematics, and short moves](architecture/ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](architecture/system-local-coordinate-scale.md) · [Navigation architecture](architecture/navigation-architecture.md) · [Moving-ship interactions](architecture/moving-ship-interactions.md) · [Concurrency and performance](architecture/concurrency-and-performance.md)
 
 - [x] **TASK-089: Define ship thrust, maneuver kinematics, and short moves**
   - Confirmed authored mass, acceleration, speed caps, turn rate, spool duration,
@@ -1034,7 +1043,7 @@ the project-level **Near-term work** section above.
   - Confirmed deterministic interaction transitions, same-time ordering,
     persistence, observer-safe presentation, compatibility, test, and benchmark
     contracts. Implementation completed by `TASK-090`.
-  - Context: [Ship thrust, maneuver kinematics, and short moves](ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
+  - Context: [Ship thrust, maneuver kinematics, and short moves](architecture/ship-maneuver-kinematics.md) · [Authoritative system-local coordinate scale](architecture/system-local-coordinate-scale.md) · [Navigation architecture](architecture/navigation-architecture.md) · [Moving-ship interactions](architecture/moving-ship-interactions.md) · [Concurrency and performance](architecture/concurrency-and-performance.md)
 
 - [x] **TASK-087: Define authoritative system-local coordinate scale**
   - Confirmed one-meter integer coordinates, Euclidean range checks, the
@@ -1047,7 +1056,7 @@ the project-level **Near-term work** section above.
   - Implementation remains with `TASK-071`, `TASK-072`, `TASK-073`, and
     `TASK-075`; `TASK-090` is complete and `TASK-088` retains late-term spatial authoring
     guidance.
-  - Context: [Authoritative system-local coordinate scale](system-local-coordinate-scale.md) · [Navigation architecture](navigation-architecture.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Concurrency and performance](concurrency-and-performance.md)
+  - Context: [Authoritative system-local coordinate scale](architecture/system-local-coordinate-scale.md) · [Navigation architecture](architecture/navigation-architecture.md) · [Moving-ship interactions](architecture/moving-ship-interactions.md) · [Concurrency and performance](architecture/concurrency-and-performance.md)
 
 - [x] **TASK-033: Define selection sets and group or fleet commands**
   - Implemented `MoveShipGroupCommand` and `CancelShipGroupCommand` with
@@ -1062,7 +1071,7 @@ the project-level **Near-term work** section above.
     current-order cancellation, while Shift-append remains focused-ship-only.
     Focused simulation and client tests plus the Godot build passed. `TASK-086`
     owns any future persistent group or fleet lifecycle.
-  - Context: [Group and fleet commands](group-and-fleet-commands.md) · [Presentation snapshots](presentation-snapshots.md) · [Actor control and order lifecycle](actor-control-and-orders.md)
+  - Context: [Group and fleet commands](systems/group-and-fleet-commands.md) · [Presentation snapshots](architecture/presentation-snapshots.md) · [Actor control and order lifecycle](systems/actor-control-and-orders.md)
 
 - [x] **TASK-083: Build a development-only Godot visual preview and scenario**
   - Added validated optional `connectorEndpoints` and `transitConnections`
@@ -1077,13 +1086,13 @@ the project-level **Near-term work** section above.
   - Added focused coordinate-transform and loader proof. Simulation and
     Godot-side suites, Godot build, content validation, headless startup, and
     project-owner interactive visual review passed.
-  - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Presentation snapshots](presentation-snapshots.md) · [Gameplay content](gameplay-content.md) · [Time and pacing](time-and-pacing.md)
+  - Context: [Application shell and map experience](application/application-shell-and-map-experience.md) · [Presentation snapshots](architecture/presentation-snapshots.md) · [Gameplay content](application/gameplay-content.md) · [Time and pacing](application/time-and-pacing.md)
 
 - [x] **TASK-085: Reconcile the built-in starter-ship position acceptance**
   - Restored the built-in `minimal` scenario's starter ship to system position
     `(0, 0)`, matching the production-pipeline acceptance test.
   - Retained the existing content-validation and static new-game loading path.
-  - Context: [Gameplay content](gameplay-content.md)
+  - Context: [Gameplay content](application/gameplay-content.md)
 
 - [x] **TASK-084: Implement the shared device-local preference store**
   - Implemented a versioned device-local JSON store that keeps typed pacing
@@ -1100,7 +1109,7 @@ the project-level **Near-term work** section above.
   - `TASK-038` consumes the typed pacing section, while `TASK-077` and later
     presentation owners may use opaque categories without creating a second
     local-preference file.
-  - Context: [Save slots and local preferences](save-slots-and-local-preferences.md) · [Time and pacing](time-and-pacing.md) · [Accessibility](accessibility.md)
+  - Context: [Save slots and local preferences](application/save-slots-and-local-preferences.md) · [Time and pacing](application/time-and-pacing.md) · [Accessibility](application/accessibility.md)
 
 - [x] **TASK-061: Define comprehensive accessibility behavior**
   - Defined the Windows and macOS platform, NVDA and VoiceOver, semantic
@@ -1116,7 +1125,7 @@ the project-level **Near-term work** section above.
   - `TASK-077` implements the application contract. `TASK-078` through
     `TASK-080` own audio, `TASK-081` retains reduced-motion design, and
     `TASK-082` retains flashing and photosensitivity design.
-  - Context: [Accessibility](accessibility.md) · [Internationalization and localization](internationalization-and-localization.md) · [Application shell and map experience](application-shell-and-map-experience.md) · [Save slots and local preferences](save-slots-and-local-preferences.md)
+  - Context: [Accessibility](application/accessibility.md) · [Internationalization and localization](application/internationalization-and-localization.md) · [Application shell and map experience](application/application-shell-and-map-experience.md) · [Save slots and local preferences](application/save-slots-and-local-preferences.md)
 
 - [x] **TASK-064: Design event-responsive simulation pacing**
   - Defined local per-category Ignore, Pause, and configured-speed-cap actions;
@@ -1134,7 +1143,7 @@ the project-level **Near-term work** section above.
     notices for pacing.
   - Implementation remains `TASK-038`; typed combat integration coordinates
     with `TASK-046`.
-  - Context: [Time and pacing](time-and-pacing.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Save slots, autosave, and local preferences](save-slots-and-local-preferences.md)
+  - Context: [Time and pacing](application/time-and-pacing.md) · [Fog-of-war and scouting](systems/fog-of-war-and-scouting.md) · [Save slots, autosave, and local preferences](application/save-slots-and-local-preferences.md)
 
 - [x] **TASK-049: Define the application shell and map experience**
   - Defined local desktop startup, new-game, load, active-session,
@@ -1149,7 +1158,7 @@ the project-level **Near-term work** section above.
     static new-game composition, while `TASK-037`, `TASK-038`, `TASK-040`, and
     `TASK-073` retain their respective dependencies. Completed `TASK-061`
     supplies the accessibility contract.
-  - Context: [Application shell and map experience](application-shell-and-map-experience.md)
+  - Context: [Application shell and map experience](application/application-shell-and-map-experience.md)
 
 - [x] **TASK-048: Integrate built-in content and static new-game composition**
   - Added an ordinary built-in `galaxy-command.core` disk package containing
@@ -1166,7 +1175,7 @@ the project-level **Near-term work** section above.
     Release build, scoped formatting, and a Godot headless startup smoke pass.
   - Content-version compatibility and saved-reference migration remain
     `TASK-037`; procedural generation remains `TASK-047`.
-  - Context: [Gameplay content and static new-game composition](gameplay-content.md) · [Gameplay integration](gameplay-integration.md) · [Save format and migration](save-format-and-migration.md)
+  - Context: [Gameplay content and static new-game composition](application/gameplay-content.md) · [Gameplay integration](architecture/gameplay-integration.md) · [Save format and migration](architecture/save-format-and-migration.md)
 
 - [x] **TASK-069: Implement generalized inventory and cargo**
   - Implemented qualified physical definitions, fungible holdings, stable
@@ -1184,7 +1193,7 @@ the project-level **Near-term work** section above.
     worker-buffer layouts with varied batch sizes.
   - Content admission was completed by `TASK-048`; saved-reference compatibility
     remains `TASK-037`, and installed equipment remains `TASK-068`.
-  - Context: [Generalized inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md) · [Authoritative save boundary](authoritative-save-boundary.md) · [Concurrency and performance](concurrency-and-performance.md)
+  - Context: [Generalized inventory and cargo](systems/inventory-and-cargo.md) · [Gameplay content](application/gameplay-content.md) · [Authoritative save boundary](architecture/authoritative-save-boundary.md) · [Concurrency and performance](architecture/concurrency-and-performance.md)
 
 - [x] **TASK-074: Define sensor deployables and their placement lifecycle**
   - Defined portable discrete sensor items that atomically materialize into
@@ -1196,7 +1205,7 @@ the project-level **Near-term work** section above.
     the committed sensor-source handoff consumed by `TASK-073`.
   - Range and action-order design completed by `TASK-075`; deferred
     combat targeting, destruction, and disposition to `TASK-046`.
-  - Context: [Sensor deployables](sensor-deployables.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Entity lifecycle](entity-lifecycle.md) · [Inventory and cargo](inventory-and-cargo.md)
+  - Context: [Sensor deployables](systems/sensor-deployables.md) · [Fog-of-war and scouting](systems/fog-of-war-and-scouting.md) · [Entity lifecycle](architecture/entity-lifecycle.md) · [Inventory and cargo](systems/inventory-and-cargo.md)
 
 - [x] **TASK-020: Define player fog-of-war and information staleness**
   - Chose player-facing spatial fog-of-war rather than a general belief,
@@ -1218,7 +1227,7 @@ the project-level **Near-term work** section above.
   - Implementation remains `TASK-073`; deployable entity design remains
     `TASK-074`; equipment contributions remain `TASK-068`; the reusable
     application surface remains `TASK-049`.
-  - Context: [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Player experience](player-experience.md) · [Moving-ship interactions](moving-ship-interactions.md) · [Dialogue](dialogue.md) · [Presentation snapshots](presentation-snapshots.md)
+  - Context: [Fog-of-war and scouting](systems/fog-of-war-and-scouting.md) · [Player experience](direction/player-experience.md) · [Moving-ship interactions](architecture/moving-ship-interactions.md) · [Dialogue](systems/dialogue.md) · [Presentation snapshots](architecture/presentation-snapshots.md)
 
 - [x] **TASK-019: Define interactions between ships in motion**
   - Defined domain-requested proximity and analytic swept-path evaluation over
@@ -1231,7 +1240,7 @@ the project-level **Near-term work** section above.
     and canonical deterministic candidate ordering.
   - `TASK-071` retains implementation. `TASK-072` separately owns ship geometry,
     physical collision, and avoidance.
-  - Context: [Moving-ship interactions](moving-ship-interactions.md) · [Navigation and spatial architecture](navigation-architecture.md) · [Concurrency and performance](concurrency-and-performance.md) · [Simulation architecture](simulation-architecture.md)
+  - Context: [Moving-ship interactions](architecture/moving-ship-interactions.md) · [Navigation and spatial architecture](architecture/navigation-architecture.md) · [Concurrency and performance](architecture/concurrency-and-performance.md) · [Simulation architecture](architecture/simulation-architecture.md)
 
 - [x] **TASK-041: Define generalized inventory and cargo**
   - Defined fungible materials and ordinary cargo plus stable discrete physical
@@ -1248,7 +1257,7 @@ the project-level **Near-term work** section above.
     deterministic proposal commit independent of worker or batch layout.
   - Implementation is complete in `TASK-069`; content-reference migration
     remains `TASK-037`.
-  - Context: [Generalized inventory and cargo](inventory-and-cargo.md) · [Gameplay content](gameplay-content.md) · [Economy](economy.md) · [Concurrency and performance](concurrency-and-performance.md)
+  - Context: [Generalized inventory and cargo](systems/inventory-and-cargo.md) · [Gameplay content](application/gameplay-content.md) · [Economy](systems/economy.md) · [Concurrency and performance](architecture/concurrency-and-performance.md)
 
 - [x] **TASK-050: Define save slots, autosave, and local preference storage**
   - Defined stable manual-slot IDs, player-editable display names, distinct
@@ -1269,7 +1278,7 @@ the project-level **Near-term work** section above.
   - `TASK-040` retains failed-load recovery, `TASK-038` pacing behavior, and
     `TASK-067` save-envelope display names. Completed `TASK-061` defines the
     accessibility preferences consumed through this store.
-  - Context: [Save slots, autosave, and local preferences](save-slots-and-local-preferences.md) · [Save format and migration](save-format-and-migration.md) · [Time and pacing](time-and-pacing.md)
+  - Context: [Save slots, autosave, and local preferences](application/save-slots-and-local-preferences.md) · [Save format and migration](architecture/save-format-and-migration.md) · [Time and pacing](application/time-and-pacing.md)
 
 - [x] **TASK-066: Implement deterministic random foundations**
   - Implemented the required immutable 256-bit root seed, versioned SHA-256
@@ -1289,7 +1298,7 @@ the project-level **Near-term work** section above.
   - Script use remains `TASK-017`, procedural generation remains `TASK-047`,
     and broader cross-platform and cross-version compatibility remains
     `TASK-060`.
-  - Context: [Deterministic randomness](deterministic-randomness.md) · [Concurrency and performance](concurrency-and-performance.md) · [Authoritative save boundary](authoritative-save-boundary.md)
+  - Context: [Deterministic randomness](architecture/deterministic-randomness.md) · [Concurrency and performance](architecture/concurrency-and-performance.md) · [Authoritative save boundary](architecture/authoritative-save-boundary.md)
 
 - [x] **TASK-021: Define random-number stream ownership**
   - Defined one resolved 256-bit session root with domain-separated generation
@@ -1306,7 +1315,7 @@ the project-level **Near-term work** section above.
   - Implementation was completed by `TASK-066`; procedural generation consumes
     the separate generation scope in `TASK-047`; cross-platform compatibility
     remains in `TASK-060`.
-  - Context: [Deterministic randomness and stream ownership](deterministic-randomness.md)
+  - Context: [Deterministic randomness and stream ownership](architecture/deterministic-randomness.md)
 
 - [x] **TASK-016: Design dialogue state and presentation**
   - Defined immutable dialogue definitions and authoritative conversation
@@ -1326,7 +1335,7 @@ the project-level **Near-term work** section above.
   - Implementation remains in `TASK-065`; completed `TASK-020` adds only narrow
     fog-of-war predicates without reinterpreting existing authoritative
     conditions; station identity remains in `TASK-057`.
-  - Context: [Dialogue state and presentation](dialogue.md)
+  - Context: [Dialogue state and presentation](systems/dialogue.md)
 
 - [x] **TASK-063: Implement the format-neutral content validation foundation**
   - Added independent content, validator, and test projects with immutable
@@ -1346,7 +1355,7 @@ the project-level **Near-term work** section above.
   - Built-in content and static new-game integration were completed by
     `TASK-048`; catalog compatibility and saved-reference migration remain
     `TASK-037`.
-  - Context: [Gameplay content and static new-game composition](gameplay-content.md) · [Concurrency and performance](concurrency-and-performance.md)
+  - Context: [Gameplay content and static new-game composition](application/gameplay-content.md) · [Concurrency and performance](architecture/concurrency-and-performance.md)
 
 - [x] **TASK-015: Decide the initial meaning and scope of individual NPCs**
   - Established that the initial NPC is an individually identifiable autonomous
@@ -1355,7 +1364,7 @@ the project-level **Near-term work** section above.
   - Deferred persons, captains, crew, employees, passengers, and population to
     `TASK-062`; `TASK-042` and `TASK-053` retain the later work for ship
     decision quality and autonomous work selection.
-  - Context: [Individual NPC scope](individual-npc-scope.md)
+  - Context: [Individual NPC scope](systems/individual-npc-scope.md)
 
 - [x] **TASK-045: Plan internationalization before game-layer expansion**
   - Defined locale selection and fallback, gettext catalog and stable-key
@@ -1369,7 +1378,7 @@ the project-level **Near-term work** section above.
   - Established the localization-related accessibility baseline; completed
     `TASK-061` subsequently defined comprehensive accessibility modes and
     acceptance criteria.
-  - Context: [Internationalization and localization](internationalization-and-localization.md)
+  - Context: [Internationalization and localization](application/internationalization-and-localization.md)
 
 - [x] **TASK-043: Review gameplay systems for scope gaps**
   - Reviewed the `TASK-044` inventory against the player experience, roadmap,
@@ -1379,7 +1388,7 @@ the project-level **Near-term work** section above.
     optional, evidence-gated, or prerequisite-gated deferral. Added
     `TASK-049` through `TASK-060` for the confirmed gaps without widening
     existing task boundaries.
-  - Context: [Planned game-system inventory](planned-systems.md#task-043-scope-gap-review)
+  - Context: [Planned game-system inventory](direction/planned-systems.md#task-043-scope-gap-review)
 
 - [x] **TASK-044: Inventory the planned game systems in documentation**
   - Added an exhaustive inventory of established, planned, and deliberately
@@ -1392,7 +1401,7 @@ the project-level **Near-term work** section above.
     separately so they cannot be mistaken for missing systems.
   - Supplied the canonical input used by the completed `TASK-043` review of
     gameplay contract and ownership gaps.
-  - Context: [Planned game-system inventory](planned-systems.md)
+  - Context: [Planned game-system inventory](direction/planned-systems.md)
 
 - [x] **TASK-023: Define gameplay content categories and format boundaries**
   - Accepted strict UTF-8 JSON behind a replaceable format adapter, one
@@ -1408,7 +1417,7 @@ the project-level **Near-term work** section above.
     new-game integration were completed by `TASK-048`; catalog compatibility
     and saved-reference migration remain `TASK-037`; procedural new-game
     generation remains `TASK-047`.
-  - Context: [Gameplay content and static new-game composition](gameplay-content.md)
+  - Context: [Gameplay content and static new-game composition](application/gameplay-content.md)
 
 - [x] **TASK-022: Select save format, versioning, and migration strategy**
   - Selected externally editable strict UTF-8 JSON, stable current-schema
@@ -1424,7 +1433,7 @@ the project-level **Near-term work** section above.
   - `TASK-063` supplies resolved content catalogs and `TASK-048` supplies static
     new-game composition. General saved sessions remain unavailable until
     `TASK-037` adds catalog compatibility and saved-reference migration.
-  - Context: [Save format, versioning, and migration](save-format-and-migration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
+  - Context: [Save format, versioning, and migration](architecture/save-format-and-migration.md) · [Authoritative save boundary](architecture/authoritative-save-boundary.md)
 
 - [x] **TASK-034: Integrate clean-session economy and transport with entity lifecycle**
   - Added a generic immutable new-game economy seed and private session-owned
@@ -1437,13 +1446,13 @@ the project-level **Near-term work** section above.
     disposal. The public session no longer accepts caller-owned construction
     processes or pending materialization workflows, completing aggregate
     admission for the save boundary defined by `TASK-014`.
-  - Context: [Entity lifecycle and explicit spawning](entity-lifecycle.md) · [Runtime orchestration](runtime-orchestration.md) · [Authoritative save boundary](authoritative-save-boundary.md)
+  - Context: [Entity lifecycle and explicit spawning](architecture/entity-lifecycle.md) · [Runtime orchestration](architecture/runtime-orchestration.md) · [Authoritative save boundary](architecture/authoritative-save-boundary.md)
 
 - [x] **TASK-031: Migrate Phase 1 logistics to hierarchical navigation**
   - Approved and implemented the explicit Mine, Refinery, and Shipyard mapping
     to systems, anchored facility and inventory entities, initial ships, and
     directional connector endpoints. See [Navigation and spatial
-    architecture](navigation-architecture.md#approved-phase-1-acceptance-mapping).
+    architecture](architecture/navigation-architecture.md#approved-phase-1-acceptance-mapping).
   - Added opaque `ILogisticsNavigation` reachability and duration estimates.
     Assignment and transport no longer inspect, retain, or schedule `RouteId`
     graph legs; the Phase 1 test fixture now uses hierarchical navigation.
@@ -1454,7 +1463,7 @@ the project-level **Near-term work** section above.
   - Phase 1 remains a test-only whole-simulation acceptance fixture. Its former
     CLI entrypoint and `baseline.phase-one` benchmark are retired. `TASK-034`
     completed clean-session economic and transport composition.
-  - Context: [Navigation and spatial architecture](navigation-architecture.md)
+  - Context: [Navigation and spatial architecture](architecture/navigation-architecture.md)
 
 - [x] **TASK-039: Cancel removed-entity movement events from the agenda**
   - Active local motion and connector transit retain their scheduled completion
@@ -1466,7 +1475,7 @@ the project-level **Near-term work** section above.
     deterministic no-ops.
   - Added focused agenda identity and sequence tests plus local-motion and
     connector-transit removal continuation coverage.
-  - Context: [Authoritative save boundary](authoritative-save-boundary.md#agenda-cancellation-for-entity-removal) · [Entity lifecycle and explicit spawning](entity-lifecycle.md)
+  - Context: [Authoritative save boundary](architecture/authoritative-save-boundary.md#agenda-cancellation-for-entity-removal) · [Entity lifecycle and explicit spawning](architecture/entity-lifecycle.md)
 
 - [x] **TASK-014: Define the authoritative save boundary**
   - Defined complete authoritative checkpoint inventory, completed-commit
@@ -1480,7 +1489,7 @@ the project-level **Near-term work** section above.
     catalogs and saved content-reference migration remain in `TASK-037`.
     Future domain owners must supply their own authoritative sections before
     they participate in a supported saved session.
-  - Context: [Authoritative save boundary](authoritative-save-boundary.md) · [Relational simulation architecture § Authoritative relationship save inventory](relational-simulation-architecture.md#authoritative-relationship-save-inventory)
+  - Context: [Authoritative save boundary](architecture/authoritative-save-boundary.md) · [Relational simulation architecture § Authoritative relationship save inventory](systems/relational-simulation-architecture.md#authoritative-relationship-save-inventory)
 
 - [x] **TASK-013: Define pause, speed, and input timing**
   - Defined quiescent input boundaries, immediate paused command commit,
@@ -1493,7 +1502,7 @@ the project-level **Near-term work** section above.
     of the prior speed.
   - Implementation remains in `TASK-038`; completed `TASK-016` supplies the
     dialogue classification and continuity contract.
-  - Context: [Time and pacing](time-and-pacing.md)
+  - Context: [Time and pacing](application/time-and-pacing.md)
 
 - [x] **TASK-012: Translate relational gameplay into simulation architecture**
   - Added `PrincipalId` identity, configurable directional standing, canonical
@@ -1509,7 +1518,7 @@ the project-level **Near-term work** section above.
     atomic restoration contract for `TASK-014`. Save encoding was completed by
     `TASK-022`, content-reference migration remains `TASK-037`, and gameplay
     policy remains with its owning domains, including piracy in `TASK-036`.
-  - Context: [Relational gameplay model](factions.md) · [Relational simulation architecture](relational-simulation-architecture.md)
+  - Context: [Relational gameplay model](systems/factions.md) · [Relational simulation architecture](systems/relational-simulation-architecture.md)
 
 - [x] **TASK-035: Define the relational gameplay model**
   - Established the independent-trader starting position, provisional power
@@ -1523,7 +1532,7 @@ the project-level **Near-term work** section above.
     boundaries without selecting implementation types or storage.
   - Piracy-specific attribution and relationship design remains in `TASK-036`;
     simulation architecture was completed in `TASK-012`.
-  - Context: [Relational gameplay model](factions.md)
+  - Context: [Relational gameplay model](systems/factions.md)
 
 - [x] **TASK-011: Define entity lifecycle and explicit spawning**
   - Added session-wide entity identity, prepared setup registration, explicit
@@ -1537,7 +1546,7 @@ the project-level **Near-term work** section above.
     stale scheduled-event handling, presentation resolution, and removal facts.
   - Clean-session economic and transport owner cleanup was completed by
     `TASK-034`; legacy spatial migration was completed by `TASK-031`.
-  - Context: [Entity lifecycle and explicit spawning](entity-lifecycle.md)
+  - Context: [Entity lifecycle and explicit spawning](architecture/entity-lifecycle.md)
 
 - [x] **TASK-010: Generalize presentation snapshots**
   - Added immutable presentation request, selection, and snapshot read models
@@ -1552,7 +1561,7 @@ the project-level **Near-term work** section above.
     clear its bounded local fact feed and remain visible in status.
   - Group commands remain in `TASK-033`; generic non-ship selection follows
     entity lifecycle work in `TASK-011`.
-  - Context: [Presentation snapshots](presentation-snapshots.md)
+  - Context: [Presentation snapshots](architecture/presentation-snapshots.md)
 
 - [x] **TASK-009: Establish production runtime systems and retire `PhaseOneRuntime`**
   - Added fixed actor and economic coordinators, stable read/evaluate batches,
@@ -1566,7 +1575,7 @@ the project-level **Near-term work** section above.
   - Entity lifecycle completed in `TASK-011`; legacy-location navigation
     migration completed in `TASK-031`, and semantic economy facts remain in
     `TASK-032`.
-  - Context: [Runtime orchestration and domain ownership](runtime-orchestration.md)
+  - Context: [Runtime orchestration and domain ownership](architecture/runtime-orchestration.md)
 
 - [x] **TASK-001: Define deterministic same-time processing**
   - The engine drains explicit physical-completion, state-update, and decision
@@ -1574,7 +1583,7 @@ the project-level **Near-term work** section above.
     timestamp before honoring a stop condition.
   - Same-time work may target the current or a later phase but cannot reopen a
     completed phase.
-  - Context: [Gameplay integration §1.1 and §2.1](gameplay-integration.md#11-same-time-event-ordering-does-not-provide-a-complete-phase-barrier)
+  - Context: [Gameplay integration §1.1 and §2.1](architecture/gameplay-integration.md#11-same-time-event-ordering-does-not-provide-a-complete-phase-barrier)
 
 - [x] **TASK-002: Define the gameplay command contract**
   - Gameplay intent is distinct from scheduled events and receives deterministic
@@ -1582,7 +1591,7 @@ the project-level **Near-term work** section above.
   - Source attribution supports player, autonomous, dialogue, and script
     callers without authentication or multiplayer-authority semantics.
   - Persistent-session integration was completed by `TASK-003`.
-  - Context: [Gameplay integration §1.2 and §2.2](gameplay-integration.md#12-there-is-no-general-gameplay-command-boundary)
+  - Context: [Gameplay integration §1.2 and §2.2](architecture/gameplay-integration.md#12-there-is-no-general-gameplay-command-boundary)
 
 - [x] **TASK-003: Introduce a persistent game-session facade**
   - `GameSession` accepts and records gameplay commands, advances without a
@@ -1591,7 +1600,7 @@ the project-level **Near-term work** section above.
   - `PhaseOneScenario` remains isolated under the test project's `Acceptance/`
     directory as a bounded regression harness.
   - Ordered semantic facts were completed by `TASK-008`.
-  - Context: [Gameplay integration §1.2, §1.7, and §2.3](gameplay-integration.md#12-there-is-no-general-gameplay-command-boundary)
+  - Context: [Gameplay integration §1.2, §1.7, and §2.3](architecture/gameplay-integration.md#12-there-is-no-general-gameplay-command-boundary)
 
 - [x] **TASK-004: Separate setup authority from runtime mutation**
   - `SimulationWorld` is internal and can only be created through a one-use
@@ -1600,7 +1609,7 @@ the project-level **Near-term work** section above.
     world; callers use snapshots, stable identifiers, commands, and records.
   - Rejected-command tests prove authoritative snapshot, event, and decision
     state remains unchanged.
-  - Context: [Gameplay integration §1.3 and §2.4](gameplay-integration.md#13-authoritative-state-is-publicly-mutable)
+  - Context: [Gameplay integration §1.3 and §2.4](architecture/gameplay-integration.md#13-authoritative-state-is-publicly-mutable)
 
 - [x] **TASK-005: Implement the first interactive ship order**
   - `GameSession` now owns a clean application runtime rather than the Phase 1
@@ -1614,7 +1623,7 @@ the project-level **Near-term work** section above.
     with right-click, and displays the order, reason, destination, and motion.
   - Queues, controller changes, and the broader lifecycle were completed by
     `TASK-006`; semantic facts were completed by `TASK-008`.
-  - Context: [Gameplay integration §2.3, §2.9, and §3.2](gameplay-integration.md#23-introduce-a-persistent-game-session-facade)
+  - Context: [Gameplay integration §2.3, §2.9, and §3.2](architecture/gameplay-integration.md#23-introduce-a-persistent-game-session-facade)
 
 - [x] **TASK-006: Define actor control and order lifecycle**
   - Actors now have explicit player or autonomous base controllers, exact
@@ -1640,7 +1649,7 @@ the project-level **Near-term work** section above.
     top of the actor cleanup boundary.
   - The current runtime still does not execute long-running scripted behavior;
     scheduling, checkpointing, and persistence remain in `TASK-017`.
-  - Context: [Actor control and order lifecycle](actor-control-and-orders.md)
+  - Context: [Actor control and order lifecycle](systems/actor-control-and-orders.md)
 
 - [x] **TASK-007: Complete scheduled-event cancellation and invalidation**
   - Production, construction, and transport activities advance generations
@@ -1651,7 +1660,7 @@ the project-level **Near-term work** section above.
   - Actor movement and order cancellation apply this contract through
     `TASK-006`; `TASK-008` completed semantic cancellation facts, and
     `TASK-011` completed entity-removal invalidation.
-  - Context: [Gameplay integration §1.5 and §2.6](gameplay-integration.md#15-scheduled-work-has-an-incomplete-cancellation-contract)
+  - Context: [Gameplay integration §1.5 and §2.6](architecture/gameplay-integration.md#15-scheduled-work-has-an-incomplete-cancellation-contract)
 
 - [x] **TASK-008: Introduce semantic game facts**
   - `GameSession` exposes typed, immutable facts with one monotonic session
@@ -1666,7 +1675,7 @@ the project-level **Near-term work** section above.
     restoration, connector traversal, stale events, retention, and incremental
     advancement. Presentation consumption completed in `TASK-010`; persistent
     scripts remain in `TASK-017`, and save boundaries in `TASK-014`.
-  - Context: [Semantic game facts](semantic-game-facts.md)
+  - Context: [Semantic game facts](architecture/semantic-game-facts.md)
 
 - [x] **TASK-024: Establish scale, performance, and concurrency targets**
   - Accepted reference and stress envelopes include galaxy-wide and
@@ -1681,7 +1690,7 @@ the project-level **Near-term work** section above.
   - The canonical Release full suite passed all five committed digests across
     repeated iterations on 2026-07-28. Concurrent worker-count and long-running
     suites remain future work under `TASK-029`.
-  - Context: [Scale targets and benchmark architecture](scale-and-benchmark-targets.md)
+  - Context: [Scale targets and benchmark architecture](validation/scale-and-benchmark-targets.md)
 
 - [x] **TASK-028: Establish hierarchical system-space navigation**
   - Added typed systems and local positions, position and system destinations,
@@ -1694,7 +1703,7 @@ the project-level **Near-term work** section above.
     non-interruptible, and replacement orders wait and wake on emergence.
   - Runtime connector availability and access remain in `TASK-030`; `TASK-011`
     completed entity destinations, and Phase 1 migration completed in `TASK-031`.
-  - Context: [Navigation and spatial architecture](navigation-architecture.md)
+  - Context: [Navigation and spatial architecture](architecture/navigation-architecture.md)
 
 - [x] **DONE-001: Establish the project vision and modular design documents**
   - The project defines a persistent, map-command, materially causal,

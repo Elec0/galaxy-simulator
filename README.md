@@ -4,53 +4,13 @@ Galaxy Command is a working title for a 2D space simulation and command game. Th
 
 The central goal is a persistent, understandable galaxy in which ships, stations, production, trade, and faction actions have material causes. Minimal graphics keep the focus on the simulation rather than piloting or navigating a 3D environment.
 
-## Design documents
+## Documentation
 
-- [Vision and principles](docs/vision.md)
-- [Player experience](docs/player-experience.md)
-- [Simulation architecture](docs/simulation-architecture.md)
-- [Source-code organization](docs/source-code-organization.md)
-- [Runtime orchestration and domain ownership](docs/runtime-orchestration.md)
-- [Navigation and spatial architecture](docs/navigation-architecture.md)
-- [Authoritative system-local coordinate scale](docs/system-local-coordinate-scale.md)
-- [Ship thrust, maneuver kinematics, and short moves](docs/ship-maneuver-kinematics.md)
-- [Moving-ship interaction architecture](docs/moving-ship-interactions.md)
-- [Combat activation and movement handoff](docs/combat-activation.md)
-- [Actor control and order lifecycle](docs/actor-control-and-orders.md)
-- [Individual NPC scope](docs/individual-npc-scope.md)
-- [Dialogue state and presentation](docs/dialogue.md)
-- [Fog-of-war and scouting](docs/fog-of-war-and-scouting.md)
-- [Sensor deployables and placement lifecycle](docs/sensor-deployables.md)
-- [Deterministic randomness and stream ownership](docs/deterministic-randomness.md)
-- [Semantic game facts](docs/semantic-game-facts.md)
-- [Presentation snapshots](docs/presentation-snapshots.md)
-- [Application shell and map experience](docs/application-shell-and-map-experience.md)
-- [Entity lifecycle and explicit spawning](docs/entity-lifecycle.md)
-- [Authoritative save boundary](docs/authoritative-save-boundary.md)
-- [Save format, versioning, and migration](docs/save-format-and-migration.md)
-- [Save slots, autosave, and local preferences](docs/save-slots-and-local-preferences.md)
-- [Gameplay content and static new-game composition](docs/gameplay-content.md)
-- [Generalized inventory and cargo](docs/inventory-and-cargo.md)
-- [Shared cargo disposition and collection](docs/cargo-disposition-and-collection.md)
-- [Equipment and ship slots](docs/equipment-and-ship-slots.md)
-- [Ship and fleet balance direction: VRO reference](docs/ship-and-fleet-balance.md)
-- [Internationalization and localization](docs/internationalization-and-localization.md)
-- [Accessibility](docs/accessibility.md)
-- [Planned game-system inventory](docs/planned-systems.md)
-- [Concurrency and performance architecture](docs/concurrency-and-performance.md)
-- [Scale targets and benchmark architecture](docs/scale-and-benchmark-targets.md)
-- [Economy and production](docs/economy.md)
-- [Station composition, construction, and expansion](docs/stations.md)
-- [Relational gameplay model](docs/factions.md)
-- [Relational simulation architecture](docs/relational-simulation-architecture.md)
-- [Time and pacing](docs/time-and-pacing.md)
-- [Technical direction](docs/technical-direction.md)
-- [Gameplay integration issues and decisions](docs/gameplay-integration.md)
-- [Project task list](docs/task-list.md)
-- [Initial roadmap](docs/roadmap.md)
-- [Phase 1 simulation specification](docs/phase-1-simulation-spec.md)
+- [Documentation index](docs/README.md): grouped designs, architecture, and validation evidence
+- [Project task list](docs/task-list.md): current priorities and implementation status
+- [Vision and principles](docs/direction/vision.md): the game's goals and boundaries
 
-These documents are an early design draft. Names, quantities, formulas, and technology choices remain open unless explicitly identified as requirements.
+Development and verification instructions follow below.
 
 ## C# development
 
@@ -137,38 +97,38 @@ dotnet run -c Release --project benchmarks/GalaxyCommand.Benchmarks -- \
   --suite full --scenario-file benchmarks/scenarios/example.interaction-dense.json
 ```
 
-The [initial proximity measurements](docs/interaction-performance-baseline.md)
+The [initial proximity measurements](docs/validation/interaction-performance-baseline.md)
 record the timed scope, machine details, and reference/prepared comparisons.
 Add `--preset interaction.prepared-proximity` to the sparse command to compare
 immutable per-view geometry and scope preparation with identical fixtures.
 
 Benchmark-only spatial-index prototypes are compared in
-[Spatial interaction index measurements](docs/interaction-index-comparison.md).
+[Spatial interaction index measurements](docs/validation/interaction-index-comparison.md).
 Use `interaction.index-scan`, `interaction.index-grid`, and
 `interaction.index-hierarchy` together with `--suite full` for matching
 two-dimensional fixtures. The sibling `interaction.swept-scan`,
 `interaction.swept-grid`, and `interaction.swept-hierarchy` presets compare
-[long sweeps and analytic bounds](docs/interaction-swept-index-comparison.md).
+[long sweeps and analytic bounds](docs/validation/interaction-swept-index-comparison.md).
 These prototype presets retain their experimental wrappers. Use
 `interaction.runtime-scan`, `interaction.runtime-grid`, and
 `interaction.runtime-hierarchy` for the matching fixtures through the public
-instant-query API. [Public API measurements](docs/interaction-runtime-index-measurements.md)
+instant-query API. [Public API measurements](docs/validation/interaction-runtime-index-measurements.md)
 record preparation/query amortization and allocation. Runtime scan remains the
 default; callers must explicitly select and tune an index. The sibling
 `interaction.runtime-swept-scan`, `interaction.runtime-swept-grid`, and
 `interaction.runtime-swept-hierarchy` presets exercise real movement captures
-and next-boundary clipping. [Public swept measurements](docs/interaction-runtime-swept-measurements.md)
+and next-boundary clipping. [Public swept measurements](docs/validation/interaction-runtime-swept-measurements.md)
 record linear and mixed-maneuver comparisons. Use the matching
 `interaction.batch-swept-*` presets with explicit `workerCount` and `batchSize`
-overrides for [pure batch measurements](docs/interaction-batch-measurements.md).
+overrides for [pure batch measurements](docs/validation/interaction-batch-measurements.md).
 `interaction.session-serial` and `interaction.session-batched` exercise
-[advancing-session throughput and invalidation churn](docs/interaction-session-measurements.md)
+[advancing-session throughput and invalidation churn](docs/validation/interaction-session-measurements.md)
 with serial domain callbacks and effects.
 
 Timing, allocation, and memory results are informational. Canonical digests,
 repeated-run agreement, semantic counts, and simulation invariants are enforced.
 The accepted benchmark contract and scale envelopes are documented in
-[Scale targets and benchmark architecture](docs/scale-and-benchmark-targets.md).
+[Scale targets and benchmark architecture](docs/validation/scale-and-benchmark-targets.md).
 
 ## Godot graphics client
 
