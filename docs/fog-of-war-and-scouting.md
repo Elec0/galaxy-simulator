@@ -38,6 +38,12 @@ stage 1, then approved stage 2, decisions S1 through S9, and the proposed 10 km
 content radii. Those approvals authorize ship observation implementation. They
 do not complete the full ship, station, and deployable acceptance scope.
 
+On 2026-10-29 the owner completed TASK-057's [station design](stations.md),
+including observable exterior fields, module targeting handles, sensor
+composition, lifecycle, and checkpoint contracts. This resolves the station
+design gap identified above. TASK-105 still owns concrete station runtime;
+TASK-073 station integration remains pending that implementation.
+
 ### Approved stages and completion boundaries
 
 | Stage | Deliverable | Evidence required to finish the stage |

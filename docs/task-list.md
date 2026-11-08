@@ -26,10 +26,60 @@ source of detailed scope and acceptance criteria.
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` completed the [equipment and ship-slot design](equipment-and-ship-slots.md); `TASK-099` owns implementation. `TASK-055` owns trade balance, pricing, and settlement design. |
 | Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract; `TASK-075` completed deployment and pickup range and action-order design. `TASK-095` completed deployable runtime, range orders, committed observation inputs and checkpoint continuity; `TASK-106` completed independent ship-definition retention. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. `TASK-071` completed shared interaction discovery, timing, deterministic evaluation, and explicit motion handoffs. | `TASK-068` defined installed-equipment capability contributions; `TASK-099` implements them; `TASK-046` retains frozen combat design and `TASK-103` tracks combat activation and active-domain continuation. `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-107` owns player deployment/pickup controls, `TASK-094` owns player order-failure notifications, and `TASK-088` retains late-term spatial authoring guidance. |
+| Stations | `TASK-057` completed the [station design](stations.md), including composition, construction, expansion, loss accounting, lifecycle, observation, and persistence. | `TASK-105` implements stations; `TASK-073` integrates observation; `TASK-108` owns cargo recovery and collection; `TASK-109` retains future ownership changes. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 | Source-code organization | `TASK-091` reorganized source and tests around the documented simulation authority, client presentation, deterministic execution, and test-harness boundaries without changing simulation behavior or public type identity. | Further namespace or assembly changes require measured need and separately approved work. |
 
 ## Current focus
+
+- [ ] **TASK-108: Design and implement shared cargo disposition and collection**
+  - Design begun at the owner's request on 2026-10-29. Accepted gameplay covers
+    cause-dependent survival (initial destruction recovery 50% floored per type
+    per causal commit), unclaimed identity-preserving cargo, deterministic scatter,
+    merged destruction fields, timed object/field collection, live-only coverage,
+    and expiry. Exact rules and initial values are in the design.
+  - Integrate station storage loss and base destruction with TASK-105, including
+    fields for storage-module loss while the station survives. Prepare inventory
+    removal, object publication, commitments, facts, and persistence atomically.
+  - Include collection commands and map controls. Voluntary-ejection commands
+    and controls remain TASK-110; installed-equipment disposition remains TASK-096.
+  - Accepted terminal rules: partial object pickup succeeds; no room fails;
+    targets taken by another ship fail object orders or advance field orders.
+    Merged fields never split; expiry destroys remaining cargo without outputs.
+  - Design completed and approved by the owner on 2026-11-09, including
+    C01-C12, R01-R09 as drafted, and R10's closing behavior. Implementation
+    remains pending. Deliver the full approved runtime, controls, content,
+    checkpoints, deterministic proof, and live station-to-collection integration
+    under R09; retain serial-reference and worker/batch equivalence checks.
+  - Context: [Cargo disposition and collection design](cargo-disposition-and-collection.md) · [Station cargo disposition](stations.md#shared-cargo-disposition-policy) · [Inventory and cargo](inventory-and-cargo.md)
+
+- [ ] **TASK-105: Implement the approved station entity runtime**
+  - Promoted by the project owner on 2026-10-29. Started independent exact
+    construction and storage-loss calculations under Q49 and R01. These are
+    internal, pure evaluators, not a live station domain. The owner directed
+    independent work to proceed and to stop at TASK-108's cargo-disposition
+    dependency. TASK-108 design is now approved; live cargo loss/removal still
+    awaits its shared runtime objects and transactions.
+  - Added greatest-affordable incremental construction consumption, exact
+    threshold/overflow-credit calculations, and whole-unit overflow counts.
+    All 36 focused tests pass, including exhaustive small affordability cases,
+    every update partition of a sample recipe, and arithmetic boundary values.
+    All 1,629 Release solution tests and the solution/Godot C# build pass with
+    zero build warnings. Runtime delivery and R05 proof remain incomplete.
+    See [initial implementation](stations.md#initial-arithmetic-implementation-2026-10-29).
+  - TASK-057 completed design approval on 2026-10-29. Implement its full accepted
+    station identity, composition, shared inventory/facility links, construction,
+    builder assignments, upgrades, dismantling, protected capacity, cargo-loss
+    accounting, authority, lifecycle, facts, checkpoints, and explicit scenario
+    conversion. Follow Q01-Q58 and R01-R05 without inventing missing policy.
+  - Supply concrete stationary sources/targets and typed observable views for
+    TASK-073. Preserve explicit station sensor contributions and private fields.
+  - Coordinate recoverable cargo with TASK-108; do not substitute placeholder
+    objects or silently discard configured ejection. Service-provider hooks do
+    not implement deferred trade, docking, repair, combat, or refitting domains.
+  - Meet R05's full proof boundary, including serial-reference determinism,
+    worker/batch comparisons before concurrency, and appropriate benchmarks.
+  - Context: [Accepted station contract](stations.md#accepted-technical-contract) · [Fog-of-war stages](fog-of-war-and-scouting.md#approved-stages-and-completion-boundaries)
 
 - [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
   - Resumed by the owner on 2026-10-26 and implemented the deployable portion:
@@ -131,6 +181,22 @@ source of detailed scope and acceptance criteria.
 
 ## Future parking lot
 
+- [ ] **TASK-110: Design and implement voluntary cargo-ejection commands and controls**
+  - Deferred by the owner during TASK-108 review on 2026-10-29. Define player
+    selection, authorization, quantities/instances, reservation handling, and
+    atomic ejection through commands and map controls. Successful ejection by a
+    functional entity preserves cargo fully and creates standalone collectible
+    objects, without a destruction field. Reuse TASK-108's shared cargo contract.
+  - Context: [Cargo disposition and collection](cargo-disposition-and-collection.md)
+
+- [ ] **TASK-109: Define station capture and ownership transfer**
+  - Added by owner approval during TASK-057 review. Define voluntary transfer
+    and capture eligibility, authority, and atomic ownership changes across
+    station modules, inventory custody, projects, builder assignments, service
+    access, external commitments, and observation. Do not infer rights from
+    faction standing or add transfer behavior to the initial station runtime.
+  - Context: [Station design](stations.md) · [Territory and political expansion](task-list.md#far-term)
+
 - [ ] **TASK-107: Design and implement player deployment/pickup controls**
   - The owner selected runtime/content integration first for TASK-095. Define
     and review the player interaction before implementing deployable selection,
@@ -138,16 +204,6 @@ source of detailed scope and acceptance criteria.
     Player order-failure notification remains TASK-094, and observation remains
     TASK-073. This task is not part of TASK-095's runtime delivery.
   - Context: [Initial deployable delivery](sensor-deployables.md#initial-content-adaptation-and-delivery)
-
-- [ ] **TASK-105: Implement the approved station entity runtime**
-  - Begin after `TASK-057` settles station composition and lifecycle design.
-    Implement its approved identity, ownership, creation/removal, observable
-    state, and checkpoint contracts; do not treat existing economic facilities
-    as stations or select missing station policy inside `TASK-073`.
-  - Supply concrete stationary source/target inputs and typed observable views
-    for `TASK-073` stages 3 and 4. Sensor capability and observable fields must
-    come from the approved station design, without inheriting ship tuning.
-  - Context: [Station design ownership](#mid-term) · [Fog-of-war stages](fog-of-war-and-scouting.md#approved-stages-and-completion-boundaries)
 
 
 - [ ] **TASK-103: Implement combat activation and active-domain continuation**
@@ -653,22 +709,6 @@ the project-level **Near-term work** section above.
     completed `TASK-020`, and economic facts with `TASK-032`.
   - Context: [Player experience](player-experience.md) · [Economy](economy.md) · [Factions](factions.md)
 
-- [ ] **TASK-057: Define station composition, construction, and expansion**
-  - Define persistent facilities composed from storage, production, trade,
-    repair, construction, defense, and service capabilities, with explicit
-    content identity and authoritative ownership.
-  - Define how station construction and expansion consume material and work,
-    choose location, allocate identity, change regional capacity, handle
-    interruption or removal, and join commands, facts, snapshots, and saves.
-  - Station refit/reclamation service design is tracked in `TASK-097`, using
-    the shared equipment vocabulary without putting station details in `TASK-068`.
-    Runtime implementation of the approved entity contract is tracked by
-    `TASK-105`; this task retains station design ownership.
-  - Begin after `TASK-068` defines installed equipment; completed `TASK-063`
-    supplies content catalogs. Coordinate docking with `TASK-051`, territory with
-    `TASK-059`, and strategic construction with `TASK-026`.
-  - Context: [Vision](vision.md) · [Player experience](player-experience.md) · [Economy](economy.md) · [Entity lifecycle](entity-lifecycle.md)
-
 ### Far term
 
 - [ ] **TASK-081: Define reduced-motion behavior for concrete visual effects**
@@ -839,6 +879,17 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application-shell-and-map-experience.md) · [Fog-of-war and scouting](fog-of-war-and-scouting.md) · [Gameplay content](gameplay-content.md) · [Presentation snapshots](presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-057: Define station composition, construction, and expansion**
+  - Completed owner design review on 2026-10-29, accepting Q01-Q58 and R01-R05
+    in the [station design](stations.md). Defined persistent identity and modules,
+    shared inventory, construction/expansion, upgrades/dismantling, capacity safety,
+    proportional cargo loss with a configurable 1% cutoff, authority, sensors,
+    observation, atomic lifecycle commits, deterministic work, and persistence.
+  - TASK-105 implements the full accepted contract; TASK-073 integrates station
+    observation. TASK-108 owns shared cargo ejection/collection, TASK-109 future
+    capture/ownership transfer, and TASK-097 refit/reclamation services.
+  - Context: [Station design](stations.md)
 
 - [x] **TASK-104: Reconcile the connector-navigation benchmark expectation**
   - Completed on 2026-10-26 after owner review of the historical investigation.
