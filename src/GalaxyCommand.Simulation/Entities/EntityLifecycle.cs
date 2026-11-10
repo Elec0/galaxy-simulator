@@ -330,6 +330,7 @@ internal sealed record PreparedEntityRemoval(
     EntityRemovalRequest Request,
     ShipId ShipId,
     InventoryId CargoInventoryId,
+    Inventory Cargo,
     IReadOnlyList<TargetedShipOrder> InboundOrders);
 
 internal abstract record EntityRemovalPreparation
@@ -669,6 +670,8 @@ internal sealed partial class EntityLifecycleOwner
             ? CheckpointResult<EntityLifecycleOwner>.Success(restored)
             : CheckpointResult<EntityLifecycleOwner>.Rejected(cargoFailure);
     }
+
+    internal GameSessionShip? GetShip(ShipId shipId) => _ships.Get(shipId);
 
     internal GameSessionShip GetRequiredShip(ShipId shipId) =>
         _ships.Get(shipId)
@@ -1199,9 +1202,10 @@ internal sealed partial class EntityLifecycleOwner
         return new ConstructionMaterializationCommit(result, WasApplied: true);
     }
 
+    /// <summary>Admits removal only when every departing commitment has an exact prepared release.</summary>
     internal EntityRemovalPreparation PrepareRemoval(
         EntityRemovalRequest request,
-        bool permitOwnerReleasedCommitments)
+        IReadOnlyList<InventoryCommitmentRelease>? commitmentReleases = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (_removalReceipts.TryGetValue(request.EntityId, out EntityRemovalResult.Removed? receipt))
@@ -1240,7 +1244,7 @@ internal sealed partial class EntityLifecycleOwner
                     EntityRemovalRejectionReason.OwnerConflict));
         }
 
-        if (cargo.HasCommitments && !permitOwnerReleasedCommitments)
+        if (!cargo.HasExactReleaseCoverage(commitmentReleases ?? []))
         {
             return new EntityRemovalPreparation.Resolved(
                 new EntityRemovalResult.Rejected(
@@ -1253,8 +1257,16 @@ internal sealed partial class EntityLifecycleOwner
                 request,
                 shipId,
                 ship.CargoInventoryId,
+                cargo,
                 _orders.PrepareTargetRemoval(request.EntityId, shipId)));
     }
+
+    /// <summary>Revalidates departing inventory identity and release coverage before any owner mutation.</summary>
+    internal bool CanCommitRemoval(PreparedEntityRemoval removal, IReadOnlyList<InventoryCommitmentRelease> releases) =>
+        _entities.GetShipId(removal.Request.EntityId) == removal.ShipId
+        && _ships.Get(removal.ShipId)?.CargoInventoryId == removal.CargoInventoryId
+        && ReferenceEquals(_inventories.Get(removal.CargoInventoryId), removal.Cargo)
+        && removal.Cargo.HasExactReleaseCoverage(releases);
 
     internal EntityRemovalResult ApplyRemoval(
         PreparedEntityRemoval removal,

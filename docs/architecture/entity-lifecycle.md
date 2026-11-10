@@ -313,6 +313,58 @@ only through the private session-owned construction process and shared agenda;
 the public session boundary accepts no external workflow owner. `GameSession`
 is therefore the complete aggregate required for later checkpoint encoding.
 
+### Exact commitment-release admission (TASK-115)
+
+Actor removal requires an explicit prepared release for every material,
+capacity, and physical reservation in the departing inventory. An economy
+owner's presence alone grants no permission to remove committed cargo. Unknown,
+uncovered, duplicate, or mismatched claims reject before agenda cancellation,
+economic cleanup, order invalidation, or lifecycle mutation.
+
+The economy owner prepares every nonterminal transport job referencing the
+ship or its cargo inventory in stable job order. Each cancellation retains
+its exact source and destination inventories, job state and generation,
+freighter assignment, accounting inputs, and actual reservation references.
+Source releases must match inventory, identity, owner, material, and quantity.
+A loaded job has already consumed its source reservation; an unloading job
+must retain its exact destination capacity reservation. Reusing a reservation
+identity with equal values does not preserve an old release proof.
+
+Preparation validates generation advancement, referenced inventories, and
+restored demand and supply arithmetic. Shared accounting is checked for the
+whole cancellation batch, so individually valid additions cannot conceal an
+aggregate overflow. Release claims must correspond exactly to the prepared
+cancellations; a plan cannot append a claim for an unrelated workflow.
+
+```mermaid
+flowchart LR
+    prepare["Prepare transport releases"] --> coverage["Match all departing commitments"]
+    coverage --> movement["Prepare exact movement cancellations"]
+    movement --> check["Revalidate all prepared participants"]
+    check --> commit["Commit agenda, economy, orders, and lifecycle"]
+```
+
+The session revalidates inventory identity, exhaustive coverage, transport
+participants, and the complete referencing-job set before its first agenda
+cancellation. Preparation and rejection allocate no simulation identities or
+sequences and leave cargo, agenda, economy, orders, facts, and session health
+unchanged. Commit retains the serial reference path and stable job ordering;
+no worker scheduling determines which reservations are released. Unexpected
+post-admission economic failures retain the existing poisoned-session guard.
+
+Regression coverage includes unsupported material, capacity, and physical
+commitments, mixed covered and uncovered claims, duplicate claims, reservation
+identity reuse, source and destination mismatches, generation and accounting
+exhaustion, stale transport participants, valid loaded-job cancellation, and
+session rejection that preserves a collecting actor's pending work and later
+successful collection.
+
+TASK-108 retains collection actor-removal integration. Its exact prepared
+attempt cancellation can supply a physical reservation release when that
+cleanup joins this boundary. Until then, collection commitments reject actor
+removal. Production, construction, and orphan reservations likewise require an
+actual prepared release; their owner labels cannot authorize removal.
+
 ## Facts, snapshots, and commands
 
 Successful transitions propose lifecycle facts after component commit:

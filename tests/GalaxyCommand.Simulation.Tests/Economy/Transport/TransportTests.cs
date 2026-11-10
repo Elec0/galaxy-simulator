@@ -453,6 +453,35 @@ public sealed class TransportTests
         Assert.Equal(new LocationId(1), fixture.Freighter.LocationId);
     }
 
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("owner")]
+    [InlineData("quantity")]
+    [InlineData("material")]
+    public void RemovalPreparationRejectsSourceReservationThatDoesNotMatchJob(string mismatch)
+    {
+        TransportFixture fixture = CreateFixture();
+        TransportJobId jobId = PublishAndAssign(fixture);
+        TransportJob job = fixture.Board.GetJob(jobId)!;
+        Inventory source = fixture.Inventories.Get(fixture.SourceInventoryId)!;
+        source.Release(job.SourceReservationId);
+        if (mismatch != "missing")
+        {
+            MaterialId material = mismatch == "material" ? new(99) : fixture.Material;
+            if (mismatch == "material") source.Add(material, new(4));
+            source.Reserve(job.SourceReservationId, material,
+                mismatch == "quantity" ? new(1) : job.Quantity,
+                new ReservationOwner.TransportJob(mismatch == "owner" ? new(99) : job.Id));
+        }
+        InventoryCheckpoint before = source.CaptureCheckpoint();
+
+        Assert.False(fixture.Board.CanCancelForEntityRemoval(job, fixture.Freighter, fixture.Inventories));
+
+        Assert.Equal(before.Reservations, source.CaptureCheckpoint().Reservations);
+        Assert.Equal(jobId, fixture.Freighter.ActiveJobId);
+        Assert.Equal(TransportJobStatus.Assigned, job.Status);
+    }
+
     private static TransportJobId PublishAndAssign(TransportFixture fixture)
     {
         fixture.Board.PublishSupply(

@@ -71,7 +71,7 @@ public sealed class CargoCollectionAttemptCheckpointTests
         Fixture f = Create();
         Assert.True(f.Attempts.Cancel(new(2), new HashSet<EventKey>()));
         var removal = Assert.IsType<EntityRemovalPreparation.Prepared>(f.Lifecycle.PrepareRemoval(
-            new(new(2), EntityRemovalReason.Despawned, EntityCargoDisposition.DiscardCargo), false));
+            new(new(2), EntityRemovalReason.Despawned, EntityCargoDisposition.DiscardCargo)));
         Assert.IsType<EntityRemovalResult.Removed>(f.Lifecycle.ApplyRemoval(removal.Value, new(0)));
         CheckpointResult<CargoCollectionAttemptOwner> restored = Restore(f, new([new(new(2), new(1))], []));
         Assert.True(restored.IsSuccess, restored.Failure?.Message);

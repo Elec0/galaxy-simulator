@@ -114,38 +114,29 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     /// Applies a prepared entity removal, invalidates inbound entity-target
     /// orders, and commits their facts before the removal fact. Controlled motion on the
     /// removed actor or an inbound-order owner rejects before any affected owner mutates.
+    /// Every departing commitment requires an exact prepared release, revalidated
+    /// with its owner before the first movement agenda cancellation.
     /// </summary>
     internal EntityRemovalResult RemoveEntity(EntityRemovalRequest request)
     {
         ThrowIfUnhealthy();
         if (_lifecycle.IsSensorRemovalReference(request.EntityId)) return RemoveSensorEntity(request);
-        EntityRemovalPreparation preparation = _lifecycle.PrepareRemoval(
-            request,
-            permitOwnerReleasedCommitments: _economy is not null);
-        if (preparation is EntityRemovalPreparation.Resolved resolved)
-        {
-            return resolved.Value;
-        }
+        PreparedEconomyEntityRemoval? economyRemoval = null;
+        if (_economy is not null && _lifecycle.Entities.GetShipId(request.EntityId) is { } departingShip
+            && _lifecycle.GetShip(departingShip) is { } ship
+            && !_economy.TryPrepareEntityRemoval(departingShip, ship.CargoInventoryId, out economyRemoval))
+            return new EntityRemovalResult.Rejected(request, EntityRemovalRejectionReason.OwnerConflict);
 
-        PreparedEntityRemoval removal =
-            ((EntityRemovalPreparation.Prepared)preparation).Value;
+        IReadOnlyList<InventoryCommitmentRelease> releases = economyRemoval?.Releases ?? [];
+        EntityRemovalPreparation preparation = _lifecycle.PrepareRemoval(request, releases);
+        if (preparation is EntityRemovalPreparation.Resolved resolved) return resolved.Value;
+        PreparedEntityRemoval removal = ((EntityRemovalPreparation.Prepared)preparation).Value;
+
         // Removal also changes inbound orders. Protect every affected controlled
         // participant before any economy, agenda, order, or lifecycle commit.
         if (_movement.GetState(removal.ShipId) is ShipSpatialState.InteractionControlled ||
             removal.InboundOrders.Any(targeted => _movement.GetState(targeted.ShipId) is ShipSpatialState.InteractionControlled))
             return new EntityRemovalResult.Rejected(request, EntityRemovalRejectionReason.OwnerConflict);
-
-        PreparedEconomyEntityRemoval? economyRemoval = null;
-        if (_economy is not null
-            && !_economy.TryPrepareEntityRemoval(
-                removal.ShipId,
-                removal.CargoInventoryId,
-                out economyRemoval))
-        {
-            return new EntityRemovalResult.Rejected(
-                request,
-                EntityRemovalRejectionReason.OwnerConflict);
-        }
 
         EntityRemovalResult.Rejected? cancellationRejection =
             PrepareMovementCancellations(removal, out PreparedMovementCancellation[] cancellations);
@@ -153,6 +144,11 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         {
             return cancellationRejection;
         }
+
+        // Revalidate the whole batch before the first agenda cancellation.
+        if (!_lifecycle.CanCommitRemoval(removal, releases)
+            || economyRemoval is not null && !_economy!.CanCommitEntityRemoval(economyRemoval))
+            return new EntityRemovalResult.Rejected(request, EntityRemovalRejectionReason.OwnerConflict);
 
         foreach (PreparedMovementCancellation cancellation in cancellations)
         {

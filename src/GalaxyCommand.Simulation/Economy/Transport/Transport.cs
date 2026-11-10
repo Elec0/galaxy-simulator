@@ -300,7 +300,7 @@ public sealed class TransportIdSequences
 /// <summary>
 /// Central Phase 1 exchange for supply, demand, and assigned transport jobs.
 /// </summary>
-public sealed class TransportBoard
+public sealed partial class TransportBoard
 {
     private readonly SortedDictionary<SupplyOfferId, SupplyOffer> _supplies =
         new(EntityIdComparer<SupplyOfferId>.Instance);
@@ -920,33 +920,9 @@ public sealed class TransportBoard
         return true;
     }
 
-    internal bool CanCancelForEntityRemoval(
-        TransportJob job,
-        Freighter? freighter,
-        InventoryRegistry inventories)
-    {
-        ArgumentNullException.ThrowIfNull(job);
-        ArgumentNullException.ThrowIfNull(inventories);
-        if (job.Status is TransportJobStatus.Completed
-            or TransportJobStatus.FailedBeforeLoading
-            or TransportJobStatus.Cancelled)
-        {
-            return true;
-        }
-
-        if (freighter is null || freighter.ActiveJobId != job.Id
-            || inventories.Get(job.SourceInventoryId) is null
-            || !_demands.ContainsKey(job.DemandRequestId))
-        {
-            return false;
-        }
-
-        bool cargoLoaded = job.Status is TransportJobStatus.WaitingForRouteToDestination
-            or TransportJobStatus.TravelingToDestination
-            or TransportJobStatus.WaitingForDestinationCapacity
-            or TransportJobStatus.Unloading;
-        return cargoLoaded || _supplies.ContainsKey(job.SupplyOfferId);
-    }
+    /// <summary>Checks exact reservation and cancellation prerequisites without changing any owner.</summary>
+    internal bool CanCancelForEntityRemoval(TransportJob job, Freighter? freighter, InventoryRegistry inventories) =>
+        TryPrepareCancellationForEntityRemoval(job, freighter, inventories, out _);
 
     private TransportAssignmentCandidate? BestCandidate(
         Freighter freighter,

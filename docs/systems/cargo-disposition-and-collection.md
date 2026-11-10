@@ -206,8 +206,9 @@ reservation and cancel owned work. In-range admission preserves nonzero
 velocity through ordinary passive drag; collection does not freeze the ship.
 An exit waits for that committed motion before resuming approach. Its waiting
 state restores directly, and reentry starts a new full-duration attempt. Field reselection uses covered members,
-priority, distance, and identity. The actor-removal handoff remains paused on
-the commitment-release proof prerequisite recorded as TASK-115.
+priority, distance, and identity. Completed TASK-115 supplies exact commitment-release admission. Actor-removal
+collection cleanup remains under TASK-108 and must join its prepared attempt
+cancellation to that boundary before removal can release collection capacity.
 
 The player receives fresh covered cargo views and bounded inspection of its
 own active in-range pickup, including outside sensor coverage. Inspection

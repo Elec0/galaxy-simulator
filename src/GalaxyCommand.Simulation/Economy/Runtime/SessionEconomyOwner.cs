@@ -510,24 +510,73 @@ internal sealed class SessionEconomyOwner
                 || job.DestinationInventoryId == cargoInventoryId)
             .OrderBy(job => job.Id.Value)
             .ToArray();
+        prepared = null;
+        var cancellations = new List<PreparedTransportRemovalCancellation>();
         foreach (TransportJob job in jobs)
         {
-            Freighter? freighter = _ships.GetFreighter(job.ShipId);
-            if (!_transportBoard.CanCancelForEntityRemoval(
-                    job,
-                    freighter,
-                    _lifecycleInventories))
-            {
-                prepared = null;
-                return false;
-            }
+            if (!_transportBoard.TryPrepareCancellationForEntityRemoval(job, _ships.GetFreighter(job.ShipId),
+                _lifecycleInventories, out var cancellation)) return false;
+            cancellations.Add(cancellation!);
         }
 
-        prepared = new PreparedEconomyEntityRemoval(
-            shipId,
-            cargoInventoryId,
-            departingFreighter is not null,
-            jobs.Select(job => job.Id).ToArray());
+        var candidate = new PreparedEconomyEntityRemoval(this, shipId, cargoInventoryId,
+            departingFreighter, Array.AsReadOnly(cancellations.ToArray()),
+            Array.AsReadOnly(cancellations.SelectMany(cancellation => cancellation.Releases).ToArray()));
+        if (!CanCommitEntityRemoval(candidate)) return false;
+        prepared = candidate;
+        return true;
+    }
+
+    /// <summary>
+    /// Revalidates all transport participants and exhaustive departing coverage.
+    /// Shared demand and supply restoration is checked as one batch because
+    /// individually affordable additions may overflow in aggregate.
+    /// </summary>
+    internal bool CanCommitEntityRemoval(PreparedEconomyEntityRemoval prepared)
+    {
+        if (!ReferenceEquals(prepared.Owner, this)
+            || !prepared.Releases.SequenceEqual(prepared.Cancellations.SelectMany(cancellation => cancellation.Releases))
+            || !ReferenceEquals(_ships.GetFreighter(prepared.ShipId), prepared.Freighter)
+            || _lifecycleInventories.Get(prepared.CargoInventoryId) is not { } cargo
+            || !cargo.HasExactReleaseCoverage(prepared.Releases)
+            || prepared.Cancellations.Any(cancellation =>
+                !ReferenceEquals(_ships.GetFreighter(cancellation.Job.ShipId), cancellation.Freighter)
+                || !_transportBoard.CanCommitRemovalCancellation(cancellation, _lifecycleInventories))) return false;
+
+        // A stale plan cannot omit a newly referencing job or cancel one job twice.
+        TransportJobId[] currentJobs = _transportBoard.Jobs
+            .Where(job => job.Status is not (TransportJobStatus.Completed or TransportJobStatus.FailedBeforeLoading or TransportJobStatus.Cancelled))
+            .Where(job => job.ShipId == prepared.ShipId || job.SourceInventoryId == prepared.CargoInventoryId
+                || job.DestinationInventoryId == prepared.CargoInventoryId)
+            .Select(job => job.Id).OrderBy(id => id.Value).ToArray();
+        if (!currentJobs.SequenceEqual(prepared.Cancellations.Select(cancellation => cancellation.Job.Id))) return false;
+
+        var releaseKeys = new HashSet<(InventoryId, int, ulong)>();
+        foreach (InventoryCommitmentRelease release in prepared.Releases)
+        {
+            var key = release switch
+            {
+                InventoryCommitmentRelease.Material claim => (claim.Inventory.Id, 0, claim.Reservation.Id.Value),
+                InventoryCommitmentRelease.Capacity claim => (claim.Inventory.Id, 1, claim.Reservation.Id.Value),
+                InventoryCommitmentRelease.Physical claim => (claim.Inventory.Id, 2, claim.Reservation.Id.Value),
+                _ => throw new InvalidOperationException("Unknown commitment release kind."),
+            };
+            if (!releaseKeys.Add(key)) return false;
+        }
+
+        foreach (var group in prepared.Cancellations.GroupBy(cancellation => cancellation.Demand))
+        {
+            UInt128 restored = group.Key.Remaining.Units;
+            foreach (var cancellation in group) restored += cancellation.Job.Quantity.Units;
+            if (restored > ulong.MaxValue) return false;
+        }
+        foreach (var group in prepared.Cancellations.Where(cancellation => cancellation.Supply is not null)
+            .GroupBy(cancellation => cancellation.Supply!))
+        {
+            UInt128 restored = group.Key.Remaining.Units;
+            foreach (var cancellation in group) restored += cancellation.Job.Quantity.Units;
+            if (restored > ulong.MaxValue) return false;
+        }
         return true;
     }
 
@@ -538,8 +587,11 @@ internal sealed class SessionEconomyOwner
     internal void ApplyEntityRemoval(PreparedEconomyEntityRemoval prepared)
     {
         ArgumentNullException.ThrowIfNull(prepared);
-        foreach (TransportJobId jobId in prepared.TransportJobIds)
+        if (!CanCommitEntityRemoval(prepared))
+            throw new InvalidOperationException("Prepared economic removal changed before commit.");
+        foreach (PreparedTransportRemovalCancellation cancellation in prepared.Cancellations)
         {
+            TransportJobId jobId = cancellation.Job.Id;
             TransportJob job = _transportBoard.GetJob(jobId)
                 ?? throw new InvalidOperationException(
                     $"Prepared transport job {jobId} no longer exists.");
@@ -553,7 +605,7 @@ internal sealed class SessionEconomyOwner
             }
         }
 
-        if (prepared.RemoveFreighter && !_ships.RemoveFreighter(prepared.ShipId))
+        if (prepared.Freighter is not null && !_ships.RemoveFreighter(prepared.ShipId))
         {
             throw new InvalidOperationException(
                 $"Prepared freighter {prepared.ShipId} no longer exists.");
@@ -562,7 +614,9 @@ internal sealed class SessionEconomyOwner
 }
 
 internal sealed record PreparedEconomyEntityRemoval(
+    SessionEconomyOwner Owner,
     ShipId ShipId,
     InventoryId CargoInventoryId,
-    bool RemoveFreighter,
-    IReadOnlyList<TransportJobId> TransportJobIds);
+    Freighter? Freighter,
+    IReadOnlyList<PreparedTransportRemovalCancellation> Cancellations,
+    IReadOnlyList<InventoryCommitmentRelease> Releases);

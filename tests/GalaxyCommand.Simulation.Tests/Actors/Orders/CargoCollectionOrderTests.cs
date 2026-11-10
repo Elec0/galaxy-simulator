@@ -343,10 +343,40 @@ public sealed class CargoCollectionOrderTests
         Assert.Equal(original.ReadFactsAfter(null, 256).Facts, restored.ReadFactsAfter(null, 256).Facts);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RemovalRejectsUnpreparedCollectionCapacityWithoutChangingSession(bool economy)
+    {
+        using GameSession session = Create(economy: economy);
+        session.SubmitCommand(GameSessionTestFixture.Player,
+            new CollectCargoObjectCommand(new(2), session.CaptureVisibleCargo()[0].EntityId, OrderPlacement.ReplaceAll));
+        session.AdvanceTo(new(0));
+        GameSessionCheckpoint before = session.CaptureCheckpoint().Value!;
+        var facts = session.ReadFactsAfter(null, 256).Facts.ToArray();
+        GameShipSnapshot ship = Ship(session, 2);
+
+        Assert.IsType<EntityRemovalResult.Rejected>(session.RemoveEntity(
+            new(new(2), EntityRemovalReason.Despawned, EntityCargoDisposition.DiscardCargo)));
+
+        Assert.True(session.IsHealthy);
+        GameSessionCheckpoint after = session.CaptureCheckpoint().Value!;
+        Assert.Equal(before.Engine.Agenda.PendingEvents, after.Engine.Agenda.PendingEvents);
+        Assert.Equal(before.Engine.Agenda.NextCreationSequence, after.Engine.Agenda.NextCreationSequence);
+        Assert.Equal(before.CargoCollectionAttempts!.Attempts, after.CargoCollectionAttempts!.Attempts);
+        Assert.Equal(before.Lifecycle.Inventories.Inventories.Single(inventory => inventory.Id == new InventoryId(2)).PhysicalReservations,
+            Cargo(session, 2).PhysicalReservations);
+        Assert.Equal(ship.CurrentOrder, Ship(session, 2).CurrentOrder);
+        Assert.Equal(ship.SpatialState, Ship(session, 2).SpatialState);
+        Assert.Equal(facts, session.ReadFactsAfter(null, 256).Facts);
+        session.AdvanceTo(new(1000));
+        Assert.Single(Cargo(session, 2).DiscreteItems);
+    }
+
     private static GameShipSnapshot Ship(GameSession session, ulong ship) => session.CaptureSnapshot().Ships.Single(value => value.Id == new ShipId(ship));
     private static InventoryCheckpoint Cargo(GameSession session, ulong ship) => session.CaptureCheckpoint().Value!.Lifecycle.Inventories.Inventories.Single(value => value.Id == new InventoryId(ship));
 
-    private static GameSession Create(int collectors = 1, bool fullCollector = false, bool field = false, ulong lifetime = 20000, long collectorX = 0)
+    private static GameSession Create(int collectors = 1, bool fullCollector = false, bool field = false, ulong lifetime = 20000, long collectorX = 0, bool economy = false)
     {
         ShipDesign Design(ulong id, ulong capacity) => new(new(id), "Fixture", new ConstructionRecipe([], new Work(1)),
             new(capacity), GameSessionTestFixture.ManeuverCapability, 10000, 5000);
@@ -362,9 +392,13 @@ public sealed class CargoCollectionOrderTests
         var policy = new CargoDispositionPolicy(QualifiedContentKey.Create("test.cargo", "cargo-policy", "orders"), 1, 1, 1, 1,
             [new(CargoLossCause.EntityDestruction, new(1, 2)), new(CargoLossCause.StorageModuleLoss, new(1, 2)), new(CargoLossCause.FunctionalEjection, new(1, 1))],
             4, 0, new(lifetime), new(1000), new(15000), new(100));
-        var setup = new GameSessionSetup([new StarSystem(new(1), "System")], ships, new ConnectorTopology([], []), [], null,
+        var navigation = new DirectLocalNavigationPlanner(new ChebyshevLocalTravelTimeEstimator(1));
+        GameSessionEconomySetup? economySetup = economy
+            ? new([], [], [], [], [], [], [], new HierarchicalLogisticsNavigation(new Dictionary<LocationId, SystemPosition>(), navigation),
+                new(SimulationDuration.Zero, new(1), new(1))) : null;
+        var setup = new GameSessionSetup([new StarSystem(new(1), "System")], ships, new ConnectorTopology([], []), [], economySetup,
             GameSessionTestFixture.Relationships, GameSessionTestFixture.RootSeed, 256, GameSessionTestFixture.Player, cargoPolicy: policy);
-        var session = new GameSession(setup, new DirectLocalNavigationPlanner(new ChebyshevLocalTravelTimeEstimator(1)));
+        var session = new GameSession(setup, navigation);
         session.SubmitCommand(GameSessionTestFixture.Player, new MoveShipCommand(new(1), GameSessionTestFixture.Destination(0, 0), OrderPlacement.ReplaceAll));
         var request = new CargoDispositionRequest(new(new CargoDispositionTrigger.Command(new(1)), new(1), 0), new(1),
             GameSessionTestFixture.Position(0, 0), field ? CargoLossCause.StorageModuleLoss : CargoLossCause.FunctionalEjection, policy,
@@ -372,4 +406,5 @@ public sealed class CargoCollectionOrderTests
         Assert.True(session.CommitCargoDisposition(request).WasApplied);
         return session;
     }
+
 }

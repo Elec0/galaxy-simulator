@@ -96,7 +96,7 @@ public sealed class SensorDeployableTransactionTests
         fixture.Owner.DeploySensor(new CommandSequence(1), new ShipId(1), new ItemInstanceId(1),
             GameSessionTestFixture.Position(0, 0), fixture.Commit, SimulationTime.Zero);
         EntityRemovalPreparation.Prepared removal = Assert.IsType<EntityRemovalPreparation.Prepared>(fixture.Owner.PrepareRemoval(
-            new EntityRemovalRequest(new EntityId(1), EntityRemovalReason.Destroyed, EntityCargoDisposition.DiscardCargo), false));
+            new EntityRemovalRequest(new EntityId(1), EntityRemovalReason.Destroyed, EntityCargoDisposition.DiscardCargo)));
         fixture.Owner.ApplyRemoval(removal.Value, SimulationTime.Zero);
         EntityLifecycleCheckpoint checkpoint = fixture.Owner.CaptureCheckpoint();
         DeployedSensorSnapshot aliased = checkpoint.SensorDeployables.Live[0]! with { EntityId = new EntityId(1) };

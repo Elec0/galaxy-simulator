@@ -41,8 +41,9 @@ source of detailed scope and acceptance criteria.
     localization and native keyboard-list foundation.
     Live station accounting/workflow cleanup and its R09 proof are on hold by
     owner direction until separate TASK-105 delivers the live runtime.
-    Actor-removal cleanup (TASK-115) and encoded checkpoints (paused until
-    separate TASK-116) also remain open. Generic component benchmarks and populated UI-fixture
+    Actor-removal collection cleanup remains open under this task; completed
+    TASK-115 supplies its exact release-proof admission prerequisite. Encoded
+    checkpoints remain paused until separate TASK-116. Generic component benchmarks and populated UI-fixture
     evidence do not qualify that station path. Broader platform accessibility
     qualification remains with TASK-077.
     See the design's
@@ -200,14 +201,6 @@ source of detailed scope and acceptance criteria.
     compatibility with TASK-037. TASK-108's encoded cargo-save delivery is
     paused by the owner until this separate prerequisite is delivered.
   - Context: [Save format and migration](architecture/save-format-and-migration.md) · [Cargo checkpoints](systems/cargo-disposition-and-collection.md#r08-policy-content-and-checkpoint-contract)
-
-- [ ] **TASK-115: Require exact commitment-release proofs for actor removal**
-  - Actor-removal admission currently allows owner-released commitments when an
-    economy owner is present without proving that every reservation has a matching
-    prepared release. Require exhaustive release coverage before any movement,
-    economy, cargo, or lifecycle mutation. TASK-108's actor-removal collection
-    cleanup is paused pending the owner's scope decision on this prerequisite.
-  - Context: [Cargo disposition and collection](systems/cargo-disposition-and-collection.md#r05-timing-interruption-and-exact-agenda-ordering)
 
 - [ ] **TASK-113: Repair the task-list link to TASK-037**
   - Link validation found that the version-content-catalogs reference points to
@@ -919,6 +912,16 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application/application-shell-and-map-experience.md) · [Fog-of-war and scouting](systems/fog-of-war-and-scouting.md) · [Gameplay content](application/gameplay-content.md) · [Presentation snapshots](architecture/presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-115: Require exact commitment-release proofs for actor removal**
+  - Replaced the economy-present bypass with exhaustive reservation release
+    coverage and whole-batch revalidation before any removal mutation.
+    Transport proofs retain exact reservations, workflow state, assignment,
+    inventories, and cancellation arithmetic; stale, duplicate, mismatched,
+    or unsupported commitments reject without partial cleanup.
+  - TASK-108 retains collection actor-removal cleanup and integration with
+    this admission boundary.
+  - Context: [Exact release admission](architecture/entity-lifecycle.md#exact-commitment-release-admission-task-115) · [Cargo interruption contract](systems/cargo-disposition-and-collection.md#r05-timing-interruption-and-exact-agenda-ordering)
 
 - [x] **TASK-117: Define collection admission motion with retained velocity**
   - Implemented the owner's passive-drag choice for in-range pickup with retained

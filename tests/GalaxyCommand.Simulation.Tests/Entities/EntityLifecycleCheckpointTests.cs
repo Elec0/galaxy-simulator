@@ -103,8 +103,7 @@ public sealed class EntityLifecycleCheckpointTests
             EntityCargoDisposition.DiscardCargo);
         var prepared = Assert.IsType<EntityRemovalPreparation.Prepared>(
             original.PrepareRemoval(
-                request,
-                permitOwnerReleasedCommitments: false));
+                request));
         EntityRemovalResult.Removed removed = Assert.IsType<EntityRemovalResult.Removed>(
             original.ApplyRemoval(prepared.Value, SimulationTime.Zero));
 
@@ -113,8 +112,7 @@ public sealed class EntityLifecycleCheckpointTests
 
         var repeated = Assert.IsType<EntityRemovalPreparation.Resolved>(
             restored.PrepareRemoval(
-                request,
-                permitOwnerReleasedCommitments: false));
+                request));
         Assert.Equal(removed, repeated.Value);
         Assert.Null(restored.Entities.GetShipId(request.EntityId));
         Assert.Single(restored.CaptureCheckpoint().RemovalReceipts);
