@@ -14,6 +14,9 @@ public sealed partial class Inventory
         PhysicalDefinitionCatalog? definitions,
         string path)
     {
+        if (checkpoint.Custody is InventoryCustody.Unclaimed && !HasValidCargoObjectShape(checkpoint))
+            return new CheckpointValidationFailure($"{path}.custody",
+                "Unclaimed cargo must hold exactly one definition or instance and no commitments or legacy materials.");
         bool hasPhysicalState = checkpoint.FungibleHoldings.Count != 0 ||
             checkpoint.DiscreteItems.Count != 0 ||
             checkpoint.PhysicalReservations.Count != 0;
@@ -86,9 +89,9 @@ public sealed partial class Inventory
                     "The fungible holding definition is missing or incompatible.");
             }
 
-            InventoryStorageResult result = restored.StoreFungible(
-                definition,
-                holding.Quantity);
+            InventoryStorageResult result = restored.Custody is InventoryCustody.Unclaimed
+                ? restored.InitializeCargoObjectContents(definition, new PhysicalTransferSubject.Fungible(definition.Key, holding.Quantity))
+                : restored.StoreFungible(definition, holding.Quantity);
             if (!result.IsAccepted)
             {
                 return new CheckpointValidationFailure(
@@ -131,7 +134,9 @@ public sealed partial class Inventory
                     "The discrete item definition is missing or incompatible.");
             }
 
-            InventoryStorageResult result = restored.StoreDiscrete(definition, item.Id);
+            InventoryStorageResult result = restored.Custody is InventoryCustody.Unclaimed
+                ? restored.InitializeCargoObjectContents(definition, new PhysicalTransferSubject.Discrete(item.Id))
+                : restored.StoreDiscrete(definition, item.Id);
             if (!result.IsAccepted)
             {
                 return new CheckpointValidationFailure(

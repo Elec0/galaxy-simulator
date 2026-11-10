@@ -2,7 +2,7 @@ namespace GalaxyCommand.Simulation;
 
 internal sealed record SensorActionWake(ShipId Ship, ShipOrderId Order, CommandSequence Command);
 internal sealed record SensorActionDue(SensorActionWake Work, EventKey Trigger);
-internal sealed record SensorActionProposal(SensorActionDue Due, ShipActionIntent Intent);
+internal sealed record SensorActionProposal(SensorActionDue Due, ShipActionIntent.Sensor Intent);
 
 internal sealed partial class ActorOrderRuntimeCoordinator
 {
@@ -11,7 +11,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     private readonly Dictionary<ShipId, (ShipOrderId Order, InteractionInterestId Interest)> _sensorBindings = [];
     private readonly HashSet<ShipId> _sensorDirtyShips = [];
 
-    internal bool IsManagedSpatialDomain(string domainKind) => _sensorInterests is not null && domainKind == SensorDomainKind;
+    internal bool IsManagedSpatialDomain(string domainKind) => _sensorInterests is not null && domainKind == SensorDomainKind
+        || _cargoInterests is not null && domainKind == CargoDomainKind;
 
     /// <summary>Preflights affected controlled owners before removing a sensor and invalidating every inbound order.</summary>
     private EntityRemovalResult RemoveSensorEntity(EntityRemovalRequest request)
@@ -70,19 +71,19 @@ internal sealed partial class ActorOrderRuntimeCoordinator
 
     /// <summary>Captures only active action eligibility before a resource owner commits its batch.</summary>
     private Dictionary<ShipId, SensorActionFailure?> CaptureSensorEligibility() => _sensorBindings.Keys
-        .Where(ship => _orders.Contains(ship) && _orders.GetActive(ship) is { Status: ShipOrderStatus.Active, Action: not null })
+        .Where(ship => _orders.Contains(ship) && _orders.GetActive(ship) is { Status: ShipOrderStatus.Active, Action: ShipActionIntent.Sensor })
         .ToDictionary(ship => ship, ship =>
         {
             ShipOrder active = _orders.GetActive(ship)!;
-            return SensorEligibility(ship, active.Source, active.Action!);
+            return SensorEligibility(ship, active.Source, (ShipActionIntent.Sensor)active.Action!);
         });
 
     /// <summary>Schedules only changed eligibility, so repeated reconciliation cannot become polling or depend on advance chunk size.</summary>
     private void InvalidateSensorEligibility(IReadOnlyDictionary<ShipId, SensorActionFailure?> before)
     {
         foreach (var prior in before)
-            if (_orders.Contains(prior.Key) && _orders.GetActive(prior.Key) is { Status: ShipOrderStatus.Active, Action: not null } active
-                && SensorEligibility(prior.Key, active.Source, active.Action) != prior.Value)
+            if (_orders.Contains(prior.Key) && _orders.GetActive(prior.Key) is { Status: ShipOrderStatus.Active, Action: ShipActionIntent.Sensor } active
+                && SensorEligibility(prior.Key, active.Source, (ShipActionIntent.Sensor)active.Action) != prior.Value)
                 _sensorDirtyShips.Add(prior.Key);
         FlushSensorReevaluations();
     }
@@ -95,17 +96,17 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         foreach (SpatialInteractionInterest saved in _sensorInterests.CaptureAllSnapshot())
         {
             if (saved is not StationaryInteractionInterest interest || !_orders.Contains(interest.Source)
-                || _orders.GetActive(interest.Source) is not { Status: ShipOrderStatus.Active, Action: not null } active
+                || _orders.GetActive(interest.Source) is not { Status: ShipOrderStatus.Active, Action: ShipActionIntent.Sensor } active
                 || _control.CheckCommand(interest.Source, active.Source) != ActorCommandEligibility.Eligible
                 || interest.PurposeId != active.Id.ToString()
-                || !TrySensorTarget(interest.Source, active.Action, out SystemPosition target, out ulong range)
+                || !TrySensorTarget(interest.Source, (ShipActionIntent.Sensor)active.Action, out SystemPosition target, out ulong range)
                 || interest.Position != target || interest.RangeUnits != range
                 || interest.EntityId != (active.Action as ShipActionIntent.PickupSensor)?.TargetEntityId
                 || !_sensorBindings.TryAdd(interest.Source, (active.Id, interest.Id)))
                 throw new InvalidOperationException("Restored sensor interest disagrees with its active action order.");
         }
         foreach (GameSessionShip ship in _lifecycle.Ships)
-            if (_orders.GetActive(ship.Id) is { Status: ShipOrderStatus.Active, Action: not null }
+            if (_orders.GetActive(ship.Id) is { Status: ShipOrderStatus.Active, Action: ShipActionIntent.Sensor }
                 && !_sensorBindings.ContainsKey(ship.Id))
                 throw new InvalidOperationException("An active sensor action has no restored stationary interest.");
     }
@@ -137,7 +138,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
 
     /// <summary>Shares replacement, append, control and planning semantics without executing during admission.</summary>
     private GameplayCommandHandlingResult AdmitSensorAction(CommandSource source, ShipId ship,
-        ShipActionIntent action, OrderPlacement placement)
+        ShipActionIntent.Sensor action, OrderPlacement placement)
     {
         if (SensorEligibility(ship, source, action) is { } failure) return SensorCommandRejected(failure);
         NavigationDestination destination = action switch
@@ -159,7 +160,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         new(CommandResult.Rejected(CommandRejectionCodes.InvalidIntent, $"Sensor action is unavailable: {reason}."));
 
     /// <summary>Rechecks all non-range eligibility from current authority; outside range remains ordinary progress.</summary>
-    private SensorActionFailure? SensorEligibility(ShipId ship, CommandSource source, ShipActionIntent action)
+    private SensorActionFailure? SensorEligibility(ShipId ship, CommandSource source, ShipActionIntent.Sensor action)
     {
         if (!_orders.Contains(ship)) return SensorActionFailure.MissingActor;
         if (_control.CheckCommand(ship, source) != ActorCommandEligibility.Eligible
@@ -189,7 +190,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     }
 
     /// <summary>Resolves only typed fixed geometry and authoritative definition ranges, without evaluating resources.</summary>
-    private bool TrySensorTarget(ShipId ship, ShipActionIntent action, out SystemPosition position, out ulong range)
+    private bool TrySensorTarget(ShipId ship, ShipActionIntent.Sensor action, out SystemPosition position, out ulong range)
     {
         position = default;
         range = 0;
@@ -216,16 +217,16 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     {
         if (_sensorInterests is null) return;
         ShipOrder? active = _orders.Contains(ship) ? _orders.GetActive(ship) : null;
-        bool valid = active is { Status: ShipOrderStatus.Active, Action: not null };
+        bool valid = active is { Status: ShipOrderStatus.Active, Action: ShipActionIntent.Sensor };
         if (_sensorBindings.TryGetValue(ship, out var binding))
         {
-            if (valid && active!.Id == binding.Order && TrySensorTarget(ship, active.Action!, out _, out _)) return;
+            if (valid && active!.Id == binding.Order && TrySensorTarget(ship, (ShipActionIntent.Sensor)active.Action!, out _, out _)) return;
             _sensorInterests.Cancel(binding.Interest);
             _sensorBindings.Remove(ship);
         }
         if (!valid) return;
         _sensorDirtyShips.Add(ship);
-        if (TrySensorTarget(ship, active!.Action!, out SystemPosition target, out ulong range))
+        if (TrySensorTarget(ship, (ShipActionIntent.Sensor)active!.Action!, out SystemPosition target, out ulong range))
         {
             StationaryInteractionInterest interest = _sensorInterests.RegisterStationary(active.Id.ToString(), ship, target, range,
                 (active.Action as ShipActionIntent.PickupSensor)?.TargetEntityId);
@@ -236,7 +237,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     /// <summary>Defers in-range and invalid action execution to the shared post-completion event boundary.</summary>
     private bool PrepareSensorApproach(ShipId ship, ShipOrder active, ICollection<ShipOrderTransition> transitions)
     {
-        if (active.Action is not { } action) return false;
+        if (active.Action is not ShipActionIntent.Sensor action) return false;
         SynchronizeSensorInterest(ship);
         bool stop = SensorEligibility(ship, active.Source, action) is not null
             || TrySensorTarget(ship, action, out SystemPosition target, out ulong radius) && SensorInRange(ship, target, radius);
@@ -263,7 +264,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         if (_sensorDirtyShips.Count == 0) return;
         SensorActionWake[] requests = _sensorDirtyShips.OrderBy(ship => ship.Value)
             .Where(ship => _orders.Contains(ship)).Select(ship => (Ship: ship, Active: _orders.GetActive(ship)))
-            .Where(value => value.Active is { Status: ShipOrderStatus.Active, Action: not null })
+            .Where(value => value.Active is { Status: ShipOrderStatus.Active, Action: ShipActionIntent.Sensor })
             .Select(value => new SensorActionWake(value.Ship, value.Active!.Id, value.Active.Action!.OriginCommandSequence)).ToArray();
         _sensorDirtyShips.Clear();
         if (requests.Length == 0) return;
@@ -285,7 +286,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         foreach (SensorActionDue entry in due.OrderBy(value => value.Work.Command.Value).ThenBy(value => value.Trigger.CreationSequence))
         {
             SensorActionWake work = entry.Work;
-            if (!_orders.Contains(work.Ship) || _orders.GetActive(work.Ship) is not { Status: ShipOrderStatus.Active, Action: not null } active
+            if (!_orders.Contains(work.Ship) || _orders.GetActive(work.Ship) is not { Status: ShipOrderStatus.Active, Action: ShipActionIntent.Sensor } active
                 || active.Id != work.Order || active.Action.OriginCommandSequence != work.Command || !handled.Add(work.Ship)) continue;
             current.Add((entry, active));
         }
@@ -297,11 +298,11 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         {
             ShipId ship = candidate.Due.Work.Ship;
             ShipOrder active = candidate.Active;
-            if (SensorEligibility(ship, active.Source, active.Action!) is not null
-                || TrySensorTarget(ship, active.Action!, out SystemPosition target, out ulong radius)
+            if (SensorEligibility(ship, active.Source, (ShipActionIntent.Sensor)active.Action!) is not null
+                || TrySensorTarget(ship, (ShipActionIntent.Sensor)active.Action!, out SystemPosition target, out ulong radius)
                 && geometry.Get(ship) is { } point && point.InRange(PreparedInteractionPoint.Capture(
                     InteractionPhaseCurve.Fixed(target, CurrentTime, CurrentTime), CurrentTime), radius))
-                proposals.Add(new SensorActionProposal(candidate.Due, active.Action!));
+                proposals.Add(new SensorActionProposal(candidate.Due, (ShipActionIntent.Sensor)active.Action!));
         }
         return proposals;
     }
@@ -313,10 +314,10 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         {
             SensorActionDue entry = proposal.Due;
             SensorActionWake work = entry.Work;
-            if (!_orders.Contains(work.Ship) || _orders.GetActive(work.Ship) is not { Status: ShipOrderStatus.Active, Action: not null } active
+            if (!_orders.Contains(work.Ship) || _orders.GetActive(work.Ship) is not { Status: ShipOrderStatus.Active, Action: ShipActionIntent.Sensor } active
                 || active.Id != work.Order || active.Action != proposal.Intent) continue;
-            SensorActionFailure? failure = SensorEligibility(work.Ship, active.Source, active.Action);
-            if (failure is null && TrySensorTarget(work.Ship, active.Action, out SystemPosition target, out ulong range)
+            SensorActionFailure? failure = SensorEligibility(work.Ship, active.Source, (ShipActionIntent.Sensor)active.Action);
+            if (failure is null && TrySensorTarget(work.Ship, (ShipActionIntent.Sensor)active.Action, out SystemPosition target, out ulong range)
                 && !SensorInRange(work.Ship, target, range)) continue;
 
             SensorActionResult? result = null;

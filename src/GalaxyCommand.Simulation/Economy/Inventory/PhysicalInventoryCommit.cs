@@ -749,7 +749,9 @@ public sealed partial class InventoryCommitOwner
             InventoryMutationProposalCheckpoint.ReservePhysical reserve
                 when reserve.InventoryId.Value != 0
                      && IsValidReservationSubject(reserve.Subject)
-                     && IsValidOwner(reserve.Owner) =>
+                     && IsValidOwner(reserve.Owner)
+                     && (reserve.Owner is not ReservationOwner.CargoCollection
+                         || reserve.Subject is PhysicalReservationSubject.IncomingCapacity) =>
                 new ReservePhysicalInventoryProposal(
                     reserve.Key,
                     reserve.InventoryId,
@@ -834,6 +836,8 @@ public sealed partial class InventoryCommitOwner
                 && saved.Reservation.InventoryId == release.InventoryId
                 && saved.Reservation.Owner == release.ExpectedOwner
                 && IsValidReservationSubject(saved.Reservation.Subject)
+                && (saved.Reservation.Owner is not ReservationOwner.CargoCollection
+                    || saved.Reservation.Subject is PhysicalReservationSubject.IncomingCapacity)
                 && WasAllocated(saved.Reservation.Id.Value, checkpoint.ReservationIds),
             (TransferPhysicalInventoryProposal transfer, InventoryMutationOutcome.Transferred saved) =>
                 saved.SourceInventoryId == transfer.Request.SourceInventoryId
@@ -883,6 +887,7 @@ public sealed partial class InventoryCommitOwner
         ReservationOwner.TransportJob transport => transport.JobId.Value != 0,
         ReservationOwner.ProductionJob production => production.JobId.Value != 0,
         ReservationOwner.ConstructionOrder construction => construction.OrderId.Value != 0,
+        ReservationOwner.CargoCollection collection => collection.ShipId.Value != 0 && collection.OrderId.Value != 0,
         _ => false,
     };
 

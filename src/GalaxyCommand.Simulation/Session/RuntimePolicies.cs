@@ -8,7 +8,8 @@ internal sealed record ResolvedRuntimePolicies(
     IReadOnlyList<ShipMaterializationPolicy> MaterializationPolicies,
     int FactRetentionCapacity,
     IReadOnlyList<ShipDesign> ShipDefinitions,
-    IReadOnlyList<SensorDeployableDefinition> SensorDeployableDefinitions);
+    IReadOnlyList<SensorDeployableDefinition> SensorDeployableDefinitions,
+    CargoDispositionPolicy? CargoPolicy = null);
 
 /// <summary>
 /// Stable capture and resolution boundary for injected behavior that can alter
@@ -32,7 +33,8 @@ internal static class RuntimePolicyManifest
         IEnumerable<ShipMaterializationPolicy> materializationPolicies,
         int factRetentionCapacity,
         IEnumerable<ShipDesign>? shipDefinitions = null,
-        IEnumerable<SensorDeployableDefinition>? sensorDeployableDefinitions = null)
+        IEnumerable<SensorDeployableDefinition>? sensorDeployableDefinitions = null,
+        CargoDispositionPolicy? cargoPolicy = null)
     {
         ArgumentNullException.ThrowIfNull(topology);
         ArgumentNullException.ThrowIfNull(navigation);
@@ -105,7 +107,8 @@ internal static class RuntimePolicyManifest
                 Array.AsReadOnly(retained.Definitions.Select(CaptureShipDesign).ToArray()),
                 Array.AsReadOnly((sensorDeployableDefinitions ?? []).OrderBy(definition => definition.Key.ToString(), StringComparer.Ordinal)
                     .Select(definition => new SensorDeployableDefinitionCheckpoint(definition.Key, definition.Name,
-                        definition.Physical.CapacityCost, definition.DeploymentRangeUnits, definition.SensorRadiusUnits)).ToArray())));
+                        definition.Physical.CapacityCost, definition.DeploymentRangeUnits, definition.SensorRadiusUnits)).ToArray()),
+                cargoPolicy is null ? null : CaptureCargoPolicy(cargoPolicy)));
     }
 
     /// <summary>
@@ -150,6 +153,13 @@ internal static class RuntimePolicyManifest
         if (!definitions.IsSuccess) return CheckpointResult<ResolvedRuntimePolicies>.Rejected(definitions.Failure!);
         CheckpointResult<IReadOnlyList<SensorDeployableDefinition>> sensors = ResolveSensorDeployableDefinitions(checkpoint.SensorDeployableDefinitions);
         if (!sensors.IsSuccess) return CheckpointResult<ResolvedRuntimePolicies>.Rejected(sensors.Failure!);
+        CargoDispositionPolicy? cargoPolicy = null;
+        if (checkpoint.CargoPolicy is { } savedCargoPolicy)
+        {
+            CheckpointResult<CargoDispositionPolicy> cargo = ResolveCargoPolicy(savedCargoPolicy);
+            if (!cargo.IsSuccess) return CheckpointResult<ResolvedRuntimePolicies>.Rejected(cargo.Failure!);
+            cargoPolicy = cargo.Value!;
+        }
         CheckpointResult<IReadOnlyList<ShipMaterializationPolicy>> materializationResult =
             ResolveMaterializationPolicies(checkpoint, systems, principals, definitions.Value!);
         if (!materializationResult.IsSuccess)
@@ -163,7 +173,49 @@ internal static class RuntimePolicyManifest
                 navigationResult.Value!,
                 materializationResult.Value!,
                 checkpoint.FactRetentionCapacity,
-                definitions.Value!, sensors.Value!));
+                definitions.Value!, sensors.Value!, cargoPolicy));
+    }
+
+    /// <summary>Retains exact selected cargo meaning, including unreduced rational cause fractions.</summary>
+    private static CargoDispositionPolicyCheckpoint CaptureCargoPolicy(CargoDispositionPolicy policy) => new(
+        policy.Key, policy.GenerationBehaviorVersion, policy.MergeBehaviorVersion,
+        policy.OrderingBehaviorVersion, policy.DurationBehaviorVersion,
+        Array.AsReadOnly(policy.RecoveryByCause.OrderBy(pair => pair.Key)
+            .Select(pair => new CargoRecoveryFractionCheckpoint(pair.Key, pair.Value.Numerator, pair.Value.Denominator)).ToArray()),
+        policy.FungibleObjectCount, policy.ScatterRadiusMeters, policy.Lifetime,
+        policy.MinimumCollectionDuration, policy.MaximumCollectionDuration, policy.CollectionStorageCap);
+
+    /// <summary>
+    /// Resolves saved cargo behavior before live state restoration. Policy validation
+    /// rejects unsupported versions and malformed parameters rather than applying
+    /// current launch defaults to saved objects or timers.
+    /// </summary>
+    private static CheckpointResult<CargoDispositionPolicy> ResolveCargoPolicy(CargoDispositionPolicyCheckpoint checkpoint)
+    {
+        const string policyPath = Path + ".cargoPolicy";
+        if (checkpoint.Key is null || checkpoint.RecoveryByCause is null)
+            return Rejected<CargoDispositionPolicy>(policyPath, "Cargo policy requires an exact qualified key and cause fractions.");
+
+        var causes = new List<KeyValuePair<CargoLossCause, CargoRecoveryFraction>>();
+        try
+        {
+            foreach (CargoRecoveryFractionCheckpoint? fraction in checkpoint.RecoveryByCause)
+            {
+                if (fraction is null)
+                    return Rejected<CargoDispositionPolicy>(policyPath + ".recoveryByCause", "A cargo recovery fraction is missing.");
+                causes.Add(new(fraction.Cause, new CargoRecoveryFraction(fraction.Numerator, fraction.Denominator)));
+            }
+            return CheckpointResult<CargoDispositionPolicy>.Success(new CargoDispositionPolicy(
+                checkpoint.Key, checkpoint.GenerationBehaviorVersion, checkpoint.MergeBehaviorVersion,
+                checkpoint.OrderingBehaviorVersion, checkpoint.DurationBehaviorVersion,
+                causes, checkpoint.FungibleObjectCount, checkpoint.ScatterRadiusMeters,
+                checkpoint.Lifetime, checkpoint.MinimumCollectionDuration, checkpoint.MaximumCollectionDuration,
+                checkpoint.CollectionStorageCap));
+        }
+        catch (ArgumentException error)
+        {
+            return Rejected<CargoDispositionPolicy>(policyPath, error.Message);
+        }
     }
 
     private static MaterializationPolicyCheckpoint CaptureMaterializationPolicy(

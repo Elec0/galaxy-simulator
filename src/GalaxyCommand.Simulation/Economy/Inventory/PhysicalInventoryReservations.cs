@@ -90,6 +90,7 @@ public enum InventoryReservationRejectionReason
     InsufficientCapacity,
     UnknownReservation,
     OwnerMismatch,
+    CargoObjectCannotReserve,
 }
 
 /// <summary>Typed result for reserving or releasing physical inventory state.</summary>
@@ -161,6 +162,12 @@ public sealed partial class Inventory
         {
             return Rejected(InventoryReservationRejectionReason.MissingCustody);
         }
+
+        if (Custody is InventoryCustody.Unclaimed)
+            return Rejected(InventoryReservationRejectionReason.CargoObjectCannotReserve);
+
+        if (owner is ReservationOwner.CargoCollection && subject is not PhysicalReservationSubject.IncomingCapacity)
+            return Rejected(InventoryReservationRejectionReason.InvalidOwner);
 
         if (reservationId.Value == 0)
         {

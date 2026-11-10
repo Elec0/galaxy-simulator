@@ -88,12 +88,13 @@ public static class BuiltInNewGame
 /// Admits selected disk packages through the production content pipeline and
 /// composes one approved static scenario into clean simulation setup state.
 /// </summary>
-public static class StaticNewGameLoader
+public static partial class StaticNewGameLoader
 {
     private const string PrincipalKind = "principal";
     private const string ShipDesignKind = "ship-design";
     private const string StandingPolicyKind = "standing-policy";
     private const string SensorDeployableKind = "sensor-deployable";
+    private const string CargoPolicyKind = "cargo-policy";
 
     private static readonly ContentKindRegistry SupportedKinds = new(
         [
@@ -101,6 +102,7 @@ public static class StaticNewGameLoader
             ContentKind.Create(ShipDesignKind),
             ContentKind.Create(StandingPolicyKind),
             ContentKind.Create(SensorDeployableKind),
+            ContentKind.Create(CargoPolicyKind),
         ]);
 
     /// <summary>
@@ -177,6 +179,8 @@ public static class StaticNewGameLoader
         string[] scenarioProperties = declaresConnectorTopology
             ? ["connectorEndpoints", "galaxyLayout", "playerCommandSource", "playerPrincipal", "ships", "standingPolicy", "systems", "transitConnections"]
             : ["galaxyLayout", "playerCommandSource", "playerPrincipal", "ships", "standingPolicy", "systems"];
+        if (scenario.Values.Properties.ContainsKey("cargoPolicy"))
+            scenarioProperties = [.. scenarioProperties, "cargoPolicy"];
         if (!TryObjectProperties(
                 scenario.Values,
                 scenarioProperties,
@@ -192,6 +196,7 @@ public static class StaticNewGameLoader
         Dictionary<QualifiedContentKey, ShipDesign> designs =
             ComposeShipDesigns(catalog, scenario, source, diagnostics);
         SensorDeployableDefinition[] deployables = ComposeSensorDeployables(catalog, scenario, diagnostics);
+        CargoDispositionPolicy? cargoPolicy = ComposeCargoPolicy(catalog, scenario, diagnostics);
         if (!TryDefinitionReference(
                 scenario.Values,
                 "playerPrincipal",
@@ -262,7 +267,8 @@ public static class StaticNewGameLoader
                 randomRootSeed,
                 factRetentionCapacity,
                 new CommandSource(CommandSourceKind.Player, new CommandSourceId(playerCommandSource!)),
-                deployables);
+                deployables,
+                cargoPolicy: cargoPolicy);
         }
         catch (Exception exception) when (exception is ArgumentException or OverflowException)
         {

@@ -540,7 +540,7 @@ public sealed class PhysicalInventoryCommitTests
         ulong entityId = 17) =>
         new(
             new InventoryId(inventoryId),
-            new InventoryCustody(
+            new InventoryCustody.PrincipalControlled(
                 new InventoryOwnerReference.SessionEntity(new EntityId(entityId)),
                 new PrincipalId(4)),
             new Quantity(capacity));

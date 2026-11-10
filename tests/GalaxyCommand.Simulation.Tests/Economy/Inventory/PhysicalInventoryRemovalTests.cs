@@ -171,7 +171,7 @@ public sealed class PhysicalInventoryRemovalTests
         ulong capacity) =>
         new(
             new InventoryId(inventoryId),
-            new InventoryCustody(
+            new InventoryCustody.PrincipalControlled(
                 new InventoryOwnerReference.SessionEntity(new EntityId(entityId)),
                 new PrincipalId(4)),
             new Quantity(capacity));

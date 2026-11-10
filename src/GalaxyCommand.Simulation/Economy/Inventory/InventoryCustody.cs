@@ -45,26 +45,43 @@ public abstract record InventoryOwnerReference
 }
 
 /// <summary>
-/// Immutable physical owner and controlling principal assigned to one
-/// inventory.
+/// Immutable physical custody. Unclaimed cargo is explicit and never represented
+/// by missing custody or a fabricated principal identity.
 /// </summary>
-public sealed record InventoryCustody
+public abstract record InventoryCustody
 {
-    /// <summary>
-    /// Creates custody metadata without asserting that the referenced owner
-    /// is currently registered. Session composition validates that link.
-    /// </summary>
-    public InventoryCustody(
-        InventoryOwnerReference physicalOwner,
-        PrincipalId controllingPrincipalId)
+    private InventoryCustody(InventoryOwnerReference physicalOwner, PrincipalId? controllingPrincipalId)
     {
-        ArgumentNullException.ThrowIfNull(physicalOwner);
-        ArgumentOutOfRangeException.ThrowIfZero(controllingPrincipalId.Value);
         PhysicalOwner = physicalOwner;
         ControllingPrincipalId = controllingPrincipalId;
     }
 
     public InventoryOwnerReference PhysicalOwner { get; }
 
-    public PrincipalId ControllingPrincipalId { get; }
+    public PrincipalId? ControllingPrincipalId { get; }
+
+    /// <summary>Physical custody controlled by one nonzero principal.</summary>
+    public sealed record PrincipalControlled : InventoryCustody
+    {
+        /// <summary>
+        /// Records a physical owner and controlling principal. Session composition
+        /// validates the registered owner link.
+        /// </summary>
+        public PrincipalControlled(InventoryOwnerReference physicalOwner, PrincipalId controllingPrincipalId)
+            : base(physicalOwner, controllingPrincipalId)
+        {
+            ArgumentNullException.ThrowIfNull(physicalOwner);
+            ArgumentOutOfRangeException.ThrowIfZero(controllingPrincipalId.Value);
+        }
+    }
+
+    /// <summary>Unclaimed physical cargo; live admission must validate its cargo-object owner.</summary>
+    public sealed record Unclaimed : InventoryCustody
+    {
+        /// <summary>Identifies a physical cargo object without granting collection rights to any principal.</summary>
+        public Unclaimed(EntityId cargoObjectId)
+            : base(new InventoryOwnerReference.SessionEntity(cargoObjectId), null)
+        {
+        }
+    }
 }

@@ -62,7 +62,7 @@ internal sealed class SessionEconomyOwner
                     facilitiesByInventory![inventorySetup.InventoryId];
                 inventory = new Inventory(
                     inventorySetup.InventoryId,
-                    new InventoryCustody(
+                    new InventoryCustody.PrincipalControlled(
                         new InventoryOwnerReference.Facility(facility.FacilityId),
                         facility.ControllingPrincipalId!.Value),
                     inventorySetup.Capacity,

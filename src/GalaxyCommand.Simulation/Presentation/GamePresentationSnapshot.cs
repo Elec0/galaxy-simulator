@@ -76,7 +76,9 @@ public sealed record GamePresentationRequest
 public sealed record GamePresentationWorldSnapshot
 {
     internal GamePresentationWorldSnapshot(GameSnapshot world, IReadOnlyList<GameObservedShipSnapshot> ships,
-        IReadOnlyList<ObservedSensorDeployableSnapshot> deployables)
+        IReadOnlyList<ObservedSensorDeployableSnapshot> deployables,
+        IReadOnlyList<CargoObjectView> cargoObjects,
+        IReadOnlyList<CargoCollectionProgressView> cargoCollectionProgress)
     {
         ArgumentNullException.ThrowIfNull(world);
         Time = world.Time;
@@ -85,6 +87,8 @@ public sealed record GamePresentationWorldSnapshot
         TransitConnections = world.TransitConnections;
         Ships = ships;
         Deployables = deployables;
+        CargoObjects = GameSnapshotCollection.Copy(cargoObjects);
+        CargoCollectionProgress = GameSnapshotCollection.Copy(cargoCollectionProgress);
     }
 
     public SimulationTime Time { get; }
@@ -98,6 +102,10 @@ public sealed record GamePresentationWorldSnapshot
     public IReadOnlyList<GameObservedShipSnapshot> Ships { get; }
 
     public IReadOnlyList<ObservedSensorDeployableSnapshot> Deployables { get; }
+
+    public IReadOnlyList<CargoObjectView> CargoObjects { get; }
+
+    public IReadOnlyList<CargoCollectionProgressView> CargoCollectionProgress { get; }
 }
 
 /// <summary>
@@ -234,7 +242,9 @@ internal static class GamePresentationSnapshotFactory
         GamePresentationRequest request,
         GameFactReadResult facts,
         ShipSensorCoverageSnapshot coverage,
-        IReadOnlyList<ObservedSensorDeployableSnapshot>? deployables = null)
+        IReadOnlyList<ObservedSensorDeployableSnapshot>? deployables = null,
+        IReadOnlyList<CargoObjectView>? cargoObjects = null,
+        IReadOnlyList<CargoCollectionProgressView>? cargoCollectionProgress = null)
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(request);
@@ -280,7 +290,8 @@ internal static class GamePresentationSnapshotFactory
             : request.FactCursor;
 
         return new GamePresentationSnapshot(
-            new GamePresentationWorldSnapshot(world, ships, deployables ?? Array.AsReadOnly(Array.Empty<ObservedSensorDeployableSnapshot>())),
+            new GamePresentationWorldSnapshot(world, ships, deployables ?? Array.Empty<ObservedSensorDeployableSnapshot>(),
+                cargoObjects ?? Array.Empty<CargoObjectView>(), cargoCollectionProgress ?? Array.Empty<CargoCollectionProgressView>()),
             CreateRelationshipPresentation(
                 world.Relationships,
                 request.ObserverPrincipalId),
@@ -342,6 +353,8 @@ internal static class GamePresentationSnapshotFactory
         return fact switch
         {
             ObservedShipChangeFact observation => observation.ShipId,
+            CargoCollectedFact collected => collected.ShipId,
+            PlayerCargoCollectedFact collected => collected.ShipId,
             ShipOrderTransitionFact transition => transition.ShipId,
             ShipLocalMotionStartedFact started => started.ShipId,
             ShipLocalMotionEndedFact ended => ended.ShipId,

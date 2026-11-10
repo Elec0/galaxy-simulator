@@ -53,10 +53,13 @@ public partial class Main : Node
 			new ApplicationEventPacingController(
 				_pacing,
 				_pacingPreferences.EventPacing.Policies));
-		(GameSession session, PrincipalId playerPrincipalId, CommandSource player, IReadOnlyList<StaticGalaxyLayoutEntry> galaxyLayout) = CreateSession();
+		(GameSession session, PrincipalId playerPrincipalId, CommandSource player, IReadOnlyList<StaticGalaxyLayoutEntry> galaxyLayout,
+			IReadOnlyDictionary<QualifiedContentKey, string> contentNames, IReadOnlyList<QualifiedContentKey> cargoTypes) = CreateSession();
 		_session = session;
 		_playerPrincipalId = playerPrincipalId;
 		_player = player;
+		_contentNames = contentNames;
+		_knownCargoTypes = cargoTypes;
 		_map = GetNode<GalaxyMap>("GalaxyMap");
 		_map.ConfigureGalaxyLayout(galaxyLayout);
 		_status = GetNode<Label>("Interface/StatusPanel/Margin/Content/Status");
@@ -78,7 +81,9 @@ public partial class Main : Node
 		_map.ViewChanged += RefreshPresentation;
 		_map.DestinationRequested += OnDestinationRequested;
 		_map.CancelRequested += OnCancelRequested;
+		ConfigureCargoControls();
 		AdvanceTo(SimulationTime.Zero);
+		_shipList.GrabFocus();
 		GD.Print("Galaxy Command development visual preview ready.");
 	}
 
@@ -122,7 +127,9 @@ public partial class Main : Node
 		GameSession Session,
 		PrincipalId PlayerPrincipalId,
 		CommandSource PlayerSource,
-		IReadOnlyList<StaticGalaxyLayoutEntry> GalaxyLayout) CreateSession()
+		IReadOnlyList<StaticGalaxyLayoutEntry> GalaxyLayout,
+		IReadOnlyDictionary<QualifiedContentKey, string> ContentNames,
+		IReadOnlyList<QualifiedContentKey> CargoTypes) CreateSession()
 	{
 		// The development package is copied for local runs but excluded from
 		// published output, while still receiving ordinary production validation.
@@ -161,7 +168,12 @@ public partial class Main : Node
 			session,
 			playerPrincipalId,
 			new CommandSource(CommandSourceKind.Player, playerSourceId),
-			loaded.GalaxyLayout!);
+			loaded.GalaxyLayout!,
+			loaded.Content!.Catalog.Definitions.ToDictionary(pair => pair.Key, pair => pair.Value.InvariantFallback),
+			setup.Ships.SelectMany(ship => ship.Cargo).Select(definition => definition.Key)
+				.Concat(setup.SensorDeployableDefinitions.Select(definition => definition.Key))
+				.Concat(setup.Economy?.MaterialCompatibility?.Mappings.Values.Select(definition => definition.Key) ?? [])
+				.Distinct().OrderBy(key => key.ToString(), StringComparer.Ordinal).ToArray());
 	}
 
 	private void OnSelectionChanged()
@@ -244,6 +256,10 @@ public partial class Main : Node
 						gameplay.Source,
 						gameplay.Command);
 					_lastCommandStatus = DescribeResult(record);
+					if (gameplay.Command is CollectCargoObjectCommand or CollectCargoFieldCommand or CancelShipOrderCommand)
+						_cargoResultText = record.Result.Status == CommandResultStatus.Accepted
+							? UiLocalization.Text("ui.cargo.accepted")
+							: UiLocalization.Text("ui.cargo.rejected", ("code", record.Result.RejectionCode?.Value ?? ""));
 					break;
 				case BufferedApplicationInput.Pacing pacing:
 					pacing.Action.Apply(_pacing);
@@ -340,7 +356,9 @@ public partial class Main : Node
 				_factCursor,
 				MaximumFactCountPerRefresh));
 		_map.Display(_presentation);
+		_cargoCollectedThisRefresh = false;
 		ConsumeFacts(_presentation.Facts);
+		RefreshCargoControls();
 		_factCursor = _presentation.NextFactCursor;
 
 		GamePresentationWorldSnapshot snapshot = _presentation.World;
@@ -385,6 +403,12 @@ public partial class Main : Node
 		foreach (GamePresentationFactEnvelope fact in facts.Facts)
 		{
 			_recentFacts.Add(fact);
+			if (fact.Fact is PlayerCargoCollectedFact collected)
+			{
+				_cargoCollectedThisRefresh = true;
+				_cargoResultText = UiLocalization.Text("ui.cargo.collected", ("ship", Id(collected.ShipId.Value)),
+					("type", CargoName(collected.DefinitionKey)), ("quantity", collected.Quantity));
+			}
 		}
 
 		if (_recentFacts.Count > MaximumRecentFacts)
@@ -428,7 +452,13 @@ public partial class Main : Node
 
 		string[] recent = _recentFacts
 			.TakeLast(4)
-			.Select(fact => $"#{fact.Sequence.Value} {fact.Fact.GetType().Name}")
+			.Select(fact => fact.Fact switch
+			{
+				PlayerCargoCollectedFact collected => UiLocalization.Text("ui.cargo.collected", ("ship", Id(collected.ShipId.Value)), ("type", CargoName(collected.DefinitionKey)), ("quantity", collected.Quantity)),
+				ObservedCargoAppearanceFact appeared => UiLocalization.Text("ui.cargo.appeared", ("type", CargoName(appeared.Cargo.DefinitionKey)), ("quantity", appeared.Cargo.Quantity)),
+				ObservedCargoDisappearanceFact => UiLocalization.Text("ui.cargo.disappeared"),
+				_ => $"#{fact.Sequence.Value} {fact.Fact.GetType().Name}",
+			})
 			.ToArray();
 		return recent.Length == 0
 			? "ACTIVITY | No disclosed facts yet"

@@ -6,7 +6,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_evaluatingInteractions) throw new InvalidOperationException("Interaction evaluation must use stable inputs and buffer its effects.");
-        if (_isPoisoned)
+        if (_isPoisoned || _cargo is { IsHealthy: false } || _cargoAttempts is { IsHealthy: false })
         {
             throw new InvalidOperationException(
                 "The game session is unhealthy after an invariant failure.");
@@ -84,6 +84,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         {
             DeploySensorCommand deploy => HandleDeploySensor(envelope, deploy),
             PickupSensorCommand pickup => HandlePickupSensor(envelope, pickup),
+            CollectCargoObjectCommand collect => HandleCollectCargoObject(envelope, collect),
+            CollectCargoFieldCommand field => HandleCollectCargoField(envelope, field),
             MoveShipCommand move => HandleMove(envelope.Source, move),
             MoveShipGroupCommand groupMove => HandleGroupMove(envelope.Source, groupMove),
             CancelShipOrderCommand cancel => HandleCancel(envelope.Source, cancel),
@@ -99,8 +101,12 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         };
         foreach (ShipId ship in result.FactProposals.Select(proposal => proposal.Fact).OfType<ShipOrderTransitionFact>()
             .Select(fact => fact.ShipId).Distinct().OrderBy(ship => ship.Value))
+        {
             SynchronizeSensorInterest(ship);
+            SynchronizeCargoInterest(ship);
+        }
         FlushSensorReevaluations();
+        FlushCargoReevaluations();
         return result;
     }
 

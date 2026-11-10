@@ -33,7 +33,8 @@ public sealed record BenchmarkScenarioReport(
     ulong SimulatedMilliseconds,
     IReadOnlyDictionary<string, long> Counts,
     string DomainMeasurementsAvailability,
-    BenchmarkTiming Timing);
+    BenchmarkTiming Timing,
+    IReadOnlyDictionary<string, BenchmarkDomainMeasurement>? DomainMeasurements = null);
 
 public sealed record BenchmarkRunReport(
     int SchemaVersion,
@@ -127,6 +128,7 @@ public static class BenchmarkApplication
 
         var elapsed = new double[measuredIterations];
         var allocated = new long[measuredIterations];
+        var domainSamples = new List<IReadOnlyDictionary<string, BenchmarkDomainMeasurement>>();
         int generation0Before = GC.CollectionCount(0);
         int generation1Before = GC.CollectionCount(1);
         int generation2Before = GC.CollectionCount(2);
@@ -139,6 +141,10 @@ public static class BenchmarkApplication
             elapsed[index] = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
             allocated[index] = checked(
                 GC.GetTotalAllocatedBytes(true) - allocatedBefore);
+            if (result.DomainMeasurements is { } domains)
+            {
+                domainSamples.Add(domains);
+            }
             if (reference is null)
             {
                 reference = result;
@@ -170,6 +176,8 @@ public static class BenchmarkApplication
             GC.CollectionCount(0) - generation0Before,
             GC.CollectionCount(1) - generation1Before,
             GC.CollectionCount(2) - generation2Before);
+        IReadOnlyDictionary<string, BenchmarkDomainMeasurement>? domainMeasurements =
+            AggregateDomainMeasurements(domainSamples, measuredIterations);
         return new BenchmarkScenarioReport(
             configuration.Id,
             configuration.BasePreset,
@@ -179,8 +187,37 @@ public static class BenchmarkApplication
             correctness.Digest,
             correctness.SimulatedMilliseconds,
             correctness.Counts,
-            "unavailable",
-            timing);
+            domainMeasurements is null ? "unavailable" : "available",
+            timing,
+            domainMeasurements);
+    }
+
+    /// <summary>Reports measured domain medians without making performance part of correctness identity.</summary>
+    private static SortedDictionary<string, BenchmarkDomainMeasurement>? AggregateDomainMeasurements(
+        List<IReadOnlyDictionary<string, BenchmarkDomainMeasurement>> samples,
+        int measuredIterations)
+    {
+        if (samples.Count == 0)
+        {
+            return null;
+        }
+
+        if (samples.Count != measuredIterations
+            || samples.Any(sample => sample.Count != samples[0].Count
+                || samples[0].Keys.Any(key => !sample.ContainsKey(key))))
+        {
+            throw new InvalidOperationException("Domain measurement keys changed across measured iterations.");
+        }
+
+        var result = new SortedDictionary<string, BenchmarkDomainMeasurement>(StringComparer.Ordinal);
+        foreach (string key in samples[0].Keys)
+        {
+            double[] milliseconds = samples.Select(sample => sample[key].Milliseconds).Order().ToArray();
+            long[] bytes = samples.Select(sample => sample[key].AllocatedBytes).Order().ToArray();
+            result.Add(key, new(Median(milliseconds), Median(bytes)));
+        }
+
+        return result;
     }
 
     private static void RequireEquivalent(

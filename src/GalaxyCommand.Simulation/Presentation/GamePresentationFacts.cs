@@ -27,6 +27,16 @@ public sealed record PlayerCommandOutcomeFact(
     CommandResultStatus Status,
     CommandRejectionCode? RejectionCode) : GameFact;
 
+/// <summary>The owned ship's received cargo, without target identity, hidden lifecycle outcome or causal authority.</summary>
+public sealed record PlayerCargoCollectedFact(ShipId ShipId, ShipOrderId OrderId, QualifiedContentKey DefinitionKey,
+    Quantity Quantity, ItemInstanceId? InstanceId) : GameFact;
+
+/// <summary>Covered cargo appearance containing only the approved live object view.</summary>
+public sealed record ObservedCargoAppearanceFact(CargoObjectView Cargo) : GameFact;
+
+/// <summary>Covered cargo disappearance without contents, cause, collector, source or expiry details.</summary>
+public sealed record ObservedCargoDisappearanceFact(EntityId EntityId, SystemPosition Position) : GameFact;
+
 /// <summary>External spatial evidence without private motion, order, or removal details.</summary>
 public sealed record ObservedShipChangeFact(
     ShipId ShipId,

@@ -151,7 +151,7 @@ public sealed class EntityLifecycleTests
         var materialized = Assert.IsType<ConstructionEntityMaterializationResult.Materialized>(
             commit.Result);
         Assert.Equal(
-            new InventoryCustody(
+            new InventoryCustody.PrincipalControlled(
                 new InventoryOwnerReference.SessionEntity(materialized.EntityId),
                 policy.PrincipalId),
             owner.Inventories.Get(materialized.CargoInventoryId)!.Custody);

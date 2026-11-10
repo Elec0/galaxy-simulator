@@ -26,6 +26,10 @@ window/stretch/mode="canvas_items"
 
 project/assembly_name="GalaxyCommand.Godot"
 
+[internationalization]
+
+locale/translations=PackedStringArray("res://Locales/en.po")
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

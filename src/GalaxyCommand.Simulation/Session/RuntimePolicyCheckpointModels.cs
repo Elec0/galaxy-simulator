@@ -42,11 +42,28 @@ internal sealed record SensorDeployableDefinitionCheckpoint(
     QualifiedContentKey? Key, string? Name, Quantity CapacityCost,
     ulong DeploymentRangeUnits, ulong SensorRadiusUnits);
 
+internal sealed record CargoRecoveryFractionCheckpoint(CargoLossCause Cause, ulong Numerator, ulong Denominator);
+
+internal sealed record CargoDispositionPolicyCheckpoint(
+    QualifiedContentKey? Key,
+    int GenerationBehaviorVersion,
+    int MergeBehaviorVersion,
+    int OrderingBehaviorVersion,
+    int DurationBehaviorVersion,
+    IReadOnlyList<CargoRecoveryFractionCheckpoint?>? RecoveryByCause,
+    int FungibleObjectCount,
+    ulong ScatterRadiusMeters,
+    SimulationDuration Lifetime,
+    SimulationDuration MinimumCollectionDuration,
+    SimulationDuration MaximumCollectionDuration,
+    Quantity CollectionStorageCap);
+
 internal sealed record RuntimePolicyManifestCheckpoint(
     NavigationPolicyCheckpoint? Navigation,
     TravelTimePolicyCheckpoint? TravelTime,
     IReadOnlyList<MaterializationPolicyCheckpoint?> MaterializationPolicies,
     int FactRetentionCapacity,
     IReadOnlyList<ShipDesignPolicyCheckpoint?>? ShipDefinitions = null,
-    IReadOnlyList<SensorDeployableDefinitionCheckpoint?>? SensorDeployableDefinitions = null);
+    IReadOnlyList<SensorDeployableDefinitionCheckpoint?>? SensorDeployableDefinitions = null,
+    CargoDispositionPolicyCheckpoint? CargoPolicy = null);
 

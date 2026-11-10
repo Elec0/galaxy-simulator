@@ -38,6 +38,7 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         _runtime.ObservationTimestampCompleted = CompletePlayerDisclosure;
         _runtime.NextObservationBoundary = FindNextDeployableObservationBoundary;
         _random = new DeterministicRandomOwner(setup.RandomRootSeed);
+        _runtime.InitializeCargoAuthority(_random);
         _commands = new GameplayCommandProcessor(this, _facts);
         _spatialInteractions.AttachMutationGuard(EnsureHealthy);
         _runtime.AttachSpatialInteractions(_spatialInteractions, this);
@@ -245,7 +246,8 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             request.FactCursor,
             request.MaximumFactCount);
         return GamePresentationSnapshotFactory.Create(world, request, facts,
-            _runtime.CaptureShipCoverage(request.ObserverPrincipalId), CaptureObservedDeployables());
+            _runtime.CaptureShipCoverage(request.ObserverPrincipalId), CaptureObservedDeployables(),
+            CaptureVisibleCargo(), CaptureCargoCollectionProgress());
     }
 
     /// <summary>
@@ -299,7 +301,7 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             value.InventoryCommit,
             _spatialInteractions.CaptureCheckpoint(),
             new PlayerObservationCheckpoint(2, value.Relationships.PlayerPrincipalId, _playerCommandSource,
-                Array.AsReadOnly(_deployableObservations.Values.OrderBy(item => item.View.EntityId.Value).ToArray())));
+                Array.AsReadOnly(_deployableObservations.Values.OrderBy(item => item.View.EntityId.Value).ToArray())), value.Cargo, value.CargoCollectionAttempts, value.CargoCollectionTargets);
         return CheckpointResult<GameSessionCheckpoint>.Success(checkpoint);
     }
 
@@ -421,7 +423,7 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             checkpoint.Lifecycle,
             checkpoint.Relationships,
             checkpoint.Economy,
-            checkpoint.InventoryCommit);
+            checkpoint.InventoryCommit, checkpoint.Cargo, checkpoint.CargoCollectionAttempts, checkpoint.CargoCollectionTargets);
         CheckpointResult<ActorOrderRuntimeCoordinator> runtime = definitions is null
             ? ActorOrderRuntimeCoordinator.RestoreCheckpoint(
                 runtimeCheckpoint,
@@ -440,6 +442,14 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         {
             return CheckpointResult<GameSession>.Rejected(runtime.Failure!);
         }
+
+        CheckpointValidationFailure? cargoFailure = runtime.Value!.RestoreCargoAuthority(random.Value!, checkpoint.Cargo, checkpoint.CargoCollectionAttempts, checkpoint.CargoCollectionTargets);
+        if (cargoFailure is not null) return CheckpointResult<GameSession>.Rejected(cargoFailure);
+        CheckpointValidationFailure? cargoAdmissionFailure = ValidateCargoAdmissionHistory(checkpoint);
+        if (cargoAdmissionFailure is not null) return CheckpointResult<GameSession>.Rejected(cargoAdmissionFailure);
+
+        CheckpointValidationFailure? collectionFailure = ValidateCargoCollectionCheckpoint(checkpoint, definitions);
+        if (collectionFailure is not null) return CheckpointResult<GameSession>.Rejected(collectionFailure);
 
         CheckpointValidationFailure? sensorFailure = ValidateSensorCheckpoint(checkpoint);
         if (sensorFailure is not null) return CheckpointResult<GameSession>.Rejected(sensorFailure);

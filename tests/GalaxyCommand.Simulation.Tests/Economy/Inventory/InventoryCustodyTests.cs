@@ -5,11 +5,36 @@ namespace GalaxyCommand.Simulation.Tests;
 public sealed class InventoryCustodyTests
 {
     [Fact]
+    public void UnclaimedCargoRetainsPhysicalEntityWithoutInventingAPrincipal()
+    {
+        var cargoObjectId = new EntityId(23);
+        InventoryCustody custody = new InventoryCustody.Unclaimed(cargoObjectId);
+
+        Assert.IsType<InventoryCustody.Unclaimed>(custody);
+        Assert.Equal(cargoObjectId, Assert.IsType<InventoryOwnerReference.SessionEntity>(custody.PhysicalOwner).EntityId);
+        Assert.Null(custody.ControllingPrincipalId);
+    }
+
+    [Fact]
+    public void UnclaimedCargoRejectsDefaultPhysicalIdentity()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new InventoryCustody.Unclaimed(default));
+    }
+
+    [Fact]
+    public void PrincipalControlledCustodyRejectsDefaultPrincipalAndMissingOwner()
+    {
+        var owner = new InventoryOwnerReference.SessionEntity(new EntityId(23));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new InventoryCustody.PrincipalControlled(owner, default));
+        Assert.Throws<ArgumentNullException>(() => new InventoryCustody.PrincipalControlled(null!, new PrincipalId(4)));
+    }
+
+    [Fact]
     public void SessionEntityOwnerAcceptsAnySessionEntityIdentity()
     {
         var entityId = new EntityId(17);
 
-        var custody = new InventoryCustody(
+        var custody = new InventoryCustody.PrincipalControlled(
             new InventoryOwnerReference.SessionEntity(entityId),
             new PrincipalId(4));
 
@@ -24,7 +49,7 @@ public sealed class InventoryCustodyTests
     {
         var facilityId = new FacilityId(8);
 
-        var custody = new InventoryCustody(
+        var custody = new InventoryCustody.PrincipalControlled(
             new InventoryOwnerReference.Facility(facilityId),
             new PrincipalId(4));
 
@@ -48,7 +73,7 @@ public sealed class InventoryCustodyTests
     [Fact]
     public void CustodyAwareInventoryCheckpointPreservesOwnerAndController()
     {
-        var custody = new InventoryCustody(
+        var custody = new InventoryCustody.PrincipalControlled(
             new InventoryOwnerReference.SessionEntity(new EntityId(17)),
             new PrincipalId(4));
         var inventory = new Inventory(

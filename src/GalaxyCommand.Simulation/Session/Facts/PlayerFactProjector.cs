@@ -22,6 +22,10 @@ internal sealed class PlayerFactProjector(CommandSource playerCommandSource, Gam
 
         return fact switch
         {
+            CargoObjectAppearedFact appearance => coverage.Contains(appearance.Object.Position)
+                ? new ObservedCargoAppearanceFact(appearance.Object) : null,
+            CargoObjectDisappearedFact disappearance => coverage.Contains(disappearance.Position)
+                ? new ObservedCargoDisappearanceFact(disappearance.EntityId, disappearance.Position) : null,
             SensorDeployedFact appearance => coverage.Contains(appearance.Sensor.Position)
                 ? new ObservedSensorChangeFact(appearance.Sensor.EntityId, appearance.Sensor.DefinitionKey,
                     appearance.Sensor.PrincipalId, appearance.Sensor.Position, ObservedSensorChangeKind.Appeared) : null,
@@ -64,6 +68,12 @@ internal sealed class PlayerFactProjector(CommandSource playerCommandSource, Gam
         }
         switch (fact)
         {
+            case CargoCollectedFact collected:
+                // Receiving cargo is the owned ship's evidence. Target visibility,
+                // remaining contents and retirement do not authorize a world notice.
+                result = subjectPrincipal == observer ? new PlayerCargoCollectedFact(collected.ShipId,
+                    collected.OrderId, collected.Outcome.DefinitionKey, collected.Outcome.Quantity, collected.Outcome.InstanceId) : null;
+                return true;
             case CommandAcceptedFact accepted:
                 result = accepted.Source == playerSource ? new PlayerCommandOutcomeFact(accepted.CommandSequence,
                     accepted.CommandKind, CommandResultStatus.Accepted, null) : null;

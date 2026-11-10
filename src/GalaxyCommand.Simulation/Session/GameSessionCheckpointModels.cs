@@ -13,7 +13,10 @@ internal sealed record GameSessionRuntimeCheckpoint(
     EntityLifecycleCheckpoint Lifecycle,
     RelationshipCheckpoint Relationships,
     SessionEconomyCheckpoint? Economy,
-    InventoryCommitOwnerCheckpoint? InventoryCommit = null);
+    InventoryCommitOwnerCheckpoint? InventoryCommit = null,
+    CargoDispositionOwnerCheckpoint? Cargo = null,
+    CargoCollectionAttemptOwnerCheckpoint? CargoCollectionAttempts = null,
+    IReadOnlyList<CargoCollectionTarget>? CargoCollectionTargets = null);
 
 internal sealed record GameSessionCheckpoint(
     SimulationEngineCheckpoint<GameEvent> Engine,
@@ -30,5 +33,8 @@ internal sealed record GameSessionCheckpoint(
     CommandAdmissionCheckpoint CommandAdmission,
     InventoryCommitOwnerCheckpoint? InventoryCommit = null,
     SpatialInteractionRegistrationCheckpoint? SpatialInteractions = null,
-    PlayerObservationCheckpoint? PlayerObservation = null);
+    PlayerObservationCheckpoint? PlayerObservation = null,
+    CargoDispositionOwnerCheckpoint? Cargo = null,
+    CargoCollectionAttemptOwnerCheckpoint? CargoCollectionAttempts = null,
+    IReadOnlyList<CargoCollectionTarget>? CargoCollectionTargets = null);
 

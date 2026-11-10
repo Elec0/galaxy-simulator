@@ -10,12 +10,13 @@ domain must account for that survival, physical presence, and eventual
 transfer into another inventory without duplicating cargo or silently deleting
 it.
 
-**Task:** TASK-108. Design begun at the owner's request.
+**Task:** TASK-108.
 
 **Status:** Design complete and accepted by the project owner,
 including C01-C12 and R01-R10. The owner approved R01-R03, R04-R06, and
 R07-R09 as drafted; R10's closing behavior was separately accepted.
-Implementation remains pending under TASK-108. TASK-105's design dependency is
+Implementation has begun with the evaluation, inventory, identity, and policy
+boundaries described below. TASK-105's design dependency is
 resolved; its live cargo-loss commits still require the shared cargo runtime.
 
 ## Established boundaries
@@ -25,7 +26,7 @@ resolved; its live cargo-loss commits still require the shared cargo runtime.
 | Station Q12 and Q51 separate storage loss from disposition. | TASK-105 selects affected cargo; shared disposition determines permanent destruction versus recoverable ejection. Do not apply the station loss fraction twice. |
 | Station R01 defines threshold accumulation, whole-unit loss, overflow credits, and deterministic selection. | Credits count all cargo removed from storage, including ejected cargo. Recovery does not put that cargo back into surviving station storage. |
 | Inventory uses fungible quantities and stable discrete item identities. | Recovery must distinguish quantities from exact instances. A rendered stack is not an authoritative object identity. |
-| Inventory custody currently requires a typed physical owner and a controlling principal. | Accepted unclaimed cargo requires a custody representation that does not fabricate a neutral principal. R01 defines its accepted technical representation. |
+| Inventory custody distinguishes typed physical ownership and principal control. | Unclaimed cargo uses an explicit variant without fabricating a neutral principal. R01 defines its accepted technical representation. |
 | Reservations do not protect station cargo from destruction. | The causal loss owner prepares affected workflow invalidation. Shared disposition cannot silently erase reservations or decide workflow failure behavior. |
 | Lifecycle creation and removal prepare every affected owner before mutation. | Source removal and recoverable-object publication must succeed together, including accounting, commitments, identity allocation, and receipts. |
 | Facts and presentation use commit-time disclosure. | A hidden loss cannot disclose private inventory, object contents, or a hidden cause through collection targets or notices. R06 defines the accepted safe-view and notice contract. |
@@ -44,10 +45,10 @@ explicit destruction or transfer to an existing inventory in
 alone does not implement partial storage loss, creation of a destination
 during the same transaction, or collectible cargo.
 
-`InventoryCustody.cs` requires a nonzero controlling principal and a typed
-owner. It can reference a registered session entity, but that reference alone
-does not establish a cargo-object entity kind, lifecycle, spatial target, or
-observation policy.
+`InventoryCustody.cs` now distinguishes principal-controlled custody from
+explicit unclaimed cargo custody. Lifecycle admission validates the cargo
+entity/inventory link. This does not yet provide a player-visible spatial
+target or observation policy.
 
 `SensorDeployableTransactions.cs` provides a nearby example of coordinated
 inventory and entity publication, range validation, and idempotent receipts.
@@ -59,19 +60,254 @@ TASK-105 currently has pure construction and storage-loss arithmetic. Its
 existing calculations do not constitute cargo selection, disposition, or live
 station lifecycle integration.
 
+### Initial arithmetic and generation implementation
+
+`CargoDispositionArithmetic` evaluates recovery fractions, collection durations,
+and expiry without changing authoritative state. Fractions are explicit inputs:
+the helper floors once per selected definition and occurrence, and does not
+select a cause policy or repeat station storage-loss calculations. Duration
+uses the object's full start-time occupied storage and rounds the exact capped
+curve upward once to a whole millisecond. Expiry rejects timeline overflow.
+
+`CargoDispositionGeneration` implements R02's partial Fisher-Yates survivor
+selection, Floyd cut selection, and integer-disk scatter. It accepts original
+item identities and already-surviving fungible quantities. Selected identities
+remain original and are returned in canonical order; no item, inventory, or
+entity allocator is consumed. Stateless samples use source identity, separate
+command/event namespaces, causal occurrence, generation behavior version,
+qualified definition, purpose, and explicit sample coordinates. Full event-key
+replay equality remains the future receipt owner's responsibility.
+
+These helpers are internal evaluation building blocks. Their coverage includes
+numeric extremes, positive partitions and quantity conservation, original item
+identity selection, valid scatter at coordinate-envelope edges, repeatable
+evaluation, and serial/worker/batch equivalence. They do not publish live cargo,
+transfer item state, define unclaimed custody, merge fields, reserve capacity,
+schedule collection, or extend content/checkpoint admission on their own.
+R09 remains the full delivery boundary, including live TASK-105 station integration.
+
+### Cargo identity, inventory, and policy implementation
+
+`CargoObjectLifecycle` prepares stationary cargo entities and their inventory
+identities without consuming the shared lifecycle allocators. Publication
+revalidates allocator positions, identity conflicts, custody, positive
+single-content inventories, and discrete-item uniqueness. Source removal and
+the causal disposition receipt must still be prepared by the enclosing
+transaction. In particular, a discrete survivor cannot be published while its
+original instance remains in the source inventory.
+
+Unclaimed inventories reject stores, incoming transfers, and gameplay
+reservations, including legacy material and whole-inventory transfer paths.
+Only private initialization and restoration can populate new cargo storage.
+Partial collection retains the original capacity without enabling refill.
+Inventory restore validates cargo shape and global item identity uniqueness;
+lifecycle restore requires every unclaimed inventory to have exactly one
+registered cargo owner and rejects identity reuse against retained lifecycle
+history. Discrete transfers retain the original instance object.
+
+`ReservationOwner.CargoCollection` binds generalized incoming capacity to a
+ship, order, and attempt generation. The collection settlement entry point
+checks the resolved actor/entity custody and exact reservation, transfers the
+actual quantity, and releases unused capacity atomically. Other workflow
+transfers continue to require exact reserved capacity. Timers and order
+authority are not supplied by this inventory primitive.
+
+The content loader admits an explicitly referenced `cargo-policy` definition.
+The core and preview scenarios author the approved values, including every
+supported cause. Runtime manifests retain the exact policy key, fractions,
+algorithm versions, and parameters through in-memory session restoration.
+This is not encoded-save delivery, and it does not schedule cargo events.
+
+```mermaid
+flowchart LR
+    policy["Explicit content policy"] --> evaluation["Pure cargo evaluation"]
+    evaluation --> transaction["Prepared cargo transaction"]
+    transaction --> lifecycle["Cargo entity and stationary position"]
+    transaction --> inventory["Unclaimed inventory<br/>sole contents authority"]
+    collector["Collection attempt<br/>runtime remains open"] --> settlement["Capacity settlement"]
+    inventory --> settlement
+    settlement --> ship["Principal-controlled ship inventory"]
+```
+
+`CargoDebrisFields` supplies prepared logical membership changes independently
+of physical cargo contents. It retains original occurrence circles, merges
+touching same-system fields through an indexed exact-distance query, flattens
+aliases to the lowest field identity, and never splits a merged field.
+Removing the last member retires the circles while retaining aliases and the
+empty-field tombstone. Its component checkpoint restores membership, original
+circle provenance, aliases, tombstones, and allocator continuity while
+rebuilding the derived interval index. The causal transaction joins those
+fields to its receipts and live physical objects as described below.
+
+### Causal disposition and scheduled expiry implementation
+
+`CargoSourceLoss` prepares canonical selected holdings and exact authorized
+inventory-reservation cleanup. It preserves untouched commitments, returns
+original discrete instances, and rejects stale source state without mutation.
+It does not cancel the transport, production, or construction workflow that
+owns a reservation; that workflow's invalidation is a separate causal-owner
+delta that still needs live station integration.
+
+`CargoDispositionOwner` joins source loss, survival and scatter, prepared
+entity/inventory publication, field membership, exact expiry envelopes, durable
+replay receipts, and private diagnostic facts. Source-aware lifecycle preflight
+proves that emitted items are selected original instances and that fungible
+shares fit the selected quantities and exact capacity costs. Every participant
+is revalidated before source mutation. Exact preflight also regenerates the
+expected recovery publication, matches source selection and authorized cleanup,
+and checks expiry, field effects, and event capacity. A merely bounded subset
+of generated cargo cannot commit while its receipt claims full recovery.
+Unexpected failure during commit poisons
+cargo authority and its enclosing session; facts publish last.
+
+Receipts compare canonical source inventory/position, typed command or full
+event cause, occurrence, cause policy, selected quantities/instances, and
+authorized inventory cleanup. Replay is resolved before source lookup, so
+later source movement or removal does not recreate cargo. The live station
+path must still join its exact accounting input and external workflow deltas
+to this preparation and receipt boundary.
+
+The session supplies cargo's declared physical definitions and shared random,
+agenda, and fact owners. Expiry participates in the StateUpdate wave after
+generic spatial and sensor effects, in object-identity order, before wave
+acknowledgement. Exact expiry permanently destroys remaining contents and
+retires physical membership without replacement output. Stale or unconsumed
+envelopes cannot retire another object. Collection completion joins the same
+wave: invalidation runs first, accepted command sequence and ship identity
+order contested completions, and remaining expiry follows. Next-object
+selection and new timers wait until the reduction finishes.
+
+In-memory checkpoint restoration regenerates historical generation inputs for
+validation without allocating identities, advancing random streams, replaying
+gameplay, or resetting expiry. It joins receipts, original circles, aliases,
+tombstones, physical objects and remaining inventory, pending expiry keys,
+policy meaning, and retained private facts. The session additionally checks
+topology and command/item allocator continuity. Historical sources require real
+live or removed source-to-inventory mappings rather than allocator high-water
+marks alone. Source systems must be registered, destroyed selected item IDs
+cannot regain live custody, and retained expiry outcomes cannot contradict live
+item custody. Collection restoration also
+joins retained intent and observed anchors, attempt generations, reserved
+capacity, motion revisions, exact pending completion/exit work, and admitted
+command identities. Immediate reevaluation work must retain its current-time,
+generationless envelope and an explicitly enabled cargo owner. Historical anchors are validated from disposition
+receipts; restoration does not replace hidden approach targets with current
+world state. Alias validation checks possible lifetime continuity as well as
+geometric connectivity: an emptied field cannot be resurrected by a later
+occurrence after all its possible members expired. This permits original
+circles to persist while another merged occurrence still has live members,
+without inventing collection history evicted from the bounded fact store.
+
+Object and field collection commands use existing order placement, actor
+control, navigation, and managed stationary interests. Timers reserve only
+incoming ship capacity and retain committed approach motion. Cancellation,
+replacement, suspension, strict range exit, and target loss release the exact
+reservation and cancel owned work. In-range admission preserves nonzero
+velocity through ordinary passive drag; collection does not freeze the ship.
+An exit waits for that committed motion before resuming approach. Its waiting
+state restores directly, and reentry starts a new full-duration attempt. Field reselection uses covered members,
+priority, distance, and identity. The actor-removal handoff remains paused on
+the commitment-release proof prerequisite recorded as TASK-115.
+
+The player receives fresh covered cargo views and bounded inspection of its
+own active in-range pickup, including outside sensor coverage. Inspection
+creates no map contact or sensor source. Successful collection has a saved,
+owned result containing the ship, order, definition, quantity, and original
+item identity. Private disposition and expiry facts have no player projection.
+Separate appearance and bounded disappearance facts capture committed object data;
+their saved notices require coverage and disclose no removal cause, source,
+collector, or expiry attribution. New field commands require an original handle
+currently offered by a covered object. Public field inspection groups covered
+objects only by their exposed original handle; private aliases never regroup
+the inspector. Existing field orders may still follow those aliases and select
+other covered members under R10, without exposing canonical IDs or extent.
+
+Client cargo selection and editable priority drafts are independent from ship
+focus and create immutable single-ship commands through the existing input
+FIFO. The Godot inspector provides separate named ship/cargo lists, covered
+object and visible field details, explicit placement and collection actions,
+priority editing, focused cancellation, saved-time progress, and bounded
+results. Cargo marker selection preserves ship focus. The shared gettext
+helper resolves semantic English keys and complete typed templates; native
+controls provide keyboard selection, actions, disabled state, and stable focus
+fallback. A populated generic fixture exercises the UI callbacks and renders
+selection, actions, progress, and completion. It does not create a new player
+spawn/ejection command or qualify live station behavior. Broader application
+shell and cross-platform accessibility qualification remain with TASK-077.
+
+The owner kept the approved live station runtime separate as TASK-105 and
+placed station integration on hold until that runtime is delivered. This
+retains the R09 proof requirement; generic sources do not replace it.
+
+The owner kept the missing whole-session typed JSON bridge separate as
+TASK-116 and paused encoded cargo-save delivery until that prerequisite is
+available. In-memory continuation does not close R08.
+
+Encoded checkpoint continuity, live station loss/accounting, workflow cleanup,
+and full delivery proof remain under TASK-108's R09 boundary. Generic component
+measurements below and the UI fixture do not establish station integration.
+An internal emitter or component restore is not the required
+station-loss-to-collection proof.
+
+### Generic component scale measurements
+
+The `cargo.component-*` benchmark presets measure shared disposition, fields,
+expiry, and collection orders. They use generic registered sources and do not
+establish the live station accounting or workflow-cleanup proof required by
+R09. Mutable ownership and commits remain serial; the batched variants use
+only the existing immutable spatial-evaluation path.
+
+Local Debug measurements used .NET 10.0.10 on macOS Arm64 with 11 reported
+logical processors, one warmup, and three measured iterations. Times are
+informational under concurrent workspace activity and do not establish a
+parallel speedup. Allocation is total allocated bytes per run, not retained
+or peak memory; peak managed memory remains unavailable.
+
+| Workload | Shape | Median wall time | Allocated MB |
+| --- | --- | ---: | ---: |
+| Separate losses | 128 occurrences, 512 objects | 59.68 ms | 50.01 |
+| Touching overlap chain | 128 circles merged into one field, 512 objects | 81.59 ms | 52.65 |
+| Large fungible quantities | 16 sources of one trillion units, 64 objects | 6.07 ms | 3.75 |
+| Contested timers, serial | 64 collectors targeting one object | 49.93 ms | 31.49 |
+| Contested timers, one worker / batch 16 | Same workload | 49.02 ms | 31.51 |
+| Contested timers, four workers / batch 16 | Same workload | 51.27 ms | 31.51 |
+
+Separate losses retain 128 receipts and 128 tombstones after all 512 expiry
+events, with no remaining circles or agenda entries. The overlap chain retains
+128 receipts, 127 aliases, and one tombstone after expiry, with no remaining
+circles. The large-quantity case preserves the configured four objects per
+occurrence without iterating once per cargo unit.
+
+The contested variants have the same authority digest,
+`513fdbed77382d36`, including causal inputs, item identities, custody, orders,
+reservations, agenda, facts/disclosures, policy, and random state. They process
+65 admitted commands and 192 events, retain 390 facts, and leave one winner,
+63 remaining objects/expiry envelopes, one original circle, one receipt, and
+no incoming reservations. Digest mutation checks cover causal cleanup,
+command/disclosure payloads, and random checkpoint changes; unexpected fixture
+payload types reject instead of silently disappearing from comparison.
+
+Reproduce through the benchmark executable using `--suite full` and the
+`cargo.component-separate-losses`, `cargo.component-overlap-chain`,
+`cargo.component-large-fungible`, `cargo.component-contested-timers-serial`,
+and `cargo.component-contested-timers-batched` presets. The batched preset
+accepts explicit `--set workerCount=4 --set batchSize=16`. Benchmark allocation,
+retention, and digest implementations are in
+[`CargoComponentBenchmarkScenario`](../../benchmarks/GalaxyCommand.Benchmarks/CargoComponentBenchmarkScenario.cs).
+
 ## Technical source evidence
 
-These sources establish current implementation shape; they do not imply cargo
-support already exists.
+These sources establish current implementation shape; they do not establish
+full cargo delivery.
 
 | Source | Current constraint or reusable boundary |
 | --- | --- |
-| [Custody](../../src/GalaxyCommand.Simulation/Economy/Inventory/InventoryCustody.cs) | A physical owner and nonzero principal are required today; R01 requires an explicit unclaimed variant. |
-| [Physical transfer](../../src/GalaxyCommand.Simulation/Economy/Inventory/PhysicalInventoryTransfers.cs) | Destination-only reservations and original-item transfer exist; smaller-than-reserved consumption needs R04's atomic extension. |
-| [Reservation owners](../../src/GalaxyCommand.Simulation/Economy/Inventory/Inventory.cs) | Transport, production, and construction owners exist; collection must extend admission and restore validation together. |
-| [StateUpdate host](../../src/GalaxyCommand.Simulation/Session/Runtime/ActorOrderRuntimeCoordinator.Interactions.cs) | Spatial/sensor envelopes and commit ordering are explicit; R05 defines the accepted cargo reduction extension. |
+| [Custody](../../src/GalaxyCommand.Simulation/Economy/Inventory/InventoryCustody.cs) | Explicit unclaimed custody is separate from principal control; lifecycle restore checks cargo ownership. |
+| [Physical transfer](../../src/GalaxyCommand.Simulation/Economy/Inventory/PhysicalInventoryTransfers.cs) | Ordinary transfers retain exact reservation costs; the separate collection entry point can consume and release unused incoming capacity. |
+| [Reservation owners](../../src/GalaxyCommand.Simulation/Economy/Inventory/Inventory.cs) | Collection owns generalized incoming capacity only; live attempt/agenda validation remains part of the collection runtime. |
+| [StateUpdate host](../../src/GalaxyCommand.Simulation/Session/Runtime/ActorOrderRuntimeCoordinator.Interactions.cs) | Cargo expiry follows spatial/sensor commits; collection-completion reduction remains part of R05 implementation. |
 | [Simulation time](../../src/GalaxyCommand.Simulation/Kernel/Time/SimulationTime.cs) and [random derivation](../../src/GalaxyCommand.Simulation/Kernel/Determinism/DeterministicRandom.cs) | Time is integer milliseconds; scoped stateless bounded samples are available. |
-| [Runtime policy manifest](../../src/GalaxyCommand.Simulation/Session/RuntimePolicyCheckpointModels.cs) | Runtime parameters are authoritative; cargo policy needs its own versioned entry. |
+| [Runtime policy manifest](../../src/GalaxyCommand.Simulation/Session/RuntimePolicyCheckpointModels.cs) | Cargo policy retains its exact versioned reference, fractions, and parameters. |
 
 ## Accepted foundation decisions
 
@@ -271,7 +507,8 @@ random state, or fact. A repeated accepted cause returns its receipt.
 
 **Decision status:** R01-R09 accepted by the project owner as
 drafted. R10 records the separately accepted closing behavior. Type names
-below identify approved responsibilities; runtime APIs remain to be implemented.
+below identify approved responsibilities rather than requiring a particular
+runtime API spelling.
 
 ### R01. Identity, custody, and authoritative contents
 
@@ -665,6 +902,7 @@ implementation contracts:
 | Choice | Accepted contract |
 | --- | --- |
 | Pickup interaction feedback outside coverage | An owned ship actively collecting within pickup range may inspect current target contents and receive target-loss feedback without sensor coverage. Use that inspection for start-time size and capacity. The object remains hidden on the map; this creates no sensor source or visibility of other objects. Approaching orders still receive no hidden target updates. |
+| In-range admission with retained velocity | If replacing another move leaves the ship already in pickup range with nonzero velocity, use the existing passive-drag motion during pickup. Appended pickup also retains existing passive drag. Its physical completion must not end or restart the collection timer. |
 | Motion while collecting | Keep the already committed approach motion. Do not submit a new travel leg during the active attempt. Monitor exact range, and reset collection if the ship leaves range. Existing motion remains under its owning subsystem. |
 | Hidden merges with covered objects | An existing field order may choose other currently covered objects from the privately merged field. A hidden merge must not regroup the inspector or reveal hidden object counts, contents, or extent. |
 

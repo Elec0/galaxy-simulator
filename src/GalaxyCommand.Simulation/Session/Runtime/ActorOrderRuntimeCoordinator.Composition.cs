@@ -18,6 +18,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
     private readonly GameFactStore _facts;
     private readonly IReadOnlyList<ShipDesign> _shipDefinitions;
     private readonly IReadOnlyList<SensorDeployableDefinition> _sensorDeployableDefinitions;
+    private readonly CargoDispositionPolicy? _cargoPolicy;
     private readonly IReadOnlyDictionary<ConstructionDesignId, ShipManeuverCapability>
         _maneuverCapabilities;
     private readonly List<GameEventRecord> _eventRecords = [];
@@ -36,11 +37,16 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         _control = new ActorControlRegistry();
         _orders = new ShipOrderCoordinator();
         _worldTopology = new WorldTopology(setup.Systems, setup.ConnectorTopology);
+        _cargoSystemIds = _worldTopology.Systems.Select(system => system.Id).ToHashSet();
         _navigation = navigation;
         _facts = facts;
         _shipDefinitions = new ShipDefinitionCatalog(setup.Ships.Select(ship => ship.Design)
             .Concat(setup.MaterializationPolicies.SelectMany(policy => policy.AllowedDesigns.Values))).Definitions;
         _sensorDeployableDefinitions = setup.SensorDeployableDefinitions;
+        _cargoPolicy = setup.CargoPolicy;
+        _cargoDefinitions = new PhysicalDefinitionCatalog(setup.Ships.SelectMany(ship => ship.Cargo)
+            .Concat(setup.SensorDeployableDefinitions.Select(definition => definition.Physical))
+            .Concat(setup.Economy?.MaterialCompatibility?.Mappings.Values ?? []).Distinct());
         _sensorRadii = BuildSensorRadii(_shipDefinitions);
         _maneuverCapabilities = BuildManeuverCapabilities(_shipDefinitions);
         _relationships = new RelationshipOwner(setup.Relationships);
@@ -74,10 +80,13 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         SessionEconomyOwner? economy,
         SimulationEngineCheckpoint<GameEvent> engineCheckpoint,
         IReadOnlyList<ShipDesign> shipDefinitions,
-        IReadOnlyList<SensorDeployableDefinition> sensorDeployableDefinitions)
+        IReadOnlyList<SensorDeployableDefinition> sensorDeployableDefinitions,
+        CargoDispositionPolicy? cargoPolicy,
+        PhysicalDefinitionCatalog? cargoDefinitions)
     {
         _facts = facts;
         _worldTopology = worldTopology;
+        _cargoSystemIds = worldTopology.Systems.Select(system => system.Id).ToHashSet();
         _navigation = navigation;
         _movement = movement;
         _control = control;
@@ -87,6 +96,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         _relationships = relationships;
         _shipDefinitions = shipDefinitions;
         _sensorDeployableDefinitions = sensorDeployableDefinitions;
+        _cargoPolicy = cargoPolicy;
+        _cargoDefinitions = cargoDefinitions ?? new PhysicalDefinitionCatalog(sensorDeployableDefinitions.Select(definition => definition.Physical));
         _sensorRadii = BuildSensorRadii(_shipDefinitions);
         _economy = economy;
         _maneuverCapabilities = BuildManeuverCapabilities(_shipDefinitions);
@@ -160,9 +171,9 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
             ]);
     }
 
-    public bool ShouldStop => _isPoisoned;
+    public bool ShouldStop => _isPoisoned || _cargo is { IsHealthy: false } || _cargoAttempts is { IsHealthy: false };
 
-    internal bool IsHealthy => !_isPoisoned && !_disposed;
+    internal bool IsHealthy => !_isPoisoned && !_disposed && _cargo is not { IsHealthy: false } && _cargoAttempts is not { IsHealthy: false };
 
     /// <summary>
     /// Captures all runtime-owned sections only after engine and movement state
@@ -171,7 +182,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
     internal CheckpointResult<GameSessionRuntimeCheckpoint> CaptureCheckpoint(
         int factRetentionCapacity)
     {
-        if (_isPoisoned || _disposed)
+        if (_isPoisoned || _disposed || _cargo is { IsHealthy: false } || _cargoAttempts is { IsHealthy: false })
         {
             return RuntimeRejected(
                 "$.checkpoint.health",
@@ -202,7 +213,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                 _navigation,
                 _lifecycle.MaterializationPolicies,
                 factRetentionCapacity,
-                _shipDefinitions, _sensorDeployableDefinitions);
+                _shipDefinitions, _sensorDeployableDefinitions, _cargoPolicy);
         if (!policies.IsSuccess)
         {
             return CheckpointResult<GameSessionRuntimeCheckpoint>.Rejected(policies.Failure!);
@@ -222,6 +233,14 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
             economyCheckpoint = economy.Value;
         }
 
+        CheckpointResult<CargoDispositionOwnerCheckpoint>? cargo = _cargo?.CaptureCheckpoint();
+        if (cargo is not null && !cargo.IsSuccess)
+            return CheckpointResult<GameSessionRuntimeCheckpoint>.Rejected(cargo.Failure!);
+        if (_cargoPolicy is not null && cargo is null)
+            return RuntimeRejected("$.checkpoint.cargo", "Cargo authority has not been attached.");
+        CheckpointResult<CargoCollectionAttemptOwnerCheckpoint>? attempts = _cargoAttempts?.CaptureCheckpoint();
+        if (attempts is not null && !attempts.IsSuccess)
+            return CheckpointResult<GameSessionRuntimeCheckpoint>.Rejected(attempts.Failure!);
         var checkpoint = new GameSessionRuntimeCheckpoint(
             engine.Value!,
             policies.Value!,
@@ -232,7 +251,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
             _lifecycle.CaptureCheckpoint(),
             _relationships.CaptureCheckpoint(),
             economyCheckpoint,
-            _inventoryCommit.CaptureCheckpoint());
+            _inventoryCommit.CaptureCheckpoint(), cargo?.Value, attempts?.Value,
+            Array.AsReadOnly(_cargoTargets.Values.OrderBy(target => target.OrderId.Value).ToArray()));
         CheckpointValidationFailure? ownerFailure = ValidateActorOwnership(checkpoint);
         if (ownerFailure is not null)
         {
@@ -358,6 +378,14 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
             return CheckpointResult<ActorOrderRuntimeCoordinator>.Rejected(lifecycle.Failure!);
         }
 
+        // Lifecycle owns physical identity but has no topology or policy authority.
+        // Join those references before exposing the restored session aggregate.
+        HashSet<SystemId> cargoSystems = topology.Value!.Systems.Select(system => system.Id).ToHashSet();
+        if (checkpoint.Lifecycle.CargoObjects.Count > 0 && (policies.Value.CargoPolicy is null
+            || checkpoint.Lifecycle.CargoObjects.Any(cargo => !cargoSystems.Contains(cargo!.Position.SystemId))))
+            return CheckpointResult<ActorOrderRuntimeCoordinator>.Rejected(new CheckpointValidationFailure(
+                "$.checkpoint.lifecycle.cargoObjects", "Cargo objects require an explicit cargo policy and a registered system."));
+
         CheckpointResult<InventoryCommitOwner>? inventoryCommit =
             checkpoint.InventoryCommit is null
                 ? null
@@ -422,7 +450,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                 economy,
                 checkpoint.Engine,
                 policies.Value.ShipDefinitions,
-                policies.Value.SensorDeployableDefinitions);
+                policies.Value.SensorDeployableDefinitions,
+                policies.Value.CargoPolicy, definitions);
         }
         catch (InvalidOperationException error)
         {
@@ -540,6 +569,27 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                         work.Ship.Value != 0 && work.Order.Value != 0 && work.Command.Value != 0
                         && (checkpoint.Orders.OrderIds.NextValue is null
                             || work.Order.Value < checkpoint.Orders.OrderIds.NextValue)),
+                GameEvent.CargoCollectionCompletion completion => scheduled.Key.Phase == EventPhase.StateUpdate
+                    && checkpoint.CargoCollectionAttempts is { } attempts
+                    && attempts.Attempts.Any(attempt => attempt is not null && attempt.ShipId == completion.ShipId
+                        && attempt.OrderId == completion.OrderId && attempt.Generation == completion.AttemptGeneration
+                        && scheduled.Generation == attempt.Generation && attempt.CompletionKey == scheduled.Key),
+                GameEvent.CargoCollectionRangeExit exit => scheduled.Key.Phase == EventPhase.StateUpdate
+                    && checkpoint.CargoCollectionAttempts is { } exitAttempts
+                    && exitAttempts.Attempts.Any(attempt => attempt is not null && attempt.ShipId == exit.ShipId
+                        && attempt.OrderId == exit.OrderId && attempt.Generation == exit.AttemptGeneration
+                        && scheduled.Generation == attempt.Generation && attempt.ExitKey == scheduled.Key),
+                GameEvent.CargoCollectionReevaluation reevaluation => checkpoint.RuntimePolicies.CargoPolicy is not null
+                    && scheduled.Key.Phase is EventPhase.StateUpdate or EventPhase.Decision
+                    && scheduled.Key.Timestamp == checkpoint.Engine.Agenda.CurrentTime && scheduled.Generation.Value == 0
+                    && reevaluation.Work is { Count: > 0 }
+                    && reevaluation.Work.All(work => work is not null && work.ShipId.Value != 0 && work.OrderId.Value != 0
+                        && work.AcceptedCommand.Value != 0 && (checkpoint.Orders.OrderIds.NextValue is null
+                            || work.OrderId.Value < checkpoint.Orders.OrderIds.NextValue))
+                    && reevaluation.Work.Select(work => work.ShipId).Distinct().Count() == reevaluation.Work.Count,
+                GameEvent.CargoExpiry expiry => scheduled.Key.Phase == EventPhase.StateUpdate
+                    && checkpoint.Cargo is { } cargo && cargo.Objects.Any(item => item.EntityId == expiry.ObjectId
+                        && item.ExpiryEvent == scheduled.Key && item.Generation == scheduled.Generation),
                 _ => false,
             };
             if (!resolved)

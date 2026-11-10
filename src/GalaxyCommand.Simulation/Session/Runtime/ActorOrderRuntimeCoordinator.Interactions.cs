@@ -24,6 +24,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         _interactionRegistration = registration;
         _interactionSession = session;
         AttachSensorActions(registration);
+        AttachCargoActions(registration);
         _interactions = new SpatialInteractionCoordinator(_movement, registration.CaptureOwners());
         IReadOnlyList<ScheduledEvent<GameEvent>> pending = _agenda.CaptureCheckpoint().Value!.PendingEvents;
         _interactions.Scheduler.RestorePending(pending.Where(item => item.Payload is GameEvent.SpatialInteraction)
@@ -38,6 +39,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     public void PrepareStateUpdate(SimulationTime now, EventAgenda<GameEvent> agenda)
     {
         FlushSensorReevaluations();
+        PrepareCargoStateUpdate();
         if (_interactions is null || _interactionRegistration is null) return;
         foreach (InteractionInterestOwner owner in _interactionRegistration.CaptureOwners()) _interactions.RegisterOwner(owner);
         if (_interactionSession?.InteractionExecution is { } execution)
@@ -51,8 +53,11 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     {
         if (_interactions is null || _interactionRegistration is null || _interactionSession is null)
             throw new InvalidOperationException("Session interaction ownership is not attached.");
-        if (events.Any(item => item.Payload is not GameEvent.SpatialInteraction and not GameEvent.SensorActionReevaluation))
+        if (events.Any(item => item.Payload is not GameEvent.SpatialInteraction and not GameEvent.SensorActionReevaluation
+            and not GameEvent.CargoExpiry and not GameEvent.CargoCollectionCompletion and not GameEvent.CargoCollectionRangeExit
+            and not GameEvent.CargoCollectionReevaluation))
             throw new InvalidOperationException("Session StateUpdate envelopes require an interaction wave owner.");
+        _cargoDueKeys = events.Select(item => item.Key).ToHashSet();
         ScheduledEvent<InteractionForecast>[] due = events.Where(item => item.Payload is GameEvent.SpatialInteraction)
             .Select(item => new ScheduledEvent<InteractionForecast>(
             item.Key, item.Generation, ((GameEvent.SpatialInteraction)item.Payload).Forecast)).ToArray();
@@ -71,6 +76,11 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                 if (_sensorInterests is not null && ReferenceEquals(_sensorInterests, _interactionRegistration.Get(domain.Key)))
                 {
                     delivered.AddRange(domain.Select(result => (_sensorInterests, result.Event.Payload.Candidate.Interest)));
+                    continue;
+                }
+                if (_cargoInterests is not null && ReferenceEquals(_cargoInterests, _interactionRegistration.Get(domain.Key)))
+                {
+                    delivered.AddRange(domain.Select(result => (_cargoInterests, result.Event.Payload.Candidate.Interest)));
                     continue;
                 }
                 if (evaluator is null) continue;
@@ -104,16 +114,27 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         foreach (ScheduledEvent<GameEvent> item in events)
             if (item.Payload is GameEvent.SensorActionReevaluation reevaluation)
                 sensorDue.AddRange(reevaluation.Work.Select(work => new SensorActionDue(work, item.Key)));
+        var cargoDue = new List<CargoCollectionDue>();
+        foreach (InteractionDueResult result in wave.Results.Where(result => result.Disposition == ScheduledEventDisposition.Applied))
+        {
+            SpatialInteractionInterest interest = result.Event.Payload.Candidate.Interest;
+            if (interest.DomainKind == CargoDomainKind && _cargoBindings.TryGetValue(interest.Source, out var binding)
+                && binding.Interest == interest.Id && _orders.GetActive(interest.Source)?.Action is ShipActionIntent.Cargo action)
+                cargoDue.Add(new(new(interest.Source, binding.Order, action.OriginCommandSequence), result.Event.Key));
+        }
         foreach (SpatialInteractionEffectProposal effect in effects.OrderBy(effect => effect.CandidateKey)
             .ThenBy(effect => effect.EffectKind).ThenBy(effect => effect.LocalOrdinal))
             effect.Effect.Commit(_interactionSession);
         CommitSensorActions(sensorDue);
+        Dictionary<EventKey, ScheduledEventDisposition> cargoDispositions = CommitCargoWave(events, cargoDue);
         foreach (var delivery in delivered) delivery.Owner.RecordDelivery(delivery.Interest, wave.View);
         _interactions.CompleteDueWave(wave);
         PrepareStateUpdate(now, agenda);
         Dictionary<EventKey, ScheduledEventDisposition> dispositions = wave.Results.ToDictionary(result => result.Event.Key, result => result.Disposition);
         foreach (ScheduledEvent<GameEvent> item in events)
             if (item.Payload is GameEvent.SensorActionReevaluation) dispositions.Add(item.Key, ScheduledEventDisposition.Applied);
+        foreach (var cargo in cargoDispositions) dispositions.Add(cargo.Key, cargo.Value);
+        _cargoDueKeys = new HashSet<EventKey>();
         return Array.AsReadOnly(events.Select(item => dispositions[item.Key]).ToArray());
     }
 }

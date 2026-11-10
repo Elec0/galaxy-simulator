@@ -11,7 +11,9 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         ArgumentNullException.ThrowIfNull(factProposals);
         while (_orders.GetActive(shipId) is { } active)
         {
+            if (PrepareCargoApproach(shipId, active, transitions)) return;
             if (PrepareSensorApproach(shipId, active, transitions)) return;
+            NavigationDestination destination = CargoDestination(shipId, active);
             SystemPosition? availablePosition = _movement.PositionAt(
                 shipId,
                 CurrentTime);
@@ -37,7 +39,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                 NavigationPlanResult result = Plan(
                     shipId,
                     current,
-                    active.Destination);
+                    destination);
                 if (result is NavigationPlanResult.Unreachable)
                 {
                     _orders.FailActive(
@@ -48,7 +50,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                 }
 
                 TravelPlan plan = ((NavigationPlanResult.Planned)result).Plan;
-                ValidateExecutablePlan(current, active.Destination, plan);
+                ValidateExecutablePlan(current, destination, plan);
                 _orders.SetPlan(
                     shipId,
                     active.Id,
@@ -62,7 +64,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                 if (RuntimeDestinationSatisfied(
                         shipId,
                         current,
-                        active.Destination,
+                        destination,
                         active.RequestedHeading))
                 {
                     _orders.CompleteActive(

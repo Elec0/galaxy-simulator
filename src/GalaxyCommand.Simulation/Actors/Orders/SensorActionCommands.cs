@@ -49,27 +49,37 @@ public sealed record PickupSensorCommand : GameplayCommand
     public OrderPlacement Placement { get; }
 }
 
-public enum ShipOrderKind { Move, DeploySensor, PickupSensor }
+public enum ShipOrderKind { Move, DeploySensor, PickupSensor, CollectCargoObject, CollectCargoField }
 
 /// <summary>Immutable action payload retained by the ordinary order lifecycle, including original command correlation.</summary>
-public abstract record ShipActionIntent
+public abstract partial record ShipActionIntent
 {
-    private protected ShipActionIntent(CommandSequence command, InventoryId inventory, QualifiedContentKey definition)
+    private protected ShipActionIntent(CommandSequence command, InventoryId inventory)
     {
         ArgumentOutOfRangeException.ThrowIfZero(command.Value);
         ArgumentOutOfRangeException.ThrowIfZero(inventory.Value);
-        ArgumentNullException.ThrowIfNull(definition);
         OriginCommandSequence = command;
         CargoInventoryId = inventory;
-        DefinitionKey = definition;
     }
 
     public CommandSequence OriginCommandSequence { get; }
     public InventoryId CargoInventoryId { get; }
-    public QualifiedContentKey DefinitionKey { get; }
     public abstract ShipOrderKind Kind { get; }
 
-    public sealed record DeploySensor : ShipActionIntent
+    /// <summary>Sensor-specific action identity; other action domains do not fabricate definition references.</summary>
+    public abstract record Sensor : ShipActionIntent
+    {
+        private protected Sensor(CommandSequence command, InventoryId inventory, QualifiedContentKey definition)
+            : base(command, inventory)
+        {
+            ArgumentNullException.ThrowIfNull(definition);
+            DefinitionKey = definition;
+        }
+
+        public QualifiedContentKey DefinitionKey { get; }
+    }
+
+    public sealed record DeploySensor : Sensor
     {
         /// <summary>Retains the admitted exact item and fixed target independently of future ship motion.</summary>
         internal DeploySensor(CommandSequence command, InventoryId inventory, QualifiedContentKey definition,
@@ -85,7 +95,7 @@ public abstract record ShipActionIntent
         public override ShipOrderKind Kind => ShipOrderKind.DeploySensor;
     }
 
-    public sealed record PickupSensor : ShipActionIntent
+    public sealed record PickupSensor : Sensor
     {
         /// <summary>Retains the admitted stable entity without reserving it for this order.</summary>
         internal PickupSensor(CommandSequence command, InventoryId inventory, QualifiedContentKey definition,

@@ -180,7 +180,8 @@ public sealed class GameSessionSetup
         RandomRootSeed randomRootSeed,
         int factRetentionCapacity,
         CommandSource playerCommandSource,
-        IEnumerable<SensorDeployableDefinition>? sensorDeployableDefinitions = null)
+        IEnumerable<SensorDeployableDefinition>? sensorDeployableDefinitions = null,
+        CargoDispositionPolicy? cargoPolicy = null)
     {
         ArgumentNullException.ThrowIfNull(systems);
         ArgumentNullException.ThrowIfNull(ships);
@@ -307,6 +308,7 @@ public sealed class GameSessionSetup
         RandomRootSeed = randomRootSeed;
         FactRetentionCapacity = factRetentionCapacity;
         PlayerCommandSource = playerCommandSource;
+        CargoPolicy = cargoPolicy;
         SensorDeployableDefinitions = Array.AsReadOnly((sensorDeployableDefinitions ?? [])
             .OrderBy(definition => definition.Key.ToString(), StringComparer.Ordinal).ToArray());
         if (SensorDeployableDefinitions.Select(definition => definition.Key).Distinct().Count()
@@ -341,6 +343,9 @@ public sealed class GameSessionSetup
 
     /// <summary>Gets the resolved portable sensor definitions in qualified-key order.</summary>
     public IReadOnlyList<SensorDeployableDefinition> SensorDeployableDefinitions { get; }
+
+    /// <summary>Gets the explicitly selected cargo policy, or null when this session has no cargo domain.</summary>
+    public CargoDispositionPolicy? CargoPolicy { get; }
 
     private static void ValidateEconomy(
         GameSessionEconomySetup? economy,

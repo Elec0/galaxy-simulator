@@ -7,6 +7,9 @@ namespace GalaxyCommand.Benchmarks;
 
 public static class BenchmarkParameterNames
 {
+    public const string LossOccurrenceCount = "lossOccurrenceCount";
+    public const string CargoUnitsPerLoss = "cargoUnitsPerLoss";
+    public const string CollectorCount = "collectorCount";
     public const string InterestCount = "interestCount";
     public const string WorkerCount = "workerCount";
     public const string BatchSize = "batchSize";
@@ -79,6 +82,11 @@ public sealed record BenchmarkPreset
 
 public static class BenchmarkPresets
 {
+    public const string CargoComponentSeparateLosses = "cargo.component-separate-losses";
+    public const string CargoComponentOverlapChain = "cargo.component-overlap-chain";
+    public const string CargoComponentLargeFungible = "cargo.component-large-fungible";
+    public const string CargoComponentContestedSerial = "cargo.component-contested-timers-serial";
+    public const string CargoComponentContestedBatched = "cargo.component-contested-timers-batched";
     public const string DeployableObservationSerial = "observation.deployable-crossings-serial";
     public const string DeployableObservationBatched = "observation.deployable-crossings-batched";
     public const string StationarySessionSerial = "interaction.stationary-session-serial";
@@ -318,8 +326,24 @@ public static class BenchmarkPresets
             new(DeployableObservationBatched, true, new Dictionary<string, long>(observationParameters)
             { [BenchmarkParameterNames.WorkerCount] = 1, [BenchmarkParameterNames.BatchSize] = 1 }),
         ];
+        var lossParameters = Parameters((BenchmarkParameterNames.WarmupIterations, 1), (BenchmarkParameterNames.MeasuredIterations, 3),
+            (BenchmarkParameterNames.Seed, 1), (BenchmarkParameterNames.SimulatedDurationMilliseconds, 1000),
+            (BenchmarkParameterNames.LossOccurrenceCount, 128), (BenchmarkParameterNames.CargoUnitsPerLoss, 100));
+        var contestedParameters = Parameters((BenchmarkParameterNames.WarmupIterations, 1), (BenchmarkParameterNames.MeasuredIterations, 3),
+            (BenchmarkParameterNames.Seed, 1), (BenchmarkParameterNames.SimulatedDurationMilliseconds, 1000),
+            (BenchmarkParameterNames.CollectorCount, 64), (BenchmarkParameterNames.FactRetentionCapacity, 10000));
+        BenchmarkPreset[] cargo =
+        [
+            new(CargoComponentSeparateLosses, true, lossParameters, "3c1370d77514c1ca"),
+            new(CargoComponentOverlapChain, true, lossParameters, "8406091287c23ac8"),
+            new(CargoComponentLargeFungible, true, new Dictionary<string, long>(lossParameters)
+                { [BenchmarkParameterNames.LossOccurrenceCount] = 16, [BenchmarkParameterNames.CargoUnitsPerLoss] = 1_000_000_000_000 }, "2958af58eff17714"),
+            new(CargoComponentContestedSerial, true, contestedParameters, "513fdbed77382d36"),
+            new(CargoComponentContestedBatched, true, new Dictionary<string, long>(contestedParameters)
+                { [BenchmarkParameterNames.WorkerCount] = 1, [BenchmarkParameterNames.BatchSize] = 16 }, "513fdbed77382d36"),
+        ];
         return new ReadOnlyDictionary<string, BenchmarkPreset>(
-            values.Append(prepared).Concat(indexes).Concat(runtime).Concat(sweeps).Concat(runtimeSweeps).Concat(batchSweeps).Concat(sessions).Concat(observations).ToDictionary(value => value.Id, StringComparer.Ordinal));
+            values.Append(prepared).Concat(indexes).Concat(runtime).Concat(sweeps).Concat(runtimeSweeps).Concat(batchSweeps).Concat(sessions).Concat(observations).Concat(cargo).ToDictionary(value => value.Id, StringComparer.Ordinal));
     }
 
     private static ReadOnlyDictionary<string, long> Parameters(
@@ -565,6 +589,25 @@ public static class BenchmarkScenarioValidator
 
         switch (scenario.BasePreset)
         {
+            case BenchmarkPresets.CargoComponentSeparateLosses:
+            case BenchmarkPresets.CargoComponentOverlapChain:
+            case BenchmarkPresets.CargoComponentLargeFungible:
+                RequireRange(scenario, BenchmarkParameterNames.LossOccurrenceCount, 1, 10000);
+                RequireRange(scenario, BenchmarkParameterNames.CargoUnitsPerLoss, 2, 1_000_000_000_000_000);
+                RequireRange(scenario, BenchmarkParameterNames.SimulatedDurationMilliseconds, 1000, 86400000);
+                if ((UInt128)scenario.GetUInt64(BenchmarkParameterNames.LossOccurrenceCount)
+                    * scenario.GetUInt64(BenchmarkParameterNames.CargoUnitsPerLoss) > long.MaxValue)
+                    throw new BenchmarkUsageException("Cargo component totals must fit the benchmark's signed count representation.");
+                break;
+            case BenchmarkPresets.CargoComponentContestedBatched:
+                RequireRange(scenario, BenchmarkParameterNames.WorkerCount, 1, 1024);
+                RequireRange(scenario, BenchmarkParameterNames.BatchSize, 1, int.MaxValue);
+                goto case BenchmarkPresets.CargoComponentContestedSerial;
+            case BenchmarkPresets.CargoComponentContestedSerial:
+                RequireRange(scenario, BenchmarkParameterNames.CollectorCount, 2, 10000);
+                RequireRange(scenario, BenchmarkParameterNames.FactRetentionCapacity, 1, int.MaxValue);
+                RequireRange(scenario, BenchmarkParameterNames.SimulatedDurationMilliseconds, 1000, 19999);
+                break;
             case BenchmarkPresets.DeployableObservationBatched:
                 RequireRange(scenario, BenchmarkParameterNames.WorkerCount, 1, 1024);
                 RequireRange(scenario, BenchmarkParameterNames.BatchSize, 1, int.MaxValue);

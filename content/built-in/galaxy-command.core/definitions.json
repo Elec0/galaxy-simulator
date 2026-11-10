@@ -63,6 +63,41 @@
         "deploymentRangeMeters": 2500,
         "sensorRadiusMeters": 75000
       }
+    },
+    {
+      "kind": "cargo-policy",
+      "id": "default-cargo",
+      "fallback": "Default Cargo Disposition",
+      "references": [],
+      "values": {
+        "generationBehaviorVersion": 1,
+        "mergeBehaviorVersion": 1,
+        "orderingBehaviorVersion": 1,
+        "durationBehaviorVersion": 1,
+        "recoveryByCause": [
+          {
+            "cause": "entity-destruction",
+            "numerator": 1,
+            "denominator": 2
+          },
+          {
+            "cause": "storage-module-loss",
+            "numerator": 1,
+            "denominator": 2
+          },
+          {
+            "cause": "functional-ejection",
+            "numerator": 1,
+            "denominator": 1
+          }
+        ],
+        "fungibleObjectCount": 4,
+        "scatterRadiusMeters": 10000,
+        "lifetimeMilliseconds": 63072000000,
+        "minimumCollectionDurationMilliseconds": 1000,
+        "maximumCollectionDurationMilliseconds": 15000,
+        "collectionStorageCap": 100
+      }
     }
   ]
 }

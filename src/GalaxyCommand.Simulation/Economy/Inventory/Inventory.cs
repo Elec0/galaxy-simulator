@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace GalaxyCommand.Simulation;
 
 /// <summary>
@@ -12,6 +14,11 @@ public abstract record ReservationOwner
     public sealed record ProductionJob(ProductionJobId JobId) : ReservationOwner;
 
     public sealed record ConstructionOrder(ConstructionOrderId OrderId) : ReservationOwner;
+
+    /// <summary>Incoming capacity owned by one exact ship/order collection attempt.</summary>
+    [SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix",
+        Justification = "Collection identifies the approved cargo action rather than a container.")]
+    public sealed record CargoCollection(ShipId ShipId, ShipOrderId OrderId, EventGeneration AttemptGeneration) : ReservationOwner;
 }
 
 /// <summary>
@@ -56,8 +63,8 @@ public sealed partial class Inventory
     }
 
     /// <summary>
-    /// Creates a generalized physical inventory with explicit custody and a
-    /// controlling principal.
+    /// Creates a generalized physical inventory with explicit principal-controlled
+    /// or unclaimed custody. Session composition validates its physical owner.
     /// </summary>
     public Inventory(
         InventoryId id,
@@ -399,8 +406,10 @@ public sealed partial class Inventory
         }
     }
 
+    /// <summary>Rejects incoming stock for floating cargo and otherwise stores within uncommitted capacity.</summary>
     public bool TryAdd(MaterialId materialId, Quantity quantity)
     {
+        if (Custody is InventoryCustody.Unclaimed) return false;
         if (_materialCompatibility is not null)
         {
             if (quantity == Quantity.Zero)
@@ -423,11 +432,16 @@ public sealed partial class Inventory
         return true;
     }
 
+    /// <summary>Reserves positive incoming capacity; floating cargo cannot accept deliveries or reservations.</summary>
     public CapacityReservation ReserveCapacity(
         CapacityReservationId reservationId,
         Quantity quantity,
         ReservationOwner owner)
     {
+        if (Custody is InventoryCustody.Unclaimed)
+            throw new InvalidOperationException("Floating cargo cannot reserve incoming capacity.");
+        if (owner is ReservationOwner.CargoCollection)
+            throw new ArgumentException("Cargo collection uses generalized incoming-capacity reservations.", nameof(owner));
         if (_capacityReservations.ContainsKey(reservationId))
         {
             throw new InvalidOperationException($"Duplicate capacity reservation {reservationId}.");
@@ -474,12 +488,17 @@ public sealed partial class Inventory
         RemoveStoredMaterial(materialId, quantity);
     }
 
+    /// <summary>Reserves available material for a workflow; floating cargo cannot carry source commitments.</summary>
     public Reservation Reserve(
         ReservationId reservationId,
         MaterialId materialId,
         Quantity quantity,
         ReservationOwner owner)
     {
+        if (Custody is InventoryCustody.Unclaimed)
+            throw new InvalidOperationException("Floating cargo cannot reserve contents.");
+        if (owner is ReservationOwner.CargoCollection)
+            throw new ArgumentException("Cargo collection cannot reserve source contents.", nameof(owner));
         if (_reservations.ContainsKey(reservationId) ||
             _physicalReservations.ContainsKey(reservationId))
         {
@@ -634,7 +653,7 @@ public sealed partial class Inventory
             reservation.InventoryId != checkpoint.Id ||
             reservation.MaterialId.Value == 0 ||
             reservation.Quantity == Quantity.Zero ||
-            !IsValidOwner(reservation.Owner))
+            !IsValidOwner(reservation.Owner) || reservation.Owner is ReservationOwner.CargoCollection)
         {
             return Failure(
                 path,
@@ -729,7 +748,7 @@ public sealed partial class Inventory
         if (reservation.Id.Value == 0 ||
             reservation.InventoryId != checkpoint.Id ||
             reservation.Quantity == Quantity.Zero ||
-            !IsValidOwner(reservation.Owner))
+            !IsValidOwner(reservation.Owner) || reservation.Owner is ReservationOwner.CargoCollection)
         {
             return Failure(
                 path,
@@ -755,6 +774,7 @@ public sealed partial class Inventory
             ReservationOwner.TransportJob value => value.JobId.Value != 0,
             ReservationOwner.ProductionJob value => value.JobId.Value != 0,
             ReservationOwner.ConstructionOrder value => value.OrderId.Value != 0,
+            ReservationOwner.CargoCollection value => value.ShipId.Value != 0 && value.OrderId.Value != 0,
             _ => false,
         };
 
@@ -845,6 +865,7 @@ public sealed partial class InventoryRegistry
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         var restored = new InventoryRegistry();
+        var itemIds = new HashSet<ItemInstanceId>();
         for (int index = 0; index < checkpoint.Inventories.Count; index++)
         {
             InventoryCheckpoint? inventory = checkpoint.Inventories[index];
@@ -883,6 +904,10 @@ public sealed partial class InventoryRegistry
                 return CheckpointResult<InventoryRegistry>.Rejected(
                     result.Failure!);
             }
+
+            if (result.Value!.DiscreteItemIds.Any(id => !itemIds.Add(id)))
+                return CheckpointResult<InventoryRegistry>.Rejected(new CheckpointValidationFailure(
+                    $"$.checkpoint.inventories[{index}].discreteItems", "A discrete item identity occurs in more than one inventory."));
 
             restored.Add(result.Value!);
         }
@@ -988,6 +1013,10 @@ public sealed partial class InventoryRegistry
 
     private static void EnsureDestinationCapacity(Inventory inventory, Quantity incoming)
     {
+        // Reject before the source mutates, including legacy transfers into a
+        // partially collected object whose remaining capacity is now positive.
+        if (inventory.Custody is InventoryCustody.Unclaimed)
+            throw new InvalidOperationException("Floating cargo cannot receive deliveries.");
         if (incoming > inventory.RemainingCapacity)
         {
             throw new InvalidOperationException(

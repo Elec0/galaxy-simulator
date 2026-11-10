@@ -399,8 +399,8 @@ public sealed class InventoryTests
             new IdSequence<ReservationId>());
     }
 
-    private static InventoryCustody Custody(ulong entityId) =>
-        new(
+    private static InventoryCustody.PrincipalControlled Custody(ulong entityId) =>
+        new InventoryCustody.PrincipalControlled(
             new InventoryOwnerReference.SessionEntity(new EntityId(entityId)),
             new PrincipalId(1));
 

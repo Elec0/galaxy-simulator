@@ -55,6 +55,7 @@ public enum InventoryRemovalRejectionReason
     MissingDestinationInventory,
     InsufficientCapacity,
     DestinationItemConflict,
+    CargoObjectCannotReceive,
 }
 
 /// <summary>Typed result for one inventory removal and disposition request.</summary>
@@ -212,6 +213,9 @@ public sealed partial class InventoryRegistry
         {
             return InventoryRemovalRejectionReason.MissingCustody;
         }
+
+        if (destination.Custody is InventoryCustody.Unclaimed)
+            return InventoryRemovalRejectionReason.CargoObjectCannotReceive;
 
         if (source.UsedCapacity > destination.RemainingCapacity)
         {

@@ -299,7 +299,7 @@ public sealed class PhysicalInventoryReservationTests
     private static Inventory CreateInventory(ulong capacity) =>
         new(
             new InventoryId(2),
-            new InventoryCustody(
+            new InventoryCustody.PrincipalControlled(
                 new InventoryOwnerReference.SessionEntity(new EntityId(17)),
                 new PrincipalId(4)),
             new Quantity(capacity));

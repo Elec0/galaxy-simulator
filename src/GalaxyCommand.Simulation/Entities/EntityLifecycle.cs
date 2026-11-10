@@ -6,6 +6,7 @@ public enum EntityKind
 {
     Ship,
     SensorDeployable,
+    CargoObject,
 }
 
 public enum InitialShipOrderPolicy
@@ -255,17 +256,20 @@ internal sealed class GameSessionShipRegistry
 public sealed class EntityRegistry
 {
     private readonly HashSet<EntityId> _sensorDeployables = [];
+    private readonly HashSet<EntityId> _cargoObjects = [];
     private readonly SortedDictionary<EntityId, ShipId> _shipsByEntity =
         new(EntityIdComparer<EntityId>.Instance);
     private readonly SortedDictionary<ShipId, EntityId> _entitiesByShip =
         new(EntityIdComparer<ShipId>.Instance);
 
-    public int Count => _shipsByEntity.Count + _sensorDeployables.Count;
+    public int Count => _shipsByEntity.Count + _sensorDeployables.Count + _cargoObjects.Count;
 
+    /// <summary>Resolves a live session identity across ship, deployable and unclaimed cargo domains.</summary>
     public EntityKind? GetKind(EntityId entityId) =>
         _shipsByEntity.ContainsKey(entityId)
             ? EntityKind.Ship
-            : _sensorDeployables.Contains(entityId) ? EntityKind.SensorDeployable : null;
+            : _sensorDeployables.Contains(entityId) ? EntityKind.SensorDeployable
+            : _cargoObjects.Contains(entityId) ? EntityKind.CargoObject : null;
 
     public ShipId? GetShipId(EntityId entityId) =>
         _shipsByEntity.TryGetValue(entityId, out ShipId shipId)
@@ -280,6 +284,7 @@ public sealed class EntityRegistry
     internal bool CanAddShip(EntityId entityId, ShipId shipId) =>
         !_shipsByEntity.ContainsKey(entityId)
         && !_sensorDeployables.Contains(entityId)
+        && !_cargoObjects.Contains(entityId)
         && !_entitiesByShip.ContainsKey(shipId);
 
     internal void ApplyAddShip(EntityId entityId, ShipId shipId)
@@ -304,7 +309,18 @@ public sealed class EntityRegistry
     }
 
     internal bool CanAddSensorDeployable(EntityId entityId) =>
-        entityId.Value != 0 && !_sensorDeployables.Contains(entityId) && !_shipsByEntity.ContainsKey(entityId);
+        entityId.Value != 0 && GetKind(entityId) is null;
+
+    internal bool CanAddCargoObject(EntityId entityId) => entityId.Value != 0 && GetKind(entityId) is null;
+
+    /// <summary>Publishes a cargo identity only after the owning transaction has prevalidated every participant.</summary>
+    internal void ApplyAddCargoObject(EntityId entityId)
+    {
+        if (!CanAddCargoObject(entityId) || !_cargoObjects.Add(entityId))
+            throw new InvalidOperationException("Cargo entity identity is already registered or invalid.");
+    }
+
+    internal bool ApplyRemoveCargoObject(EntityId entityId) => _cargoObjects.Remove(entityId);
 
     internal void ApplyAddSensorDeployable(EntityId entityId) => _sensorDeployables.Add(entityId);
     internal bool ApplyRemoveSensorDeployable(EntityId entityId) => _sensorDeployables.Remove(entityId);
@@ -448,7 +464,7 @@ internal sealed partial class EntityLifecycleOwner
                     receipt.Request,
                     receipt.ShipId,
                     receipt.CargoInventoryId)),
-            CaptureSensorState());
+            CaptureSensorState(), CaptureCargoObjects());
 
     /// <summary>
     /// Validates and directly restores lifecycle identity, inventories,
@@ -648,9 +664,10 @@ internal sealed partial class EntityLifecycleOwner
                 shipIds.Value!,
                 materialCompatibility, sensorDefinitions, shipDefinitions);
         CheckpointValidationFailure? sensorFailure = restored.RestoreSensorState(checkpoint);
-        return sensorFailure is null
+        CheckpointValidationFailure? cargoFailure = sensorFailure ?? restored.RestoreCargoObjects(checkpoint);
+        return cargoFailure is null
             ? CheckpointResult<EntityLifecycleOwner>.Success(restored)
-            : CheckpointResult<EntityLifecycleOwner>.Rejected(sensorFailure);
+            : CheckpointResult<EntityLifecycleOwner>.Rejected(cargoFailure);
     }
 
     internal GameSessionShip GetRequiredShip(ShipId shipId) =>
@@ -671,7 +688,7 @@ internal sealed partial class EntityLifecycleOwner
         PrincipalId principalId,
         Quantity capacity)
     {
-        var custody = new InventoryCustody(
+        var custody = new InventoryCustody.PrincipalControlled(
             new InventoryOwnerReference.SessionEntity(entityId),
             principalId);
         return _materialCompatibility is null
@@ -690,6 +707,8 @@ internal sealed partial class EntityLifecycleOwner
     internal void RegisterEconomyInventory(Inventory inventory)
     {
         ArgumentNullException.ThrowIfNull(inventory);
+        if (inventory.Custody is InventoryCustody.Unclaimed)
+            throw new ArgumentException("Unclaimed inventories require a prepared cargo-object publication.", nameof(inventory));
         if (_inventories.Contains(inventory.Id))
         {
             throw new InvalidOperationException(
@@ -835,7 +854,7 @@ internal sealed partial class EntityLifecycleOwner
                     "A live ship cargo inventory is missing.");
             }
 
-            var expectedCustody = new InventoryCustody(
+            var expectedCustody = new InventoryCustody.PrincipalControlled(
                 new InventoryOwnerReference.SessionEntity(ship.EntityId),
                 ship.PrincipalId);
             if (cargo.Custody != expectedCustody)

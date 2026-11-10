@@ -8,7 +8,8 @@
     "galaxy-command.preview/ship-design/preview-courier",
     "galaxy-command.preview/standing-policy/default-standing",
     "galaxy-command.preview/sensor-deployable/satellite",
-    "galaxy-command.preview/sensor-deployable/advanced-satellite"
+    "galaxy-command.preview/sensor-deployable/advanced-satellite",
+    "galaxy-command.preview/cargo-policy/default-cargo"
   ],
   "values": {
     "playerCommandSource": "local-player",
@@ -126,6 +127,7 @@
           "galaxy-command.preview/sensor-deployable/advanced-satellite"
         ]
       }
-    ]
+    ],
+    "cargoPolicy": "galaxy-command.preview/cargo-policy/default-cargo"
   }
 }

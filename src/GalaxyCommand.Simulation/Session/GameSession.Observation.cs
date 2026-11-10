@@ -86,9 +86,26 @@ public sealed partial class GameSession
         EntityLifecycleShipCheckpoint? live = subject is { } id
             ? checkpoint.Lifecycle.LiveShips.FirstOrDefault(ship => ship?.ShipId == id) : null;
         if (live is not null && receipt.SubjectPrincipalId != live.PrincipalId) return false;
+        if (envelope.Fact is CargoObjectAppearedFact or CargoObjectDisappearedFact
+            && receipt.SubjectPrincipalId is not null) return false;
         if (receipt.Fact is null) return true;
 
         PrincipalId observer = observation.ObserverPrincipalId;
+        if (receipt.Fact is ObservedCargoAppearanceFact cargoAppearance)
+            return envelope.Fact is CargoObjectAppearedFact source && cargoAppearance.Cargo == source.Object
+                && checkpoint.WorldTopology.Systems.Any(system => system?.Id == cargoAppearance.Cargo.Position.SystemId);
+        if (receipt.Fact is ObservedCargoDisappearanceFact cargoDisappearance)
+            return envelope.Fact is CargoObjectDisappearedFact source && cargoDisappearance.EntityId == source.EntityId
+                && cargoDisappearance.Position == source.Position
+                && checkpoint.WorldTopology.Systems.Any(system => system?.Id == cargoDisappearance.Position.SystemId);
+        if (receipt.Fact is PlayerCargoCollectedFact collected)
+        {
+            // Preserve the saved owned result without granting new disclosure
+            // from target coverage or hidden lifecycle state at restoration.
+            return receipt.SubjectPrincipalId == observer && envelope.Fact is CargoCollectedFact source
+                && collected == new PlayerCargoCollectedFact(source.ShipId, source.OrderId,
+                    source.Outcome.DefinitionKey, source.Outcome.Quantity, source.Outcome.InstanceId);
+        }
         if (receipt.Fact is PlayerCommandOutcomeFact command)
         {
             return envelope.Fact switch

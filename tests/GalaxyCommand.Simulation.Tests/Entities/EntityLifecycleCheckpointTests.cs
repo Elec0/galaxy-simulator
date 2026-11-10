@@ -33,7 +33,7 @@ public sealed class EntityLifecycleCheckpointTests
         Assert.NotNull(restored.Inventories.Get(GameSessionTestFixture.CargoInventory));
         Assert.NotNull(restored.Inventories.Get(new InventoryId(5)));
         Assert.Equal(
-            new InventoryCustody(
+            new InventoryCustody.PrincipalControlled(
                 new InventoryOwnerReference.SessionEntity(
                     GameSessionTestFixture.Entity),
                 GameSessionTestFixture.Principal),
@@ -213,7 +213,7 @@ public sealed class EntityLifecycleCheckpointTests
         InventoryCheckpoint inventory = Assert.Single(captured.Inventories.Inventories)!;
         var mismatched = new InventoryCheckpoint(
             inventory.Id,
-            new InventoryCustody(
+            new InventoryCustody.PrincipalControlled(
                 new InventoryOwnerReference.SessionEntity(new EntityId(99)),
                 GameSessionTestFixture.Principal),
             inventory.Capacity,

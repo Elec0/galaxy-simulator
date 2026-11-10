@@ -33,7 +33,21 @@ source of detailed scope and acceptance criteria.
 ## Current focus
 
 - [ ] **TASK-108: Design and implement shared cargo disposition and collection**
-  - Design begun at the owner's request. Accepted gameplay covers
+  - Implemented recovery/generation, unclaimed inventory, cargo identity,
+    explicit policy admission, fields, generic causal disposition, expiry,
+    collection orders/timers, covered views, owned pickup feedback, world notices,
+    exact publication/admission and in-memory restoration checks, and Godot cargo
+    controls with the minimum English
+    localization and native keyboard-list foundation.
+    Live station accounting/workflow cleanup and its R09 proof are on hold by
+    owner direction until separate TASK-105 delivers the live runtime.
+    Actor-removal cleanup (TASK-115) and encoded checkpoints (paused until
+    separate TASK-116) also remain open. Generic component benchmarks and populated UI-fixture
+    evidence do not qualify that station path. Broader platform accessibility
+    qualification remains with TASK-077.
+    See the design's
+    [implementation boundaries](systems/cargo-disposition-and-collection.md#initial-arithmetic-and-generation-implementation).
+  - Accepted gameplay covers
     cause-dependent survival (initial destruction recovery 50% floored per type
     per causal commit), unclaimed identity-preserving cargo, deterministic scatter,
     merged destruction fields, timed object/field collection, live-only coverage,
@@ -48,7 +62,7 @@ source of detailed scope and acceptance criteria.
     Merged fields never split; expiry destroys remaining cargo without outputs.
   - Design completed and approved by the owner, including
     C01-C12, R01-R09 as drafted, and R10's closing behavior. Implementation
-    remains pending. Deliver the full approved runtime, controls, content,
+    is in progress. Deliver the full approved runtime, controls, content,
     checkpoints, deterministic proof, and live station-to-collection integration
     under R09; retain serial-reference and worker/batch equivalence checks.
   - Context: [Cargo disposition and collection design](systems/cargo-disposition-and-collection.md) · [Station cargo disposition](systems/stations.md#shared-cargo-disposition-policy) · [Inventory and cargo](systems/inventory-and-cargo.md)
@@ -58,8 +72,10 @@ source of detailed scope and acceptance criteria.
     construction and storage-loss calculations under Q49 and R01. These are
     internal, pure evaluators, not a live station domain. The owner directed
     independent work to proceed and to stop at TASK-108's cargo-disposition
-    dependency. TASK-108 design is now approved; live cargo loss/removal still
-    awaits its shared runtime objects and transactions.
+    dependency. TASK-108 now supplies generic cargo objects and transactions;
+    live station loss, accounting, and workflow-cleanup integration remain open.
+    The owner kept this runtime separate from TASK-108 and placed TASK-108's
+    station integration on hold until this prerequisite is delivered.
   - Added greatest-affordable incremental construction consumption, exact
     threshold/overflow-credit calculations, and whole-unit overflow counts.
     Coverage includes exhaustive small affordability cases, every update
@@ -175,6 +191,23 @@ source of detailed scope and acceptance criteria.
   - Context: [Time and pacing](application/time-and-pacing.md)
 
 ## Future parking lot
+
+- [ ] **TASK-116: Implement the whole-session typed checkpoint JSON bridge**
+  - Existing save mechanics read and write inert JSON documents; no bridge
+    encodes or decodes GameSessionCheckpoint owner sections. Implement the
+    accepted current-schema encoding rules and privately restored session
+    admission before claiming encoded session continuation. Coordinate content
+    compatibility with TASK-037. TASK-108's encoded cargo-save delivery is
+    paused by the owner until this separate prerequisite is delivered.
+  - Context: [Save format and migration](architecture/save-format-and-migration.md) · [Cargo checkpoints](systems/cargo-disposition-and-collection.md#r08-policy-content-and-checkpoint-contract)
+
+- [ ] **TASK-115: Require exact commitment-release proofs for actor removal**
+  - Actor-removal admission currently allows owner-released commitments when an
+    economy owner is present without proving that every reservation has a matching
+    prepared release. Require exhaustive release coverage before any movement,
+    economy, cargo, or lifecycle mutation. TASK-108's actor-removal collection
+    cleanup is paused pending the owner's scope decision on this prerequisite.
+  - Context: [Cargo disposition and collection](systems/cargo-disposition-and-collection.md#r05-timing-interruption-and-exact-agenda-ordering)
 
 - [ ] **TASK-113: Repair the task-list link to TASK-037**
   - Link validation found that the version-content-catalogs reference points to
@@ -515,6 +548,13 @@ the project-level **Near-term work** section above.
   - Context: [Save slots, autosave, and local preferences](application/save-slots-and-local-preferences.md) · [Save format and migration](architecture/save-format-and-migration.md)
 
 - [ ] **TASK-077: Implement the desktop application shell and minimal map**
+  - TASK-108's Godot collection controls depend on the accepted localization
+    service and accessible semantic map-list foundation, which the development
+    preview previously lacked. TASK-108 now supplies its minimum gettext service,
+    English cargo catalog, named native lists/controls, and stable keyboard focus
+    behavior. Native cargo names, roles, and disabled states are observable in
+    the accessibility tree; full native interaction and named-screen-reader
+    qualification remain here alongside the full shell and settings.
   - Implement the accepted `TASK-049` application contract in the Godot client:
     validated new-game and load admission, active-session and leave flows,
     safe failure states, public-static galaxy topology, system maps, local
@@ -879,6 +919,14 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application/application-shell-and-map-experience.md) · [Fog-of-war and scouting](systems/fog-of-war-and-scouting.md) · [Gameplay content](application/gameplay-content.md) · [Presentation snapshots](architecture/presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-117: Define collection admission motion with retained velocity**
+  - Implemented the owner's passive-drag choice for in-range pickup with retained
+    velocity. Collection retains committed drag, physical completion preserves
+    its timer, and strict exit releases capacity before later full-duration
+    reentry. Waiting motion and restarted attempts continue through in-memory
+    restoration. Full cargo delivery remains TASK-108.
+  - Context: [Cargo motion](systems/cargo-disposition-and-collection.md#r10-accepted-closing-behavior)
 
 - [x] **TASK-114: Keep routine test and build success reports out of documentation**
   - Added repository guidance and removed routine successful test, build,

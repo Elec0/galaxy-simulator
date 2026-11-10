@@ -94,6 +94,9 @@ public sealed class EventAgenda<TEvent>
 
     public int Count => _pending.Count;
 
+    /// <summary>Exposes the next commit sequence for aggregate preparation without allocating an event.</summary>
+    internal ulong NextCreationSequence => _nextCreationSequence;
+
     /// <summary>Checks capacity for an entire serial commit without allocating sequences or changing pending work.</summary>
     internal void EnsureCreationCapacity(int count)
     {

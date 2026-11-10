@@ -54,7 +54,8 @@ internal sealed class EntityLifecycleCheckpoint
         IEnumerable<EntityLifecycleShipCheckpoint?> liveShips,
         IEnumerable<EntityMaterializationReceiptCheckpoint?> materializationReceipts,
         IEnumerable<EntityRemovalReceiptCheckpoint?> removalReceipts,
-        SensorDeployableStateCheckpoint? sensorDeployables = null)
+        SensorDeployableStateCheckpoint? sensorDeployables = null,
+        IEnumerable<CargoObjectSnapshot?>? cargoObjects = null)
     {
         ArgumentNullException.ThrowIfNull(entityIds);
         ArgumentNullException.ThrowIfNull(shipIds);
@@ -76,6 +77,7 @@ internal sealed class EntityLifecycleCheckpoint
             new ReadOnlyCollection<EntityRemovalReceiptCheckpoint?>(
                 removalReceipts.ToArray());
         SensorDeployables = sensorDeployables ?? new SensorDeployableStateCheckpoint([], []);
+        CargoObjects = Array.AsReadOnly((cargoObjects ?? []).ToArray());
     }
 
     internal IdSequenceCheckpoint EntityIds { get; }
@@ -95,5 +97,7 @@ internal sealed class EntityLifecycleCheckpoint
     internal ReadOnlyCollection<EntityRemovalReceiptCheckpoint?> RemovalReceipts { get; }
 
     internal SensorDeployableStateCheckpoint SensorDeployables { get; }
+
+    internal IReadOnlyList<CargoObjectSnapshot?> CargoObjects { get; }
 }
 

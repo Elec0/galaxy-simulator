@@ -1,6 +1,7 @@
 using GalaxyCommand.Client;
 using GalaxyCommand.Simulation;
 using Godot;
+using System.Globalization;
 
 namespace GalaxyCommand.GodotClient;
 
@@ -14,6 +15,7 @@ public partial class GalaxyMap : Control
 	private const float SystemHitRadius = 18.0f;
 	private const float ShipHitRadius = 14.0f;
 	private const float ShipGlyphRadius = 6.0f;
+	private const float CargoHitRadius = 12.0f;
 	private const float MinimumZoom = 0.25f;
 	private const float MaximumZoom = 4.0f;
 	private readonly SortedSet<ShipId> _selectedShipIds = new(
@@ -34,10 +36,30 @@ public partial class GalaxyMap : Control
 	public event Action? ViewChanged;
 	public event Action<SystemPosition, OrderPlacement>? DestinationRequested;
 	public event Action<ShipId>? CancelRequested;
+	public event Action<EntityId>? CargoSelected;
+	public EntityId? SelectedCargoId { get; private set; }
 
 	public IReadOnlyList<ShipId> SelectedShipIds => _selectedShipIds.ToArray();
 
 	public ShipId? FocusedShipId { get; private set; }
+
+	/// <summary>Synchronizes only a live covered cargo highlight, independently of focused ship and command targets.</summary>
+	public void SetCargoSelection(EntityId? id)
+	{
+		SelectedCargoId = id is { } selected && _snapshot?.CargoObjects.Any(cargo => cargo.EntityId == selected) == true ? id : null;
+		QueueRedraw();
+	}
+
+	/// <summary>Offers the visual map's ship inspection through a native keyboard list without issuing movement.</summary>
+	public void SelectShipFromList(ShipId id)
+	{
+		GameObservedShipSnapshot? ship = _snapshot?.Ships.FirstOrDefault(candidate => candidate.Id == id);
+		if (ship is null) return;
+		SelectOnly(id);
+		if (ship.Position is { } position) { _systemContext = position.SystemId; _scale = MapScale.System; Recenter(); }
+		SelectionChanged?.Invoke();
+		QueueRedraw();
+	}
 
 	public string ViewDescription => _scale == MapScale.Galaxy
 		? "GALAXY"
@@ -72,6 +94,7 @@ public partial class GalaxyMap : Control
 	{
 		ArgumentNullException.ThrowIfNull(presentation);
 		_snapshot = presentation.World;
+		if (SelectedCargoId is { } cargo && !_snapshot.CargoObjects.Any(view => view.EntityId == cargo)) SelectedCargoId = null;
 		foreach (ShipId unresolved in presentation.Selection.UnresolvedShipIds)
 		{
 			_selectedShipIds.Remove(unresolved);
@@ -276,6 +299,14 @@ public partial class GalaxyMap : Control
 				fontSize: 11, modulate: new Color("668ca5"));
 		}
 
+		foreach (CargoObjectView cargo in _snapshot.CargoObjects.Where(item => item.Position.SystemId == system.Id))
+		{
+			Vector2 position = ToSystemView(cargo.Position.Position);
+			DrawPolyline([position + new Vector2(0, -6), position + new Vector2(6, 0), position + new Vector2(0, 6), position + new Vector2(-6, 0), position + new Vector2(0, -6)], new Color("91ddb3"), 2, true);
+			if (SelectedCargoId == cargo.EntityId) DrawRect(new Rect2(position - new Vector2(10, 10), new Vector2(20, 20)), Colors.White, false, 2);
+			DrawString(ThemeDB.FallbackFont, position + new Vector2(10, 12), UiLocalization.Text("ui.map.cargo_marker", ("object", cargo.EntityId.Value.ToString(CultureInfo.InvariantCulture))), fontSize: 12, modulate: new Color("91ddb3"));
+		}
+
 		foreach (GameObservedShipSnapshot ship in _snapshot.Ships.Where(ship => ship.Position?.SystemId == system.Id))
 		{
 			if (ship.Position is not { } systemPosition)
@@ -339,6 +370,15 @@ public partial class GalaxyMap : Control
 		GameSystemSnapshot? system = CurrentSystem();
 		if (system is null)
 		{
+			return;
+		}
+
+		CargoObjectView? cargo = _snapshot!.CargoObjects.Where(view => view.Position.SystemId == system.Id).OrderBy(view => view.EntityId.Value)
+			.FirstOrDefault(view => ToSystemView(view.Position.Position).DistanceTo(mouse.Position) <= CargoHitRadius);
+		if (cargo is not null)
+		{
+			CargoSelected?.Invoke(cargo.EntityId);
+			AcceptEvent();
 			return;
 		}
 

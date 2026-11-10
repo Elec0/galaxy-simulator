@@ -107,6 +107,8 @@ public enum InventoryTransferRejectionReason
     InvalidReservationOwner,
     InsufficientCapacity,
     CapacityOverflow,
+    CargoObjectCannotReceive,
+    InvalidCollectionAuthority,
 }
 
 /// <summary>Typed outcome of one atomic physical transfer request.</summary>
@@ -137,7 +139,13 @@ public sealed partial class InventoryRegistry
     /// Validates both inventories, reservation authority, exact source state,
     /// and destination capacity before applying one indivisible transfer.
     /// </summary>
-    public InventoryTransferResult TransferPhysical(PhysicalTransferRequest request)
+    public InventoryTransferResult TransferPhysical(PhysicalTransferRequest request) => TransferPhysicalCore(request, false);
+
+    /// <summary>
+    /// Validates all transfer state before mutation. Only the separately authorized
+    /// collection entry point permits an oversized incoming reservation to settle.
+    /// </summary>
+    private InventoryTransferResult TransferPhysicalCore(PhysicalTransferRequest request, bool releaseUnusedIncomingCapacity)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (request.SourceInventoryId == request.DestinationInventoryId)
@@ -161,6 +169,9 @@ public sealed partial class InventoryRegistry
         {
             return Rejected(InventoryTransferRejectionReason.MissingCustody);
         }
+
+        if (destination.Custody is InventoryCustody.Unclaimed)
+            return Rejected(InventoryTransferRejectionReason.CargoObjectCannotReceive);
 
         InventoryTransferRejectionReason? subjectFailure = ValidateSubject(
             source,
@@ -187,7 +198,7 @@ public sealed partial class InventoryRegistry
         }
 
         InventoryTransferRejectionReason? destinationFailure =
-            ValidateDestination(destination, request, capacityCost);
+            ValidateDestination(destination, request, capacityCost, releaseUnusedIncomingCapacity);
         if (destinationFailure is not null)
         {
             return Rejected(destinationFailure.Value);
@@ -308,7 +319,8 @@ public sealed partial class InventoryRegistry
     private static InventoryTransferRejectionReason? ValidateDestination(
         Inventory destination,
         PhysicalTransferRequest request,
-        Quantity capacityCost)
+        Quantity capacityCost,
+        bool releaseUnusedIncomingCapacity)
     {
         if (request.DestinationCapacityReservationId is not { } reservationId)
         {
@@ -327,7 +339,7 @@ public sealed partial class InventoryRegistry
             destination.GetPhysicalReservation(reservationId);
         return reservation?.Owner == request.ReservationOwner &&
             reservation.Subject is PhysicalReservationSubject.IncomingCapacity incoming &&
-            incoming.Quantity == capacityCost
+            (incoming.Quantity == capacityCost || releaseUnusedIncomingCapacity && incoming.Quantity >= capacityCost)
                 ? null
                 : InventoryTransferRejectionReason.DestinationReservationMismatch;
     }
@@ -369,12 +381,9 @@ public sealed partial class InventoryRegistry
                     capacityCost);
                 break;
             case PhysicalTransferSubject.Discrete discrete:
+                DiscreteItemInstance original = source.GetDiscrete(discrete.InstanceId)!;
                 source.ApplyRemoveDiscrete(discrete.InstanceId, capacityCost);
-                destination.ApplyStoreDiscrete(
-                    new DiscreteItemInstance(
-                        discrete.InstanceId,
-                        request.Definition.Key),
-                    capacityCost);
+                destination.ApplyStoreDiscrete(original, capacityCost);
                 break;
         }
     }
@@ -413,6 +422,7 @@ public sealed partial class InventoryRegistry
             ReservationOwner.TransportJob value => value.JobId.Value != 0,
             ReservationOwner.ProductionJob value => value.JobId.Value != 0,
             ReservationOwner.ConstructionOrder value => value.OrderId.Value != 0,
+            ReservationOwner.CargoCollection value => value.ShipId.Value != 0 && value.OrderId.Value != 0,
             _ => false,
         };
 

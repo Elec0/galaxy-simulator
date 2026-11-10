@@ -27,7 +27,7 @@ public sealed class GameSessionEconomySetupTests
 
         Inventory inventory = lifecycle.Inventories.Get(new InventoryId(2))!;
         Assert.Equal(
-            new InventoryCustody(
+            new InventoryCustody.PrincipalControlled(
                 new InventoryOwnerReference.Facility(new FacilityId(1)),
                 GameSessionTestFixture.Principal),
             inventory.Custody);

@@ -36,6 +36,7 @@ public enum InventoryStorageRejectionReason
     DuplicateItemInstance,
     InsufficientCapacity,
     CapacityOverflow,
+    CargoObjectCannotReceive,
 }
 
 /// <summary>
@@ -210,6 +211,9 @@ public sealed partial class Inventory
             return InventoryStorageResult.Rejected(
                 InventoryStorageRejectionReason.MissingCustody);
         }
+
+        if (Custody is InventoryCustody.Unclaimed)
+            return InventoryStorageResult.Rejected(InventoryStorageRejectionReason.CargoObjectCannotReceive);
 
         if (definition.HoldingKind != expectedKind)
         {

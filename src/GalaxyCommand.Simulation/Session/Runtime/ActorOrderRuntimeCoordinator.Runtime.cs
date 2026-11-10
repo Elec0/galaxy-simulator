@@ -70,6 +70,14 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         SimulationTime now,
         EventAgenda<GameEvent> agenda)
     {
+        if (simulationEvent.Payload is GameEvent.CargoCollectionReevaluation reevaluationCargo)
+        {
+            CommitCargoReevaluations(reevaluationCargo.Work.Select(work => new CargoCollectionDue(work, simulationEvent.Key)));
+            ContinueCargoOrders(simulationEvent.Key);
+            return ScheduledEventDisposition.Applied;
+        }
+        if (simulationEvent.Payload is GameEvent.CargoExpiry)
+            return _cargo?.Expire(simulationEvent) ?? ScheduledEventDisposition.IgnoredMissingReference;
         if (simulationEvent.Payload is GameEvent.SensorActionReevaluation reevaluation)
         {
             CommitSensorActions(reevaluation.Work.Select(work => new SensorActionDue(work, simulationEvent.Key)));
@@ -237,13 +245,18 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                                 $"Applied completion for ship {maneuver.ShipId} had no matching maneuver.");
                         if (completed.Plan.Kind == BoundedTerminalPlanKind.PassiveDrag)
                         {
-                            if (_orders.GetActive(maneuver.ShipId) is not null)
+                            ShipOrder? collecting = _orders.GetActive(maneuver.ShipId);
+                            if (collecting is not null && (collecting.Action is not ShipActionIntent.Cargo
+                                || collecting.MotionId is not null || collecting.TransitId is not null))
                             {
                                 throw new InvalidOperationException(
-                                    $"Ship {maneuver.ShipId} completed orderless passive drag with an active order.");
+                                    $"Ship {maneuver.ShipId} completed orderless passive drag with an unrelated active order.");
                             }
 
-                            continueOrders = false;
+                            // Cargo may wait in range while the movement owner
+                            // finishes drag. Re-evaluate the order without ending
+                            // or restarting an independently timed pickup.
+                            continueOrders = collecting is not null;
                             break;
                         }
 
@@ -332,6 +345,10 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             GameEvent.Economic economic => new GameEventKind.Economic(economic.Event),
             GameEvent.SpatialInteraction interaction => new GameEventKind.SpatialInteraction(interaction.Forecast.Candidate),
             GameEvent.SensorActionReevaluation reevaluation => new GameEventKind.SensorActionReevaluation(reevaluation.Work.Count),
+            GameEvent.CargoExpiry expiry => new GameEventKind.CargoExpiry(expiry.ObjectId),
+            GameEvent.CargoCollectionCompletion completion => new GameEventKind.CargoCollectionCompletion(completion.ShipId, completion.OrderId),
+            GameEvent.CargoCollectionRangeExit exit => new GameEventKind.CargoCollectionRangeExit(exit.ShipId, exit.OrderId),
+            GameEvent.CargoCollectionReevaluation reevaluationCargo => new GameEventKind.CargoCollectionReevaluation(reevaluationCargo.Work.Count),
             _ => throw new InvalidOperationException(
                 $"Unsupported game event {simulationEvent.Payload.GetType().Name}."),
         };

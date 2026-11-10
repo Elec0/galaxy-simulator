@@ -42,6 +42,7 @@ public enum ShipOrderReason
     ActionDefinitionUnavailable,
     ActionIdentifierExhausted,
     ActionActorRemoved,
+    CollectingCargo,
 }
 
 public sealed record ShipOrderSnapshot(
@@ -852,6 +853,11 @@ internal sealed partial class ShipOrderCoordinator
         if (!Enum.IsDefined(checkpoint.Kind) || checkpoint.Kind != (checkpoint.Action?.Kind ?? ShipOrderKind.Move))
             return OrderRejected($"{path}.kind", "Order kind and action payload disagree.");
 
+        if (checkpoint.Action is ShipActionIntent.Cargo cargo
+            && (checkpoint.Destination is not NavigationDestination.Position anchor
+                || anchor.Value != cargo.LastObservedPosition || checkpoint.RequestedHeading is not null))
+            return OrderRejected($"{path}.action", "Cargo intent must retain its accepted observed position destination without a requested heading.");
+
         if (checkpoint.Status is not { } status || !Enum.IsDefined(status))
         {
             return OrderRejected(
@@ -867,6 +873,9 @@ internal sealed partial class ShipOrderCoordinator
                 $"{path}.reason",
                 "The order reason does not match its lifecycle status.");
         }
+
+        if (reason == ShipOrderReason.CollectingCargo && checkpoint.Action is not ShipActionIntent.Cargo)
+            return OrderRejected($"{path}.reason", "Only a cargo collection action can retain collection progress.");
 
         CheckpointValidationFailure? stateFailure = ValidateExecutionState(
             checkpoint,
@@ -939,7 +948,11 @@ internal sealed partial class ShipOrderCoordinator
 
         if (checkpoint.Plan is not { } plan || plan.Legs.Count == 0)
         {
-            if (checkpoint.Action is not null && checkpoint.Reason == ShipOrderReason.AwaitingActionExecution
+            bool awaitingAction = checkpoint.Action is not null && checkpoint.Reason == ShipOrderReason.AwaitingActionExecution;
+            bool collectingCargo = checkpoint.Action is ShipActionIntent.Cargo && checkpoint.Reason == ShipOrderReason.CollectingCargo;
+            // Collection may continue after the committed approach motion finishes.
+            // A missing plan cannot make another action domain appear to be collecting.
+            if ((awaitingAction || collectingCargo)
                 && checkpoint.Plan is null && checkpoint.NextLegIndex == 0
                 && checkpoint.MotionId is null && checkpoint.TransitId is null) return null;
             return new CheckpointValidationFailure(
@@ -1054,7 +1067,8 @@ internal sealed partial class ShipOrderCoordinator
                 reason == ShipOrderReason.QueuedBehindActiveOrder,
             ShipOrderStatus.Active =>
                 reason is ShipOrderReason.MovingToDestination
-                    or ShipOrderReason.ResumingAfterScriptedOverride or ShipOrderReason.AwaitingActionExecution,
+                    or ShipOrderReason.ResumingAfterScriptedOverride or ShipOrderReason.AwaitingActionExecution
+                    or ShipOrderReason.CollectingCargo,
             ShipOrderStatus.Waiting =>
                 reason == ShipOrderReason.WaitingForConnectorTransitCompletion,
             ShipOrderStatus.Suspended =>

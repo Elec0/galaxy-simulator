@@ -67,7 +67,7 @@ public sealed partial class GameSession
                 {
                     if (order is null) continue;
                     retainedOrders.Add(order.Id, (ship.ShipId, order.Action));
-                    if (order.Action is not { } action) continue;
+                    if (order.Action is not ShipActionIntent.Sensor action) continue;
                     bool destinationMatches = action switch
                     {
                         ShipActionIntent.DeploySensor deployment => order.Destination is NavigationDestination.Position position
@@ -103,7 +103,7 @@ public sealed partial class GameSession
                 && reevaluation.Work.Any(work => !Allocated(work.Command.Value, checkpoint.CommandAdmission.Sequences)
                     || !Allocated(work.Ship.Value, checkpoint.Lifecycle.ShipIds)
                     || retainedOrders.TryGetValue(work.Order, out var order)
-                        && (order.Ship != work.Ship || order.Action?.OriginCommandSequence != work.Command)))
+                        && (order.Ship != work.Ship || order.Action is not ShipActionIntent.Sensor action || action.OriginCommandSequence != work.Command)))
                 return new CheckpointValidationFailure("$.checkpoint.engine.agenda", "A sensor wake references an unallocated command or ship.");
         return null;
     }

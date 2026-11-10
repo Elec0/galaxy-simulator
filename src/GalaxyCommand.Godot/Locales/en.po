@@ -1,0 +1,185 @@
+msgid ""
+msgstr ""
+"Language: en\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "ui.cargo.heading"
+msgstr "Cargo collection"
+
+msgid "ui.map.ships"
+msgstr "Ships: select a focused ship"
+
+msgid "ui.map.cargo"
+msgstr "Visible cargo: select a target"
+
+msgid "ui.cargo.select"
+msgstr "Select visible cargo to inspect. Ship focus stays unchanged."
+
+msgid "ui.cargo.no_field"
+msgstr "This object has no selected visible field."
+
+msgid "ui.cargo.placement"
+msgstr "Collection order placement"
+
+msgid "ui.cargo.replace"
+msgstr "Replace existing orders"
+
+msgid "ui.cargo.append"
+msgstr "Append to order queue"
+
+msgid "ui.cargo.collect_object"
+msgstr "Collect object"
+
+msgid "ui.cargo.collect_field"
+msgstr "Collect field"
+
+msgid "ui.cargo.cancel"
+msgstr "Cancel focused ship order"
+
+msgid "ui.cargo.priorities"
+msgstr "Cargo type priorities"
+
+msgid "ui.cargo.priority_help"
+msgstr "Empty means equal priorities. Unlisted types follow listed types. Changes affect new field orders."
+
+msgid "ui.cargo.priority_type"
+msgstr "Cargo type to add"
+
+msgid "ui.cargo.priority_add"
+msgstr "Add type"
+
+msgid "ui.cargo.priority_remove"
+msgstr "Remove selected priority"
+
+msgid "ui.cargo.priority_up"
+msgstr "Move selected priority up"
+
+msgid "ui.cargo.priority_down"
+msgstr "Move selected priority down"
+
+msgid "ui.cargo.no_progress"
+msgstr "No active pickup for the focused ship."
+
+msgid "ui.cargo.ready"
+msgstr "Ready to collect with an authorized focused ship."
+
+msgid "ui.cargo.queued"
+msgstr "Collection input queued."
+
+msgid "ui.cargo.unavailable"
+msgstr "Selected cargo is no longer visible or available."
+
+msgid "ui.map.ship_row"
+msgstr "{system}: ship {ship}"
+
+msgid "ui.map.cargo_row"
+msgstr "Cargo {object}: {quantity} x {type} ({system})"
+
+msgid "ui.map.cargo_marker"
+msgstr "Cargo {object}"
+
+msgid "ui.map.transit"
+msgstr "In transit"
+
+msgid "ui.cargo.object_details"
+msgstr "Object {object}\nType: {type}\nQuantity: {quantity}\nOccupied storage: {storage}\nItem: {item}"
+
+msgid "ui.cargo.fungible"
+msgstr "Fungible cargo"
+
+msgid "ui.cargo.visible_field"
+msgstr "Visible cargo:\n{contents}"
+
+msgid "ui.cargo.visible_type"
+msgstr "{type}: quantity {quantity}, occupied storage {storage}"
+
+msgid "ui.cargo.progress"
+msgstr "Ship {ship} collecting {type}: {elapsed} / {duration} s\nReserved quantity: {quantity}; current target quantity: {available}; occupied storage: {storage}\nItem: {item}"
+
+msgid "ui.cargo.order_state"
+msgstr "Collection order: {state}"
+
+msgid "ui.cargo.order_and_result"
+msgstr "{state}\n{result}"
+
+msgid "ui.cargo.collected"
+msgstr "Ship {ship} collected {type}. Quantity: {quantity}."
+
+msgid "ui.cargo.appeared"
+msgstr "Visible cargo appeared: {type}, quantity {quantity}."
+
+msgid "ui.cargo.disappeared"
+msgstr "Previously visible cargo is no longer present."
+
+msgid "ui.cargo.reason.QueuedBehindActiveOrder"
+msgstr "Queued"
+
+msgid "ui.cargo.reason.MovingToDestination"
+msgstr "Approaching last observed position"
+
+msgid "ui.cargo.reason.DestinationReached"
+msgstr "Destination reached"
+
+msgid "ui.cargo.reason.CancelledByCommand"
+msgstr "Cancelled"
+
+msgid "ui.cargo.reason.ReplacedByCommand"
+msgstr "Replaced"
+
+msgid "ui.cargo.reason.SuspendedByScriptedOverride"
+msgstr "Suspended"
+
+msgid "ui.cargo.reason.ResumingAfterScriptedOverride"
+msgstr "Resuming"
+
+msgid "ui.cargo.reason.ScriptedOverrideEnded"
+msgstr "Scripted control ended"
+
+msgid "ui.cargo.reason.WaitingForConnectorTransitCompletion"
+msgstr "Waiting for connector arrival"
+
+msgid "ui.cargo.reason.DestinationBecameUnreachable"
+msgstr "Destination unreachable"
+
+msgid "ui.cargo.reason.TargetRemoved"
+msgstr "Target unavailable"
+
+msgid "ui.cargo.reason.AwaitingActionExecution"
+msgstr "Preparing pickup"
+
+msgid "ui.cargo.reason.ActionCompleted"
+msgstr "Completed"
+
+msgid "ui.cargo.reason.ActionItemUnavailable"
+msgstr "Cargo unavailable"
+
+msgid "ui.cargo.reason.ActionItemReserved"
+msgstr "Item unavailable"
+
+msgid "ui.cargo.reason.ActionCapacityUnavailable"
+msgstr "Insufficient cargo capacity"
+
+msgid "ui.cargo.reason.ActionUnauthorized"
+msgstr "Ship control unavailable"
+
+msgid "ui.cargo.reason.ActionInvalidSpatialState"
+msgstr "Pickup position unavailable"
+
+msgid "ui.cargo.reason.ActionDefinitionUnavailable"
+msgstr "Cargo definition unavailable"
+
+msgid "ui.cargo.reason.ActionIdentifierExhausted"
+msgstr "Pickup unavailable"
+
+msgid "ui.cargo.reason.ActionActorRemoved"
+msgstr "Ship unavailable"
+
+msgid "ui.cargo.reason.CollectingCargo"
+msgstr "Collecting"
+
+msgid "ui.cargo.accepted"
+msgstr "Command accepted."
+
+msgid "ui.cargo.rejected"
+msgstr "Command rejected ({code})."

@@ -97,7 +97,7 @@ public sealed class PhysicalInventoryCheckpointTests
         PhysicalDefinition ore = FungibleDefinition("ore", 3);
         var checkpoint = new InventoryCheckpoint(
             new InventoryId(1),
-            new InventoryCustody(
+            new InventoryCustody.PrincipalControlled(
                 new InventoryOwnerReference.SessionEntity(new EntityId(17)),
                 new PrincipalId(4)),
             new Quantity(5),
@@ -146,7 +146,7 @@ public sealed class PhysicalInventoryCheckpointTests
         var inventoryId = new InventoryId(1);
         var checkpoint = new InventoryCheckpoint(
             inventoryId,
-            new InventoryCustody(
+            new InventoryCustody.PrincipalControlled(
                 new InventoryOwnerReference.SessionEntity(new EntityId(17)),
                 new PrincipalId(4)),
             new Quantity(10),
@@ -179,7 +179,7 @@ public sealed class PhysicalInventoryCheckpointTests
         ulong entityId = 17) =>
         new(
             new InventoryId(inventoryId),
-            new InventoryCustody(
+            new InventoryCustody.PrincipalControlled(
                 new InventoryOwnerReference.SessionEntity(new EntityId(entityId)),
                 new PrincipalId(4)),
             new Quantity(capacity));

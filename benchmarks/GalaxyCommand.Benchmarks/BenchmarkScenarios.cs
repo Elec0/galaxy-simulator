@@ -7,7 +7,10 @@ namespace GalaxyCommand.Benchmarks;
 public sealed record ScenarioCorrectnessResult(
     string Digest,
     ulong SimulatedMilliseconds,
-    IReadOnlyDictionary<string, long> Counts);
+    IReadOnlyDictionary<string, long> Counts,
+    IReadOnlyDictionary<string, BenchmarkDomainMeasurement>? DomainMeasurements = null);
+
+public sealed record BenchmarkDomainMeasurement(double Milliseconds, long AllocatedBytes);
 
 internal interface IBenchmarkScenario
 {
@@ -20,6 +23,9 @@ internal static class BenchmarkScenarioFactory
     internal static IBenchmarkScenario Create(string basePreset) =>
         basePreset switch
         {
+            BenchmarkPresets.CargoComponentSeparateLosses or BenchmarkPresets.CargoComponentOverlapChain
+                or BenchmarkPresets.CargoComponentLargeFungible or BenchmarkPresets.CargoComponentContestedSerial
+                or BenchmarkPresets.CargoComponentContestedBatched => new CargoComponentBenchmarkScenario(),
             BenchmarkPresets.DeployableObservationSerial => new DeployableObservationBenchmarkScenario(false),
             BenchmarkPresets.DeployableObservationBatched => new DeployableObservationBenchmarkScenario(true),
             BenchmarkPresets.InteractionSessionSerial => new InteractionSessionBenchmarkScenario(false),

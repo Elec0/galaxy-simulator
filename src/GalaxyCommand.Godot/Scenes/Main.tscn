@@ -62,7 +62,7 @@ text = "Recenter"
 [node name="StatusPanel" type="PanelContainer" parent="Interface" unique_id=1753963765]
 offset_left = 28.0
 offset_top = 490.0
-offset_right = 1252.0
+offset_right = 832.0
 offset_bottom = 704.0
 
 [node name="Margin" type="MarginContainer" parent="Interface/StatusPanel" unique_id=1844007533]
@@ -115,6 +115,7 @@ theme_override_font_sizes/font_size = 14
 
 [node name="Status" type="Label" parent="Interface/StatusPanel/Margin/Content" unique_id=1438274183]
 layout_mode = 2
+autowrap_mode = 3
 theme_override_colors/font_color = Color(0.7, 0.82, 0.9, 1)
 theme_override_font_sizes/font_size = 14
 text = "Loading simulation status…"
@@ -132,3 +133,15 @@ theme_override_colors/font_color = Color(0.64, 0.8, 0.9, 1)
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 3
 text = "ACTIVITY | Loading…"
+
+[node name="CargoPanel" type="PanelContainer" parent="Interface"]
+anchors_preset = 7
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -420.0
+offset_top = 158.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 0
+grow_vertical = 2

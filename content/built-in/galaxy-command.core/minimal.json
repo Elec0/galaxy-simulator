@@ -8,7 +8,8 @@
     "galaxy-command.core/ship-design/starter-ship",
     "galaxy-command.core/standing-policy/default-standing",
     "galaxy-command.core/sensor-deployable/satellite",
-    "galaxy-command.core/sensor-deployable/advanced-satellite"
+    "galaxy-command.core/sensor-deployable/advanced-satellite",
+    "galaxy-command.core/cargo-policy/default-cargo"
   ],
   "values": {
     "playerCommandSource": "local-player",
@@ -42,6 +43,7 @@
           "galaxy-command.core/sensor-deployable/advanced-satellite"
         ]
       }
-    ]
+    ],
+    "cargoPolicy": "galaxy-command.core/cargo-policy/default-cargo"
   }
 }
