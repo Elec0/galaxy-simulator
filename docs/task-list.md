@@ -39,8 +39,8 @@ source of detailed scope and acceptance criteria.
     exact publication/admission and in-memory restoration checks, and Godot cargo
     controls with the minimum English
     localization and native keyboard-list foundation.
-    Live station accounting/workflow cleanup and its R09 proof are on hold by
-    owner direction until separate TASK-105 delivers the live runtime.
+    TASK-105 now supplies live station accounting, workflow cleanup, real loss
+    fields, and collection with coupled in-memory continuation proof.
     Actor-removal collection cleanup remains open under this task; completed
     TASK-115 supplies its exact release-proof admission prerequisite. Encoded
     checkpoints remain paused until separate TASK-116. Generic component benchmarks and populated UI-fixture
@@ -53,9 +53,9 @@ source of detailed scope and acceptance criteria.
     per causal commit), unclaimed identity-preserving cargo, deterministic scatter,
     merged destruction fields, timed object/field collection, live-only coverage,
     and expiry. Exact rules and initial values are in the design.
-  - Integrate station storage loss and base destruction with TASK-105, including
-    fields for storage-module loss while the station survives. Prepare inventory
-    removal, object publication, commitments, facts, and persistence atomically.
+  - TASK-105 joined storage-module loss and base destruction to shared cargo
+    disposition, preserving surviving stations and preparing inventory removal,
+    object publication, commitments, agenda, facts, and restoration together.
   - Include collection commands and map controls. Voluntary-ejection commands
     and controls remain TASK-110; installed-equipment disposition remains TASK-096.
   - Accepted terminal rules: partial object pickup succeeds; no room fails;
@@ -67,35 +67,6 @@ source of detailed scope and acceptance criteria.
     checkpoints, deterministic proof, and live station-to-collection integration
     under R09; retain serial-reference and worker/batch equivalence checks.
   - Context: [Cargo disposition and collection design](systems/cargo-disposition-and-collection.md) · [Station cargo disposition](systems/stations.md#shared-cargo-disposition-policy) · [Inventory and cargo](systems/inventory-and-cargo.md)
-
-- [ ] **TASK-105: Implement the approved station entity runtime**
-  - Promoted by the project owner. Started independent exact
-    construction and storage-loss calculations under Q49 and R01. These are
-    internal, pure evaluators, not a live station domain. The owner directed
-    independent work to proceed and to stop at TASK-108's cargo-disposition
-    dependency. TASK-108 now supplies generic cargo objects and transactions;
-    live station loss, accounting, and workflow-cleanup integration remain open.
-    The owner kept this runtime separate from TASK-108 and placed TASK-108's
-    station integration on hold until this prerequisite is delivered.
-  - Added greatest-affordable incremental construction consumption, exact
-    threshold/overflow-credit calculations, and whole-unit overflow counts.
-    Coverage includes exhaustive small affordability cases, every update
-    partition of a sample recipe, and arithmetic boundary values. Runtime
-    delivery and R05 proof remain incomplete.
-    See [initial implementation](systems/stations.md#initial-arithmetic-implementation).
-  - TASK-057 completed design approval. Implement its full accepted
-    station identity, composition, shared inventory/facility links, construction,
-    builder assignments, upgrades, dismantling, protected capacity, cargo-loss
-    accounting, authority, lifecycle, facts, checkpoints, and explicit scenario
-    conversion. Follow Q01-Q58 and R01-R05 without inventing missing policy.
-  - Supply concrete stationary sources/targets and typed observable views for
-    TASK-073. Preserve explicit station sensor contributions and private fields.
-  - Coordinate recoverable cargo with TASK-108; do not substitute placeholder
-    objects or silently discard configured ejection. Service-provider hooks do
-    not implement deferred trade, docking, repair, combat, or refitting domains.
-  - Meet R05's full proof boundary, including serial-reference determinism,
-    worker/batch comparisons before concurrency, and appropriate benchmarks.
-  - Context: [Accepted station contract](systems/stations.md#accepted-technical-contract) · [Fog-of-war stages](systems/fog-of-war-and-scouting.md#approved-stages-and-completion-boundaries)
 
 - [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
   - Resumed by the owner and implemented the deployable portion:
@@ -122,8 +93,9 @@ source of detailed scope and acceptance criteria.
     tracked by `TASK-104`.
   - The deployable portion of stages 3 and 4 now consumes TASK-095's committed
     views and sources. Station design remains `TASK-057` and station runtime is
-    `TASK-105`. Station integration and the remaining full-domain proof stay
-    open; this task is not complete.
+    `TASK-105`. Its committed station sources, exterior views, and retained
+    observation now integrate with this pipeline. The remaining full-domain
+    delivery proof stays under this task; it is not marked complete here.
   - Implement the accepted `TASK-020` contracts for player-owned ship,
     station, and deployable sensor coverage, live authoritative contacts,
     transient ship disappearance, persistent structure discovery, stale
@@ -192,6 +164,14 @@ source of detailed scope and acceptance criteria.
   - Context: [Time and pacing](application/time-and-pacing.md)
 
 ## Future parking lot
+
+- [ ] **TASK-118: Review authored station gameplay content and disk starting state**
+  - Obtain owner direction before adding stations, builder capabilities, material
+    stock, or economic providers to built-in or preview scenarios.
+  - If disk-authored starting stations are selected, define their scenario
+    vocabulary and explicit shared inventory/module/facility origins. TASK-105
+    converts only the approved typed Phase 1 fixture and supplies runtime
+    definition loading; it does not select this gameplay content.
 
 - [ ] **TASK-116: Implement the whole-session typed checkpoint JSON bridge**
   - Existing save mechanics read and write inert JSON documents; no bridge
@@ -913,6 +893,28 @@ the project-level **Near-term work** section above.
 
 ## Completed foundations
 
+- [x] **TASK-105: Implement the approved station entity runtime**
+  - Delivered TASK-057's Q01-Q58 and R01-R05: stable site/base/module identity,
+    shared storage, authorized builders, exact partial construction, upgrades,
+    protected capacity, timed recovery/dismantling, and atomic final removal.
+  - Joined deterministic storage/base loss to real cargo fields and collection,
+    exact commitment invalidation, retired economic history, causal facts,
+    stationary targets, owned views, and persistent exterior observation.
+  - Added exact provider pause/resume and compatible replacement, authorized
+    shipyard enqueue, reserved Decision wakes, and malformed in-memory restore
+    rejection across station, inventory, agenda, economy, and lifecycle owners.
+  - Delivered approved schema-5 definition loading with explicit material and
+    provider context, plus the Phase 1 conversion to three actual stations and
+    four facility modules sharing station storage. No new built-in gameplay
+    values or starting stations were selected.
+  - Retained serial owner commits with deterministic physical work waves,
+    material-gate timing, full checkpoint/event digests, and measured station
+    workloads across worker, partition, and restore layouts.
+  - Encoded checkpoint delivery remains TASK-116; authored starting gameplay
+    content remains TASK-118. TASK-108 retains its separate remaining cargo
+    work, and TASK-073 retains full observation delivery ownership.
+  - Context: [Station contract](systems/stations.md) · [Performance and determinism](validation/station-runtime-performance.md) · [Phase 1 conversion](validation/phase-1-simulation-spec.md#station-conversion-baseline)
+
 - [x] **TASK-115: Require exact commitment-release proofs for actor removal**
   - Replaced the economy-present bypass with exhaustive reservation release
     coverage and whole-batch revalidation before any removal mutation.
@@ -1505,9 +1507,10 @@ the project-level **Near-term work** section above.
     Assignment and transport no longer inspect, retain, or schedule `RouteId`
     graph legs; the Phase 1 test fixture now uses hierarchical navigation.
   - The approved fixture migration removes route disruption coverage until
-    `TASK-030` supplies authoritative connector availability. The acceptance
-    baseline is 45 processed events, event digest `175eac5bd99a0695`, and
-    final-state digest `424bec2061b0e8f9`.
+    `TASK-030` supplies authoritative connector availability. Its historical
+    pre-station baseline is 45 processed events, event digest `175eac5bd99a0695`,
+    and final-state digest `424bec2061b0e8f9`; `TASK-105` records the current
+    [explicit station-conversion baseline](validation/phase-1-simulation-spec.md#station-conversion-baseline).
   - Phase 1 remains a test-only whole-simulation acceptance fixture. Its former
     CLI entrypoint and `baseline.phase-one` benchmark are retired. `TASK-034`
     completed clean-session economic and transport composition.

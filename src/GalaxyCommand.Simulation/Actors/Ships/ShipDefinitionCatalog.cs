@@ -19,6 +19,7 @@ internal sealed class ShipDefinitionCatalog
                 if (prior.Name != definition.Name || prior.CargoCapacity != definition.CargoCapacity
                     || prior.ManeuverCapability != definition.ManeuverCapability
                     || prior.SensorRadiusUnits != definition.SensorRadiusUnits || prior.PickupRangeUnits != definition.PickupRangeUnits
+                    || prior.StationConstructionCapability != definition.StationConstructionCapability
                     || prior.Recipe.RequiredWork != definition.Recipe.RequiredWork
                     || !prior.Recipe.Inputs.OrderBy(input => input.Key.Value).SequenceEqual(
                         definition.Recipe.Inputs.OrderBy(input => input.Key.Value)))

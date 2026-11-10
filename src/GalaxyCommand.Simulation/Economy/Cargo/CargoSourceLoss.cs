@@ -44,6 +44,9 @@ internal sealed class PreparedCargoSourceLoss
     internal InventoryCheckpoint ExpectedState { get; }
     internal IReadOnlyList<CargoSourceLossGroup> Groups { get; }
     internal Quantity RemovedCapacity { get; }
+    internal bool WasApplied => _applied;
+    internal IReadOnlyList<PhysicalReservation> PhysicalCleanup => _physicalCleanup;
+    internal IReadOnlyList<Reservation> LegacyCleanup => _legacyCleanup;
 
     /// <summary>
     /// Binds a prepared removal to a freshly resolved causal request, including
@@ -67,6 +70,12 @@ internal sealed class PreparedCargoSourceLoss
         InventoryCheckpoint current = Source.CaptureCheckpoint();
         return current.Id == ExpectedState.Id && current.Custody == ExpectedState.Custody
             && current.Capacity == ExpectedState.Capacity
+            && current.EnabledIntakeCapacity == ExpectedState.EnabledIntakeCapacity
+            && current.ProtectedIntakeCapacity == ExpectedState.ProtectedIntakeCapacity
+            && current.NextIncomingAdmissionSequence == ExpectedState.NextIncomingAdmissionSequence
+            && current.IncomingAdmissions.SequenceEqual(ExpectedState.IncomingAdmissions)
+            && current.NextOutgoingAdmissionSequence == ExpectedState.NextOutgoingAdmissionSequence
+            && current.OutgoingAdmissions.SequenceEqual(ExpectedState.OutgoingAdmissions)
             && current.StoredMaterials.SequenceEqual(ExpectedState.StoredMaterials)
             && current.FungibleHoldings.SequenceEqual(ExpectedState.FungibleHoldings)
             && current.DiscreteItems.SequenceEqual(ExpectedState.DiscreteItems)

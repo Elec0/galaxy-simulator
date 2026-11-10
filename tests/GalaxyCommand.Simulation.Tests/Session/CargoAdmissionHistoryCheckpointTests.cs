@@ -59,7 +59,10 @@ public sealed class CargoAdmissionHistoryCheckpointTests
         InventoryCheckpoint destination = saved.Lifecycle.Inventories.Inventories.Single(inventory => inventory.Id == new InventoryId(2));
         var forgedInventory = new InventoryCheckpoint(destination.Id, destination.Custody, destination.Capacity,
             destination.StoredMaterials, destination.Reservations, destination.CapacityReservations, destination.FungibleHoldings,
-            [new(destroyed, Item.Key)], destination.PhysicalReservations);
+            [new(destroyed, Item.Key)], destination.PhysicalReservations,
+            destination.EnabledIntakeCapacity, destination.ProtectedIntakeCapacity,
+            destination.NextIncomingAdmissionSequence, destination.IncomingAdmissions,
+            destination.NextOutgoingAdmissionSequence, destination.OutgoingAdmissions);
         EntityLifecycleCheckpoint life = saved.Lifecycle;
         var forged = saved with { Lifecycle = new(life.EntityIds, life.ShipIds, life.InventoryIds,
             new(life.Inventories.Inventories.Select(inventory => inventory.Id == destination.Id ? forgedInventory : inventory)),

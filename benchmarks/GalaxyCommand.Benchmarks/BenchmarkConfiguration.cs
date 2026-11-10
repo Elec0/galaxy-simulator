@@ -7,6 +7,16 @@ namespace GalaxyCommand.Benchmarks;
 
 public static class BenchmarkParameterNames
 {
+    public const string DestructionLifecycle = "destructionLifecycle";
+    public const string StationCount = "stationCount";
+    public const string ActiveStationCount = "activeStationCount";
+    public const string BuildersPerProject = "buildersPerProject";
+    public const string ConstructionWork = "constructionWork";
+    public const string ConstructionMaterials = "constructionMaterials";
+    public const string BuilderThroughput = "builderThroughput";
+    public const string DeliveryWaves = "deliveryWaves";
+    public const string AdvancePartitions = "advancePartitions";
+    public const string RestoreAtMilliseconds = "restoreAtMilliseconds";
     public const string LossOccurrenceCount = "lossOccurrenceCount";
     public const string CargoUnitsPerLoss = "cargoUnitsPerLoss";
     public const string CollectorCount = "collectorCount";
@@ -82,6 +92,9 @@ public sealed record BenchmarkPreset
 
 public static class BenchmarkPresets
 {
+    public const string StationManyQuiet = "station.many-quiet-sites";
+    public const string StationOneCrowded = "station.one-crowded";
+    public const string StationPartialDeliveries = "station.partial-deliveries";
     public const string CargoComponentSeparateLosses = "cargo.component-separate-losses";
     public const string CargoComponentOverlapChain = "cargo.component-overlap-chain";
     public const string CargoComponentLargeFungible = "cargo.component-large-fungible";
@@ -334,16 +347,36 @@ public static class BenchmarkPresets
             (BenchmarkParameterNames.CollectorCount, 64), (BenchmarkParameterNames.FactRetentionCapacity, 10000));
         BenchmarkPreset[] cargo =
         [
-            new(CargoComponentSeparateLosses, true, lossParameters, "3c1370d77514c1ca"),
-            new(CargoComponentOverlapChain, true, lossParameters, "8406091287c23ac8"),
+            new(CargoComponentSeparateLosses, true, lossParameters, "3bfd5cf89ad3e162"),
+            new(CargoComponentOverlapChain, true, lossParameters, "3d077fb9cbc27290"),
             new(CargoComponentLargeFungible, true, new Dictionary<string, long>(lossParameters)
-                { [BenchmarkParameterNames.LossOccurrenceCount] = 16, [BenchmarkParameterNames.CargoUnitsPerLoss] = 1_000_000_000_000 }, "2958af58eff17714"),
-            new(CargoComponentContestedSerial, true, contestedParameters, "513fdbed77382d36"),
+                { [BenchmarkParameterNames.LossOccurrenceCount] = 16, [BenchmarkParameterNames.CargoUnitsPerLoss] = 1_000_000_000_000 }, "136a338b14147963"),
+            new(CargoComponentContestedSerial, true, contestedParameters, "499d2f63ec017fb9"),
             new(CargoComponentContestedBatched, true, new Dictionary<string, long>(contestedParameters)
-                { [BenchmarkParameterNames.WorkerCount] = 1, [BenchmarkParameterNames.BatchSize] = 16 }, "513fdbed77382d36"),
+                { [BenchmarkParameterNames.WorkerCount] = 1, [BenchmarkParameterNames.BatchSize] = 16 }, "499d2f63ec017fb9"),
+        ];
+        var stationParameters = Parameters((BenchmarkParameterNames.DestructionLifecycle, 0), (BenchmarkParameterNames.WarmupIterations, 1), (BenchmarkParameterNames.MeasuredIterations, 3),
+            (BenchmarkParameterNames.Seed, 1), (BenchmarkParameterNames.SimulatedDurationMilliseconds, 24000),
+            (BenchmarkParameterNames.SystemCount, 16), (BenchmarkParameterNames.StationCount, 256),
+            (BenchmarkParameterNames.ActiveStationCount, 8), (BenchmarkParameterNames.BuildersPerProject, 2),
+            (BenchmarkParameterNames.ConstructionWork, 24), (BenchmarkParameterNames.ConstructionMaterials, 12),
+            (BenchmarkParameterNames.BuilderThroughput, 3), (BenchmarkParameterNames.DeliveryWaves, 3),
+            (BenchmarkParameterNames.AdvancePartitions, 1), (BenchmarkParameterNames.RestoreAtMilliseconds, 16001),
+            (BenchmarkParameterNames.WorkerCount, 0), (BenchmarkParameterNames.BatchSize, 16),
+            (BenchmarkParameterNames.FactRetentionCapacity, 100000));
+        BenchmarkPreset[] stations =
+        [
+            new(StationManyQuiet, true, stationParameters, "285568c294f5e9db", version: 2),
+            new(StationOneCrowded, true, new Dictionary<string, long>(stationParameters)
+            { [BenchmarkParameterNames.SystemCount] = 1, [BenchmarkParameterNames.StationCount] = 64, [BenchmarkParameterNames.ActiveStationCount] = 64 }, "b56940d4752279bc", version: 2),
+            new(StationPartialDeliveries, true, new Dictionary<string, long>(stationParameters)
+            { [BenchmarkParameterNames.SystemCount] = 4, [BenchmarkParameterNames.StationCount] = 32, [BenchmarkParameterNames.ActiveStationCount] = 32,
+                [BenchmarkParameterNames.ConstructionWork] = 48, [BenchmarkParameterNames.ConstructionMaterials] = 24,
+                [BenchmarkParameterNames.DeliveryWaves] = 6, [BenchmarkParameterNames.SimulatedDurationMilliseconds] = 96000,
+                [BenchmarkParameterNames.RestoreAtMilliseconds] = 64001 }, "8d0fba9b6bf6c88b", version: 2),
         ];
         return new ReadOnlyDictionary<string, BenchmarkPreset>(
-            values.Append(prepared).Concat(indexes).Concat(runtime).Concat(sweeps).Concat(runtimeSweeps).Concat(batchSweeps).Concat(sessions).Concat(observations).Concat(cargo).ToDictionary(value => value.Id, StringComparer.Ordinal));
+            values.Append(prepared).Concat(indexes).Concat(runtime).Concat(sweeps).Concat(runtimeSweeps).Concat(batchSweeps).Concat(sessions).Concat(observations).Concat(cargo).Concat(stations).ToDictionary(value => value.Id, StringComparer.Ordinal));
     }
 
     private static ReadOnlyDictionary<string, long> Parameters(
@@ -589,6 +622,11 @@ public static class BenchmarkScenarioValidator
 
         switch (scenario.BasePreset)
         {
+            case BenchmarkPresets.StationManyQuiet:
+            case BenchmarkPresets.StationOneCrowded:
+            case BenchmarkPresets.StationPartialDeliveries:
+                ValidateStation(scenario);
+                break;
             case BenchmarkPresets.CargoComponentSeparateLosses:
             case BenchmarkPresets.CargoComponentOverlapChain:
             case BenchmarkPresets.CargoComponentLargeFungible:
@@ -704,6 +742,31 @@ public static class BenchmarkScenarioValidator
     }
 
     /// <summary>Keeps the sampled instant within known linear motion and bounds explicit query work.</summary>
+    /// <summary>Bounds real station workloads and leaves enough scheduled time for every authored lifecycle phase.</summary>
+    private static void ValidateStation(ResolvedBenchmarkScenario scenario)
+    {
+        RequireRange(scenario, BenchmarkParameterNames.DestructionLifecycle, 0, 1);
+        RequireRange(scenario, BenchmarkParameterNames.StationCount, 1, 10000);
+        RequireRange(scenario, BenchmarkParameterNames.ActiveStationCount, 1, scenario.Get(BenchmarkParameterNames.StationCount));
+        RequireRange(scenario, BenchmarkParameterNames.SystemCount, 1, scenario.Get(BenchmarkParameterNames.StationCount));
+        RequireRange(scenario, BenchmarkParameterNames.BuildersPerProject, 1, 16);
+        RequireRange(scenario, BenchmarkParameterNames.ConstructionWork, 1, 1000000000);
+        RequireRange(scenario, BenchmarkParameterNames.ConstructionMaterials, 1, 1000000000);
+        RequireRange(scenario, BenchmarkParameterNames.BuilderThroughput, 1, 1000000);
+        RequireRange(scenario, BenchmarkParameterNames.DeliveryWaves, 1, scenario.Get(BenchmarkParameterNames.ConstructionMaterials));
+        RequireRange(scenario, BenchmarkParameterNames.AdvancePartitions, 1, 10000);
+        RequireRange(scenario, BenchmarkParameterNames.WorkerCount, 0, 1024);
+        RequireRange(scenario, BenchmarkParameterNames.BatchSize, 1, int.MaxValue);
+        RequireRange(scenario, BenchmarkParameterNames.FactRetentionCapacity, 1, int.MaxValue);
+        ulong duration = scenario.GetUInt64(BenchmarkParameterNames.SimulatedDurationMilliseconds);
+        RequireRange(scenario, BenchmarkParameterNames.RestoreAtMilliseconds, 0, (long)duration - 1);
+        UInt128 rate = (UInt128)scenario.GetUInt64(BenchmarkParameterNames.BuildersPerProject) * scenario.GetUInt64(BenchmarkParameterNames.BuilderThroughput);
+        UInt128 workTime = ((UInt128)scenario.GetUInt64(BenchmarkParameterNames.ConstructionWork) * 1000 + rate - 1) / rate;
+        if (workTime * 2 * scenario.GetUInt64(BenchmarkParameterNames.DeliveryWaves) > duration
+            || (2000 + rate - 1) / rate > duration / 12)
+            throw new BenchmarkUsageException("Station duration must admit all delivery waves and each structural phase.");
+    }
+
     private static void ValidateProximity(ResolvedBenchmarkScenario scenario)
     {
         RequireRange(scenario, BenchmarkParameterNames.SystemCount, 1, 10_000);

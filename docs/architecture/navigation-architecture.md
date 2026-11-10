@@ -454,30 +454,32 @@ coverage.
 
 **Decision status:** Accepted by the project owner.
 
-`TASK-031` migrates the bounded Phase 1 acceptance fixture without treating a
-legacy `LocationId` as a future gameplay identity. The fixture maps each legacy
-location to one system and maps each facility and inventory to an explicit
-anchored spatial entity. This preserves the existing economic topology while
-making the distinctions that the location graph previously collapsed visible to
-the migration.
+`TASK-031` mapped each legacy location to one system without treating a
+`LocationId` as a future gameplay identity. `TASK-105` then explicitly converted
+those same economic assets into three operational station entities. Each
+production or construction facility is an attached module with its existing
+facility identity and workload. This conversion changes shared storage within
+the Shipyard station; connector topology and travel policy remain the same.
 
 | Legacy location | System | Anchored entities and inventories | Initial ships |
 | --- | --- | --- | --- |
-| Mine | Mine system | Mine facility entity and mine inventory | One freighter at the mine facility anchor |
-| Refinery | Refinery system | Refinery facility entity and refinery inventory | One freighter at the refinery facility anchor |
-| Shipyard | Shipyard system | Component-factory entity and inventory; separate shipyard entity and inventory | Constructed freighters appear at the shipyard facility anchor |
+| Mine | Mine system | Mine station, production module and shared station inventory | One freighter at the mine facility anchor |
+| Refinery | Refinery system | Refinery station, production module and shared station inventory | One freighter at the refinery facility anchor |
+| Shipyard | Shipyard system | One station with component-production and ship-construction modules sharing one inventory | Constructed freighters appear at the shipyard facility anchor |
 
 Every facility anchor in this fixture uses the same system-local coordinate.
-The component factory and shipyard are distinct entities despite being
-co-located. The initial local travel-time policy therefore assigns zero duration
-between anchors in the same system. This is a compatibility choice, not a
-claim that future facilities share a physical position or that local movement
-is generally instantaneous.
+The component factory and shipyard retain independent workloads and identities,
+but share their station's position and actual inventory instance. Components
+feed ship construction directly, with no transport between attached modules.
+The initial local travel-time policy still assigns zero duration between anchors
+in the same system. This test policy does not make general local movement
+instantaneous.
 
 Each ship cargo inventory remains attached to its owning ship entity. The
-fixture's legacy `OrganizationId` continues to identify ownership within the
-acceptance composition. It does not create a parallel `GameSession` entity or
-principal model; `TASK-034` completed that production integration separately.
+fixture's legacy `OrganizationId` continues to identify economic ownership.
+Station custody uses an explicitly authored principal and real station lifecycle
+authority over the same inventories. The canonical acceptance runtime retains
+that station owner; it does not spawn an unrelated `GameSession` demonstration.
 
 The two legacy bidirectional links become directional connector transit pairs:
 
@@ -489,8 +491,9 @@ flowchart LR
     refineryFacility["Refinery facility and inventory"]
     refineryShipyardGate["Refinery-side Shipyard connector endpoint"]
     shipyardGate["Shipyard-side Refinery connector endpoint"]
-    componentFactory["Component factory and inventory"]
-    shipyardFacility["Shipyard facility and inventory"]
+    componentFactory["Component-production module"]
+    shipyardFacility["Ship-construction module"]
+    shipyardInventory["Shared station inventory"]
 
     subgraph mine["Mine system"]
         mineFacility
@@ -505,10 +508,13 @@ flowchart LR
         shipyardGate
         componentFactory
         shipyardFacility
+        shipyardInventory
     end
 
     mineGate <-- "60 seconds each direction" --> refineryGate
     refineryShipyardGate <-- "60 seconds each direction" --> shipyardGate
+    componentFactory <--> shipyardInventory
+    shipyardFacility <--> shipyardInventory
 ```
 
 Each endpoint has its own stable identity. The Mine-Refinery pair and the
@@ -518,3 +524,7 @@ but it must not inspect connector identities, select legs, or retain a
 `RouteId`. The test-only fixture has no mutable connector availability. When
 `TASK-030` adds authoritative availability, it owns the renewed disruption
 coverage and its replan and wake behavior.
+
+The [Phase 1 acceptance baseline](../validation/phase-1-simulation-spec.md#station-conversion-baseline)
+records the changed end-to-end timing and fingerprints. Its earlier separate-
+inventory baseline remains historical context for `TASK-031`.

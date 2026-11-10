@@ -106,6 +106,8 @@ public sealed record GamePresentationWorldSnapshot
     public IReadOnlyList<CargoObjectView> CargoObjects { get; }
 
     public IReadOnlyList<CargoCollectionProgressView> CargoCollectionProgress { get; }
+
+    public IReadOnlyList<ObservedStationSnapshot> Stations { get; internal init; } = [];
 }
 
 /// <summary>
@@ -244,7 +246,8 @@ internal static class GamePresentationSnapshotFactory
         ShipSensorCoverageSnapshot coverage,
         IReadOnlyList<ObservedSensorDeployableSnapshot>? deployables = null,
         IReadOnlyList<CargoObjectView>? cargoObjects = null,
-        IReadOnlyList<CargoCollectionProgressView>? cargoCollectionProgress = null)
+        IReadOnlyList<CargoCollectionProgressView>? cargoCollectionProgress = null,
+        IReadOnlyList<ObservedStationSnapshot>? stations = null)
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(request);
@@ -291,7 +294,8 @@ internal static class GamePresentationSnapshotFactory
 
         return new GamePresentationSnapshot(
             new GamePresentationWorldSnapshot(world, ships, deployables ?? Array.Empty<ObservedSensorDeployableSnapshot>(),
-                cargoObjects ?? Array.Empty<CargoObjectView>(), cargoCollectionProgress ?? Array.Empty<CargoCollectionProgressView>()),
+                cargoObjects ?? Array.Empty<CargoObjectView>(), cargoCollectionProgress ?? Array.Empty<CargoCollectionProgressView>())
+            { Stations = GameSnapshotCollection.Copy(stations ?? []) },
             CreateRelationshipPresentation(
                 world.Relationships,
                 request.ObserverPrincipalId),

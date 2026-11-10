@@ -27,7 +27,7 @@ internal sealed class RestoredConstructionOwner
             _processes.Values.Select(process => process.CaptureCheckpoint()).ToArray());
 }
 
-internal static class ConstructionCheckpointRestore
+internal static partial class ConstructionCheckpointRestore
 {
     private const string Path = "$.checkpoint.economy.construction";
 
@@ -160,7 +160,13 @@ internal static class ConstructionCheckpointRestore
                 Status = saved.Status,
                 CompletesAt = saved.CompletesAt,
                 Generation = saved.Generation,
+                WorkState = saved.WorkState,
             };
+            if (!EconomicJobWorkState.IsValidCheckpoint(saved.WorkState, order.Design.Recipe.RequiredWork, checkpoint.Throughput,
+                checkpoint.IsProviderAvailable, saved.Status == ConstructionOrderStatus.Running,
+                saved.Status == ConstructionOrderStatus.Paused,
+                saved.Status is ConstructionOrderStatus.AwaitingMaterialization or ConstructionOrderStatus.Completed, saved.CompletesAt))
+                return RejectedProcess($"{orderPath}.workState", "Construction work progress, provider availability or cached deadline is inconsistent.");
             CheckpointValidationFailure? reservationFailure = RestoreReservations(
                 saved,
                 order,
@@ -239,7 +245,8 @@ internal static class ConstructionCheckpointRestore
                 checkpoint.ActiveOrderId,
                 checkpoint.QueuedOrderIds,
                 pendingResult.Value!,
-                receiptResult.Value!));
+                receiptResult.Value!,
+                checkpoint.IsProviderAvailable));
     }
 
     private static CheckpointValidationFailure? ValidateAssignments(
@@ -251,7 +258,8 @@ internal static class ConstructionCheckpointRestore
             && (!orders.TryGetValue(activeId, out ConstructionOrder? active)
                 || active.Status is not (
                     ConstructionOrderStatus.WaitingForInputs
-                    or ConstructionOrderStatus.Running)))
+                    or ConstructionOrderStatus.Running
+                    or ConstructionOrderStatus.Paused)))
         {
             return new CheckpointValidationFailure(
                 $"{path}.activeOrderId",
@@ -284,7 +292,7 @@ internal static class ConstructionCheckpointRestore
         {
             bool assigned = order.Id == checkpoint.ActiveOrderId || queued.Contains(order.Id);
             bool assignable = order.Status is ConstructionOrderStatus.WaitingForInputs
-                or ConstructionOrderStatus.Running;
+                or ConstructionOrderStatus.Running or ConstructionOrderStatus.Paused;
             if (assigned != assignable)
             {
                 return new CheckpointValidationFailure(

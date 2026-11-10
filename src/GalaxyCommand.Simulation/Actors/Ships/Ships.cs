@@ -18,7 +18,8 @@ public sealed class ShipDesign : ConstructionDesign
         Quantity cargoCapacity,
         ShipManeuverCapability maneuverCapability,
         ulong sensorRadiusUnits,
-        ulong pickupRangeUnits)
+        ulong pickupRangeUnits,
+        StationConstructionCapability? stationConstructionCapability = null)
         : base(id, name, recipe)
     {
         ArgumentNullException.ThrowIfNull(maneuverCapability);
@@ -26,6 +27,7 @@ public sealed class ShipDesign : ConstructionDesign
         ManeuverCapability = maneuverCapability;
         SensorRadiusUnits = sensorRadiusUnits;
         PickupRangeUnits = pickupRangeUnits;
+        StationConstructionCapability = stationConstructionCapability;
     }
 
     public Quantity CargoCapacity { get; }
@@ -35,6 +37,8 @@ public sealed class ShipDesign : ConstructionDesign
     public ulong SensorRadiusUnits { get; }
 
     public ulong PickupRangeUnits { get; }
+
+    public StationConstructionCapability? StationConstructionCapability { get; }
 }
 
 public sealed record Ship(

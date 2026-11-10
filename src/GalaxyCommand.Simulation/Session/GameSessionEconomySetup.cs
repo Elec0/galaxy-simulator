@@ -1,3 +1,4 @@
+using GalaxyCommand.Content;
 using System.Collections.ObjectModel;
 
 namespace GalaxyCommand.Simulation;
@@ -70,7 +71,27 @@ public sealed record EconomyFacilitySetup(
     InventoryId InventoryId,
     LocationId LogisticsLocationId,
     SystemPosition Position,
-    PrincipalId? ControllingPrincipalId = null);
+    PrincipalId? ControllingPrincipalId = null,
+    StationFacilityBinding? StationBinding = null, QualifiedContentKey? StationModuleDefinitionKey = null);
+
+/// <summary>Explicit facility link to an attached module and its shared station inventory owner.</summary>
+public sealed record StationFacilityBinding
+{
+    /// <summary>Creates a nonzero station/entity/module link; session admission validates the live composition.</summary>
+    public StationFacilityBinding(StationId stationId, EntityId stationEntityId, StationModuleId moduleId)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(stationId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(stationEntityId.Value);
+        ArgumentOutOfRangeException.ThrowIfZero(moduleId.Value);
+        StationId = stationId;
+        StationEntityId = stationEntityId;
+        ModuleId = moduleId;
+    }
+
+    public StationId StationId { get; }
+    public EntityId StationEntityId { get; }
+    public StationModuleId ModuleId { get; }
+}
 
 /// <summary>
 /// Initial recurring production behavior for one facility.
@@ -152,6 +173,7 @@ public sealed class GameSessionEconomySetup
 
         ValidateInventories(inventoryValues);
         ValidateFacilities(facilityValues, inventoryValues);
+        ValidateStationBindings(facilityValues, materialCompatibility);
         ValidateProduction(productionValues, facilityValues);
         ValidateConstructionFacilities(constructionFacilityValues, facilityValues);
         _shipDesigns = ValidateShipDesigns(shipDesigns);
@@ -216,7 +238,7 @@ public sealed class GameSessionEconomySetup
         IEnumerable<InitialInventorySetup> inventories)
     {
         var facilityIds = new HashSet<FacilityId>();
-        var locationIds = new HashSet<LocationId>();
+        var locations = new Dictionary<LocationId, EconomyFacilitySetup>();
         var inventoryIds = new HashSet<InventoryId>(inventories.Select(inventory => inventory.InventoryId));
         foreach (EconomyFacilitySetup facility in facilities)
         {
@@ -225,13 +247,20 @@ public sealed class GameSessionEconomySetup
             ArgumentOutOfRangeException.ThrowIfZero(facility.InventoryId.Value);
             ArgumentOutOfRangeException.ThrowIfZero(facility.LogisticsLocationId.Value);
             ArgumentOutOfRangeException.ThrowIfZero(facility.Position.SystemId.Value);
-            if (!facilityIds.Add(facility.FacilityId)
-                || !locationIds.Add(facility.LogisticsLocationId))
+            if (!facilityIds.Add(facility.FacilityId))
             {
                 throw new ArgumentException(
                     $"Economy facility {facility.FacilityId} or logistics location {facility.LogisticsLocationId} is duplicated.",
                     nameof(facilities));
             }
+
+            if (locations.TryGetValue(facility.LogisticsLocationId, out EconomyFacilitySetup? anchor)
+                && (anchor.StationBinding is not { } binding || facility.StationBinding?.StationId != binding.StationId
+                    || facility.StationBinding.StationEntityId != binding.StationEntityId
+                    || facility.InventoryId != anchor.InventoryId || facility.Position != anchor.Position
+                    || facility.ControllingPrincipalId != anchor.ControllingPrincipalId))
+                throw new ArgumentException("Only explicitly bound modules of one station may share a logistics anchor.", nameof(facilities));
+            locations.TryAdd(facility.LogisticsLocationId, facility);
 
             if (!inventoryIds.Contains(facility.InventoryId))
             {
@@ -258,6 +287,45 @@ public sealed class GameSessionEconomySetup
                     $"Production configuration for facility {production.FacilityId} is missing or duplicated.",
                     nameof(productionFacilities));
             }
+        }
+    }
+
+    /// <summary>
+    /// Requires explicit coherent composition before facilities may share station storage.
+    /// Legacy unbound seeds retain their existing inventory semantics.
+    /// </summary>
+    private static void ValidateStationBindings(
+        IReadOnlyCollection<EconomyFacilitySetup> facilities,
+        MaterialInventoryCompatibilityMap? compatibility)
+    {
+        var stations = new Dictionary<StationId, EconomyFacilitySetup>();
+        var entities = new Dictionary<EntityId, StationId>();
+        var modules = new HashSet<(StationId, StationModuleId)>();
+        foreach (EconomyFacilitySetup facility in facilities)
+        {
+            if (facility.StationBinding is not { } binding) continue;
+            if (compatibility is null || facility.ControllingPrincipalId is not { Value: > 0 })
+                throw new ArgumentException("Station facilities require mapped materials and an explicit controlling principal.", nameof(facilities));
+            if (!modules.Add((binding.StationId, binding.ModuleId)))
+                throw new ArgumentException("A station module cannot bind more than one economy facility.", nameof(facilities));
+            if (entities.TryGetValue(binding.StationEntityId, out StationId station) && station != binding.StationId)
+                throw new ArgumentException("A station entity cannot identify multiple stations.", nameof(facilities));
+            entities[binding.StationEntityId] = binding.StationId;
+
+            if (stations.TryGetValue(binding.StationId, out EconomyFacilitySetup? first)
+                && (first.InventoryId != facility.InventoryId || first.Position != facility.Position
+                    || first.ControllingPrincipalId != facility.ControllingPrincipalId
+                    || first.StationBinding!.StationEntityId != binding.StationEntityId))
+                throw new ArgumentException("Station facilities must share one inventory, owner, position and entity.", nameof(facilities));
+            stations.TryAdd(binding.StationId, facility);
+        }
+
+        foreach (IGrouping<InventoryId, EconomyFacilitySetup> group in facilities.GroupBy(facility => facility.InventoryId))
+        {
+            EconomyFacilitySetup first = group.First();
+            if (group.Count() == 1 || compatibility is null && group.All(facility => facility.StationBinding is null)) continue;
+            if (first.StationBinding is not { } binding || group.Any(facility => facility.StationBinding?.StationId != binding.StationId))
+                throw new ArgumentException("Shared mapped storage requires an explicit common station binding on every facility.", nameof(facilities));
         }
     }
 
@@ -354,23 +422,23 @@ public sealed class GameSessionEconomySetup
             return;
         }
 
-        var facilitiesByInventory = new Dictionary<InventoryId, EconomyFacilitySetup>();
+        var facilityInventoryIds = new HashSet<InventoryId>();
         foreach (EconomyFacilitySetup facility in facilities)
         {
-            if (facility.ControllingPrincipalId is not { Value: > 0 }
-                || !facilitiesByInventory.TryAdd(facility.InventoryId, facility))
+            if (facility.ControllingPrincipalId is not { Value: > 0 })
             {
                 throw new ArgumentException(
-                    "Mapped economy facilities require one explicit controlling principal and one inventory each.",
+                    "Mapped economy facilities require an explicit controlling principal.",
                     nameof(facilities));
             }
+            facilityInventoryIds.Add(facility.InventoryId);
         }
 
         if (inventories.Any(inventory =>
-                !facilitiesByInventory.ContainsKey(inventory.InventoryId)))
+                !facilityInventoryIds.Contains(inventory.InventoryId)))
         {
             throw new ArgumentException(
-                "Every mapped economy inventory must belong to exactly one facility.",
+                "Every mapped economy inventory must belong to a facility or explicit station facility group.",
                 nameof(inventories));
         }
 

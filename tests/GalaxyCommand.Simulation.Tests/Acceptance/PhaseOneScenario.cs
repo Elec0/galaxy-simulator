@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Text;
 
 namespace GalaxyCommand.Simulation
 {
@@ -169,6 +170,7 @@ namespace GalaxyCommand.Simulation.Acceptance
         private readonly IdSequence<InventoryId> _inventoryIds;
         private readonly EconomicRuntimeSystem _economicSystem;
         private readonly MaterialId[] _knownMaterials;
+        private readonly StationRuntimeOwner _stations;
         private readonly SortedDictionary<LocationId, string> _locationNames;
         private readonly List<ScenarioEventRecord> _eventRecords = [];
         private readonly List<DecisionRecord> _decisionRecords = [];
@@ -225,12 +227,16 @@ namespace GalaxyCommand.Simulation.Acceptance
                     _reservationIds,
                     _capacityReservationIds));
             _knownMaterials = fixture.KnownMaterials;
+            _stations = fixture.StationOwner;
             _engine = new SimulationEngine<PhaseOneEvent>(this, _agenda);
         }
 
         public IReadOnlyList<ScenarioEventRecord> EventRecords => _eventRecords;
         public IReadOnlyList<DecisionRecord> DecisionRecords => _decisionRecords;
         public SimulationTime CurrentTime => _engine.CurrentTime;
+
+        /// <summary>Captures real station composition whose shared inventories are used by this scenario's economic workloads.</summary>
+        public IReadOnlyList<StationSnapshot> CaptureStations() => _stations.Capture();
 
         public PhaseOneSnapshot CaptureSnapshot()
         {
@@ -716,6 +722,32 @@ namespace GalaxyCommand.Simulation.Acceptance
             hash.WriteUInt64(_agenda.CurrentTime.Milliseconds);
             hash.WriteUInt64(_config.RandomSeed);
             hash.WriteUInt64(_constructedShipId?.Value ?? 0);
+            IReadOnlyList<StationSnapshot> stations = CaptureStations();
+            hash.WriteUInt64((ulong)stations.Count);
+            foreach (StationSnapshot station in stations)
+            {
+                hash.WriteUInt64(station.Id.Value);
+                hash.WriteUInt64(station.EntityId.Value);
+                hash.WriteUInt64(station.InventoryId.Value);
+                hash.WriteUInt64(station.PrincipalId.Value);
+                hash.WriteString(station.DefinitionKey.ToString());
+                hash.WriteUInt64(station.Position.SystemId.Value);
+                hash.WriteUInt64(unchecked((ulong)station.Position.Position.X.Units));
+                hash.WriteUInt64(unchecked((ulong)station.Position.Position.Y.Units));
+                hash.WriteByte((byte)station.Phase);
+                hash.WriteUInt64(station.Revision);
+                hash.WriteUInt64(station.SensorRadiusUnits);
+                hash.WriteUInt64((ulong)station.Projects.Count);
+                hash.WriteUInt64((ulong)station.Modules.Count);
+                foreach (StationModuleSnapshot module in station.Modules)
+                {
+                    hash.WriteUInt64(module.Id.Value);
+                    hash.WriteString(module.DefinitionKey.ToString());
+                    hash.WriteByte((byte)module.Phase);
+                    hash.WriteBoolean(module.Enabled);
+                    hash.WriteUInt64(module.OccupiedCapacity);
+                }
+            }
             var inventoryIds = new SortedSet<InventoryId>(EntityIdComparer<InventoryId>.Instance);
             foreach (ProductionLine line in _productionLines.Values)
             {
@@ -903,6 +935,14 @@ namespace GalaxyCommand.Simulation.Acceptance
             }
 
             public void WriteBoolean(bool value) => WriteByte(value ? (byte)1 : (byte)0);
+
+            /// <summary>Hashes a length-delimited UTF-8 identity without culture-dependent encoding or concatenation ambiguity.</summary>
+            public void WriteString(string value)
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(value);
+                WriteUInt64((ulong)bytes.Length);
+                foreach (byte item in bytes) WriteByte(item);
+            }
 
             public void WriteUInt64(ulong value)
             {

@@ -109,6 +109,12 @@ public sealed partial class InventoryRegistry
     /// <summary>Compares canonical owner state rather than container identity or derived totals.</summary>
     private static bool CollectionInventoryStateMatches(InventoryCheckpoint current, InventoryCheckpoint expected) =>
         current.Id == expected.Id && current.Custody == expected.Custody && current.Capacity == expected.Capacity
+        && current.EnabledIntakeCapacity == expected.EnabledIntakeCapacity
+        && current.ProtectedIntakeCapacity == expected.ProtectedIntakeCapacity
+        && current.NextIncomingAdmissionSequence == expected.NextIncomingAdmissionSequence
+        && current.IncomingAdmissions.SequenceEqual(expected.IncomingAdmissions)
+        && current.NextOutgoingAdmissionSequence == expected.NextOutgoingAdmissionSequence
+        && current.OutgoingAdmissions.SequenceEqual(expected.OutgoingAdmissions)
         && current.StoredMaterials.SequenceEqual(expected.StoredMaterials)
         && current.FungibleHoldings.SequenceEqual(expected.FungibleHoldings) && current.DiscreteItems.SequenceEqual(expected.DiscreteItems)
         && current.Reservations.SequenceEqual(expected.Reservations) && current.CapacityReservations.SequenceEqual(expected.CapacityReservations)

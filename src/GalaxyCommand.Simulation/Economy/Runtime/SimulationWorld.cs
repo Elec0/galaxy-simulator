@@ -92,6 +92,14 @@ internal sealed class SimulationWorld
         return inventory;
     }
 
+    /// <summary>Creates authored custody-aware setup storage while retaining the world's exact inventory allocator.</summary>
+    private Inventory AddInventory(Quantity capacity, InventoryCustody custody, MaterialInventoryCompatibilityMap materials)
+    {
+        var inventory = new Inventory(InventoryIds.Allocate(), custody, capacity, materials);
+        Inventories.Add(inventory);
+        return inventory;
+    }
+
     private ProductionLine AddProductionLine(
         FacilityId facilityId,
         InventoryId inventoryId,
@@ -193,6 +201,10 @@ internal sealed class SimulationWorld
 
         internal Inventory AddInventory(Quantity capacity) =>
             World.AddInventory(capacity);
+
+        /// <summary>Seeds one explicit shared inventory without inventing station or facility identity.</summary>
+        internal Inventory AddInventory(Quantity capacity, InventoryCustody custody, MaterialInventoryCompatibilityMap materials) =>
+            World.AddInventory(capacity, custody, materials);
 
         internal ProductionLine AddProductionLine(
             FacilityId facilityId,

@@ -6,7 +6,7 @@ internal sealed record PreparedTransportRemovalCancellation(
     TransportJobStatus Status, EventGeneration Generation,
     Inventory Source, Inventory Destination, DemandRequest Demand, Quantity DemandRemaining,
     SupplyOffer? Supply, Quantity? SupplyRemaining,
-    IReadOnlyList<InventoryCommitmentRelease> Releases);
+    IReadOnlyList<InventoryCommitmentRelease> Releases, SimulationTime? TransitionAt);
 
 public sealed partial class TransportBoard
 {
@@ -63,7 +63,7 @@ public sealed partial class TransportBoard
 
         prepared = new(this, job, freighter, job.Status, job.Generation,
             source, destination, demand, demand.Remaining, supply, supply?.Remaining,
-            Array.AsReadOnly(releases.ToArray()));
+            Array.AsReadOnly(releases.ToArray()), job.TransitionAt);
         return true;
     }
 
@@ -71,6 +71,7 @@ public sealed partial class TransportBoard
     internal bool CanCommitRemovalCancellation(PreparedTransportRemovalCancellation prepared, InventoryRegistry inventories) =>
         ReferenceEquals(prepared.Owner, this)
         && prepared.Job.Status == prepared.Status && prepared.Job.Generation == prepared.Generation
+        && prepared.Job.TransitionAt == prepared.TransitionAt
         && ReferenceEquals(inventories.Get(prepared.Source.Id), prepared.Source)
         && ReferenceEquals(inventories.Get(prepared.Destination.Id), prepared.Destination)
         && prepared.Demand.Remaining == prepared.DemandRemaining
@@ -79,4 +80,19 @@ public sealed partial class TransportBoard
         && TryPrepareCancellationForEntityRemoval(prepared.Job, prepared.Freighter, inventories, out var current)
         && ReferenceEquals(current!.Demand, prepared.Demand) && ReferenceEquals(current.Supply, prepared.Supply)
         && current.Releases.SequenceEqual(prepared.Releases);
+    /// <summary>Checks the same retained workflow after an exact source delta released only its authorized outgoing claim.</summary>
+    internal bool CanCommitRemovalAfterSourceLoss(PreparedTransportRemovalCancellation prepared,
+        InventoryRegistry inventories, PreparedCargoSourceLoss loss) =>
+        ReferenceEquals(prepared.Owner, this) && ReferenceEquals(GetJob(prepared.Job.Id), prepared.Job)
+        && prepared.Job.Status == prepared.Status && prepared.Job.Generation == prepared.Generation
+        && prepared.Job.TransitionAt == prepared.TransitionAt
+        && prepared.Freighter.ActiveJobId == prepared.Job.Id
+        && ReferenceEquals(inventories.Get(prepared.Source.Id), prepared.Source)
+        && ReferenceEquals(inventories.Get(prepared.Destination.Id), prepared.Destination)
+        && ReferenceEquals(GetDemand(prepared.Demand.Id), prepared.Demand)
+        && prepared.Demand.Remaining == prepared.DemandRemaining
+        && (prepared.Supply is null || ReferenceEquals(GetSupply(prepared.Supply.Id), prepared.Supply)
+            && prepared.Supply.Remaining == prepared.SupplyRemaining)
+        && prepared.Releases.All(release => EconomicReservationRelease.IsLiveOrReleased(release, loss));
+
 }

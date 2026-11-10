@@ -7,6 +7,7 @@ public enum EntityKind
     Ship,
     SensorDeployable,
     CargoObject,
+    Station,
 }
 
 public enum InitialShipOrderPolicy
@@ -253,7 +254,7 @@ internal sealed class GameSessionShipRegistry
 /// Session-wide live identity mappings. Typed subsystem identifiers remain
 /// authoritative inside their owning domains.
 /// </summary>
-public sealed class EntityRegistry
+public sealed partial class EntityRegistry
 {
     private readonly HashSet<EntityId> _sensorDeployables = [];
     private readonly HashSet<EntityId> _cargoObjects = [];
@@ -262,14 +263,15 @@ public sealed class EntityRegistry
     private readonly SortedDictionary<ShipId, EntityId> _entitiesByShip =
         new(EntityIdComparer<ShipId>.Instance);
 
-    public int Count => _shipsByEntity.Count + _sensorDeployables.Count + _cargoObjects.Count;
+    public int Count => _shipsByEntity.Count + _sensorDeployables.Count + _cargoObjects.Count + _stationsByEntity.Count;
 
     /// <summary>Resolves a live session identity across ship, deployable and unclaimed cargo domains.</summary>
     public EntityKind? GetKind(EntityId entityId) =>
         _shipsByEntity.ContainsKey(entityId)
             ? EntityKind.Ship
             : _sensorDeployables.Contains(entityId) ? EntityKind.SensorDeployable
-            : _cargoObjects.Contains(entityId) ? EntityKind.CargoObject : null;
+            : _cargoObjects.Contains(entityId) ? EntityKind.CargoObject
+            : _stationsByEntity.ContainsKey(entityId) ? EntityKind.Station : null;
 
     public ShipId? GetShipId(EntityId entityId) =>
         _shipsByEntity.TryGetValue(entityId, out ShipId shipId)
@@ -285,6 +287,7 @@ public sealed class EntityRegistry
         !_shipsByEntity.ContainsKey(entityId)
         && !_sensorDeployables.Contains(entityId)
         && !_cargoObjects.Contains(entityId)
+        && !_stationsByEntity.ContainsKey(entityId)
         && !_entitiesByShip.ContainsKey(shipId);
 
     internal void ApplyAddShip(EntityId entityId, ShipId shipId)

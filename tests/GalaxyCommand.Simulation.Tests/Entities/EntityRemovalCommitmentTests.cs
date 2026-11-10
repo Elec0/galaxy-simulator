@@ -36,6 +36,10 @@ public sealed class EntityRemovalCommitmentTests
         Assert.Equal(before.Reservations, after.Reservations);
         Assert.Equal(before.CapacityReservations, after.CapacityReservations);
         Assert.Equal(before.PhysicalReservations, after.PhysicalReservations);
+        Assert.Equal(before.NextIncomingAdmissionSequence, after.NextIncomingAdmissionSequence);
+        Assert.Equal(before.IncomingAdmissions, after.IncomingAdmissions);
+        Assert.Equal(before.NextOutgoingAdmissionSequence, after.NextOutgoingAdmissionSequence);
+        Assert.Equal(before.OutgoingAdmissions, after.OutgoingAdmissions);
         Assert.Equal(GameSessionTestFixture.Ship, lifecycle.Entities.GetShipId(GameSessionTestFixture.Entity));
     }
 

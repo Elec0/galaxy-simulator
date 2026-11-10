@@ -60,6 +60,8 @@ public sealed class EconomicRuntimeCoordinator
     private readonly TransportBoard _transportBoard;
     private readonly TransportIdSequences _transportIds;
     private readonly TransportSystem _transport = new();
+    private readonly IReadOnlyDictionary<(InventoryId Inventory, MaterialId Material), LocationId> _stationSupplies;
+    private readonly IReadOnlySet<InventoryId> _stationInventories;
 
     public EconomicRuntimeCoordinator(
         IReadOnlyDictionary<FacilityId, ProductionLine> productionLines,
@@ -74,8 +76,12 @@ public sealed class EconomicRuntimeCoordinator
         ProductionIdSequences productionIds,
         TransportIdSequences transportIds,
         IdSequence<ReservationId> reservationIds,
-        IdSequence<CapacityReservationId> capacityReservationIds)
+        IdSequence<CapacityReservationId> capacityReservationIds,
+        IReadOnlyDictionary<(InventoryId Inventory, MaterialId Material), LocationId>? stationSupplies = null,
+        IReadOnlySet<InventoryId>? stationInventories = null)
     {
+        _stationSupplies = stationSupplies ?? new Dictionary<(InventoryId, MaterialId), LocationId>();
+        _stationInventories = stationInventories ?? new HashSet<InventoryId>();
         _productionLines = productionLines
             ?? throw new ArgumentNullException(nameof(productionLines));
         _productionOutputs = productionOutputs
@@ -120,9 +126,27 @@ public sealed class EconomicRuntimeCoordinator
             _reservationIds,
             now);
 
+        LogisticsDemandPublicationRead[] demandReads = CreateDemandReads().GroupBy(read =>
+            (read.InventoryId, read.LocationId, read.MaterialId)).Select(group => new LogisticsDemandPublicationRead(
+                group.Key.InventoryId, group.Key.LocationId, group.Key.MaterialId,
+                new Quantity(group.Aggregate(0UL, (sum, read) => checked(sum + read.Required.Units))),
+                _transportBoard.PendingDeliveryQuantity(group.Key.InventoryId, group.Key.MaterialId), new DemandPriority(1))).ToArray();
+        foreach (InventoryId inventory in _stationInventories.OrderBy(id => id.Value))
+            foreach (MaterialId material in _transportBoard.Demands.Where(demand => demand.InventoryId == inventory)
+                .Select(demand => demand.MaterialId).Concat(demandReads.Where(read => read.InventoryId == inventory)
+                    .Select(read => read.MaterialId)).Distinct().OrderBy(id => id.Value))
+            {
+                ulong required = demandReads.Where(read => read.InventoryId == inventory && read.MaterialId == material)
+                    .Aggregate(0UL, (sum, read) => checked(sum + read.Required.Units));
+                ulong committed = _transportBoard.CommittedDeliveryQuantity(inventory, material).Units;
+                _transportBoard.TrimStationUnassignedDemand(inventory, material, new(required > committed ? required - committed : 0));
+            }
+        // Refresh pending quantities after withdrawing obsolete unassigned station demand.
+        demandReads = demandReads.Select(read => read with {
+            Pending = _transportBoard.PendingDeliveryQuantity(read.InventoryId, read.MaterialId) }).ToArray();
         LogisticsPublicationReconciliationResult publication =
             _logistics.ReconcilePublication(
-                CreateDemandReads(),
+                demandReads,
                 CreateSupplyReads(),
                 _transportBoard,
                 _transportIds,
@@ -269,16 +293,22 @@ public sealed class EconomicRuntimeCoordinator
 
     private IEnumerable<LogisticsSupplyPublicationRead> CreateSupplyReads()
     {
-        foreach ((FacilityId facilityId, MaterialId materialId) in _productionOutputs)
+        var sources = _productionOutputs.Select(pair => (_productionLines[pair.Key].InventoryId,
+                Location: _productionLocations[pair.Key], Material: pair.Value))
+            .Concat(_stationSupplies.Select(pair => (InventoryId: pair.Key.Inventory, Location: pair.Value, Material: pair.Key.Material)))
+            .Distinct().OrderBy(source => source.InventoryId.Value).ThenBy(source => source.Material.Value);
+        foreach (var source in sources)
         {
-            ProductionLine line = _productionLines[facilityId];
-            Inventory inventory = GetInventory(line.InventoryId);
+            if (_inventories.Get(source.InventoryId) is not { } inventory) continue;
+            MaterialId materialId = source.Material;
+            if (_stationInventories.Contains(source.InventoryId))
+                _transportBoard.TrimStationUnassignedSupply(source.InventoryId, materialId, inventory.Available(materialId));
             yield return new LogisticsSupplyPublicationRead(
-                line.InventoryId,
-                _productionLocations[facilityId],
+                source.InventoryId,
+                source.Location,
                 materialId,
                 inventory.Available(materialId),
-                _transportBoard.OfferedQuantity(line.InventoryId, materialId));
+                _transportBoard.OfferedQuantity(source.InventoryId, materialId));
         }
     }
 

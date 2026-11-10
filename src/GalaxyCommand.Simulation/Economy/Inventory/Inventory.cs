@@ -15,6 +15,9 @@ public abstract record ReservationOwner
 
     public sealed record ConstructionOrder(ConstructionOrderId OrderId) : ReservationOwner;
 
+    /// <summary>Exact incoming dismantling recovery claim owned by one station project.</summary>
+    public sealed record StationProject(StationId StationId, StationProjectId ProjectId) : ReservationOwner;
+
     /// <summary>Incoming capacity owned by one exact ship/order collection attempt.</summary>
     [SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix",
         Justification = "Collection identifies the approved cargo action rather than a container.")]
@@ -59,7 +62,7 @@ public sealed partial class Inventory
     public Inventory(InventoryId id, Quantity capacity)
     {
         Id = id;
-        Capacity = capacity;
+        _capacityLimits = new InventoryCapacityLimits(capacity, capacity, null);
     }
 
     /// <summary>
@@ -93,7 +96,7 @@ public sealed partial class Inventory
 
     public InventoryId Id { get; }
 
-    public Quantity Capacity { get; }
+    public Quantity Capacity => _capacityLimits.Physical;
 
     public InventoryCustody? Custody { get; }
 
@@ -132,7 +135,13 @@ public sealed partial class Inventory
                     instance.Id,
                     instance.DefinitionKey)),
             _physicalReservations.Values.OrderBy(
-                reservation => reservation.Id.Value));
+                reservation => reservation.Id.Value),
+            EnabledIntakeCapacity,
+            ProtectedIntakeCapacity,
+            _nextIncomingAdmissionSequence,
+            CaptureIncomingAdmissionCheckpoints(),
+            _nextOutgoingAdmissionSequence,
+            CaptureOutgoingAdmissionCheckpoints());
 
     /// <summary>
     /// Validates and privately restores one inventory without allocating new
@@ -356,21 +365,39 @@ public sealed partial class Inventory
 
         restored.TotalStored = new Quantity((ulong)totalStored);
         restored.ReservedCapacity = new Quantity((ulong)reservedCapacity);
+        // Restore saved reservation ages directly after reconstructing reservations;
+        // their private admission must not create a fresh, ID-derived ordering.
+        restored._restoringIncomingAdmissions = true;
+        restored._restoringOutgoingAdmissions = true;
         CheckpointValidationFailure? physicalFailure = RestorePhysicalState(
             restored,
             checkpoint,
             definitions,
             path);
+        restored._restoringIncomingAdmissions = false;
+        restored._restoringOutgoingAdmissions = false;
         if (physicalFailure is not null)
         {
             return CheckpointResult<Inventory>.Rejected(physicalFailure);
         }
+        CheckpointValidationFailure? incomingFailure = restored.RestoreIncomingAdmissionState(checkpoint, path);
+        if (incomingFailure is not null) return CheckpointResult<Inventory>.Rejected(incomingFailure);
+        CheckpointValidationFailure? outgoingFailure = restored.RestoreOutgoingAdmissionState(checkpoint, path);
+        if (outgoingFailure is not null) return CheckpointResult<Inventory>.Rejected(outgoingFailure);
+
+        // Rebuild holdings under physical capacity first. Disabled storage may
+        // legitimately retain cargo above its enabled intake limit on restore.
+        PreparedInventoryCapacityChange? capacity = restored.PrepareCapacityChange(
+            checkpoint.Capacity, checkpoint.EnabledIntakeCapacity, checkpoint.ProtectedIntakeCapacity);
+        if (capacity is null || !restored.ApplyCapacityChange(capacity))
+            return Rejected(path, "capacityLimits", "Inventory capacity limits are inconsistent with retained cargo or commitments.");
 
         return CheckpointResult<Inventory>.Success(restored);
     }
 
     public Quantity RemainingCapacity =>
-        new(Capacity.Units - UsedCapacity.Units - ReservedCapacity.Units);
+        new((UInt128)UsedCapacity.Units + ReservedCapacity.Units >= EffectiveIntakeCapacity.Units
+            ? 0 : EffectiveIntakeCapacity.Units - UsedCapacity.Units - ReservedCapacity.Units);
 
     public Quantity Stored(MaterialId materialId)
     {
@@ -388,8 +415,10 @@ public sealed partial class Inventory
     public Quantity Reserved(MaterialId materialId) =>
         _reservedByMaterial.GetValueOrDefault(materialId, Quantity.Zero);
 
+    /// <summary>Returns unclaimed material stock, combining legacy and generalized reservations for an explicitly mapped definition.</summary>
     public Quantity Available(MaterialId materialId) =>
-        new(Stored(materialId).Units - Reserved(materialId).Units);
+        _materialCompatibility?.Get(materialId) is { } definition ? FungibleAvailable(definition.Key)
+            : new(Stored(materialId).Units - Reserved(materialId).Units);
 
     public Reservation? GetReservation(ReservationId reservationId) =>
         _reservations.GetValueOrDefault(reservationId);
@@ -440,7 +469,7 @@ public sealed partial class Inventory
     {
         if (Custody is InventoryCustody.Unclaimed)
             throw new InvalidOperationException("Floating cargo cannot reserve incoming capacity.");
-        if (owner is ReservationOwner.CargoCollection)
+        if (owner is ReservationOwner.CargoCollection or ReservationOwner.StationProject)
             throw new ArgumentException("Cargo collection uses generalized incoming-capacity reservations.", nameof(owner));
         if (_capacityReservations.ContainsKey(reservationId))
         {
@@ -453,10 +482,12 @@ public sealed partial class Inventory
             throw new InvalidOperationException(
                 $"Inventory {Id} does not have {quantity.Units} units of uncommitted capacity.");
         }
+        if (!CanAdmitIncomingCapacity) throw new InvalidOperationException("Inventory incoming admission sequence exhausted.");
 
         var reservation = new CapacityReservation(reservationId, Id, quantity, owner);
         ReservedCapacity = ReservedCapacity.Add(quantity);
         _capacityReservations.Add(reservationId, reservation);
+        RecordIncomingAdmission(reservationId);
         return reservation;
     }
 
@@ -468,6 +499,7 @@ public sealed partial class Inventory
         }
 
         ReservedCapacity = ReservedCapacity.Subtract(reservation.Quantity);
+        _legacyIncomingAdmissions.Remove(reservationId);
         return reservation;
     }
 
@@ -497,7 +529,7 @@ public sealed partial class Inventory
     {
         if (Custody is InventoryCustody.Unclaimed)
             throw new InvalidOperationException("Floating cargo cannot reserve contents.");
-        if (owner is ReservationOwner.CargoCollection)
+        if (owner is ReservationOwner.CargoCollection or ReservationOwner.StationProject)
             throw new ArgumentException("Cargo collection cannot reserve source contents.", nameof(owner));
         if (_reservations.ContainsKey(reservationId) ||
             _physicalReservations.ContainsKey(reservationId))
@@ -514,11 +546,14 @@ public sealed partial class Inventory
         }
 
         var reservation = new Reservation(reservationId, Id, materialId, quantity, owner);
+        if (!CanAdmitOutgoingCommitment) throw new InvalidOperationException("Inventory outgoing admission sequence exhausted.");
         _reservations.Add(reservationId, reservation);
         _reservedByMaterial[materialId] = Reserved(materialId).Add(quantity);
+        RecordOutgoingAdmission(reservation);
         return reservation;
     }
 
+    /// <summary>Releases one material claim and retires its live age without resetting admission highwater.</summary>
     public Reservation Release(ReservationId reservationId)
     {
         if (!_reservations.Remove(reservationId, out Reservation? reservation))
@@ -529,9 +564,11 @@ public sealed partial class Inventory
         SetReservedQuantity(
             reservation.MaterialId,
             Reserved(reservation.MaterialId).Subtract(reservation.Quantity));
+        _legacyOutgoingAdmissions.Remove(reservationId);
         return reservation;
     }
 
+    /// <summary>Validates every owner-qualified material claim before batch consumption, retiring their live outgoing ages.</summary>
     public IReadOnlyList<Reservation> ConsumeReservations(
         IReadOnlyCollection<ReservationId> reservationIds,
         ReservationOwner expectedOwner)
@@ -573,6 +610,7 @@ public sealed partial class Inventory
         foreach (Reservation reservation in selected)
         {
             _reservations.Remove(reservation.Id);
+            _legacyOutgoingAdmissions.Remove(reservation.Id);
         }
 
         foreach ((MaterialId materialId, Quantity quantity) in materialTotals)
@@ -653,7 +691,7 @@ public sealed partial class Inventory
             reservation.InventoryId != checkpoint.Id ||
             reservation.MaterialId.Value == 0 ||
             reservation.Quantity == Quantity.Zero ||
-            !IsValidOwner(reservation.Owner) || reservation.Owner is ReservationOwner.CargoCollection)
+            !IsValidOwner(reservation.Owner) || reservation.Owner is ReservationOwner.CargoCollection or ReservationOwner.StationProject)
         {
             return Failure(
                 path,
@@ -748,7 +786,7 @@ public sealed partial class Inventory
         if (reservation.Id.Value == 0 ||
             reservation.InventoryId != checkpoint.Id ||
             reservation.Quantity == Quantity.Zero ||
-            !IsValidOwner(reservation.Owner) || reservation.Owner is ReservationOwner.CargoCollection)
+            !IsValidOwner(reservation.Owner) || reservation.Owner is ReservationOwner.CargoCollection or ReservationOwner.StationProject)
         {
             return Failure(
                 path,
@@ -775,6 +813,7 @@ public sealed partial class Inventory
             ReservationOwner.ProductionJob value => value.JobId.Value != 0,
             ReservationOwner.ConstructionOrder value => value.OrderId.Value != 0,
             ReservationOwner.CargoCollection value => value.ShipId.Value != 0 && value.OrderId.Value != 0,
+            ReservationOwner.StationProject value => value.StationId.Value != 0 && value.ProjectId.Value != 0,
             _ => false,
         };
 
@@ -981,6 +1020,11 @@ public sealed partial class InventoryRegistry
             throw new InvalidOperationException(
                 $"Capacity reservation {reservationId} holds {reservation.Quantity.Units}, not {quantity.Units} units.");
         }
+
+        // Validate before either inventory changes. An old reservation cannot
+        // force a delivery into storage disabled after that claim was admitted.
+        if (!destination.CanAcceptReservedIntake(quantity, reservation.Quantity))
+            throw new InvalidOperationException($"Inventory {destination.Id} cannot currently receive the reserved delivery.");
 
         source.RemoveAvailable(materialId, quantity);
         destination.ReleaseCapacity(reservationId);

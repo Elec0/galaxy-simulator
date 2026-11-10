@@ -1,10 +1,15 @@
+using GalaxyCommand.Content;
+
 namespace GalaxyCommand.Simulation;
 
 internal sealed record PhaseOneFixtureState(
     SimulationWorld World,
     Shipyard Shipyard,
     ILogisticsNavigation LogisticsNavigation,
-    MaterialId[] KnownMaterials);
+    MaterialId[] KnownMaterials,
+    StationRuntimeOwner StationOwner,
+    EntityLifecycleOwner StationLifecycle,
+    IReadOnlyList<EconomyFacilitySetup> StationFacilities);
 
 /// <summary>
 /// Builds the concrete Phase 1 acceptance world without coupling the
@@ -43,10 +48,15 @@ internal static class PhaseOneFixture
         FacilityId refinery = setup.AddFacility();
         FacilityId componentFactory = setup.AddFacility();
         FacilityId shipyardFacility = setup.AddFacility();
-        Inventory mineInventory = setup.AddInventory(config.FacilityStorageCapacity);
-        Inventory refineryInventory = setup.AddInventory(config.FacilityStorageCapacity);
-        Inventory componentInventory = setup.AddInventory(config.FacilityStorageCapacity);
-        Inventory shipyardInventory = setup.AddInventory(config.FacilityStorageCapacity);
+        PrincipalId principal = new(1);
+        var materials = new MaterialInventoryCompatibilityMap(new Dictionary<MaterialId, PhysicalDefinition>
+        {
+            [ore] = Material("ore"), [alloy] = Material("alloy"), [components] = Material("components"),
+        });
+        Inventory mineInventory = setup.AddInventory(config.FacilityStorageCapacity, Custody(1, principal), materials);
+        Inventory refineryInventory = setup.AddInventory(config.FacilityStorageCapacity, Custody(2, principal), materials);
+        // Both attached services use this same physical owner, with the two prior storage budgets retained in aggregate.
+        Inventory shipyardInventory = setup.AddInventory(config.FacilityStorageCapacity.Add(config.FacilityStorageCapacity), Custody(3, principal), materials);
 
         var throughput = new Throughput(1);
         setup.AddProductionLine(
@@ -67,7 +77,7 @@ internal static class PhaseOneFixture
             throughput);
         setup.AddProductionLine(
             componentFactory,
-            componentInventory.Id,
+            shipyardInventory.Id,
             shipyardLocation,
             new Recipe(
                 [new KeyValuePair<MaterialId, Quantity>(alloy, config.ComponentAlloyInput)],
@@ -106,11 +116,69 @@ internal static class PhaseOneFixture
             setup.AddFreighter(organization, shipDesign, location);
         }
 
+        SimulationWorld world = setup.Complete();
+        (StationRuntimeOwner stationOwner, EntityLifecycleOwner stationLifecycle, IReadOnlyList<EconomyFacilitySetup> bindings) =
+            CreateStationAuthority(principal, materials, world, shipDesign,
+                [(mine, mineInventory, mineLocation), (refinery, refineryInventory, refineryLocation),
+                    (componentFactory, shipyardInventory, shipyardLocation), (shipyardFacility, shipyardInventory, shipyardLocation)]);
         return new PhaseOneFixtureState(
-            setup.Complete(),
+            world,
             shipyard,
             logisticsNavigation,
-            [ore, alloy, components]);
+            [ore, alloy, components], stationOwner, stationLifecycle, bindings);
+    }
+
+    private static PhysicalDefinition Material(string name) => new(
+        QualifiedContentKey.Create("test.phase-one", "material", name), PhysicalHoldingKind.Fungible, new(1));
+
+    private static InventoryCustody.PrincipalControlled Custody(ulong stationEntity, PrincipalId principal) =>
+        new InventoryCustody.PrincipalControlled(new InventoryOwnerReference.SessionEntity(new(stationEntity)), principal);
+
+    /// <summary>
+    /// Registers actual economic inventories with station authority and explicit module/facility links.
+    /// The canonical scenario continues to run the same economic workloads; these authored origins do not replay construction.
+    /// </summary>
+    private static (StationRuntimeOwner Owner, EntityLifecycleOwner Lifecycle, IReadOnlyList<EconomyFacilitySetup> Bindings)
+        CreateStationAuthority(PrincipalId principal, MaterialInventoryCompatibilityMap materials, SimulationWorld world, ShipDesign shipDesign,
+            IReadOnlyList<(FacilityId Facility, Inventory Inventory, LocationId Location)> facilities)
+    {
+        StationModuleDefinition[] modules = facilities.Select(facility => new StationModuleDefinition(
+            QualifiedContentKey.Create("test.phase-one", "station-module", $"facility-{facility.Facility.Value}"),
+            $"Facility {facility.Facility.Value}", 1, Quantity.Zero, 0, null,
+            new([], new(1)), new(1), [], [], productionProvider:
+                world.ProductionLines.TryGetValue(facility.Facility, out ProductionLine? line)
+                    ? new StationProductionProvider(line.ActiveJob!.Recipe, line.Throughput, line.ActiveJob.IsRepeating) : null,
+                shipConstructionProvider: world.Shipyards.TryGetValue(facility.Facility, out Shipyard? shipyard)
+                    ? new StationShipConstructionProvider([shipDesign], shipyard.Process.Throughput,
+                        new(ActorControllerKind.Autonomous, new("phase-one-organization")), InitialShipOrderPolicy.NoInitialOrder) : null)).ToArray();
+        var definitions = new List<StationDefinition>();
+        var initial = new List<InitialStationSetup>();
+        var bindings = new List<EconomyFacilitySetup>();
+        var lifecycle = new EntityLifecycleOwner(new(), new(), new(), [], materials);
+        foreach (IGrouping<LocationId, (FacilityId Facility, Inventory Inventory, LocationId Location)> group in facilities.GroupBy(facility => facility.Location))
+        {
+            Inventory inventory = group.First().Inventory;
+            if (group.Any(facility => !ReferenceEquals(facility.Inventory, inventory)))
+                throw new InvalidOperationException("One station's facilities must share the actual economic inventory instance.");
+            ulong id = group.Key.Value;
+            var key = QualifiedContentKey.Create("test.phase-one", "station", $"location-{id}");
+            InitialStationModuleSetup[] attached = group.Select(facility => new InitialStationModuleSetup(
+                new(facility.Facility.Value), modules.Single(module => module.Key.LocalId.Value == $"facility-{facility.Facility.Value}").Key,
+                true, facility.Facility)).ToArray();
+            definitions.Add(new(key, $"Phase 1 Station {id}", (ulong)attached.Length, Quantity.Zero,
+                inventory.Capacity, new([], new(1)), 0, attached.Select(module => module.DefinitionKey), new(1), []));
+            initial.Add(new(new(id), new(id), inventory.Id, principal, key, Position(id), attached, SimulationTime.Zero));
+            lifecycle.RegisterEconomyInventory(inventory);
+            foreach (var facility in group)
+                bindings.Add(new(facility.Facility, inventory.Id, facility.Location, Position(id), principal,
+                    new(new(id), new(id), new(facility.Facility.Value)),
+                    modules.Single(module => module.Key.LocalId.Value == $"facility-{facility.Facility.Value}").Key));
+        }
+        var catalog = new StationDefinitionCatalog(definitions, modules);
+        catalog.ValidateForSession(materials, [new(1), new(2), new(3)]);
+        var setup = new StationRuntimeSetup(catalog, materials, StationTerritoryPolicy.Absent, initialStations: initial);
+        return (new StationRuntimeOwner(setup, lifecycle, new(), (_, _) => null), lifecycle,
+            Array.AsReadOnly(bindings.OrderBy(binding => binding.FacilityId.Value).ToArray()));
     }
 
     private static HierarchicalLogisticsNavigation CreateLogisticsNavigation(

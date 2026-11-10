@@ -38,6 +38,12 @@ public sealed partial class GameSession
             .ToDictionary(ship => ship!.EntityId, ship => ship!.CargoInventoryId);
         foreach (EntityRemovalReceiptCheckpoint removal in checkpoint.Lifecycle.RemovalReceipts.Select(receipt => receipt!))
             sourceInventories.Add(removal.Request!.EntityId, removal.CargoInventoryId);
+        if (checkpoint.Stations is { } stations)
+        {
+            foreach (StationStateCheckpoint station in stations.Stations) sourceInventories.Add(station.Entity, station.Inventory);
+            foreach (StationRemovalReceipt removal in stations.Removals)
+                sourceInventories.Add(removal.Station.EntityId, removal.Station.InventoryId);
+        }
         HashSet<SystemId> systems = checkpoint.WorldTopology.Systems.Select(system => system!.Id).ToHashSet();
         var destroyedItems = new HashSet<ItemInstanceId>();
         bool Allocated(ulong value, IdSequenceCheckpoint sequence) => value != 0 && (sequence.NextValue is null || value < sequence.NextValue);

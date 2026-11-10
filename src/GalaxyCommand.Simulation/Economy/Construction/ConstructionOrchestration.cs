@@ -130,7 +130,7 @@ public sealed class ConstructionSystem
             process => process.FacilityId,
             _facilityComparer))
         {
-            if (process.ActiveOrder is not
+            if (!process.IsProviderAvailable || process.ActiveOrder is not
                 {
                     Status: ConstructionOrderStatus.WaitingForInputs,
                 } order)

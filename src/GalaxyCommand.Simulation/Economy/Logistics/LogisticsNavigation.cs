@@ -48,6 +48,7 @@ public interface ILogisticsNavigation
 public sealed class HierarchicalLogisticsNavigation : ILogisticsNavigation
 {
     private readonly ReadOnlyDictionary<LocationId, SystemPosition> _anchors;
+    private readonly Dictionary<LocationId, SystemPosition> _mutableAnchors;
     private readonly ISpatialNavigationPlanner _planner;
 
     /// <summary>
@@ -68,6 +69,7 @@ public sealed class HierarchicalLogisticsNavigation : ILogisticsNavigation
             copiedAnchors.Add(locationId, position);
         }
 
+        _mutableAnchors = copiedAnchors;
         _anchors = new ReadOnlyDictionary<LocationId, SystemPosition>(copiedAnchors);
         _planner = planner;
     }
@@ -75,6 +77,17 @@ public sealed class HierarchicalLogisticsNavigation : ILogisticsNavigation
     internal IReadOnlyDictionary<LocationId, SystemPosition> Anchors => _anchors;
 
     internal ISpatialNavigationPlanner Planner => _planner;
+
+    internal bool CanRegisterStationAnchor(LocationId location, SystemPosition position) =>
+        location.Value != 0 && (!_anchors.TryGetValue(location, out var existing) || existing == position);
+
+    /// <summary>Registers one already committed station provider anchor without replacing existing geometry.</summary>
+    internal void RegisterStationAnchor(LocationId location, SystemPosition position)
+    {
+        if (!CanRegisterStationAnchor(location, position)) throw new InvalidOperationException("Station logistics anchor conflicts with existing geometry.");
+        _mutableAnchors.TryAdd(location, position);
+    }
+
 
     /// <inheritdoc />
     public LogisticsTravelEstimate? Estimate(

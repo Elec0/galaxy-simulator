@@ -116,7 +116,7 @@ internal sealed partial class ShipOrderCoordinator
     /// transitioning, promoting, or cancelling any saved order.
     /// </summary>
     internal static CheckpointResult<ShipOrderCoordinator> RestoreCheckpoint(
-        ShipOrderCoordinatorCheckpoint checkpoint)
+        ShipOrderCoordinatorCheckpoint checkpoint, IReadOnlySet<ShipId>? pendingContinuations = null)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         CheckpointResult<IdSequence<ShipOrderId>> idResult =
@@ -161,7 +161,7 @@ internal sealed partial class ShipOrderCoordinator
                 $"{path}[{index}].base",
                 hasOverride ? WorkSetRole.SuspendedBase : WorkSetRole.Current,
                 checkpoint.OrderIds,
-                retainedOrderIds);
+                retainedOrderIds, pendingContinuations?.Contains(actor.ShipId) == true);
             if (!baseResult.IsSuccess)
             {
                 return CheckpointResult<ShipOrderCoordinator>.Rejected(
@@ -176,7 +176,7 @@ internal sealed partial class ShipOrderCoordinator
                     $"{path}[{index}].override",
                     WorkSetRole.Current,
                     checkpoint.OrderIds,
-                    retainedOrderIds);
+                    retainedOrderIds, pendingContinuations?.Contains(actor.ShipId) == true);
                 if (!overrideResult.IsSuccess)
                 {
                     return CheckpointResult<ShipOrderCoordinator>.Rejected(
@@ -709,7 +709,7 @@ internal sealed partial class ShipOrderCoordinator
         string path,
         WorkSetRole role,
         IdSequenceCheckpoint orderIds,
-        HashSet<ShipOrderId> retainedOrderIds)
+        HashSet<ShipOrderId> retainedOrderIds, bool pendingContinuation)
     {
         if (checkpoint is null)
         {
@@ -723,7 +723,7 @@ internal sealed partial class ShipOrderCoordinator
                 activeCheckpoint,
                 $"{path}.active",
                 orderIds,
-                retainedOrderIds);
+                retainedOrderIds, pendingContinuation);
             if (!activeResult.IsSuccess)
             {
                 return CheckpointResult<WorkSet>.Rejected(activeResult.Failure!);
@@ -819,7 +819,7 @@ internal sealed partial class ShipOrderCoordinator
         ShipOrderCheckpoint checkpoint,
         string path,
         IdSequenceCheckpoint orderIds,
-        HashSet<ShipOrderId> retainedOrderIds)
+        HashSet<ShipOrderId> retainedOrderIds, bool pendingContinuation = false)
     {
         if (checkpoint.Id.Value == 0
             || !WasAllocated(checkpoint.Id, orderIds))
@@ -880,7 +880,7 @@ internal sealed partial class ShipOrderCoordinator
         CheckpointValidationFailure? stateFailure = ValidateExecutionState(
             checkpoint,
             status,
-            path);
+            path, pendingContinuation);
         if (stateFailure is not null)
         {
             return CheckpointResult<ShipOrder>.Rejected(stateFailure);
@@ -911,7 +911,7 @@ internal sealed partial class ShipOrderCoordinator
     private static CheckpointValidationFailure? ValidateExecutionState(
         ShipOrderCheckpoint checkpoint,
         ShipOrderStatus status,
-        string path)
+        string path, bool pendingContinuation)
     {
         if (checkpoint.NextLegIndex < 0)
         {
@@ -952,7 +952,7 @@ internal sealed partial class ShipOrderCoordinator
             bool collectingCargo = checkpoint.Action is ShipActionIntent.Cargo && checkpoint.Reason == ShipOrderReason.CollectingCargo;
             // Collection may continue after the committed approach motion finishes.
             // A missing plan cannot make another action domain appear to be collecting.
-            if ((awaitingAction || collectingCargo)
+            if ((awaitingAction || collectingCargo || pendingContinuation)
                 && checkpoint.Plan is null && checkpoint.NextLegIndex == 0
                 && checkpoint.MotionId is null && checkpoint.TransitId is null) return null;
             return new CheckpointValidationFailure(

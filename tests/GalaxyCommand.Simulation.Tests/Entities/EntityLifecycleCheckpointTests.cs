@@ -220,7 +220,10 @@ public sealed class EntityLifecycleCheckpointTests
             inventory.CapacityReservations,
             inventory.FungibleHoldings,
             inventory.DiscreteItems,
-            inventory.PhysicalReservations);
+            inventory.PhysicalReservations,
+            inventory.EnabledIntakeCapacity, inventory.ProtectedIntakeCapacity,
+            inventory.NextIncomingAdmissionSequence, inventory.IncomingAdmissions,
+            inventory.NextOutgoingAdmissionSequence, inventory.OutgoingAdmissions);
         var checkpoint = new EntityLifecycleCheckpoint(
             captured.EntityIds,
             captured.ShipIds,

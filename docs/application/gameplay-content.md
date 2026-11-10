@@ -45,6 +45,15 @@ No stock or capability is inferred from omitted fields. The actual initial
 satellite content and its reference sources are recorded in the
 [deployable design](../systems/sensor-deployables.md#initial-content-adaptation-and-delivery).
 
+TASK-105 advances definition and scenario documents to schema 5, retaining
+manifest schema 1 and every existing built-in and preview gameplay value. The
+[station package vocabulary](../systems/stations.md#accepted-package-adapter-vocabulary)
+adds explicit station/module/material definitions, construction capability,
+recipes and station loss policy. Provider selections require authored economic
+timing and the host's shared navigation binding. Definition loading creates no
+starting stations, stock or economic facilities. TASK-118 retains owner review
+of that starting gameplay content; TASK-037 retains older-schema migration.
+
 ## Decisions at a glance
 
 | Question | Decision |

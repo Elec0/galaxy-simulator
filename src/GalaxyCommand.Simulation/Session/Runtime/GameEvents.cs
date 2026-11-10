@@ -9,6 +9,8 @@ public abstract record GameEventKind
     public sealed record SpatialMovement(SpatialMovementEvent Event) : GameEventKind;
 
     public sealed record Economic(EconomicEvent Event) : GameEventKind;
+    public sealed record StationTargetContinuation : GameEventKind;
+    public sealed record EconomicReevaluation : GameEventKind;
 
     public sealed record SpatialInteraction(InteractionCandidate Candidate) : GameEventKind;
     public sealed record SensorActionReevaluation(int ActorCount) : GameEventKind;
@@ -16,6 +18,7 @@ public abstract record GameEventKind
     public sealed record CargoCollectionCompletion(ShipId ShipId, ShipOrderId OrderId) : GameEventKind;
     public sealed record CargoCollectionRangeExit(ShipId ShipId, ShipOrderId OrderId) : GameEventKind;
     public sealed record CargoCollectionReevaluation(int ActorCount) : GameEventKind;
+    public sealed record StationWork(StationId Station, StationProjectId Project) : GameEventKind;
 }
 
 public sealed record GameEventRecord(
@@ -35,6 +38,8 @@ internal abstract record GameEvent
     internal sealed record SpatialMovement(SpatialMovementEvent Event) : GameEvent;
 
     internal sealed record Economic(EconomicEvent Event) : GameEvent;
+    internal sealed record StationTargetContinuation : GameEvent;
+    internal sealed record EconomicReevaluation : GameEvent;
 
     internal sealed record SpatialInteraction(InteractionForecast Forecast) : GameEvent;
     internal sealed record SensorActionReevaluation(IReadOnlyList<SensorActionWake> Work) : GameEvent;
@@ -42,6 +47,7 @@ internal abstract record GameEvent
     internal sealed record CargoCollectionCompletion(ShipId ShipId, ShipOrderId OrderId, EventGeneration AttemptGeneration) : GameEvent;
     internal sealed record CargoCollectionRangeExit(ShipId ShipId, ShipOrderId OrderId, EventGeneration AttemptGeneration) : GameEvent;
     internal sealed record CargoCollectionReevaluation(IReadOnlyList<CargoCollectionWake> Work) : GameEvent;
+    internal sealed record StationWork(StationId Station, StationProjectId Project) : GameEvent;
 }
 
 internal sealed record PreparedMovementCancellation(

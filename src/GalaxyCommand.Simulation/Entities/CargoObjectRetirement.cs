@@ -45,10 +45,17 @@ internal sealed partial class EntityLifecycleOwner
     internal void ApplyPreparedCollectedCargoRetirement(PreparedCollectedCargoRetirement prepared)
     {
         ArgumentNullException.ThrowIfNull(prepared);
+        InventoryCheckpoint afterTransfer = prepared.Inventory.CaptureCheckpoint();
         if (!HasExactCollectedCargoIdentity(prepared) || !prepared.Transfer.WasApplied
             || !ReferenceEquals(prepared.Transfer.Source, prepared.Inventory)
             || prepared.Inventory.UsedCapacity != Quantity.Zero || prepared.Inventory.HasCommitments
-            || prepared.Inventory.Capacity != prepared.ExpectedBeforeTransfer.Capacity)
+            || prepared.Inventory.Capacity != prepared.ExpectedBeforeTransfer.Capacity
+            || prepared.Inventory.EnabledIntakeCapacity != prepared.ExpectedBeforeTransfer.EnabledIntakeCapacity
+            || prepared.Inventory.ProtectedIntakeCapacity != prepared.ExpectedBeforeTransfer.ProtectedIntakeCapacity
+            || afterTransfer.NextIncomingAdmissionSequence != prepared.ExpectedBeforeTransfer.NextIncomingAdmissionSequence
+            || !afterTransfer.IncomingAdmissions.SequenceEqual(prepared.ExpectedBeforeTransfer.IncomingAdmissions)
+            || afterTransfer.NextOutgoingAdmissionSequence != prepared.ExpectedBeforeTransfer.NextOutgoingAdmissionSequence
+            || !afterTransfer.OutgoingAdmissions.SequenceEqual(prepared.ExpectedBeforeTransfer.OutgoingAdmissions))
             throw new InvalidOperationException("Prepared collected cargo did not reach its expected empty post-transfer state.");
         if (!_cargoObjects.Remove(prepared.Object.EntityId) || !_entities.ApplyRemoveCargoObject(prepared.Object.EntityId)
             || !_inventories.ApplyRemove(prepared.Object.InventoryId))
@@ -123,6 +130,12 @@ internal sealed partial class EntityLifecycleOwner
     /// <summary>Compares canonical authoritative content snapshots without relying on container reference equality.</summary>
     private static bool CargoRetirementContentsMatch(InventoryCheckpoint actual, InventoryCheckpoint expected) =>
         actual.Id == expected.Id && actual.Custody == expected.Custody && actual.Capacity == expected.Capacity
+        && actual.EnabledIntakeCapacity == expected.EnabledIntakeCapacity
+        && actual.ProtectedIntakeCapacity == expected.ProtectedIntakeCapacity
+        && actual.NextIncomingAdmissionSequence == expected.NextIncomingAdmissionSequence
+        && actual.IncomingAdmissions.SequenceEqual(expected.IncomingAdmissions)
+        && actual.NextOutgoingAdmissionSequence == expected.NextOutgoingAdmissionSequence
+        && actual.OutgoingAdmissions.SequenceEqual(expected.OutgoingAdmissions)
         && actual.StoredMaterials.SequenceEqual(expected.StoredMaterials)
         && actual.FungibleHoldings.SequenceEqual(expected.FungibleHoldings)
         && actual.DiscreteItems.SequenceEqual(expected.DiscreteItems)

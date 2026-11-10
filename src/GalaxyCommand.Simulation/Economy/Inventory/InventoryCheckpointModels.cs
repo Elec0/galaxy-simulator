@@ -65,7 +65,13 @@ internal sealed class InventoryCheckpoint
         IEnumerable<CapacityReservation> capacityReservations,
         IEnumerable<InventoryFungibleCheckpoint> fungibleHoldings,
         IEnumerable<InventoryDiscreteItemCheckpoint> discreteItems,
-        IEnumerable<PhysicalReservation> physicalReservations)
+        IEnumerable<PhysicalReservation> physicalReservations,
+        Quantity? enabledIntakeCapacity = null,
+        Quantity? protectedIntakeCapacity = null,
+        ulong? nextIncomingAdmissionSequence = 1,
+        IEnumerable<InventoryIncomingAdmissionCheckpoint>? incomingAdmissions = null,
+        ulong? nextOutgoingAdmissionSequence = 1,
+        IEnumerable<InventoryOutgoingAdmissionCheckpoint>? outgoingAdmissions = null)
     {
         ArgumentNullException.ThrowIfNull(storedMaterials);
         ArgumentNullException.ThrowIfNull(reservations);
@@ -76,6 +82,12 @@ internal sealed class InventoryCheckpoint
         Id = id;
         Custody = custody;
         Capacity = capacity;
+        EnabledIntakeCapacity = enabledIntakeCapacity ?? capacity;
+        ProtectedIntakeCapacity = protectedIntakeCapacity;
+        NextIncomingAdmissionSequence = nextIncomingAdmissionSequence;
+        IncomingAdmissions = Array.AsReadOnly((incomingAdmissions ?? []).ToArray());
+        NextOutgoingAdmissionSequence = nextOutgoingAdmissionSequence;
+        OutgoingAdmissions = Array.AsReadOnly((outgoingAdmissions ?? []).ToArray());
         StoredMaterials = new ReadOnlyCollection<InventoryMaterialCheckpoint>(
             storedMaterials.ToArray());
         Reservations = new ReadOnlyCollection<Reservation>(
@@ -95,6 +107,18 @@ internal sealed class InventoryCheckpoint
     internal InventoryCustody? Custody { get; }
 
     internal Quantity Capacity { get; }
+
+    internal Quantity EnabledIntakeCapacity { get; }
+
+    internal Quantity? ProtectedIntakeCapacity { get; }
+
+    internal ulong? NextIncomingAdmissionSequence { get; }
+
+    internal IReadOnlyList<InventoryIncomingAdmissionCheckpoint> IncomingAdmissions { get; }
+
+    internal ulong? NextOutgoingAdmissionSequence { get; }
+
+    internal IReadOnlyList<InventoryOutgoingAdmissionCheckpoint> OutgoingAdmissions { get; }
 
     internal ReadOnlyCollection<InventoryMaterialCheckpoint> StoredMaterials { get; }
 

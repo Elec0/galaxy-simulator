@@ -186,6 +186,11 @@ public sealed class SimulationEngine<TEvent>
         foreach (EventPhase phase in Enum.GetValues<EventPhase>())
         {
             _agenda.EnterPhase(phase);
+            if (phase == EventPhase.PhysicalCompletion && _runtime is ISimulationPhysicalCompletionWaveRuntime<TEvent> { HasPhysicalCompletionWaves: true } physicalRuntime)
+            {
+                eventsProcessed = ProcessPhysicalCompletionWaves(physicalRuntime, timestamp, eventsProcessed);
+                continue;
+            }
             if (phase == EventPhase.StateUpdate && _runtime is ISimulationStateUpdateRuntime<TEvent> waveRuntime)
             {
                 waveRuntime.PrepareStateUpdate(timestamp, _agenda);
@@ -211,6 +216,35 @@ public sealed class SimulationEngine<TEvent>
         if (_runtime is ISimulationTimestampCompletionRuntime completedRuntime)
             completedRuntime.CompleteTimestamp(timestamp);
 
+        return eventsProcessed;
+    }
+
+    /// <summary>Groups only contiguous selected envelopes; foreign work remains live on the agenda until its exact turn.</summary>
+    private long ProcessPhysicalCompletionWaves(ISimulationPhysicalCompletionWaveRuntime<TEvent> runtime,
+        SimulationTime timestamp, long eventsProcessed)
+    {
+        while (_agenda.PeekNextInCurrentPhase() is { } next)
+        {
+            if (!runtime.IsPhysicalCompletionWaveEvent(next))
+            {
+                ScheduledEvent<TEvent> scheduled = _agenda.PopNextInCurrentPhase()!;
+                ScheduledEventDisposition disposition = _runtime.HandleEvent(scheduled, timestamp, _agenda);
+                _runtime.RecordEvent(scheduled, disposition);
+                eventsProcessed = checked(eventsProcessed + 1);
+                continue;
+            }
+            var events = new List<ScheduledEvent<TEvent>>();
+            while (_agenda.PeekNextInCurrentPhase() is { } candidate && runtime.IsPhysicalCompletionWaveEvent(candidate))
+                events.Add(_agenda.PopNextInCurrentPhase()!);
+            IReadOnlyList<ScheduledEventDisposition> dispositions = runtime.HandlePhysicalCompletionWave(events.AsReadOnly(), timestamp, _agenda);
+            if (dispositions is null || dispositions.Count != events.Count)
+                throw new InvalidOperationException("A physical completion wave must return one disposition per envelope.");
+            for (int index = 0; index < events.Count; index++)
+            {
+                _runtime.RecordEvent(events[index], dispositions[index]);
+                eventsProcessed = checked(eventsProcessed + 1);
+            }
+        }
         return eventsProcessed;
     }
 

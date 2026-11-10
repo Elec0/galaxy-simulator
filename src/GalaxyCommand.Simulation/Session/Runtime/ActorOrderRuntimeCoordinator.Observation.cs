@@ -14,6 +14,15 @@ internal sealed partial class ActorOrderRuntimeCoordinator
 
     internal SensorDeployableObservationSnapshot CaptureSensorObservation() => _lifecycle.CaptureSensorObservation(CurrentTime);
 
+    internal StationObservationSnapshot CaptureStationObservation() =>
+        _stations?.CaptureObservation(CurrentTime) ?? new(CurrentTime, [], []);
+
+    internal IReadOnlyList<StationSensorSourceSnapshot> CaptureStationSources() =>
+        _stations?.CaptureSensorSources() ?? [];
+
+    internal PrincipalId? CaptureStationPrincipal(StationId station) =>
+        _stations?.PrincipalOf(station);
+
     /// <summary>Reads only identity/ownership for a pending fact subject, without constructing a world snapshot.</summary>
     internal PrincipalId? CaptureSubjectPrincipal(ShipId ship) => _lifecycle.Entities.GetEntityId(ship) is null
         ? null : _lifecycle.GetRequiredShip(ship).PrincipalId;
@@ -37,6 +46,10 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             if (sensor.PrincipalId == observer)
                 sources.Add((PreparedInteractionPoint.Capture(
                     InteractionPhaseCurve.Fixed(sensor.Position, CurrentTime, CurrentTime), CurrentTime), sensor.RadiusUnits));
+        foreach (StationSensorSourceSnapshot station in CaptureStationSources())
+            if (station.PrincipalId == observer)
+                sources.Add((PreparedInteractionPoint.Capture(
+                    InteractionPhaseCurve.Fixed(station.Position, CurrentTime, CurrentTime), CurrentTime), station.RadiusUnits));
         return new PlayerCoverageBoundary(CurrentTime, sources.ToArray());
     }
 
@@ -52,13 +65,16 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         }).ToArray();
         ShipSensorCoverageSnapshot ships = ShipSensorCoverage.Evaluate(view, observer, inputs,
             InteractionPreparationStrategy.BoundingBoxHierarchy(8), 128);
-        DeployedSensorSourceSnapshot[] stationary = CaptureSensorObservation().Sources
-            .Where(source => source.PrincipalId == observer).OrderBy(source => source.EntityId.Value).ToArray();
+        var stationary = CaptureSensorObservation().Sources
+            .Where(source => source.PrincipalId == observer).Select(source => (source.EntityId, source.Position, source.RadiusUnits))
+            .Concat(CaptureStationSources().Where(source => source.PrincipalId == observer)
+                .Select(source => (source.EntityId, source.Position, source.RadiusUnits)))
+            .OrderBy(source => source.EntityId.Value).ToArray();
         if (stationary.Length == 0) return ships;
         PreparedInteractionProximityScope scope = InteractionProximityQuery.Prepare(view).PrepareScope(
             inputs.Select(input => input.ShipId), InteractionPreparationStrategy.BoundingBoxHierarchy(8));
         var covered = new HashSet<ShipId>(ships.CoveredShipIds);
-        foreach (DeployedSensorSourceSnapshot sensor in stationary)
+        foreach (var sensor in stationary)
             covered.UnionWith(scope.FindStationary(PreparedInteractionPoint.Capture(
                 InteractionPhaseCurve.Fixed(sensor.Position, CurrentTime, CurrentTime), CurrentTime), sensor.RadiusUnits));
         return ships with

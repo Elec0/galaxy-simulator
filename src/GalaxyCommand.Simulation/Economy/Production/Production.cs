@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace GalaxyCommand.Simulation;
 
 /// <summary>
@@ -37,7 +39,7 @@ public readonly record struct Throughput
 /// </summary>
 public sealed class Recipe
 {
-    private readonly SortedDictionary<MaterialId, Quantity> _inputs;
+    private readonly ReadOnlyDictionary<MaterialId, Quantity> _inputs;
 
     public Recipe(
         IEnumerable<KeyValuePair<MaterialId, Quantity>> inputs,
@@ -45,11 +47,13 @@ public sealed class Recipe
         Quantity outputQuantity,
         Work requiredWork)
     {
-        _inputs = new SortedDictionary<MaterialId, Quantity>(EntityIdComparer<MaterialId>.Instance);
+        var values = new SortedDictionary<MaterialId, Quantity>(EntityIdComparer<MaterialId>.Instance);
         foreach ((MaterialId materialId, Quantity quantity) in inputs)
         {
-            _inputs.Add(materialId, quantity);
+            values.Add(materialId, quantity);
         }
+
+        _inputs = new(values);
 
         OutputMaterial = outputMaterial;
         OutputQuantity = outputQuantity;
@@ -72,6 +76,7 @@ public enum ProductionJobStatus
     CompletedAwaitingStorage,
     Completed,
     Cancelled,
+    Paused,
 }
 
 /// <summary>
@@ -100,6 +105,8 @@ public sealed class ProductionJob
     public SimulationTime? CompletesAt { get; internal set; }
 
     public EventGeneration Generation { get; internal set; } = new(0);
+
+    internal EconomicJobWorkState? WorkState { get; set; }
 
     public Quantity ReservedInput(Inventory inventory, MaterialId materialId)
     {
@@ -138,6 +145,11 @@ public sealed class ProductionJob
         _reservationIds.SelectMany(pair => pair.Value.Select(reservationId =>
             new ProductionReservationLinkCheckpoint(pair.Key, reservationId)));
 
+    internal void RemoveReservation(ReservationId id)
+    {
+        foreach (List<ReservationId> ids in _reservationIds.Values) ids.Remove(id);
+    }
+
     internal void ClearReservations() => _reservationIds.Clear();
 }
 
@@ -172,9 +184,9 @@ public sealed class ProductionIdSequences
 /// <summary>
 /// One production capability with a shared inventory and FIFO job queue.
 /// </summary>
-public sealed class ProductionLine
+public sealed partial class ProductionLine
 {
-    private readonly Throughput _throughput;
+    private Throughput _throughput;
     private readonly Queue<ProductionJob> _queued = new();
     private readonly SortedDictionary<ProductionJobId, ProductionJob> _jobs =
         new(EntityIdComparer<ProductionJobId>.Instance);
@@ -228,8 +240,8 @@ public sealed class ProductionLine
                 job.ReservationLinks
                     .OrderBy(link => link.MaterialId.Value)
                     .ThenBy(link => link.ReservationId.Value)
-                    .ToArray()))
-                .ToArray());
+                    .ToArray()) { WorkState = job.WorkState })
+                .ToArray()) { IsProviderAvailable = IsProviderAvailable };
 
     /// <summary>
     /// Directly assembles already validated job state without enqueueing,
@@ -241,9 +253,10 @@ public sealed class ProductionLine
         Throughput throughput,
         IReadOnlyDictionary<ProductionJobId, ProductionJob> jobs,
         ProductionJobId? activeJobId,
-        IEnumerable<ProductionJobId> queuedJobIds)
+        IEnumerable<ProductionJobId> queuedJobIds,
+        bool isProviderAvailable = true)
     {
-        var line = new ProductionLine(facilityId, inventoryId, throughput);
+        var line = new ProductionLine(facilityId, inventoryId, throughput) { IsProviderAvailable = isProviderAvailable };
         foreach ((ProductionJobId jobId, ProductionJob job) in jobs)
         {
             line._jobs.Add(jobId, job);
@@ -261,7 +274,7 @@ public sealed class ProductionLine
     public IReadOnlyDictionary<MaterialId, Quantity> UnmetInputs(Inventory inventory)
     {
         var unmet = new SortedDictionary<MaterialId, Quantity>(EntityIdComparer<MaterialId>.Instance);
-        if (ActiveJob is not { Status: ProductionJobStatus.WaitingForInputs } job)
+        if (!IsProviderAvailable || ActiveJob is not { Status: ProductionJobStatus.WaitingForInputs } job)
         {
             return unmet;
         }
@@ -303,7 +316,7 @@ public sealed class ProductionLine
         SimulationTime now)
     {
         RequireConfiguredInventory(inventory);
-        if (ActiveJob is not { Status: ProductionJobStatus.WaitingForInputs } job)
+        if (!IsProviderAvailable || ActiveJob is not { Status: ProductionJobStatus.WaitingForInputs } job)
         {
             return null;
         }
@@ -333,7 +346,7 @@ public sealed class ProductionLine
     internal bool MatchesActivePreparation(
         ProductionJobId jobId,
         EventGeneration generation) =>
-        ActiveJob is
+        IsProviderAvailable && ActiveJob is
         {
             Status: ProductionJobStatus.WaitingForInputs,
         } job
@@ -343,7 +356,7 @@ public sealed class ProductionLine
     internal Quantity MissingInput(Inventory inventory, MaterialId materialId)
     {
         RequireConfiguredInventory(inventory);
-        if (ActiveJob is not
+        if (!IsProviderAvailable || ActiveJob is not
             {
                 Status: ProductionJobStatus.WaitingForInputs,
             } job
@@ -362,7 +375,7 @@ public sealed class ProductionLine
         Quantity quantity)
     {
         RequireConfiguredInventory(inventory);
-        if (ActiveJob is not
+        if (!IsProviderAvailable || ActiveJob is not
             {
                 Status: ProductionJobStatus.WaitingForInputs,
             } job)
@@ -392,7 +405,7 @@ public sealed class ProductionLine
         SimulationTime now)
     {
         RequireConfiguredInventory(inventory);
-        if (ActiveJob is not
+        if (!IsProviderAvailable || ActiveJob is not
             {
                 Status: ProductionJobStatus.WaitingForInputs,
             } job)
@@ -415,6 +428,7 @@ public sealed class ProductionLine
         SimulationTime completesAt = now.Add(_throughput.DurationFor(job.Recipe.RequiredWork));
         job.Status = ProductionJobStatus.Running;
         job.CompletesAt = completesAt;
+        job.WorkState = EconomicJobWorkState.Start(job.Recipe.RequiredWork, now);
         return completesAt;
     }
 
@@ -424,7 +438,7 @@ public sealed class ProductionLine
         SimulationTime now)
     {
         RequireConfiguredInventory(inventory);
-        if (ActiveJob is not { } job)
+        if (!IsProviderAvailable || ActiveJob is not { } job)
         {
             return false;
         }
@@ -434,6 +448,7 @@ public sealed class ProductionLine
             && now >= completesAt)
         {
             job.Status = ProductionJobStatus.CompletedAwaitingStorage;
+            job.WorkState = new(0, null);
         }
         else if (job.Status != ProductionJobStatus.CompletedAwaitingStorage)
         {
@@ -509,6 +524,7 @@ public sealed class ProductionLine
         job.Generation = nextGeneration;
         job.Status = ProductionJobStatus.Cancelled;
         job.CompletesAt = null;
+        job.WorkState = null;
         ActiveJob = null;
         PromoteQueuedJob();
         return true;

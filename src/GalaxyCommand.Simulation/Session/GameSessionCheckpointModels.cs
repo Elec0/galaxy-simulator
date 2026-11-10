@@ -16,7 +16,9 @@ internal sealed record GameSessionRuntimeCheckpoint(
     InventoryCommitOwnerCheckpoint? InventoryCommit = null,
     CargoDispositionOwnerCheckpoint? Cargo = null,
     CargoCollectionAttemptOwnerCheckpoint? CargoCollectionAttempts = null,
-    IReadOnlyList<CargoCollectionTarget>? CargoCollectionTargets = null);
+    IReadOnlyList<CargoCollectionTarget>? CargoCollectionTargets = null,
+    StationRuntimeCheckpoint? Stations = null,
+    StationTargetContinuationCheckpoint? StationTargetContinuation = null);
 
 internal sealed record GameSessionCheckpoint(
     SimulationEngineCheckpoint<GameEvent> Engine,
@@ -36,5 +38,7 @@ internal sealed record GameSessionCheckpoint(
     PlayerObservationCheckpoint? PlayerObservation = null,
     CargoDispositionOwnerCheckpoint? Cargo = null,
     CargoCollectionAttemptOwnerCheckpoint? CargoCollectionAttempts = null,
-    IReadOnlyList<CargoCollectionTarget>? CargoCollectionTargets = null);
+    IReadOnlyList<CargoCollectionTarget>? CargoCollectionTargets = null,
+    StationRuntimeCheckpoint? Stations = null,
+    StationTargetContinuationCheckpoint? StationTargetContinuation = null);
 

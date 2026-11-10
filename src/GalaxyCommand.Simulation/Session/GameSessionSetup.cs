@@ -181,7 +181,8 @@ public sealed class GameSessionSetup
         int factRetentionCapacity,
         CommandSource playerCommandSource,
         IEnumerable<SensorDeployableDefinition>? sensorDeployableDefinitions = null,
-        CargoDispositionPolicy? cargoPolicy = null)
+        CargoDispositionPolicy? cargoPolicy = null,
+        StationRuntimeSetup? stations = null)
     {
         ArgumentNullException.ThrowIfNull(systems);
         ArgumentNullException.ThrowIfNull(ships);
@@ -309,6 +310,10 @@ public sealed class GameSessionSetup
         FactRetentionCapacity = factRetentionCapacity;
         PlayerCommandSource = playerCommandSource;
         CargoPolicy = cargoPolicy;
+        Stations = stations?.BindPlayer(playerCommandSource, relationships.PlayerPrincipalId);
+        stations?.Definitions.ValidateForSession(stations.Materials, systemIds);
+        if (Stations is not null && Stations.CommandAuthorities.Any(authority => !principalIds.Contains(authority.Principal)))
+            throw new ArgumentException("Station command authority references an unknown principal.", nameof(stations));
         SensorDeployableDefinitions = Array.AsReadOnly((sensorDeployableDefinitions ?? [])
             .OrderBy(definition => definition.Key.ToString(), StringComparer.Ordinal).ToArray());
         if (SensorDeployableDefinitions.Select(definition => definition.Key).Distinct().Count()
@@ -346,6 +351,8 @@ public sealed class GameSessionSetup
 
     /// <summary>Gets the explicitly selected cargo policy, or null when this session has no cargo domain.</summary>
     public CargoDispositionPolicy? CargoPolicy { get; }
+
+    public StationRuntimeSetup? Stations { get; }
 
     private static void ValidateEconomy(
         GameSessionEconomySetup? economy,

@@ -151,7 +151,7 @@ public sealed class ProductionSystem
             line => line.FacilityId,
             _facilityComparer))
         {
-            if (line.ActiveJob is not
+            if (!line.IsProviderAvailable || line.ActiveJob is not
                 {
                     Status: ProductionJobStatus.WaitingForInputs,
                 } job)

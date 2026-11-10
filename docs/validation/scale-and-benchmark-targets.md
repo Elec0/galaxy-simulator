@@ -451,3 +451,12 @@ navigation.connector-volume`. Historical diagnostic runs override only
 noncanonical and retain every simulation parameter. Temporary instrumentation
 and historical source copies live outside the repository and are not benchmark
 timing evidence.
+
+## Station runtime workload
+
+The live station presets cover quiet sites, one crowded system and partial
+material delivery, with exact checkpoint continuation and host worker/batch
+invariance. The optional grouped-loss fixture also covers storage/base
+destruction, recoverable fields and collection. See
+[Station runtime performance and determinism](station-runtime-performance.md)
+for the proof boundary, event-gate optimization and measured tradeoffs.

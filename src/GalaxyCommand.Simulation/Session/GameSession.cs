@@ -65,6 +65,8 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         _playerCommandSource = observation.PlayerCommandSource;
         foreach (ObservedSensorDeployableSnapshot item in observation.Deployables!)
             _deployableObservations.Add(item.View.EntityId, item);
+        foreach (ObservedStationSnapshot item in observation.Stations ?? [])
+            _stationObservations.Add(item.View.EntityId, item);
         _runtime.ObservationTimestampCompleted = CompletePlayerDisclosure;
         _runtime.NextObservationBoundary = FindNextDeployableObservationBoundary;
         _random = random;
@@ -247,7 +249,7 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             request.MaximumFactCount);
         return GamePresentationSnapshotFactory.Create(world, request, facts,
             _runtime.CaptureShipCoverage(request.ObserverPrincipalId), CaptureObservedDeployables(),
-            CaptureVisibleCargo(), CaptureCargoCollectionProgress());
+            CaptureVisibleCargo(), CaptureCargoCollectionProgress(), CaptureObservedStations());
     }
 
     /// <summary>
@@ -300,8 +302,9 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             _commands.CaptureCheckpoint(),
             value.InventoryCommit,
             _spatialInteractions.CaptureCheckpoint(),
-            new PlayerObservationCheckpoint(2, value.Relationships.PlayerPrincipalId, _playerCommandSource,
-                Array.AsReadOnly(_deployableObservations.Values.OrderBy(item => item.View.EntityId.Value).ToArray())), value.Cargo, value.CargoCollectionAttempts, value.CargoCollectionTargets);
+            new PlayerObservationCheckpoint(3, value.Relationships.PlayerPrincipalId, _playerCommandSource,
+                Array.AsReadOnly(_deployableObservations.Values.OrderBy(item => item.View.EntityId.Value).ToArray()),
+                Array.AsReadOnly(_stationObservations.Values.OrderBy(item => item.View.EntityId.Value).ToArray())), value.Cargo, value.CargoCollectionAttempts, value.CargoCollectionTargets, value.Stations, value.StationTargetContinuation);
         return CheckpointResult<GameSessionCheckpoint>.Success(checkpoint);
     }
 
@@ -423,7 +426,7 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             checkpoint.Lifecycle,
             checkpoint.Relationships,
             checkpoint.Economy,
-            checkpoint.InventoryCommit, checkpoint.Cargo, checkpoint.CargoCollectionAttempts, checkpoint.CargoCollectionTargets);
+            checkpoint.InventoryCommit, checkpoint.Cargo, checkpoint.CargoCollectionAttempts, checkpoint.CargoCollectionTargets, checkpoint.Stations, checkpoint.StationTargetContinuation);
         CheckpointResult<ActorOrderRuntimeCoordinator> runtime = definitions is null
             ? ActorOrderRuntimeCoordinator.RestoreCheckpoint(
                 runtimeCheckpoint,
@@ -447,6 +450,8 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         if (cargoFailure is not null) return CheckpointResult<GameSession>.Rejected(cargoFailure);
         CheckpointValidationFailure? cargoAdmissionFailure = ValidateCargoAdmissionHistory(checkpoint);
         if (cargoAdmissionFailure is not null) return CheckpointResult<GameSession>.Rejected(cargoAdmissionFailure);
+        CheckpointValidationFailure? stationAdmissionFailure = ValidateStationAdmission(checkpoint);
+        if (stationAdmissionFailure is not null) return CheckpointResult<GameSession>.Rejected(stationAdmissionFailure);
 
         CheckpointValidationFailure? collectionFailure = ValidateCargoCollectionCheckpoint(checkpoint, definitions);
         if (collectionFailure is not null) return CheckpointResult<GameSession>.Rejected(collectionFailure);
@@ -458,14 +463,21 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             runtime.Value!.CaptureInteractionReadView());
         if (deliveryFailure is not null) return CheckpointResult<GameSession>.Rejected(deliveryFailure);
 
-        if (checkpoint.PlayerObservation is not { BehaviorVersion: 2 } observation
+        if (checkpoint.PlayerObservation is not { BehaviorVersion: 2 or 3 } observation
             || observation.PlayerCommandSource is not { Kind: CommandSourceKind.Player }
-            || observation.ObserverPrincipalId != checkpoint.Relationships.PlayerPrincipalId
-            || !IsValidDeployableObservation(checkpoint, observation, runtime.Value!)
-            || checkpoint.Facts.RetainedFacts.Any(fact => fact is null
-                || !IsValidPlayerDisclosure(fact, checkpoint, observation)))
+            || observation.ObserverPrincipalId != checkpoint.Relationships.PlayerPrincipalId)
             return CheckpointResult<GameSession>.Rejected(new CheckpointValidationFailure(
-                "$.checkpoint.playerObservation", "Player observation binding or retained disclosure receipts are missing or inconsistent."));
+                "$.checkpoint.playerObservation", "Player observation binding is missing or inconsistent."));
+        if (!IsValidDeployableObservation(checkpoint, observation, runtime.Value!))
+            return CheckpointResult<GameSession>.Rejected(new CheckpointValidationFailure(
+                "$.checkpoint.playerObservation", "Retained deployable evidence is missing or inconsistent."));
+        if (!IsValidStationObservation(checkpoint, observation, runtime.Value!))
+            return CheckpointResult<GameSession>.Rejected(new CheckpointValidationFailure(
+                "$.checkpoint.playerObservation", "Retained station exterior evidence is missing or inconsistent."));
+        foreach (GameFactEnvelope? fact in checkpoint.Facts.RetainedFacts)
+            if (fact is null || !IsValidPlayerDisclosure(fact, checkpoint, observation))
+                return CheckpointResult<GameSession>.Rejected(new CheckpointValidationFailure(
+                    "$.checkpoint.playerObservation", $"Retained fact disclosure {fact?.Sequence.Value} ({fact?.Fact.GetType().Name}) is missing or inconsistent."));
 
         try
         {

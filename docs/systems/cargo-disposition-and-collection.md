@@ -236,19 +236,20 @@ selection, actions, progress, and completion. It does not create a new player
 spawn/ejection command or qualify live station behavior. Broader application
 shell and cross-platform accessibility qualification remain with TASK-077.
 
-The owner kept the approved live station runtime separate as TASK-105 and
-placed station integration on hold until that runtime is delivered. This
-retains the R09 proof requirement; generic sources do not replace it.
+TASK-105 delivers the live station integration: grouped module/base loss,
+accounting windows, exact workflow cleanup, recoverable fields, ordinary player
+collection and coupled in-memory continuation. Its
+[station workloads](../validation/station-runtime-performance.md) exercise the
+actual source-to-collection path; generic sources do not replace that proof.
 
 The owner kept the missing whole-session typed JSON bridge separate as
 TASK-116 and paused encoded cargo-save delivery until that prerequisite is
 available. In-memory continuation does not close R08.
 
-Encoded checkpoint continuity, live station loss/accounting, workflow cleanup,
-and full delivery proof remain under TASK-108's R09 boundary. Generic component
-measurements below and the UI fixture do not establish station integration.
-An internal emitter or component restore is not the required
-station-loss-to-collection proof.
+Encoded checkpoint continuity and remaining actor-removal collection cleanup
+stay open under TASK-108's full delivery boundary. The station proof does not
+qualify the encoded adapter or broader application accessibility. Generic
+component measurements below and the UI fixture retain their narrower scope.
 
 ### Generic component scale measurements
 
@@ -280,8 +281,9 @@ circles. The large-quantity case preserves the configured four objects per
 occurrence without iterating once per cargo unit.
 
 The contested variants have the same authority digest,
-`513fdbed77382d36`, including causal inputs, item identities, custody, orders,
-reservations, agenda, facts/disclosures, policy, and random state. They process
+`499d2f63ec017fb9`, including causal inputs, item identities, custody, orders,
+reservations, shared incoming and outgoing admission ages and highwater, storage intake and
+protection limits, agenda, facts/disclosures, policy, and random state. They process
 65 admitted commands and 192 events, retain 390 facts, and leave one winner,
 63 remaining objects/expiry envelopes, one original circle, one receipt, and
 no incoming reservations. Digest mutation checks cover causal cleanup,
@@ -946,7 +948,7 @@ after ship destruction. TASK-110 retains voluntary-ejection player commands
 and controls.
 
 Design approval is complete for R01-R10 and the included player controls.
-TASK-108 remains open for implementation and full delivery proof. TASK-105 can
-consume this accepted contract without selecting additional cargo policy;
-its live integration still requires the shared runtime and end-to-end proof
-specified in R09.
+TASK-108 remains open for its remaining implementation and full delivery proof.
+TASK-105 consumes this accepted contract through real station loss and player
+collection, without selecting additional game-content policy. Its in-memory
+proof does not close the encoded checkpoint prerequisite in TASK-116.

@@ -27,7 +27,7 @@ internal sealed class RestoredProductionOwner
             _lines.Values.Select(line => line.CaptureCheckpoint()).ToArray());
 }
 
-internal static class ProductionCheckpointRestore
+internal static partial class ProductionCheckpointRestore
 {
     private const string Path = "$.checkpoint.economy.production";
 
@@ -148,7 +148,13 @@ internal static class ProductionCheckpointRestore
                 Status = saved.Status,
                 CompletesAt = saved.CompletesAt,
                 Generation = saved.Generation,
+                WorkState = saved.WorkState,
             };
+            if (!EconomicJobWorkState.IsValidCheckpoint(saved.WorkState, job.Recipe.RequiredWork, checkpoint.Throughput,
+                checkpoint.IsProviderAvailable, saved.Status == ProductionJobStatus.Running,
+                saved.Status == ProductionJobStatus.Paused,
+                saved.Status is ProductionJobStatus.CompletedAwaitingStorage or ProductionJobStatus.Completed, saved.CompletesAt))
+                return RejectedLine($"{jobPath}.workState", "Production work progress, provider availability or cached deadline is inconsistent.");
             CheckpointValidationFailure? reservationFailure = RestoreReservations(
                 saved,
                 job,
@@ -236,7 +242,8 @@ internal static class ProductionCheckpointRestore
             checkpoint.Throughput,
             jobs,
             checkpoint.ActiveJobId,
-            checkpoint.QueuedJobIds));
+            checkpoint.QueuedJobIds,
+            checkpoint.IsProviderAvailable));
     }
 
     /// <summary>

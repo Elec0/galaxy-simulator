@@ -34,7 +34,8 @@ public sealed record BenchmarkScenarioReport(
     IReadOnlyDictionary<string, long> Counts,
     string DomainMeasurementsAvailability,
     BenchmarkTiming Timing,
-    IReadOnlyDictionary<string, BenchmarkDomainMeasurement>? DomainMeasurements = null);
+    IReadOnlyDictionary<string, BenchmarkDomainMeasurement>? DomainMeasurements = null,
+    string? GameplayDigest = null);
 
 public sealed record BenchmarkRunReport(
     int SchemaVersion,
@@ -189,7 +190,8 @@ public static class BenchmarkApplication
             correctness.Counts,
             domainMeasurements is null ? "unavailable" : "available",
             timing,
-            domainMeasurements);
+            domainMeasurements,
+            correctness.GameplayDigest);
     }
 
     /// <summary>Reports measured domain medians without making performance part of correctness identity.</summary>
@@ -225,7 +227,8 @@ public static class BenchmarkApplication
         ScenarioCorrectnessResult expected,
         ScenarioCorrectnessResult actual)
     {
-        if (!StringComparer.Ordinal.Equals(expected.Digest, actual.Digest)
+        if (!StringComparer.Ordinal.Equals(expected.GameplayDigest, actual.GameplayDigest)
+            || !StringComparer.Ordinal.Equals(expected.Digest, actual.Digest)
             || expected.SimulatedMilliseconds != actual.SimulatedMilliseconds
             || expected.Counts.Count != actual.Counts.Count
             || expected.Counts.Any(pair =>

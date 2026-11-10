@@ -14,8 +14,8 @@ fog-of-war can discover it, remember it, or use its sensors.
 
 **Decision status:** Accepted by the project owner, including
 Q01-Q58 and the [closing technical contract](#accepted-technical-contract),
-R01-R05. TASK-057 design review is complete. Runtime implementation remains
-TASK-105; station observation integration remains TASK-073.
+R01-R05. TASK-057 design review and TASK-105 runtime delivery are complete.
+TASK-073 retains full observation delivery ownership.
 
 **Implementation boundary:** TASK-105 owns the approved station runtime;
 TASK-073 consumes its sensor sources and observable views. Those tasks implement and consume this accepted contract without selecting
@@ -448,6 +448,10 @@ content validation must reject a recipe/capacity deadlock. Module construction
 and services wait for completed base construction. Dismantling an unfinished
 structure recovers no more than its actually consumed material inputs, using an
 explicit authored recovery rule; repeating cancel/dismantle cannot create value.
+The accepted unfinished-structure rule caps each material's authored
+completed-structure recovery quantity at the quantity actually consumed for that
+structure. Missing consumed inputs yield no recovery of that material. This
+does not refund material automatically on cancellation.
 
 Placement rules are explicit allowed-system references, allowed regions, and
 exclusion regions using shared system-local geometry. An omitted restriction
@@ -557,6 +561,9 @@ TASK-073's existing rules for every approved exterior field.
 TASK-105 implements the complete approved station domain and construction
 contracts, including explicit scenario conversion. It adapts facility consumers
 to shared station storage without adding a compatibility inventory per module.
+The owner selected conversion of the Phase 1 Mine, Refinery, and Shipyard test
+fixture, preserving its economic behavior. Adding station gameplay content to
+the built-in or preview scenarios requires separate owner review.
 TASK-073 consumes concrete committed station sources and typed views. Provider
 hooks for trade, repair, defense, docking, refitting, and territory do not count
 as implementations of those domains. TASK-108 supplies recoverable physical
@@ -579,6 +586,66 @@ builder orders; stale observation and confirmed absence; malformed restore;
 and explicit scenario conversion retaining economic behavior. Build and existing
 regression/benchmark checks must pass before runtime delivery is complete.
 
+## Accepted integration policies
+
+Final station withdrawal stops inbound physical motion and fails invalid target
+orders within the removal transaction. Starting the next queued order or
+orderless passive drag belongs to one coalesced Decision wake at the same
+simulation timestamp. The removal preflights interruption generations,
+spatial revisions, exact pending movement envelopes and agenda capacity for
+that wake together with any cargo expiry envelopes. Its retained actor set and
+exact wake identity restore reciprocally; continuation remains serial in actor
+identity order after physical removal has fully committed.
+
+
+Q35 requires invalidating commitments whose reserved cargo is lost, while Q36
+settles oldest-first retention only for incoming capacity. Fungible reservations
+do not identify individual physical units. If stock falls from 100 to 80 while
+older and newer workflows reserve 60 and 40 units, respectively, both claims
+cannot remain intact. Preserve viable older claims and release newer affected
+claims in full until the remaining reservations fit, as selected by the owner.
+Releasing an affected claim invalidates its workflow commitment; that workflow
+retains its own recovery behavior. Unaffected claims remain intact.
+
+Operational production and ship-construction providers also need an explicit
+interruption contract. The existing economic pipeline consumes inputs before
+work and supports cancellation, but does not retain exact remaining work while
+a provider is disabled. The accepted contract pauses that remaining work and
+retains queues while disabled or dismantling, cancels work at final removal,
+and preserves existing job recipes/work through compatible upgrades while
+applying replacement throughput atomically. Already consumed inputs are not
+refunded when final removal cancels a job.
+
+A production provider authors one immutable recipe, throughput, and repetition
+choice. Its compatible upgrade retains that recipe exactly. A ship-construction
+provider authors its allowed retained ship designs, throughput, persistent
+controller, and initial-order policy. A compatible replacement must retain every
+existing order's design unchanged. Incompatible targets reject before creating
+an upgrade project, reserving inputs, or allocating identities.
+
+The owning principal may enqueue an explicitly allowed ship design through the
+station command boundary. Admission checks the explicit source/principal
+binding, station revision, module identity, and expected facility identity.
+An operational disabled module retains new orders in its paused queue; a
+module being dismantled accepts no new orders. One shared construction-order
+allocator supplies identities only after admission. Private queue confirmations
+and command-to-order receipts do not reveal designs or work to exterior observers.
+
+Economic work is reevaluated at a coalesced current-timestamp Decision wake
+after accepted idle queue/input changes. Command admission does not consume
+materials or advance jobs. Provider transitions replace exact physical-completion
+envelopes while retaining fractional remaining work. Checkpoints retain the wake,
+work clocks, and exact facility/location allocators. Final removal archives only
+terminal workflows and their authored policy evidence, without retaining a fake
+live inventory or reviving a removed provider.
+
+Logistics demand and supply belong to station inventory, rather than to a
+particular attached facility. Disabling or removing a provider withdraws only
+unassigned demand beyond the surviving providers' aggregate unmet inputs.
+Already committed shipments retain their claims while the inventory survives.
+Existing physical cargo remains supply independently of its original producer.
+Final base removal cancels referenced transport and retires its market history.
+
 ## Adjacent design ownership
 
 TASK-051 retains docking, berths, and congestion and was explicitly deferred by
@@ -588,18 +655,17 @@ retains faction strategic construction. Combat and repair behavior remain with
 their owning tasks. Station design must identify these interfaces without
 choosing their unresolved behavior.
 
-TASK-057 completed the full design review accepted in Q03. TASK-105 has an
-approved delivery contract in this document and has begun the independent
-arithmetic foundation described below. TASK-073 station integration follows
-concrete runtime delivery; fixtures alone do not complete it.
+TASK-057 completed the full design review accepted in Q03. TASK-105 owns the
+runtime delivery contract in this document. TASK-073 consumes its committed
+station sources and exterior views; fixtures alone do not establish integration.
 
-## Initial arithmetic implementation
+## Arithmetic and owner commit boundaries
 
-TASK-105 now supplies two internal pure evaluators under
+The station runtime uses pure evaluators under
 `Entities/Stations`. They calculate proposed quantities without changing any
 inventory, allocating identity, scheduling events, advancing random streams,
-or publishing a station. The existing economic construction pipeline retains
-its current behavior until explicit station integration.
+or publishing a station. Station authority joins those proposals to the actual
+shared inventory, economic provider, cargo, agenda, lifecycle and fact owners.
 
 `StationConstructionProgress` implements Q49's cumulative ceiling rule using
 an existing `ConstructionRecipe`, prior completed work, supplied whole work,
@@ -607,8 +673,8 @@ and currently available material quantities. It finds the greatest affordable
 new work and returns only the incremental consumption in canonical material
 order. Missing inputs stop at the affordable boundary; already consumed inputs
 can support further work until the next material increment is required.
-Multiplication widens to exact 128-bit arithmetic. Runtime preparation must
-still validate revisions and availability and commit consumption with progress.
+Multiplication widens to exact 128-bit arithmetic. Runtime preparation validates
+revisions and availability, then commits consumption with progress.
 
 `StationStorageLoss` implements R01's rational cutoff comparison, additional
 per-definition loss after overflow credits, and minimum whole-unit overflow
@@ -619,18 +685,310 @@ is supplied by the caller; this helper does not create session policy. It does
 not retain or reset the accounting window, select cargo or item identities,
 invalidate reservations, or dispose of holdings.
 
-The 36 focused tests cover all 2,048 update partitions of a representative
+Focused tests cover all 2,048 update partitions of a representative
 recipe, an exhaustive small-integer affordability oracle, missing and partial
 inputs, bounded work and completion, immutable consumption results, threshold
 equality, accumulated loss and dilution, current-stock changes, overflow
-credits, whole-unit rounding, and large arithmetic values. This proves the
-calculations, not station runtime, checkpoint continuity, builder timing,
-concurrency, observation, or R05's full delivery boundary.
+credits, whole-unit rounding, and large arithmetic values. Separate live-session
+coverage exercises construction, economic providers, real cargo loss and
+collection, command and observation disclosure, and checkpoint continuation.
+The [station performance proof](../validation/station-runtime-performance.md)
+compares authoritative state across execution layouts and update partitions.
 
-The owner selected independent implementation followed by a stop at the
-TASK-108 dependency. Cargo selection and disposition commits must wait for
-that task's shared recovery policy and physical-object contract. No default
-permanent destruction or placeholder ejection has been introduced. Station
-identity/composition, content, work and inventory commit, lifecycle, facts,
-checkpoints, scenario conversion, and observation integration remain under
-TASK-105 and TASK-073 as already assigned in the canonical task list.
+```mermaid
+flowchart LR
+    state["Committed station and shared inventory"] --> prepare["Prepare structural, workflow and cargo effects"]
+    prepare --> check["Revalidate exact claims and agenda capacity"]
+    check --> loss["Inventory owner applies exact source loss"]
+    loss --> owners["Commit providers, module state, agenda and lifecycle"]
+    owners --> publish["Publish causal facts and observation inputs"]
+```
+
+Station loss selection preserves its accounting window and produces explicit
+subjects for TASK-108's cargo disposition transaction. The resulting objects
+use ordinary field collection. Retired provider archives retain terminal
+history and exact origin links, without retaining a live storage owner.
+In-memory checkpoints preserve these joins. TASK-116 retains the encoded
+whole-session checkpoint bridge; these tests do not qualify that adapter.
+
+### Construction admission foundation
+
+`StationConstructionAdmission` validates a base recipe against the existing
+material compatibility map and explicit staging/completed capacities. Required
+work and input quantities must be positive, material references must resolve,
+and aggregate recipe capacity must fit the checked quantity representation.
+Completed base capacity must retain at least the site's staging capacity.
+
+For required quantity M and total whole work W, the first work unit consumes
+ceil(M/W) of each input simultaneously. No later one-unit increment requires
+more of any input. The sum of those first increments is therefore the minimum
+empty staging capacity needed to permit progress through this recipe with
+partial deliveries. Checking each input separately would admit a deadlock when
+the required inputs cannot fit together. This bound uses explicit material
+capacity costs and widened integer arithmetic; it introduces no content defaults.
+
+Coverage compares that bound with every single-work increment of small recipes,
+including simultaneous inputs, absent material references, zero values, capacity
+shrinkage, and arithmetic limits. `StationDefinitionCatalog.ValidateForSession`
+now applies this validator during station content admission. Occupied inventory
+and competing commitments still require live preparation and work consumption.
+Definition validation alone does not register a station or complete R05's
+runtime proof.
+
+## Authored origins and explicit fixture conversion
+
+Pre-existing operational stations use `InitialStationSetup` with explicit
+station/entity/inventory/principal identities, position, definition, origin time
+and attached `InitialStationModuleSetup` records. An attached module may carry
+its real economic facility identity. These origins do not manufacture completed
+construction projects, consumed inputs or completed work. Their physical state
+is authored initial state rather than a replay of runtime creation commands.
+
+Fresh station admission validates the whole initial batch before publishing any
+identity. It checks shared inventory custody and physical/enabled limits,
+definition and module references, allowed composition, occupied module capacity,
+placement rules and duplicate identities/facility links. Each station retains
+the existing inventory object. Accepted setup advances station/module and shared
+entity/inventory identity high-water marks; the project allocator has no invented
+construction history to skip. Private restoration bypasses initial admission
+and validates retained authority against those immutable authored origins.
+
+The canonical Phase 1 acceptance fixture explicitly converts Mine and Refinery
+to one-module stations, and ComponentFactory plus Shipyard to two attached
+modules on one station. It retains the actual station owner alongside its
+existing economic runtime, with both authorities referring to the same inventory
+instances. Component production and ship construction retain their independent
+recipes, queues and work rates while consuming one shared station inventory.
+No compatibility inventory or internal component delivery remains. The Shipyard
+station retains the sum of the two previous storage budgets.
+
+The [acceptance baseline](../validation/phase-1-simulation-spec.md#station-conversion-baseline)
+explains the resulting timing/fingerprint change and includes station composition
+in the state digest. This authored test conversion does not add built-in or
+preview gameplay content or activate deferred service domains. Live lifecycle
+coverage and deterministic performance qualification remain separate from this
+fixture conversion.
+
+## Accepted package adapter vocabulary
+
+**Accepted within TASK-105.** The existing content library preserves qualified
+references and format-neutral values; it does not need station-specific runtime
+types. `StaticNewGameLoader` composes station definitions, the common material
+mapping, explicit policies, and ship construction capability from that catalog.
+
+This contract extends definition and scenario documents from schema 4 to schema
+5, retaining package manifest schema 1 and the existing definition envelope
+(`kind`, `id`, `fallback`, `references`, `values`). Unknown properties, unresolved
+references and unsupported kinds remain errors. Older document migration stays
+with TASK-037. This vocabulary does not select any station,
+module, material, work rate, recipe, cutoff or starting stock.
+
+### Definitions and material identity
+
+Register `station`, `station-module`, `material`, and
+`station-storage-loss-policy` with the trusted loader. Every content-valued
+reference in a definition must also appear in its existing `references` array.
+The scenario's selected reference closure determines the admitted catalog.
+
+A `material` definition has required `holdingKind` and `capacityCost` values.
+This adapter supports the existing material compatibility subset only:
+`holdingKind` must be `fungible`, and `capacityCost` must explicitly satisfy the
+existing map's one-unit requirement. Other physical cargo remains with its
+owning adapter. Sort admitted qualified material keys ordinally and allocate
+`MaterialId` values with the existing typed identity allocator before composing
+any recipe. Construct one `MaterialInventoryCompatibilityMap` from those exact
+pairs and reuse it throughout station, inventory and economic setup. Numeric
+material IDs are never authored, guessed from a key, or independently allocated
+by each consumer.
+
+Recipes use `inputs` entries with a qualified `material` reference and a positive
+`quantity`, plus positive `requiredWork`. Recovery uses the same material/quantity
+entry form. Reject duplicated materials rather than silently adding entries.
+Capacities, quantities, whole work, throughput and radii use exact unsigned
+64-bit integers. Positions use the existing signed integral `x` and `y`
+coordinates in meters. Existing checked-total, staging-progress, upgrade and
+capacity validators run before publishing setup.
+
+Required station values are `moduleCapacity`, `stagingCapacity`, `baseCapacity`,
+`baseRecipe`, `sensorRadiusMeters`, `allowedModules`, `dismantleWork`,
+`dismantleRecovery`, and `placementRules`. The latter has required
+`allowedSystems`, `allowedRegions`, and `exclusionRegions` arrays. Each system
+reference uses the selected scenario's existing system string identity, resolved
+through its canonical system map; no runtime `SystemId` appears in a package.
+Each region has `system`, `x`, `y`, and `radiusMeters`. Empty arrays explicitly
+mean no restriction of that category. These restrictions grant no territory
+permission.
+
+Required module values are `capacityCost`, `storageCapacity`,
+`sensorRadiusMeters`, `constructionRecipe`, `dismantleWork`,
+`dismantleRecovery`, and `upgradePaths`. Each upgrade path has `target` and its
+own `recipe`; derive allowed upgrade keys from these paths without a second
+list or target-recipe fallback. Optional `constructionCapability` has required
+`rangeMeters` and positive `throughputUnitsPerSecond`. Omission means the
+module supplies no station-construction work. Zero storage and sensor values
+remain explicit rather than inherited.
+
+These JSON templates illustrate field names only. Angle-bracket strings stand
+for values or array members that the owner must author; they are not loadable
+content or selected gameplay values.
+
+```json
+{
+  "kind": "station",
+  "id": "<local station id>",
+  "fallback": "<invariant display name>",
+  "references": ["<package>/station-module/<module>", "<package>/material/<material>"],
+  "values": {
+    "moduleCapacity": "<uint64>",
+    "stagingCapacity": "<uint64>",
+    "baseCapacity": "<uint64>",
+    "baseRecipe": {
+      "inputs": [{"material": "<package>/material/<material>", "quantity": "<positive uint64>"}],
+      "requiredWork": "<positive uint64>"
+    },
+    "sensorRadiusMeters": "<uint64>",
+    "allowedModules": ["<package>/station-module/<module>"],
+    "dismantleWork": "<positive uint64>",
+    "dismantleRecovery": [{"material": "<package>/material/<material>", "quantity": "<positive uint64>"}],
+    "placementRules": {
+      "allowedSystems": ["<scenario system string>"],
+      "allowedRegions": [{"system": "<scenario system string>", "x": "<int64>", "y": "<int64>", "radiusMeters": "<uint64>"}],
+      "exclusionRegions": [{"system": "<scenario system string>", "x": "<int64>", "y": "<int64>", "radiusMeters": "<uint64>"}]
+    }
+  }
+}
+```
+
+The `references` array must include every material named by its recipe and
+recovery. A module uses the same envelope:
+
+```json
+{
+  "kind": "station-module",
+  "id": "<local module id>",
+  "fallback": "<invariant display name>",
+  "references": ["<every referenced material, upgrade target and ship design>"],
+  "values": {
+    "capacityCost": "<uint64>",
+    "storageCapacity": "<uint64>",
+    "sensorRadiusMeters": "<uint64>",
+    "constructionRecipe": {
+      "inputs": [{"material": "<package>/material/<material>", "quantity": "<positive uint64>"}],
+      "requiredWork": "<positive uint64>"
+    },
+    "dismantleWork": "<positive uint64>",
+    "dismantleRecovery": [{"material": "<package>/material/<material>", "quantity": "<positive uint64>"}],
+    "upgradePaths": [{
+      "target": "<package>/station-module/<target>",
+      "recipe": {"inputs": [{"material": "<package>/material/<material>", "quantity": "<positive uint64>"}], "requiredWork": "<positive uint64>"}
+    }],
+    "constructionCapability": {
+      "rangeMeters": "<uint64>",
+      "throughputUnitsPerSecond": "<positive uint64>"
+    }
+  }
+}
+```
+
+Optional `productionProvider` contains required `inputs`, `outputMaterial`,
+`outputQuantity`, `requiredWork`, `throughputUnitsPerSecond`, and `repeat`.
+Optional `shipConstructionProvider` contains required `allowedDesigns`,
+`throughputUnitsPerSecond`, `materializedShipController`, and
+`initialOrderPolicy`. Allowed designs are qualified `ship-design` references.
+The controller has explicit `kind` (`player` or `autonomous`) and `source`;
+`script` remains unsupported for retained materialization. The only currently
+supported initial order policy is `no-initial-order`. Missing provider objects
+mean no such provider, and never synthesize a recipe, rate or facility.
+
+Extend the existing `ship-design` values with optional
+`stationConstructionCapability`, using the same `rangeMeters` and
+`throughputUnitsPerSecond` object. Omission retains the existing ship behavior:
+it cannot supply station-construction work. For ship-provider designs with
+material costs, extend the existing `requiredWork` with optional `inputs` using
+the recipe entry form above; omission preserves the existing empty-input ship
+recipe. This does not select a recipe for any built-in ship.
+
+### Session selection and starting-state boundary
+
+A `station-storage-loss-policy` definition has explicit `behaviorVersion`,
+`cutoffNumerator`, and `cutoffDenominator`, validated by the existing retained
+policy type. Add optional scenario `stationRuntime` containing required
+`territoryPolicy` (currently only `absent`) and a qualified `storageLossPolicy`
+reference. It is required when station definitions are selected, so the loader
+never chooses a loss cutoff or territorial permission. The existing explicit
+`cargoPolicy` selection remains the recovery/disposition authority.
+
+Compose `StationRuntimeSetup` from the resolved catalog, common material map,
+explicit policies and existing player source/principal binding. Loading
+station definitions creates no station or module identities and no inventory
+stock. Runtime commands create sites through the existing admission boundary.
+
+### Economic provider context and host navigation
+
+Definition loading alone is insufficient for economic providers. Without an
+economic context, no owner exists to admit a dynamically constructed production
+module or shipyard.
+The adapter also admits optional `stationRuntime.economy` with a
+required `transportTiming` object. Its exact fields are
+`dockingOverheadMilliseconds`, `loadingUnitsPerSecond`, and
+`unloadingUnitsPerSecond`, corresponding to `TransportTiming.DockingOverhead`,
+`LoadingRate`, and `UnloadingRate`. The overhead is an unsigned 64-bit duration;
+both rates are positive unsigned 64-bit quantities per second. No timing or
+travel speed is selected by this adapter.
+
+```json
+{
+  "stationRuntime": {
+    "territoryPolicy": "absent",
+    "storageLossPolicy": "<package>/station-storage-loss-policy/<policy>",
+    "economy": {
+      "transportTiming": {
+        "dockingOverheadMilliseconds": "<uint64>",
+        "loadingUnitsPerSecond": "<positive uint64>",
+        "unloadingUnitsPerSecond": "<positive uint64>"
+      }
+    }
+  }
+}
+```
+
+Append an optional host binding `ISpatialNavigationPlanner? navigation = null`
+to `StaticNewGameLoader.Load`. It is runtime-only and never appears in package
+JSON, the package fingerprint, or an authored definition. The host supplies an
+already selected planner and must pass that exact same instance to
+`new GameSession(setup, navigation)`. This preserves the existing shared planner
+boundary used by economic checkpoint validation. The adapter must not create a
+second planner or choose a travel estimator, route policy or movement speed.
+The planner must support the selected scenario's resolved topology; supplying a
+binding does not override or manufacture content topology.
+
+If any selected module definition contains `productionProvider` or
+`shipConstructionProvider`, require both `stationRuntime.economy.transportTiming`
+and the host `navigation` binding. Missing either rejects the load before
+publishing setup, even if the module has not yet been built. This prevents a
+catalog that advertises providers whose runtime cannot activate. Station
+catalogs containing only storage, sensors or station-construction work remain
+valid without this economic context, with `Economy = null`. An explicitly
+supplied economic context is validated even when no provider is selected.
+
+With economic context present, construct an otherwise empty
+`GameSessionEconomySetup`: `inventories`, `facilities`, `productionFacilities`,
+`constructionFacilities`, `constructionOrders`, and `freighters` are empty;
+`shipDesigns` contains the retained resolved ship definitions, and
+`materialCompatibility` is the same map used by `StationRuntimeSetup`. Its
+`navigation` is `HierarchicalLogisticsNavigation` with an empty anchor map and
+the explicit host planner; its `transportTiming` comes only from the authored
+object above. Runtime module activation supplies actual facility identities
+and shared-inventory anchors through the existing prepared provider boundary.
+No initial provider, facility, stock or delivery fleet is invented by loading the
+context. Existing built-in and preview calls need no new binding because their
+content does not select station providers.
+
+A disk `startingStations` scenario schema is not required for this TASK-105
+adapter. The owner-approved Phase 1 conversion already authors its
+initial stations through the typed acceptance fixture. Built-in and preview
+scenarios receive no new station references, stations, modules, builder
+capabilities, material stock or economic providers. A future request to author
+starting stations on disk is tracked by TASK-118 and needs a separate explicit
+composition proposal; it must preserve the same origin, shared inventory and module/facility identity
+rules rather than manufacture construction history.

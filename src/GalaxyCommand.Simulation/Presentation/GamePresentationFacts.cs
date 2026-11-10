@@ -53,4 +53,5 @@ internal sealed record PlayerObservationCheckpoint(
     int BehaviorVersion,
     PrincipalId ObserverPrincipalId,
     CommandSource PlayerCommandSource,
-    IReadOnlyList<ObservedSensorDeployableSnapshot>? Deployables = null);
+    IReadOnlyList<ObservedSensorDeployableSnapshot>? Deployables = null,
+    IReadOnlyList<ObservedStationSnapshot>? Stations = null);

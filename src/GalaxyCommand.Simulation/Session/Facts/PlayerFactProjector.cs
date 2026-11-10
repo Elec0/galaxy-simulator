@@ -4,6 +4,8 @@ namespace GalaxyCommand.Simulation;
 internal sealed class PlayerFactProjector(CommandSource playerCommandSource, GameSnapshot world,
     Dictionary<ShipId, GameShipSnapshot> ships, PlayerCoverageBoundary coverage)
 {
+    private readonly Dictionary<StationId, StationSnapshot> _stations = world.Stations.ToDictionary(station => station.Id);
+
     /// <summary>Applies the approved explicit policy for every currently supported fact kind.</summary>
     internal GameFact? Project(GameFact fact)
     {
@@ -12,6 +14,9 @@ internal sealed class PlayerFactProjector(CommandSource playerCommandSource, Gam
             : fact is SensorPickedUpFact pickedUp ? pickedUp.Sensor.PrincipalId
             : fact is SensorRemovedFact sensorRemoval ? sensorRemoval.Sensor.PrincipalId
             : fact is EntityMaterializedFact materialized ? materialized.PrincipalId
+            : fact is StationRemovedFact removedStation ? removedStation.Station.PrincipalId
+            : fact is StationCommitmentInvalidatedFact invalidated ? invalidated.PrincipalId
+            : GetStationId(fact) is { } station ? _stations.GetValueOrDefault(station)?.PrincipalId
             : GamePresentationSnapshotFactory.GetShipId(fact) is { } subject
                 ? ships.GetValueOrDefault(subject)?.PrincipalId : null;
         if (TryProjectWithoutCoverage(fact, observer, playerCommandSource, subjectPrincipal, out GameFact? direct)) return direct;
@@ -19,9 +24,25 @@ internal sealed class PlayerFactProjector(CommandSource playerCommandSource, Gam
             position is { } anchor && coverage.Contains(anchor)
                 ? new ObservedShipChangeFact(ship, kind, anchor) : null;
         SystemPosition? Position(ShipId ship) => ships.GetValueOrDefault(ship)?.Position;
+        GameFact? StationChange(StationId id, ObservedStationChangeKind kind) =>
+            _stations.GetValueOrDefault(id) is { } station && coverage.Contains(station.Position)
+                ? new ObservedStationChangeFact(id, station.EntityId, station.DefinitionKey,
+                    station.PrincipalId, station.Position, kind) : null;
 
         return fact switch
         {
+            StationCreatedFact created => coverage.Contains(created.Position)
+                ? new ObservedStationChangeFact(created.StationId, created.EntityId, created.DefinitionKey,
+                    created.PrincipalId, created.Position, ObservedStationChangeKind.Appeared) : null,
+            StationProjectCompletedFact completed when _stations.GetValueOrDefault(completed.StationId)?.Projects
+                .Any(project => project.Id == completed.ProjectId && project.Kind == StationProjectKind.BaseConstruction) == true
+                => StationChange(completed.StationId, ObservedStationChangeKind.Changed),
+            StationModuleChangedFact changed => StationChange(changed.StationId, ObservedStationChangeKind.Changed),
+            StationModuleRemovedFact removed => StationChange(removed.StationId, ObservedStationChangeKind.Changed),
+            StationRemovedFact removed => coverage.Contains(removed.Station.Position)
+                ? new ObservedStationChangeFact(removed.Station.Id, removed.Station.EntityId,
+                    removed.Station.DefinitionKey, removed.Station.PrincipalId, removed.Station.Position,
+                    ObservedStationChangeKind.Disappeared) : null,
             CargoObjectAppearedFact appearance => coverage.Contains(appearance.Object.Position)
                 ? new ObservedCargoAppearanceFact(appearance.Object) : null,
             CargoObjectDisappearedFact disappearance => coverage.Contains(disappearance.Position)
@@ -105,5 +126,20 @@ internal sealed class PlayerFactProjector(CommandSource playerCommandSource, Gam
         ShipOrderTransitionFact or ShipWaypointArrivedFact or ShipLocalMotionStartedFact or ShipLocalMotionEndedFact
         or ShipCruiseEnteredFact or ShipCruiseDroppedOutFact or ShipConnectorTransitStartedFact
         or ShipConnectorTransitCompletedFact or EntityMaterializedFact or EntityRemovedFact
-        or SensorDeployedFact or SensorPickedUpFact or SensorRemovedFact;
+        or SensorDeployedFact or SensorPickedUpFact or SensorRemovedFact
+        or StationCreatedFact or StationProjectChangedFact or StationProjectCompletedFact or StationModuleChangedFact or StationModuleRemovedFact
+        or StationRemovedFact or StationCommitmentInvalidatedFact or StationShipConstructionQueuedFact;
+
+    internal static StationId? GetStationId(GameFact fact) => fact switch
+    {
+        StationCreatedFact created => created.StationId,
+        StationProjectChangedFact changed => changed.StationId,
+        StationProjectCompletedFact completed => completed.StationId,
+        StationModuleChangedFact changed => changed.StationId,
+        StationShipConstructionQueuedFact queued => queued.StationId,
+        StationModuleRemovedFact removed => removed.StationId,
+        StationRemovedFact removed => removed.Station.Id,
+        StationCommitmentInvalidatedFact invalidated => invalidated.StationId,
+        _ => null,
+    };
 }

@@ -337,11 +337,14 @@ public sealed partial class InventoryRegistry
 
         PhysicalReservation? reservation =
             destination.GetPhysicalReservation(reservationId);
-        return reservation?.Owner == request.ReservationOwner &&
+        bool matches = reservation?.Owner == request.ReservationOwner &&
             reservation.Subject is PhysicalReservationSubject.IncomingCapacity incoming &&
-            (incoming.Quantity == capacityCost || releaseUnusedIncomingCapacity && incoming.Quantity >= capacityCost)
-                ? null
-                : InventoryTransferRejectionReason.DestinationReservationMismatch;
+            (incoming.Quantity == capacityCost || releaseUnusedIncomingCapacity && incoming.Quantity >= capacityCost);
+        if (!matches) return InventoryTransferRejectionReason.DestinationReservationMismatch;
+
+        var claim = (PhysicalReservationSubject.IncomingCapacity)reservation!.Subject;
+        return destination.CanAcceptReservedIntake(capacityCost, claim.Quantity)
+            ? null : InventoryTransferRejectionReason.InsufficientCapacity;
     }
 
     /// <summary>
@@ -423,6 +426,7 @@ public sealed partial class InventoryRegistry
             ReservationOwner.ProductionJob value => value.JobId.Value != 0,
             ReservationOwner.ConstructionOrder value => value.OrderId.Value != 0,
             ReservationOwner.CargoCollection value => value.ShipId.Value != 0 && value.OrderId.Value != 0,
+            ReservationOwner.StationProject value => value.StationId.Value != 0 && value.ProjectId.Value != 0,
             _ => false,
         };
 

@@ -20,7 +20,10 @@ internal sealed record ProductionJobCheckpoint(
     ProductionJobStatus Status,
     SimulationTime? CompletesAt,
     EventGeneration Generation,
-    IReadOnlyList<ProductionReservationLinkCheckpoint?> Reservations);
+    IReadOnlyList<ProductionReservationLinkCheckpoint?> Reservations)
+{
+    internal EconomicJobWorkState? WorkState { get; init; }
+}
 
 internal sealed record ProductionLineCheckpoint(
     FacilityId FacilityId,
@@ -28,7 +31,10 @@ internal sealed record ProductionLineCheckpoint(
     Throughput Throughput,
     ProductionJobId? ActiveJobId,
     IReadOnlyList<ProductionJobId> QueuedJobIds,
-    IReadOnlyList<ProductionJobCheckpoint?> Jobs);
+    IReadOnlyList<ProductionJobCheckpoint?> Jobs)
+{
+    internal bool IsProviderAvailable { get; init; } = true;
+}
 
 internal sealed record ProductionOwnerCheckpoint(
     IdSequenceCheckpoint JobIds,

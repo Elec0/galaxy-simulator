@@ -6,6 +6,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     {
         if (_economy is null)
         {
+            _stations?.Reconcile(now);
             return;
         }
 
@@ -58,10 +59,12 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             _ = AgendaCommitOwner.Commit(agenda, proposals);
         }
         InvalidateSensorEligibility(sensorEligibility);
+        _stations?.Reconcile(now);
     }
 
     public void AccrueTo(SimulationTime now)
     {
+        _stations?.AccrueTo(now);
     }
 
     /// <inheritdoc/>
@@ -70,6 +73,21 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         SimulationTime now,
         EventAgenda<GameEvent> agenda)
     {
+        if (simulationEvent.Payload is GameEvent.StationTargetContinuation) return ContinueStationTargets(simulationEvent);
+        if (simulationEvent.Payload is GameEvent.EconomicReevaluation)
+        {
+            if (_economicWake != simulationEvent.Key || simulationEvent.Generation != new EventGeneration(0))
+                return ScheduledEventDisposition.IgnoredMissingReference;
+            _economicWake = null;
+            return ScheduledEventDisposition.Applied;
+        }
+        if (simulationEvent.Payload is GameEvent.StationWork)
+        {
+            if (_stations is null) return ScheduledEventDisposition.IgnoredMissingReference;
+            var applied = _stations.ApplyWork(simulationEvent);
+            _facts.Commit(now, new ScheduledEventFactCause(simulationEvent.Key), applied.Facts);
+            return applied.Disposition;
+        }
         if (simulationEvent.Payload is GameEvent.CargoCollectionReevaluation reevaluationCargo)
         {
             CommitCargoReevaluations(reevaluationCargo.Work.Select(work => new CargoCollectionDue(work, simulationEvent.Key)));
@@ -343,12 +361,15 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             GameEvent.SpatialMovement spatial =>
                 new GameEventKind.SpatialMovement(spatial.Event),
             GameEvent.Economic economic => new GameEventKind.Economic(economic.Event),
+            GameEvent.StationTargetContinuation => new GameEventKind.StationTargetContinuation(),
+            GameEvent.EconomicReevaluation => new GameEventKind.EconomicReevaluation(),
             GameEvent.SpatialInteraction interaction => new GameEventKind.SpatialInteraction(interaction.Forecast.Candidate),
             GameEvent.SensorActionReevaluation reevaluation => new GameEventKind.SensorActionReevaluation(reevaluation.Work.Count),
             GameEvent.CargoExpiry expiry => new GameEventKind.CargoExpiry(expiry.ObjectId),
             GameEvent.CargoCollectionCompletion completion => new GameEventKind.CargoCollectionCompletion(completion.ShipId, completion.OrderId),
             GameEvent.CargoCollectionRangeExit exit => new GameEventKind.CargoCollectionRangeExit(exit.ShipId, exit.OrderId),
             GameEvent.CargoCollectionReevaluation reevaluationCargo => new GameEventKind.CargoCollectionReevaluation(reevaluationCargo.Work.Count),
+            GameEvent.StationWork work => new GameEventKind.StationWork(work.Station, work.Project),
             _ => throw new InvalidOperationException(
                 $"Unsupported game event {simulationEvent.Payload.GetType().Name}."),
         };

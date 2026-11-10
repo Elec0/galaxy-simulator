@@ -72,7 +72,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                     _orders.CaptureCurrent(ship.ShipId),
                     _orders.CaptureQueue(ship.ShipId),
                     _orders.CaptureSuspended(ship.ShipId));
-            }))) { DeployedSensors = _lifecycle.CaptureDeployedSensors() };
+        }))) { DeployedSensors = _lifecycle.CaptureDeployedSensors(), Stations = _stations?.Capture() ?? [] };
     }
 
     /// <summary>Admits commands and synchronizes changed action intent without executing an action during admission.</summary>
@@ -80,8 +80,17 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         GameplayCommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(envelope);
+        bool needsEconomicWake = CommandNeedsEconomicWake(envelope.Command);
+        if (needsEconomicWake && !CanRequestEconomicReevaluation())
+            return new(CommandResult.Rejected(new("economic-wake-capacity-exhausted"), "The economic reevaluation agenda identity is exhausted."));
+        _stations?.AccrueTo(CurrentTime);
         GameplayCommandHandlingResult result = envelope.Command switch
         {
+            CreateStationSiteCommand or AssignStationBuilderCommand or ControlStationProjectCommand or ReleaseStationBuilderCommand
+                or ConstructStationModuleCommand or UpgradeStationModuleCommand or DismantleStationModuleCommand
+                or SetStationModuleEnabledCommand or AssignStationModuleBuilderCommand or SetStationRecoveryDestinationCommand
+                or ReleaseStationModuleBuilderCommand or DismantleStationBaseCommand or EnqueueStationShipCommand
+                => HandleStationCommand(envelope),
             DeploySensorCommand deploy => HandleDeploySensor(envelope, deploy),
             PickupSensorCommand pickup => HandlePickupSensor(envelope, pickup),
             CollectCargoObjectCommand collect => HandleCollectCargoObject(envelope, collect),
@@ -99,6 +108,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
                     CommandRejectionCodes.UnsupportedCommand,
                     $"Gameplay command '{envelope.Command.Kind}' is not supported yet.")),
         };
+        if (needsEconomicWake && result.Result.Status == CommandResultStatus.Accepted) RequestEconomicReevaluation();
         foreach (ShipId ship in result.FactProposals.Select(proposal => proposal.Fact).OfType<ShipOrderTransitionFact>()
             .Select(fact => fact.ShipId).Distinct().OrderBy(ship => ship.Value))
         {
@@ -107,6 +117,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         }
         FlushSensorReevaluations();
         FlushCargoReevaluations();
+        _stations?.Reconcile(CurrentTime);
         return result;
     }
 
@@ -200,6 +211,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         }
 
         EntityRemovalResult result = _lifecycle.ApplyRemoval(removal, CurrentTime);
+        ReleaseRemovedStationTarget(removal.ShipId);
+        _stations?.ReleaseRemovedBuilder(removal.ShipId, CurrentTime);
         foreach (ShipId shipId in removal.InboundOrders
                      .Where(targeted => targeted.WasCurrentActive)
                      .Select(targeted => targeted.ShipId)

@@ -97,6 +97,29 @@ public sealed class EventAgenda<TEvent>
     /// <summary>Exposes the next commit sequence for aggregate preparation without allocating an event.</summary>
     internal ulong NextCreationSequence => _nextCreationSequence;
 
+    /// <summary>Counts one owner's exact pending meaning without capturing or consuming the agenda.</summary>
+    internal int CountPending(SimulationTime timestamp, EventPhase phase, EventGeneration generation, TEvent payload) =>
+        _pending.Count(entry => entry.Key.Timestamp == timestamp && entry.Key.Phase == phase
+            && entry.Value.Generation == generation && EqualityComparer<TEvent>.Default.Equals(entry.Value.Payload, payload));
+
+    /// <summary>Resolves one uniquely matching pending owner envelope during a phase without consuming work or identity.</summary>
+    internal bool TryFindPending(SimulationTime timestamp, EventPhase phase, EventGeneration generation,
+        TEvent payload, out EventKey key)
+    {
+        key = default;
+        bool found = false;
+        foreach ((EventKey candidate, PendingEvent pending) in _pending)
+        {
+            if (candidate.Timestamp != timestamp || candidate.Phase != phase
+                || pending.Generation != generation || !EqualityComparer<TEvent>.Default.Equals(pending.Payload, payload)) continue;
+            // An ambiguous meaning cannot authorize cancellation of either envelope.
+            if (found) { key = default; return false; }
+            key = candidate;
+            found = true;
+        }
+        return found;
+    }
+
     /// <summary>Checks capacity for an entire serial commit without allocating sequences or changing pending work.</summary>
     internal void EnsureCreationCapacity(int count)
     {
@@ -331,6 +354,15 @@ public sealed class EventAgenda<TEvent>
         }
 
         CurrentPhase = null;
+    }
+
+    /// <summary>Reads the next current-phase envelope without removing work beyond a domain's cancellation barrier.</summary>
+    internal ScheduledEvent<TEvent>? PeekNextInCurrentPhase()
+    {
+        if (CurrentPhase is not { } phase || _pending.Count == 0) return null;
+        KeyValuePair<EventKey, PendingEvent> first = _pending.First();
+        return first.Key.Timestamp == CurrentTime && first.Key.Phase == phase
+            ? new(first.Key, first.Value.Generation, first.Value.Payload) : null;
     }
 
     /// <summary>

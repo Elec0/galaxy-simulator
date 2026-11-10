@@ -258,6 +258,19 @@ internal sealed partial class CargoComponentBenchmarkScenario : IBenchmarkScenar
         foreach (InventoryCheckpoint inventory in life.Inventories.Inventories)
         {
             digest.Add(inventory.Id.Value); digest.Add(inventory.Capacity.Units); digest.Add(inventory.Custody is InventoryCustody.Unclaimed);
+            digest.Add(inventory.EnabledIntakeCapacity.Units);
+            digest.Add(inventory.ProtectedIntakeCapacity is not null);
+            if (inventory.ProtectedIntakeCapacity is { } protectedCapacity) digest.Add(protectedCapacity.Units);
+            digest.Add(inventory.NextIncomingAdmissionSequence is not null);
+            if (inventory.NextIncomingAdmissionSequence is { } nextIncoming) digest.Add(nextIncoming);
+            digest.Add(inventory.IncomingAdmissions.Count);
+            foreach (InventoryIncomingAdmissionCheckpoint admission in inventory.IncomingAdmissions)
+            { digest.Add((int)admission.Kind); digest.Add(admission.ReservationValue); digest.Add(admission.AdmissionSequence); }
+            digest.Add(inventory.NextOutgoingAdmissionSequence is not null);
+            if (inventory.NextOutgoingAdmissionSequence is { } nextOutgoing) digest.Add(nextOutgoing);
+            digest.Add(inventory.OutgoingAdmissions.Count);
+            foreach (InventoryOutgoingAdmissionCheckpoint admission in inventory.OutgoingAdmissions)
+            { digest.Add((int)admission.Kind); digest.Add(admission.ReservationValue); digest.Add(admission.AdmissionSequence); }
             digest.Add(inventory.Custody?.ControllingPrincipalId?.Value ?? 0);
             if (inventory.Custody?.PhysicalOwner is InventoryOwnerReference.SessionEntity ownerEntity) digest.Add(ownerEntity.EntityId.Value);
             else throw new InvalidOperationException("Unexpected cargo fixture inventory owner.");

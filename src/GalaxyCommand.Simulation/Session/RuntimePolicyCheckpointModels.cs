@@ -17,6 +17,10 @@ internal sealed record ShipManeuverCapabilityCheckpoint(
     ManeuverTurnRate TurnRate,
     SimulationDuration MovingSpoolDuration);
 
+internal sealed record StationConstructionCapabilityCheckpoint(
+    ulong RangeUnits,
+    ulong ThroughputUnitsPerSecond);
+
 internal sealed record ShipDesignPolicyCheckpoint(
     ConstructionDesignId Id,
     string? Name,
@@ -25,7 +29,8 @@ internal sealed record ShipDesignPolicyCheckpoint(
     Quantity CargoCapacity,
     ShipManeuverCapabilityCheckpoint? ManeuverCapability,
     ulong? SensorRadiusUnits,
-    ulong? PickupRangeUnits = null);
+    ulong? PickupRangeUnits = null,
+    StationConstructionCapabilityCheckpoint? StationConstructionCapability = null);
 
 internal sealed record MaterializationPolicyCheckpoint(
     FacilityId FacilityId,

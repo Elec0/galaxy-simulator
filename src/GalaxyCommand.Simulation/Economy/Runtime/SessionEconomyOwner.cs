@@ -4,7 +4,7 @@ namespace GalaxyCommand.Simulation;
 /// Private aggregate owner for economy, construction, and transport state
 /// created from a generic new-game seed.
 /// </summary>
-internal sealed class SessionEconomyOwner
+internal sealed partial class SessionEconomyOwner
 {
     private readonly SortedDictionary<FacilityId, ConstructionProcess> _constructionProcesses;
     private readonly SortedDictionary<FacilityId, LocationId> _constructionLocations;
@@ -16,6 +16,7 @@ internal sealed class SessionEconomyOwner
     private readonly IdSequence<CapacityReservationId> _capacityReservationIds;
     private readonly IdSequence<ReservationId> _reservationIds;
     private readonly InventoryRegistry _lifecycleInventories;
+    private readonly EntityLifecycleOwner _lifecycle;
     private readonly ILogisticsNavigation _navigation;
     private readonly ProductionIdSequences _productionIds;
     private readonly ShipRegistry _ships;
@@ -46,13 +47,15 @@ internal sealed class SessionEconomyOwner
         _transportBoard = new TransportBoard();
         _transportIds = new TransportIdSequences();
         _transportTiming = setup.TransportTiming;
+        _lifecycle = lifecycle;
         _lifecycleInventories = lifecycle.Inventories;
         _navigation = setup.Navigation;
 
         Dictionary<InventoryId, EconomyFacilitySetup>? facilitiesByInventory =
             setup.MaterialCompatibility is null
                 ? null
-                : setup.Facilities.ToDictionary(facility => facility.InventoryId);
+                : setup.Facilities.GroupBy(facility => facility.InventoryId)
+                    .ToDictionary(group => group.Key, group => group.OrderBy(facility => facility.FacilityId.Value).First());
         foreach (InitialInventorySetup inventorySetup in setup.Inventories)
         {
             Inventory inventory;
@@ -63,7 +66,9 @@ internal sealed class SessionEconomyOwner
                 inventory = new Inventory(
                     inventorySetup.InventoryId,
                     new InventoryCustody.PrincipalControlled(
-                        new InventoryOwnerReference.Facility(facility.FacilityId),
+                        facility.StationBinding is { } binding
+                            ? new InventoryOwnerReference.SessionEntity(binding.StationEntityId)
+                            : new InventoryOwnerReference.Facility(facility.FacilityId),
                         facility.ControllingPrincipalId!.Value),
                     inventorySetup.Capacity,
                     compatibility);
@@ -96,7 +101,8 @@ internal sealed class SessionEconomyOwner
                     facility.InventoryId,
                     facility.LogisticsLocationId,
                     facility.Position,
-                    output));
+                    output,
+                    facility.StationBinding, facility.StationModuleDefinitionKey));
         }
         foreach (ProductionFacilitySetup productionSetup in setup.ProductionFacilities)
         {
@@ -139,18 +145,20 @@ internal sealed class SessionEconomyOwner
                 ship.CargoInventoryId);
         }
 
+        InitializeProviderIdentities();
         Runtime = CreateRuntime();
     }
 
     private SessionEconomyOwner(
-        InventoryRegistry inventories,
+        EntityLifecycleOwner lifecycle,
         ILogisticsNavigation navigation,
         SortedDictionary<FacilityId, EconomyFacilityCheckpoint> facilities,
         RestoredProductionOwner production,
         RestoredConstructionOwner construction,
         RestoredTransportOwner transport)
     {
-        _lifecycleInventories = inventories;
+        _lifecycle = lifecycle;
+        _lifecycleInventories = lifecycle.Inventories;
         _navigation = navigation;
         _facilities = facilities;
         _productionLines = NewDictionary<ProductionLine>();
@@ -190,6 +198,7 @@ internal sealed class SessionEconomyOwner
             }
         }
 
+        InitializeProviderIdentities();
         Runtime = CreateRuntime();
     }
 
@@ -199,6 +208,10 @@ internal sealed class SessionEconomyOwner
 
     internal IReadOnlyDictionary<FacilityId, ConstructionProcess> ConstructionProcesses =>
         _constructionProcesses;
+
+    /// <summary>Captures explicit module links for the station owner's cross-aggregate admission checks.</summary>
+    internal IReadOnlyList<EconomyFacilityCheckpoint> CaptureStationFacilities() => Array.AsReadOnly(
+        _facilities.Values.Where(facility => facility.StationBinding is not null).ToArray());
 
     internal ConstructionProcess GetRequiredConstructionProcess(FacilityId facilityId) =>
         _constructionProcesses.GetValueOrDefault(facilityId)
@@ -216,12 +229,14 @@ internal sealed class SessionEconomyOwner
                 _productionLines.TryGetValue(
                     production.FacilityId,
                     out ProductionLine? line)
-                && line.GetJob(production.JobId) is not null,
+                && line.GetJob(production.JobId) is not null
+                || _retiredFacilities.GetValueOrDefault(production.FacilityId)?.Production?.Jobs.Any(job => job!.Id == production.JobId) == true,
             EconomicEvent.ConstructionComplete construction =>
                 _constructionProcesses.TryGetValue(
                     construction.FacilityId,
                     out ConstructionProcess? process)
-                && process.GetOrder(construction.OrderId) is not null,
+                && process.GetOrder(construction.OrderId) is not null
+                || _retiredFacilities.GetValueOrDefault(construction.FacilityId)?.Construction?.Orders.Any(order => order!.Id == construction.OrderId) == true,
             EconomicEvent.Transport transport =>
                 _transportBoard.GetJob(transport.Event.JobId) is not null,
             _ => false,
@@ -259,7 +274,10 @@ internal sealed class SessionEconomyOwner
                     _transportIds,
                     _reservationIds,
                     _capacityReservationIds,
-                    _transportTiming)));
+                    _transportTiming),
+                Array.AsReadOnly(_retiredFacilities.Values.Select(FreezeArchive).ToArray()),
+                _facilityIds.CaptureCheckpoint(),
+                _locationIds.CaptureCheckpoint()));
     }
 
     /// <summary>
@@ -310,12 +328,15 @@ internal sealed class SessionEconomyOwner
             return CheckpointResult<SessionEconomyOwner>.Rejected(construction.Failure!);
         }
 
+        CheckpointValidationFailure? archiveFailure = ValidateArchives(checkpoint, lifecycle.Inventories, topology, designs);
+        if (archiveFailure is not null) return CheckpointResult<SessionEconomyOwner>.Rejected(archiveFailure);
+
         IReadOnlyDictionary<ShipId, InventoryId> liveShips = LiveShips(lifecycle);
         CheckpointResult<RestoredTransportOwner> transport =
             TransportCheckpointRestore.Restore(
                 checkpoint.Transport,
                 lifecycle.Inventories,
-                liveShips);
+                liveShips, checkpoint.RetiredFacilities!.Select(value => value!.Facility).ToArray());
         if (!transport.IsSuccess)
         {
             return CheckpointResult<SessionEconomyOwner>.Rejected(transport.Failure!);
@@ -330,17 +351,23 @@ internal sealed class SessionEconomyOwner
             return CheckpointResult<SessionEconomyOwner>.Rejected(bindingFailure);
         }
 
-        var anchors = facilities.Value!.Values.ToDictionary(
-            facility => facility.LocationId,
-            facility => facility.Position);
-        return CheckpointResult<SessionEconomyOwner>.Success(
-            new SessionEconomyOwner(
-                lifecycle.Inventories,
+        var anchors = facilities.Value!.Values.Concat(checkpoint.RetiredFacilities!.Select(value => value!.Facility)).GroupBy(facility => facility.LocationId)
+            .ToDictionary(group => group.Key, group => group.First().Position);
+        var owner = new SessionEconomyOwner(
+                lifecycle,
                 new HierarchicalLogisticsNavigation(anchors, navigation),
                 facilities.Value!,
                 production.Value!,
                 construction.Value!,
-                transport.Value!));
+                transport.Value!);
+        owner._facilityIds = IdSequence<FacilityId>.RestoreCheckpoint(checkpoint.FacilityIds!).Value!;
+        owner._locationIds = IdSequence<LocationId>.RestoreCheckpoint(checkpoint.LocationIds!).Value!;
+        foreach (var archive in checkpoint.RetiredFacilities!)
+        {
+            owner._retiredFacilities.Add(archive!.Facility.FacilityId, FreezeArchive(archive));
+            if (lifecycle.Inventories.Get(archive.Facility.InventoryId) is not null) owner.RememberStationSupply(archive.Facility);
+        }
+        return CheckpointResult<SessionEconomyOwner>.Success(owner);
     }
 
     /// <summary>
@@ -354,7 +381,7 @@ internal sealed class SessionEconomyOwner
             WorldTopology topology)
     {
         var facilities = NewDictionary<EconomyFacilityCheckpoint>();
-        var locations = new HashSet<LocationId>();
+        var locations = new Dictionary<LocationId, EconomyFacilityCheckpoint>();
         HashSet<SystemId> systemIds = topology.Systems.Select(system => system.Id).ToHashSet();
         for (int index = 0; index < checkpoint.Facilities.Count; index++)
         {
@@ -375,12 +402,19 @@ internal sealed class SessionEconomyOwner
                     "The economy facility inventory is not restored.");
             }
 
-            if (facility.LocationId.Value == 0 || !locations.Add(facility.LocationId))
+            if (facility.LocationId.Value == 0)
             {
                 return RejectFacilities(
                     $"{path}.locationId",
                     "The logistics location identity is missing or duplicated.");
             }
+
+            if (locations.TryGetValue(facility.LocationId, out EconomyFacilityCheckpoint? anchor)
+                && (anchor.StationBinding is not { } binding || facility.StationBinding?.StationId != binding.StationId
+                    || facility.StationBinding.StationEntityId != binding.StationEntityId
+                    || facility.InventoryId != anchor.InventoryId || facility.Position != anchor.Position))
+                return RejectFacilities($"{path}.locationId", "Shared logistics anchors require one explicit station, entity, inventory and position.");
+            locations.TryAdd(facility.LocationId, facility);
 
             if (!systemIds.Contains(facility.Position.SystemId))
             {
@@ -397,9 +431,72 @@ internal sealed class SessionEconomyOwner
             }
         }
 
+        CheckpointValidationFailure? stationFailure = ValidateStationStorage(facilities.Values, inventories);
+        if (stationFailure is not null)
+            return CheckpointResult<SortedDictionary<FacilityId, EconomyFacilityCheckpoint>>.Rejected(stationFailure);
+
         return CheckpointResult<SortedDictionary<FacilityId, EconomyFacilityCheckpoint>>
             .Success(facilities);
     }
+
+    /// <summary>
+    /// Validates shared storage and immutable station custody before economic workflows restore.
+    /// The enclosing station owner separately proves that every bound module remains live.
+    /// </summary>
+    private static CheckpointValidationFailure? ValidateStationStorage(
+        IEnumerable<EconomyFacilityCheckpoint> facilities,
+        InventoryRegistry inventories)
+    {
+        EconomyFacilityCheckpoint[] values = facilities.ToArray();
+        var stations = new Dictionary<StationId, EconomyFacilityCheckpoint>();
+        var entities = new Dictionary<EntityId, StationId>();
+        var modules = new HashSet<(StationId, StationModuleId)>();
+        foreach (EconomyFacilityCheckpoint facility in values)
+        {
+            Inventory inventory = inventories.Get(facility.InventoryId)!;
+            if (facility.StationBinding is not { } binding)
+            {
+                if (inventory.Custody?.PhysicalOwner is InventoryOwnerReference.SessionEntity)
+                    return StationStorageFailure("A session-entity inventory requires its explicit station facility binding.");
+                continue;
+            }
+
+            if (binding.StationId.Value == 0 || binding.StationEntityId.Value == 0 || binding.ModuleId.Value == 0
+                || inventory.Custody is not InventoryCustody.PrincipalControlled custody
+                || custody.PhysicalOwner is not InventoryOwnerReference.SessionEntity physicalOwner
+                || physicalOwner.EntityId != binding.StationEntityId)
+                return StationStorageFailure("Station facility custody disagrees with its explicit station entity.");
+            if (!modules.Add((binding.StationId, binding.ModuleId)))
+                return StationStorageFailure("A station module has duplicated facility bindings.");
+            if (entities.TryGetValue(binding.StationEntityId, out StationId station) && station != binding.StationId)
+                return StationStorageFailure("A station entity identifies more than one station.");
+            entities[binding.StationEntityId] = binding.StationId;
+
+            if (stations.TryGetValue(binding.StationId, out EconomyFacilityCheckpoint? first)
+                && (first.InventoryId != facility.InventoryId || first.Position != facility.Position
+                    || first.StationBinding!.StationEntityId != binding.StationEntityId))
+                return StationStorageFailure("Station facilities disagree about shared inventory, position or entity.");
+            stations.TryAdd(binding.StationId, facility);
+        }
+
+        foreach (IGrouping<InventoryId, EconomyFacilityCheckpoint> group in values.GroupBy(facility => facility.InventoryId))
+        {
+            if (group.Count() == 1) continue;
+            EconomyFacilityCheckpoint first = group.First();
+            if (first.StationBinding is { } binding)
+            {
+                if (group.Any(facility => facility.StationBinding?.StationId != binding.StationId))
+                    return StationStorageFailure("Shared station inventory has mixed or absent station facility bindings.");
+            }
+            else if (group.Any(facility => facility.StationBinding is not null)
+                || inventories.Get(group.Key)!.Custody is not null)
+                return StationStorageFailure("Mapped shared storage requires explicit common station facility bindings.");
+        }
+        return null;
+    }
+
+    private static CheckpointValidationFailure StationStorageFailure(string message) =>
+        new("$.checkpoint.economy.facilities", message);
 
     /// <summary>
     /// Requires each workflow facility to use the inventory and output retained
@@ -455,8 +552,8 @@ internal sealed class SessionEconomyOwner
 
     private bool AnchorsMatch(
         IReadOnlyDictionary<LocationId, SystemPosition> anchors) =>
-        anchors.Count == _facilities.Count
-        && _facilities.Values.All(facility =>
+        anchors.Count == _facilities.Values.Concat(_retiredFacilities.Values.Select(value => value.Facility)).Select(facility => facility.LocationId).Distinct().Count()
+        && _facilities.Values.Concat(_retiredFacilities.Values.Select(value => value.Facility)).All(facility =>
             anchors.TryGetValue(facility.LocationId, out SystemPosition position)
             && position == facility.Position);
 
@@ -474,7 +571,7 @@ internal sealed class SessionEconomyOwner
             _productionIds,
             _transportIds,
             _reservationIds,
-            _capacityReservationIds));
+            _capacityReservationIds, _stationSupplies, _stationLogisticsInventories));
 
     private static SortedDictionary<FacilityId, TValue> NewDictionary<TValue>() =>
         new(EntityIdComparer<FacilityId>.Instance);

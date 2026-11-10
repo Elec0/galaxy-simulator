@@ -13,7 +13,10 @@ internal sealed record ConstructionOrderCheckpoint(
     ConstructionOrderStatus Status,
     SimulationTime? CompletesAt,
     EventGeneration Generation,
-    IReadOnlyList<ConstructionReservationLinkCheckpoint?> Reservations);
+    IReadOnlyList<ConstructionReservationLinkCheckpoint?> Reservations)
+{
+    internal EconomicJobWorkState? WorkState { get; init; }
+}
 
 internal sealed record ConstructionShipIdentityCheckpoint(
     EntityId EntityId,
@@ -32,7 +35,10 @@ internal sealed record ConstructionProcessCheckpoint(
     IReadOnlyList<ConstructionOrderId> QueuedOrderIds,
     IReadOnlyList<ConstructionOrderCheckpoint?> Orders,
     IReadOnlyList<ConstructionMaterializationEffect?> PendingMaterializations,
-    IReadOnlyList<ConstructionMaterializationReceiptCheckpoint?> MaterializationReceipts);
+    IReadOnlyList<ConstructionMaterializationReceiptCheckpoint?> MaterializationReceipts)
+{
+    internal bool IsProviderAvailable { get; init; } = true;
+}
 
 internal sealed record ConstructionOwnerCheckpoint(
     IdSequenceCheckpoint OrderIds,

@@ -30,7 +30,18 @@ The initial fixture uses Mine, Refinery, and Shipyard locations connected by bid
 - Component factory at Shipyard: 5 Alloy to 2 Components, 60 seconds
 - Shipyard: 4 Components to one capacity-10 freighter, 120 seconds
 
-Facility inventories hold 100 units. Two capacity-10 freighters begin at Mine and Refinery. Loading and unloading use a five-second docking overhead and ten material units per second. One organization owns all initial facilities and ships.
+The explicit station conversion places these four facilities on three pre-existing
+operational stations. Mine and Refinery each retain a 100-unit inventory. The
+component factory and shipyard share one 200-unit station inventory, preserving
+their combined prior storage budget and independent workloads. Components pass
+directly from production to construction through this same inventory, without
+an internal delivery job. Initial station modules are authored origins rather
+than fabricated completed construction projects.
+
+Two capacity-10 freighters begin at Mine and Refinery. Loading and unloading use
+a five-second docking overhead and ten material units per second. One
+organization owns all initial facilities and ships; station custody also records
+the explicitly authored principal and entity identities.
 
 ## Included behavior
 
@@ -203,13 +214,43 @@ The headless runner reports at least:
 
 Phase 1 uses an explicit random seed even if the first fixture requires little randomness. Stable entity and event ordering must not depend on hash-map iteration order.
 
-Repeated runs with identical configuration, seed, initial state, and commands should produce the same final-state and event-log digests. Phase 1 uses FNV-1a 64-bit fingerprints with explicit little-endian field encoding. The event-log fingerprint covers canonical processed-event ordering and structured decision records; the final-state fingerprint covers the authoritative time, route availability, inventories, ships, and transport jobs. These fingerprints are regression checks, not security hashes.
+Repeated runs with identical configuration, seed, initial state, and commands
+should produce the same final-state and event-log digests. Phase 1 uses FNV-1a
+64-bit fingerprints with explicit little-endian field encoding. The event-log
+fingerprint covers canonical processed-event ordering and structured decision
+records. The final-state fingerprint covers authoritative time, station and
+module identity/composition, inventories, ships, and transport jobs. Qualified
+content identities use length-delimited UTF-8 encoding. These fingerprints are
+regression checks, not security hashes.
 
 Construction-completion event records include the construction facility and
 order IDs. Ship state fingerprints include construction design IDs, and
 inventory fingerprints include configured capacity, so different constructed
 designs cannot collapse to the same state solely because their current cargo
 and locations happen to match.
+
+### Station conversion baseline
+
+The canonical fixture now retains real station authority over the same inventory
+instances consumed by its economic runtime. It contains three station entities
+and four attached facility modules. Removing component transport inside the
+Shipyard station advances the first completed ship from 675,400 to 665,000
+simulated milliseconds and removes four processed events. Recipes, queues and
+work rates are unchanged; four produced Components are consumed by the finite
+ship-construction order to create the third persistent freighter.
+
+| Acceptance composition | First ship time, milliseconds | Processed events | Event digest | Final-state digest |
+| --- | ---: | ---: | --- | --- |
+| Historical `TASK-031` topology mapping with separate component/shipyard inventories | 675,400 | 45 | `175eac5bd99a0695` | `424bec2061b0e8f9` |
+| Explicit `TASK-105` station conversion with shared attached-module storage | 665,000 | 41 | `8644bb09c9867ab0` | `adbb710ee8f3a417` |
+
+The current final-state digest includes station and module identifiers, content
+keys, positions, phases, enabled condition and occupied expansion capacity. It
+therefore qualifies station composition as part of the acceptance state rather
+than changing only the expected economic hash. Component delivery to a separate
+shipyard inventory is absent; Ore and Alloy deliveries still cross their
+respective station boundaries. This bounded fixture does not qualify the full
+station loss/provider or concurrency contracts.
 
 ## Acceptance criteria
 

@@ -83,6 +83,7 @@ public enum ConstructionOrderStatus
     AwaitingMaterialization,
     Completed,
     Cancelled,
+    Paused,
 }
 
 public sealed record ConstructionMaterializationEffect(
@@ -144,6 +145,8 @@ public sealed class ConstructionOrder
 
     public EventGeneration Generation { get; internal set; } = new(0);
 
+    internal EconomicJobWorkState? WorkState { get; set; }
+
     internal Quantity ReservedInput(Inventory inventory, MaterialId materialId)
     {
         if (!_reservationIds.TryGetValue(materialId, out List<ReservationId>? reservationIds))
@@ -181,6 +184,11 @@ public sealed class ConstructionOrder
         _reservationIds.SelectMany(pair => pair.Value.Select(reservationId =>
             new ConstructionReservationLinkCheckpoint(pair.Key, reservationId)));
 
+    internal void RemoveReservation(ReservationId id)
+    {
+        foreach (List<ReservationId> ids in _reservationIds.Values) ids.Remove(id);
+    }
+
     internal void ClearReservations() => _reservationIds.Clear();
 }
 
@@ -216,9 +224,9 @@ public sealed class ConstructionIdSequences
 /// Shared FIFO construction lifecycle. Product-specific owners materialize the
 /// completed product through the completion callback.
 /// </summary>
-public sealed class ConstructionProcess
+public sealed partial class ConstructionProcess
 {
-    private readonly Throughput _throughput;
+    private Throughput _throughput;
     private readonly Queue<ConstructionOrder> _queued = new();
     private readonly SortedDictionary<ConstructionOrderId, ConstructionOrder> _orders =
         new(EntityIdComparer<ConstructionOrderId>.Instance);
@@ -286,7 +294,7 @@ public sealed class ConstructionProcess
                 order.ReservationLinks
                     .OrderBy(link => link.MaterialId.Value)
                     .ThenBy(link => link.ReservationId.Value)
-                    .ToArray()))
+                    .ToArray()) { WorkState = order.WorkState })
                 .ToArray(),
             _pendingMaterializations.Values.ToArray(),
             _acknowledgedMaterializations.Values.Select(receipt =>
@@ -298,7 +306,7 @@ public sealed class ConstructionProcess
                             ship.ShipId,
                             ship.CargoInventoryId)
                         : null))
-                .ToArray());
+                .ToArray()) { IsProviderAvailable = IsProviderAvailable };
 
     /// <summary>
     /// Directly assembles validated construction state without enqueueing,
@@ -312,9 +320,10 @@ public sealed class ConstructionProcess
         ConstructionOrderId? activeOrderId,
         IEnumerable<ConstructionOrderId> queuedOrderIds,
         IEnumerable<ConstructionMaterializationEffect> pendingMaterializations,
-        IEnumerable<ConstructionMaterializationReceipt> receipts)
+        IEnumerable<ConstructionMaterializationReceipt> receipts,
+        bool isProviderAvailable = true)
     {
-        var process = new ConstructionProcess(facilityId, inventoryId, throughput);
+        var process = new ConstructionProcess(facilityId, inventoryId, throughput) { IsProviderAvailable = isProviderAvailable };
         foreach ((ConstructionOrderId orderId, ConstructionOrder order) in orders)
         {
             process._orders.Add(orderId, order);
@@ -366,7 +375,7 @@ public sealed class ConstructionProcess
         RequireConfiguredInventory(inventory);
         var unmet = new SortedDictionary<MaterialId, Quantity>(
             EntityIdComparer<MaterialId>.Instance);
-        if (ActiveOrder is not { Status: ConstructionOrderStatus.WaitingForInputs } order)
+        if (!IsProviderAvailable || ActiveOrder is not { Status: ConstructionOrderStatus.WaitingForInputs } order)
         {
             return unmet;
         }
@@ -389,7 +398,7 @@ public sealed class ConstructionProcess
         SimulationTime now)
     {
         RequireConfiguredInventory(inventory);
-        if (ActiveOrder is not { Status: ConstructionOrderStatus.WaitingForInputs } order)
+        if (!IsProviderAvailable || ActiveOrder is not { Status: ConstructionOrderStatus.WaitingForInputs } order)
         {
             return null;
         }
@@ -418,7 +427,7 @@ public sealed class ConstructionProcess
     internal bool MatchesActivePreparation(
         ConstructionOrderId orderId,
         EventGeneration generation) =>
-        ActiveOrder is
+        IsProviderAvailable && ActiveOrder is
         {
             Status: ConstructionOrderStatus.WaitingForInputs,
         } order
@@ -428,7 +437,7 @@ public sealed class ConstructionProcess
     internal Quantity MissingInput(Inventory inventory, MaterialId materialId)
     {
         RequireConfiguredInventory(inventory);
-        if (ActiveOrder is not
+        if (!IsProviderAvailable || ActiveOrder is not
             {
                 Status: ConstructionOrderStatus.WaitingForInputs,
             } order
@@ -447,7 +456,7 @@ public sealed class ConstructionProcess
         Quantity quantity)
     {
         RequireConfiguredInventory(inventory);
-        if (ActiveOrder is not
+        if (!IsProviderAvailable || ActiveOrder is not
             {
                 Status: ConstructionOrderStatus.WaitingForInputs,
             } order)
@@ -477,7 +486,7 @@ public sealed class ConstructionProcess
         SimulationTime now)
     {
         RequireConfiguredInventory(inventory);
-        if (ActiveOrder is not
+        if (!IsProviderAvailable || ActiveOrder is not
             {
                 Status: ConstructionOrderStatus.WaitingForInputs,
             } order)
@@ -500,6 +509,7 @@ public sealed class ConstructionProcess
             now.Add(_throughput.DurationFor(order.Design.Recipe.RequiredWork));
         order.Status = ConstructionOrderStatus.Running;
         order.CompletesAt = completesAt;
+        order.WorkState = EconomicJobWorkState.Start(order.Design.Recipe.RequiredWork, now);
         return completesAt;
     }
 
@@ -507,7 +517,7 @@ public sealed class ConstructionProcess
         SimulationTime now,
         EventKey? completionEventKey = null)
     {
-        if (ActiveOrder is not
+        if (!IsProviderAvailable || ActiveOrder is not
             {
                 Status: ConstructionOrderStatus.Running,
                 CompletesAt: { } completesAt,
@@ -519,6 +529,7 @@ public sealed class ConstructionProcess
 
         ActiveOrder = null;
         order.Status = ConstructionOrderStatus.AwaitingMaterialization;
+        order.WorkState = new(0, null);
         if (_queued.TryDequeue(out ConstructionOrder? next))
         {
             ActiveOrder = next;
@@ -635,6 +646,7 @@ public sealed class ConstructionProcess
         order.Generation = nextGeneration;
         order.Status = ConstructionOrderStatus.Cancelled;
         order.CompletesAt = null;
+        order.WorkState = null;
         ActiveOrder = null;
         if (_queued.TryDequeue(out ConstructionOrder? next))
         {

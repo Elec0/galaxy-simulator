@@ -8,6 +8,7 @@ public sealed partial class InventoryCommitOwner
     internal bool CanReserveCargoCapacity(Inventory inventory, Quantity capacity, ReservationOwner.CargoCollection owner, ReservationId expected)
         => _reservationIds.TryPeek(out ReservationId next) && next == expected && capacity != Quantity.Zero
             && owner.ShipId.Value != 0 && owner.OrderId.Value != 0 && inventory.Custody is InventoryCustody.PrincipalControlled
+            && inventory.CanAdmitIncomingCapacity
             && inventory.GetPhysicalReservation(expected) is null && inventory.GetReservation(expected) is null
             && capacity <= inventory.RemainingCapacity;
 

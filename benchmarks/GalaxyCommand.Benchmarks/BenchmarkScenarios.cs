@@ -8,7 +8,8 @@ public sealed record ScenarioCorrectnessResult(
     string Digest,
     ulong SimulatedMilliseconds,
     IReadOnlyDictionary<string, long> Counts,
-    IReadOnlyDictionary<string, BenchmarkDomainMeasurement>? DomainMeasurements = null);
+    IReadOnlyDictionary<string, BenchmarkDomainMeasurement>? DomainMeasurements = null,
+    string? GameplayDigest = null);
 
 public sealed record BenchmarkDomainMeasurement(double Milliseconds, long AllocatedBytes);
 
@@ -23,6 +24,7 @@ internal static class BenchmarkScenarioFactory
     internal static IBenchmarkScenario Create(string basePreset) =>
         basePreset switch
         {
+            BenchmarkPresets.StationManyQuiet or BenchmarkPresets.StationOneCrowded or BenchmarkPresets.StationPartialDeliveries => new StationRuntimeBenchmarkScenario(),
             BenchmarkPresets.CargoComponentSeparateLosses or BenchmarkPresets.CargoComponentOverlapChain
                 or BenchmarkPresets.CargoComponentLargeFungible or BenchmarkPresets.CargoComponentContestedSerial
                 or BenchmarkPresets.CargoComponentContestedBatched => new CargoComponentBenchmarkScenario(),

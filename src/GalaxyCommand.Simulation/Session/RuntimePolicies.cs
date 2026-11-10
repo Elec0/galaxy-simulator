@@ -231,7 +231,7 @@ internal static class RuntimePolicyManifest
             policy.InitialOrderPolicy,
             Array.AsReadOnly(policy.AllowedDesigns.Keys.OrderBy(id => id.Value).ToArray()));
 
-    /// <summary>Captures exact operational definition meaning independently of any construction policy.</summary>
+    /// <summary>Captures exact operational capabilities independently of producers, preserving explicit construction absence.</summary>
     private static ShipDesignPolicyCheckpoint CaptureShipDesign(ShipDesign design) => new(
         design.Id,
         design.Name,
@@ -252,7 +252,10 @@ internal static class RuntimePolicyManifest
             design.ManeuverCapability.TurnRate,
             design.ManeuverCapability.MovingSpoolDuration),
         design.SensorRadiusUnits,
-        design.PickupRangeUnits);
+        design.PickupRangeUnits,
+        design.StationConstructionCapability is { } construction
+            ? new StationConstructionCapabilityCheckpoint(construction.RangeUnits, construction.Throughput.UnitsPerSecond)
+            : null);
 
     /// <summary>
     /// Resolves the closed travel-time vocabulary without using runtime type names.
@@ -446,6 +449,18 @@ internal static class RuntimePolicyManifest
                 return RejectedDesigns(designPath, "The ship design definition is incomplete.");
             }
 
+            StationConstructionCapability? construction = null;
+            if (design.StationConstructionCapability is { } savedConstruction)
+            {
+                // Null means no capability. A present zero-throughput capability
+                // is malformed authority, not another spelling of absence.
+                if (savedConstruction.ThroughputUnitsPerSecond == 0)
+                    return RejectedDesigns($"{designPath}.stationConstructionCapability.throughputUnitsPerSecond",
+                        "Station construction throughput must be positive.");
+                construction = new StationConstructionCapability(savedConstruction.RangeUnits,
+                    new Throughput(savedConstruction.ThroughputUnitsPerSecond));
+            }
+
             var inputs = new SortedDictionary<MaterialId, Quantity>(
                 EntityIdComparer<MaterialId>.Instance);
             for (int inputIndex = 0; inputIndex < design.Inputs.Count; inputIndex++)
@@ -467,7 +482,8 @@ internal static class RuntimePolicyManifest
                 design.CargoCapacity,
                 maneuverCapability!,
                 design.SensorRadiusUnits!.Value,
-                design.PickupRangeUnits!.Value));
+                design.PickupRangeUnits!.Value,
+                construction));
         }
 
         designs.Sort((left, right) => left.Id.Value.CompareTo(right.Id.Value));

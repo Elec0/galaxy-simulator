@@ -39,7 +39,10 @@ public sealed partial class GameSession
     {
         SystemPosition[] positions = _runtime.CaptureSensorObservation().Deployables
             .Where(view => view.PrincipalId != _runtime.PlayerObserverPrincipalId).Select(view => view.Position)
-            .Concat(_deployableObservations.Values.Select(item => item.View.Position)).Distinct().ToArray();
+            .Concat(_deployableObservations.Values.Select(item => item.View.Position))
+            .Concat(_runtime.CaptureStationObservation().Stations
+                .Where(view => view.PrincipalId != _runtime.PlayerObserverPrincipalId).Select(view => view.Position))
+            .Concat(_stationObservations.Values.Select(item => item.View.Position)).Distinct().ToArray();
         return positions.Length == 0 ? null : _runtime.FindNextObservationBoundary(positions, through);
     }
 

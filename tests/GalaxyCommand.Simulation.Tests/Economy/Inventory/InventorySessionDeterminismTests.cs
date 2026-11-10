@@ -35,7 +35,11 @@ public sealed class InventorySessionDeterminismTests
 
         Assert.Equal(8, reference.Outcomes.Count);
         Assert.Equal(4, reference.Outcomes.Count(outcome => outcome.WasApplied));
-        Assert.Equal(4, reference.InventoryState.Count);
+        Assert.Equal(8, reference.InventoryState.Count);
+        Assert.Contains("incoming-next:2", reference.InventoryState);
+        Assert.Contains("incoming:PhysicalCapacity:1:1", reference.InventoryState);
+        Assert.Contains("outgoing-next:2", reference.InventoryState);
+        Assert.Contains("outgoing:Physical:2:1", reference.InventoryState);
         Assert.Equal<ulong?>(2, reference.ItemAllocator.NextValue);
         Assert.Equal<ulong?>(3, reference.ReservationAllocator.NextValue);
         Assert.Equal(4, reference.Receipts.Count);
@@ -192,6 +196,12 @@ public sealed class InventorySessionDeterminismTests
 
     private static string[] InventoryState(InventoryCheckpoint checkpoint) =>
     [
+        $"incoming-next:{checkpoint.NextIncomingAdmissionSequence}",
+        .. checkpoint.IncomingAdmissions.Select(admission =>
+            $"incoming:{admission.Kind}:{admission.ReservationValue}:{admission.AdmissionSequence}"),
+        $"outgoing-next:{checkpoint.NextOutgoingAdmissionSequence}",
+        .. checkpoint.OutgoingAdmissions.Select(admission =>
+            $"outgoing:{admission.Kind}:{admission.ReservationValue}:{admission.AdmissionSequence}"),
         .. checkpoint.FungibleHoldings.Select(holding =>
             $"fungible:{holding.DefinitionKey}:{holding.Quantity.Units}"),
         .. checkpoint.DiscreteItems.Select(item =>

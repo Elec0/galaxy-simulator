@@ -365,6 +365,23 @@ public sealed partial class InventoryCommitOwner
         return new InventoryCommitBatchResult(outcomes);
     }
 
+    /// <summary>Rejects new writes at an enclosing admission boundary while preserving canonical duplicate and replay outcomes.</summary>
+    internal InventoryCommitBatchResult RejectBatchForAdmission(IReadOnlyList<InventoryMutationProposal> proposals,
+        InventoryCommitRejectionReason reason)
+    {
+        var outcomes = new List<InventoryCommitDisposition>();
+        foreach (var group in proposals.OrderBy(proposal => proposal.Key.SourceKind).ThenBy(proposal => proposal.Key.Value)
+            .GroupBy(proposal => proposal.Key))
+        {
+            if (group.Skip(1).Any()) outcomes.Add(Rejected(group.Key, InventoryCommitRejectionReason.DuplicateOperationKey));
+            else if (_receipts.TryGetValue(group.Key, out var prior))
+                outcomes.Add(prior.Proposal == group.First() ? new(prior.Outcome, WasApplied: false)
+                    : Rejected(group.Key, InventoryCommitRejectionReason.OperationIdentityConflict));
+            else outcomes.Add(Rejected(group.Key, reason));
+        }
+        return new(outcomes);
+    }
+
     internal InventoryCommitOwnerCheckpoint CaptureCheckpoint() =>
         new(
             _itemInstanceIds.CaptureCheckpoint(),
@@ -888,6 +905,7 @@ public sealed partial class InventoryCommitOwner
         ReservationOwner.ProductionJob production => production.JobId.Value != 0,
         ReservationOwner.ConstructionOrder construction => construction.OrderId.Value != 0,
         ReservationOwner.CargoCollection collection => collection.ShipId.Value != 0 && collection.OrderId.Value != 0,
+        ReservationOwner.StationProject project => project.StationId.Value != 0 && project.ProjectId.Value != 0,
         _ => false,
     };
 

@@ -14,7 +14,7 @@ public sealed class ContentDocumentJsonTests
             """
             {
               "format": "galaxy-command-content-definitions",
-              "schemaVersion": 4,
+              "schemaVersion": 5,
               "definitions": [
                 {
                   "kind": "ship-design",
@@ -49,10 +49,10 @@ public sealed class ContentDocumentJsonTests
     public void ScenarioReaderAndWriterAreStableAcrossPropertyOrder()
     {
         const string firstJson = """
-            {"format":"galaxy-command-content-scenario","schemaVersion":4,"id":"minimal","fallback":"Minimal","references":["core/ship-design/scout"],"values":{"z":2,"a":1}}
+            {"format":"galaxy-command-content-scenario","schemaVersion":5,"id":"minimal","fallback":"Minimal","references":["core/ship-design/scout"],"values":{"z":2,"a":1}}
             """;
         const string secondJson = """
-            {"values":{"a":1,"z":2},"references":["core/ship-design/scout"],"fallback":"Minimal","id":"minimal","schemaVersion":4,"format":"galaxy-command-content-scenario"}
+            {"values":{"a":1,"z":2},"references":["core/ship-design/scout"],"fallback":"Minimal","id":"minimal","schemaVersion":5,"format":"galaxy-command-content-scenario"}
             """;
 
         ContentReadResult<StaticScenarioSource> first = ContentJsonAdapter.ReadScenario(
@@ -73,7 +73,7 @@ public sealed class ContentDocumentJsonTests
     {
         byte[] json = Encoding.UTF8.GetBytes(
             """
-            {"format":"galaxy-command-content-definitions","schemaVersion":4,"definitions":[],"executable":"plugin.dll"}
+            {"format":"galaxy-command-content-definitions","schemaVersion":5,"definitions":[],"executable":"plugin.dll"}
             """);
 
         ContentReadResult<ContentDefinitionsSource> result = ContentJsonAdapter.ReadDefinitions(
@@ -105,12 +105,14 @@ public sealed class ContentDocumentJsonTests
 
         Assert.True(decoded.IsSuccess);
         Assert.Equal(source, decoded.Value);
-        Assert.Contains("\"schemaVersion\": 4", Encoding.UTF8.GetString(encoded));
+        Assert.Contains("\"schemaVersion\": 5", Encoding.UTF8.GetString(encoded));
     }
 
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
     public void DefinitionReaderRejectsPreviousDocumentSchema(int version)
     {
         byte[] json = Encoding.UTF8.GetBytes(

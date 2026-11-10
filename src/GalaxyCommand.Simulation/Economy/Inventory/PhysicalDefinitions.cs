@@ -109,6 +109,7 @@ public sealed class PhysicalDefinitionCatalog
 public sealed class MaterialInventoryCompatibilityMap
 {
     private readonly ReadOnlyDictionary<MaterialId, PhysicalDefinition> _byMaterial;
+    private readonly ReadOnlyDictionary<QualifiedContentKey, MaterialId> _materialByDefinition;
 
     public MaterialInventoryCompatibilityMap(
         IEnumerable<KeyValuePair<MaterialId, PhysicalDefinition>> mappings)
@@ -139,12 +140,18 @@ public sealed class MaterialInventoryCompatibilityMap
         }
 
         _byMaterial = new ReadOnlyDictionary<MaterialId, PhysicalDefinition>(byMaterial);
+        _materialByDefinition = new ReadOnlyDictionary<QualifiedContentKey, MaterialId>(
+            byMaterial.ToDictionary(pair => pair.Value.Key, pair => pair.Key));
     }
 
     public IReadOnlyDictionary<MaterialId, PhysicalDefinition> Mappings => _byMaterial;
 
     public PhysicalDefinition? Get(MaterialId materialId) =>
         _byMaterial.GetValueOrDefault(materialId);
+
+    /// <summary>Resolves only an explicit reverse mapping; material identity is never inferred from a content key.</summary>
+    internal MaterialId? GetMaterialId(QualifiedContentKey key) =>
+        _materialByDefinition.TryGetValue(key, out MaterialId material) ? material : null;
 
     internal PhysicalDefinition GetRequired(MaterialId materialId) =>
         Get(materialId)

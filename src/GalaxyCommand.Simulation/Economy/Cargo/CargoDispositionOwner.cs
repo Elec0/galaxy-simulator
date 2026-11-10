@@ -97,7 +97,11 @@ internal sealed partial class CargoDispositionOwner
     /// unexpected post-mutation failure poisons this owner for its enclosing session.
     /// Facts publish last and exact replay never allocates more work or identities.
     /// </summary>
-    internal CargoDispositionCommitResult Commit(PreparedCargoDisposition prepared)
+    internal CargoDispositionCommitResult Commit(PreparedCargoDisposition prepared) => Commit(prepared, [], null);
+
+    /// <summary>Joins prevalidated causal-owner changes before publishing any cargo or causal facts.</summary>
+    internal CargoDispositionCommitResult Commit(PreparedCargoDisposition prepared,
+        IReadOnlyList<GameFactProposal> causalFacts, Action? applyCausalChanges, int additionalFactCapacity = 0, int additionalAgendaCapacity = 0)
     {
         ThrowIfUnhealthy();
         ArgumentNullException.ThrowIfNull(prepared);
@@ -105,6 +109,15 @@ internal sealed partial class CargoDispositionOwner
         if (_receipts.TryGetValue(prepared.Request.Key, out CargoDispositionReceipt? replay))
             return RequestsMatch(replay.Request, prepared.Request) ? new(replay, null, false) : new(null, CargoDispositionFailure.ConflictingReplay, false);
         if (!CanCommit(prepared)) return new(null, CargoDispositionFailure.StalePreparation, false);
+        ArgumentNullException.ThrowIfNull(causalFacts);
+        ArgumentOutOfRangeException.ThrowIfNegative(additionalFactCapacity);
+        ArgumentOutOfRangeException.ThrowIfNegative(additionalAgendaCapacity);
+        try { _agenda.EnsureCreationCapacity(checked(prepared.Objects.Objects.Count + additionalAgendaCapacity)); }
+        catch (OverflowException) { return new(null, CargoDispositionFailure.NumericExhaustion, false); }
+        int causalFactCapacity = checked(causalFacts.Count + additionalFactCapacity);
+        if (causalFacts.Any(fact => fact is null)) throw new ArgumentException("Causal facts must be non-null.", nameof(causalFacts));
+        if (!_facts.CanCommit(checked(prepared.Objects.Objects.Count + 1 + causalFactCapacity)))
+            return new(null, CargoDispositionFailure.FactCapacityExhausted, false);
         try
         {
             if (!prepared.SourceLoss.Apply()) throw new InvalidOperationException("Prepared source loss changed during cargo commit.");
@@ -120,6 +133,9 @@ internal sealed partial class CargoDispositionOwner
             var receipt = new CargoDispositionReceipt(prepared.Request, prepared.PreparedAt, prepared.Outcomes,
                 Array.AsReadOnly(prepared.Objects.Objects.Select(entry => entry.Object.EntityId).ToArray()), prepared.Field?.OriginalFieldId);
             _receipts.Add(receipt.Request.Key, receipt);
+            applyCausalChanges?.Invoke();
+            if (causalFacts.Count > causalFactCapacity)
+                throw new InvalidOperationException("The causal owner exceeded its prepared fact budget.");
             GameFactCause cause = prepared.Request.Key.Trigger switch
             {
                 CargoDispositionTrigger.Command command => new CommandFactCause(command.Sequence),
@@ -133,6 +149,7 @@ internal sealed partial class CargoDispositionOwner
                 proposals.Add(new(new(GameFactCommitCategory.EntityLifecycle, entry.Object.EntityId.Value, 0, 0),
                     new CargoObjectAppearedFact(CaptureObjectView(entry.Object.EntityId)
                         ?? throw new InvalidOperationException("Published cargo requires its committed appearance view."))));
+            proposals.AddRange(causalFacts);
             _facts.Commit(prepared.PreparedAt, cause, proposals);
             return new(receipt, null, true);
         }

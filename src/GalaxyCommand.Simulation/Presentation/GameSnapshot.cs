@@ -15,6 +15,8 @@ public sealed record GameSnapshot(
 {
     /// <summary>Gets complete authoritative stationary sensor state for diagnostic consumers.</summary>
     public IReadOnlyList<DeployedSensorSnapshot> DeployedSensors { get; init; } = [];
+
+    public IReadOnlyList<StationSnapshot> Stations { get; init; } = [];
 }
 
 public sealed record GameSystemSnapshot(

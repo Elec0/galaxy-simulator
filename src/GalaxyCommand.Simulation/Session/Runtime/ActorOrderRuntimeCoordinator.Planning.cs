@@ -227,7 +227,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
         if (destination is NavigationDestination.Entity entity)
         {
             ShipId? targetShipId = _lifecycle.Entities.GetShipId(entity.EntityId);
-            SystemPosition? targetPosition = _lifecycle.GetDeployedSensor(entity.EntityId)?.Position ?? (targetShipId is { } target
+            SystemPosition? targetPosition = _stations?.ResolvePosition(entity.EntityId)
+                ?? _lifecycle.GetDeployedSensor(entity.EntityId)?.Position ?? (targetShipId is { } target
                 ? _movement.PositionAt(target, CurrentTime)
                 : null);
             if (targetPosition is null)
@@ -329,7 +330,9 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             NavigationDestination.System system =>
                 current.SystemId == system.SystemId,
             NavigationDestination.Entity entity =>
-                _lifecycle.GetDeployedSensor(entity.EntityId) is { } sensor
+                _stations?.ResolvePosition(entity.EntityId) is { } stationPosition
+                    ? current == stationPosition
+                    : _lifecycle.GetDeployedSensor(entity.EntityId) is { } sensor
                     ? current == sensor.Position
                     : _lifecycle.Entities.GetShipId(entity.EntityId) is { } targetShipId
                         && _movement.PositionAt(targetShipId, CurrentTime) == current,

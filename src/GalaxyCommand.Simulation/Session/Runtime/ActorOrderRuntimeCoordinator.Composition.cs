@@ -1,6 +1,6 @@
 namespace GalaxyCommand.Simulation;
 
-internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEvent>, ISimulationStateUpdateRuntime<GameEvent>, ISimulationTimestampCompletionRuntime, IDisposable
+internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<GameEvent>, ISimulationStateUpdateRuntime<GameEvent>, ISimulationPhysicalCompletionWaveRuntime<GameEvent>, ISimulationTimestampCompletionRuntime, IDisposable
 {
     private readonly EventAgenda<GameEvent> _agenda;
     private readonly SimulationEngine<GameEvent> _engine;
@@ -23,6 +23,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         _maneuverCapabilities;
     private readonly List<GameEventRecord> _eventRecords = [];
     private bool _isPoisoned;
+    private readonly StationRuntimeOwner? _stations;
 
     internal ActorOrderRuntimeCoordinator(
         GameSessionSetup setup,
@@ -41,12 +42,16 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         _navigation = navigation;
         _facts = facts;
         _shipDefinitions = new ShipDefinitionCatalog(setup.Ships.Select(ship => ship.Design)
-            .Concat(setup.MaterializationPolicies.SelectMany(policy => policy.AllowedDesigns.Values))).Definitions;
+            .Concat(setup.MaterializationPolicies.SelectMany(policy => policy.AllowedDesigns.Values))
+            .Concat(setup.Stations?.Definitions.Modules.SelectMany(module => module.ShipConstructionProvider?.AllowedDesigns ?? []) ?? [])).Definitions;
         _sensorDeployableDefinitions = setup.SensorDeployableDefinitions;
         _cargoPolicy = setup.CargoPolicy;
         _cargoDefinitions = new PhysicalDefinitionCatalog(setup.Ships.SelectMany(ship => ship.Cargo)
             .Concat(setup.SensorDeployableDefinitions.Select(definition => definition.Physical))
             .Concat(setup.Economy?.MaterialCompatibility?.Mappings.Values ?? []).Distinct());
+        if (setup.Stations is not null)
+            _cargoDefinitions = new PhysicalDefinitionCatalog(_cargoDefinitions.Definitions
+                .Concat(setup.Stations.Materials.Mappings.Values).Distinct());
         _sensorRadii = BuildSensorRadii(_shipDefinitions);
         _maneuverCapabilities = BuildManeuverCapabilities(_shipDefinitions);
         _relationships = new RelationshipOwner(setup.Relationships);
@@ -55,7 +60,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
             _control,
             _orders,
             setup.MaterializationPolicies,
-            setup.Economy?.MaterialCompatibility,
+            setup.Economy?.MaterialCompatibility ?? setup.Stations?.Materials,
             _sensorDeployableDefinitions, _shipDefinitions);
 
         _lifecycle.RegisterSetup(setup.Ships);
@@ -63,8 +68,11 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
             ? null
             : new SessionEconomyOwner(setup.Economy, _lifecycle);
         _inventoryCommit = new InventoryCommitOwner(_lifecycle.Inventories);
+        _stations = setup.Stations is null ? null : new StationRuntimeOwner(setup.Stations, _lifecycle, _agenda, CaptureStationBuilder, _inventoryCommit);
 
+        _stations?.BindEconomicProviders(_economy, economicWakeCapacity: EconomicWakeCreationCapacity);
         _engine = new SimulationEngine<GameEvent>(this, _agenda);
+        _stations?.BindRemovalTargets(CanRemoveStationTargets, ApplyStationTargetRemoval, StationTargetFactCapacity, StationTargetAgendaCapacity);
     }
 
     private ActorOrderRuntimeCoordinator(
@@ -82,7 +90,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         IReadOnlyList<ShipDesign> shipDefinitions,
         IReadOnlyList<SensorDeployableDefinition> sensorDeployableDefinitions,
         CargoDispositionPolicy? cargoPolicy,
-        PhysicalDefinitionCatalog? cargoDefinitions)
+        PhysicalDefinitionCatalog? cargoDefinitions,
+        StationRuntimeCheckpoint? stations, EventKey? economicWake, StationTargetContinuationCheckpoint? stationTargetContinuation)
     {
         _facts = facts;
         _worldTopology = worldTopology;
@@ -100,6 +109,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         _cargoDefinitions = cargoDefinitions ?? new PhysicalDefinitionCatalog(sensorDeployableDefinitions.Select(definition => definition.Physical));
         _sensorRadii = BuildSensorRadii(_shipDefinitions);
         _economy = economy;
+        _economicWake = economicWake;
+        RestoreStationTargetContinuation(stationTargetContinuation);
         _maneuverCapabilities = BuildManeuverCapabilities(_shipDefinitions);
         CheckpointResult<SimulationEngine<GameEvent>> engine =
             SimulationEngine<GameEvent>.RestoreCheckpoint(this, engineCheckpoint);
@@ -110,6 +121,16 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
 
         _engine = engine.Value!;
         _agenda = _engine.Agenda;
+        if (stations is not null)
+        {
+            CheckpointResult<StationRuntimeOwner> restoredStations = StationRuntimeOwner.Restore(stations, _lifecycle,
+                _agenda, CaptureStationBuilder, CurrentTime, _worldTopology.Systems.Select(system => system.Id),
+                _relationships.CaptureSnapshot().Principals.Select(principal => principal.Id), _inventoryCommit, CanRemoveStationTargets);
+            if (!restoredStations.IsSuccess) throw new InvalidOperationException(restoredStations.Failure!.Message);
+            _stations = restoredStations.Value!;
+            _stations.BindEconomicProviders(_economy, restoring: true, economicWakeCapacity: EconomicWakeCreationCapacity);
+            _stations.BindRemovalTargets(CanRemoveStationTargets, ApplyStationTargetRemoval, StationTargetFactCapacity, StationTargetAgendaCapacity);
+        }
     }
 
     internal SimulationTime CurrentTime => _engine.CurrentTime;
@@ -125,9 +146,16 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
     internal InventoryCommitBatchResult CommitInventoryMutations(
         IEnumerable<InventoryMutationProposal> proposals)
     {
+        ArgumentNullException.ThrowIfNull(proposals);
+        InventoryMutationProposal[] submitted = proposals.ToArray();
+        foreach (var proposal in submitted) ArgumentNullException.ThrowIfNull(proposal);
+        if (submitted.Length != 0 && !CanRequestEconomicReevaluation())
+            return _inventoryCommit.RejectBatchForAdmission(submitted, InventoryCommitRejectionReason.IdentifierCapacityExhausted);
         Dictionary<ShipId, SensorActionFailure?> before = CaptureSensorEligibility();
-        InventoryCommitBatchResult result = _inventoryCommit.CommitBatch(proposals);
+        InventoryCommitBatchResult result = _inventoryCommit.CommitBatch(submitted);
+        if (result.Outcomes.Any(outcome => outcome.WasApplied)) RequestEconomicReevaluation();
         InvalidateSensorEligibility(before);
+        _stations?.Reconcile(CurrentTime);
         return result;
     }
 
@@ -230,7 +258,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                     economy.Failure!);
             }
 
-            economyCheckpoint = economy.Value;
+            economyCheckpoint = economy.Value! with { PendingWake = _economicWake };
         }
 
         CheckpointResult<CargoDispositionOwnerCheckpoint>? cargo = _cargo?.CaptureCheckpoint();
@@ -252,7 +280,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
             _relationships.CaptureCheckpoint(),
             economyCheckpoint,
             _inventoryCommit.CaptureCheckpoint(), cargo?.Value, attempts?.Value,
-            Array.AsReadOnly(_cargoTargets.Values.OrderBy(target => target.OrderId.Value).ToArray()));
+            Array.AsReadOnly(_cargoTargets.Values.OrderBy(target => target.OrderId.Value).ToArray()), _stations?.CaptureCheckpoint(), CaptureStationTargetContinuation());
         CheckpointValidationFailure? ownerFailure = ValidateActorOwnership(checkpoint);
         if (ownerFailure is not null)
         {
@@ -335,6 +363,16 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
 
         // A deployable's physical meaning is saved with its independent definition.
         // Explicit caller catalogs may add other inventory kinds but cannot replace that meaning.
+        if (checkpoint.Stations is { Setup: { } stationSetup })
+        {
+            foreach ((MaterialId material, PhysicalDefinition physical) in stationSetup.Materials.Mappings)
+                if (definitions?.Get(physical.Key) is { } provided && provided != physical
+                    || materialCompatibility?.Get(material) is { } mapped && mapped != physical)
+                    return RuntimeRejectedOwner("$.checkpoint.stations.setup.materials", "Station material definitions conflict with supplied content.");
+            definitions = new PhysicalDefinitionCatalog((definitions?.Definitions ?? [])
+                .Concat(stationSetup.Materials.Mappings.Values.Where(physical => definitions?.Get(physical.Key) is null)));
+            materialCompatibility ??= stationSetup.Materials;
+        }
         if (policies.Value!.SensorDeployableDefinitions.Count != 0)
         {
             foreach (SensorDeployableDefinition sensor in policies.Value.SensorDeployableDefinitions)
@@ -363,7 +401,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         }
 
         CheckpointResult<ShipOrderCoordinator> orders =
-            ShipOrderCoordinator.RestoreCheckpoint(checkpoint.Orders);
+            ShipOrderCoordinator.RestoreCheckpoint(checkpoint.Orders, UnplannedStationContinuations(checkpoint));
         if (!orders.IsSuccess)
         {
             return CheckpointResult<ActorOrderRuntimeCoordinator>.Rejected(orders.Failure!);
@@ -451,7 +489,7 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                 checkpoint.Engine,
                 policies.Value.ShipDefinitions,
                 policies.Value.SensorDeployableDefinitions,
-                policies.Value.CargoPolicy, definitions);
+                policies.Value.CargoPolicy, definitions, checkpoint.Stations, checkpoint.Economy?.PendingWake, checkpoint.StationTargetContinuation);
         }
         catch (InvalidOperationException error)
         {
@@ -539,6 +577,14 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
         EntityLifecycleOwner lifecycle,
         SessionEconomyOwner? economy)
     {
+        ScheduledEvent<GameEvent>[] economicWakes = checkpoint.Engine.Agenda.PendingEvents
+            .Where(item => item.Payload is GameEvent.EconomicReevaluation).ToArray();
+        if (checkpoint.Economy?.PendingWake is { } wake
+            ? economicWakes.Length != 1 || economicWakes[0].Key != wake
+            : economicWakes.Length != 0)
+            return new("$.checkpoint.economy.pendingWake", "The economic wake identity and its exact agenda envelope must agree.");
+        CheckpointValidationFailure? targetFailure = ValidateStationTargetContinuation(checkpoint);
+        if (targetFailure is not null) return targetFailure;
         CheckpointValidationFailure? movementFailure =
             ValidateActiveMovementEvents(checkpoint);
         if (movementFailure is not null)
@@ -590,6 +636,14 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
                 GameEvent.CargoExpiry expiry => scheduled.Key.Phase == EventPhase.StateUpdate
                     && checkpoint.Cargo is { } cargo && cargo.Objects.Any(item => item.EntityId == expiry.ObjectId
                         && item.ExpiryEvent == scheduled.Key && item.Generation == scheduled.Generation),
+                GameEvent.EconomicReevaluation => economy is not null && checkpoint.Economy?.PendingWake == scheduled.Key
+                    && scheduled.Key.Phase == EventPhase.Decision
+                    && scheduled.Key.Timestamp == checkpoint.Engine.Agenda.CurrentTime && scheduled.Generation == new EventGeneration(0),
+                GameEvent.StationTargetContinuation => checkpoint.StationTargetContinuation?.Key == scheduled.Key,
+                GameEvent.StationWork work => scheduled.Key.Phase == EventPhase.PhysicalCompletion
+                    && checkpoint.Stations is { } stations && stations.Stations.Any(station => station.Id == work.Station
+                        && station.Projects.Any(project => project.Id == work.Project && project.Pending == scheduled.Key
+                            && project.Generation == scheduled.Generation)),
                 _ => false,
             };
             if (!resolved)

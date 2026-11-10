@@ -91,6 +91,8 @@ public enum InventoryReservationRejectionReason
     UnknownReservation,
     OwnerMismatch,
     CargoObjectCannotReserve,
+    IncomingAdmissionSequenceExhausted,
+    OutgoingAdmissionSequenceExhausted,
 }
 
 /// <summary>Typed result for reserving or releasing physical inventory state.</summary>
@@ -135,9 +137,21 @@ public sealed partial class Inventory
         return _fungibleReserved.GetValueOrDefault(definitionKey, Quantity.Zero);
     }
 
-    /// <summary>Returns the unreserved fungible quantity for an exact definition.</summary>
-    public Quantity FungibleAvailable(QualifiedContentKey definitionKey) =>
-        FungibleStored(definitionKey).Subtract(FungibleReserved(definitionKey));
+    /// <summary>Returns stock unclaimed by either reservation facade when an explicit material mapping connects them.</summary>
+    public Quantity FungibleAvailable(QualifiedContentKey definitionKey)
+    {
+        ulong held = FungibleStored(definitionKey).Units;
+        UInt128 reserved = CombinedFungibleReservedUnits(definitionKey);
+        return new(reserved >= held ? 0 : held - (ulong)reserved);
+    }
+
+    /// <summary>Counts each live facade's claim once without overflowing on malformed restore input.</summary>
+    private UInt128 CombinedFungibleReservedUnits(QualifiedContentKey definitionKey)
+    {
+        UInt128 reserved = FungibleReserved(definitionKey).Units;
+        if (_materialCompatibility?.GetMaterialId(definitionKey) is { } material) reserved += Reserved(material).Units;
+        return reserved;
+    }
 
     /// <summary>Returns whether an exact held instance has a live reservation.</summary>
     public bool IsDiscreteReserved(ItemInstanceId instanceId) =>
@@ -166,7 +180,8 @@ public sealed partial class Inventory
         if (Custody is InventoryCustody.Unclaimed)
             return Rejected(InventoryReservationRejectionReason.CargoObjectCannotReserve);
 
-        if (owner is ReservationOwner.CargoCollection && subject is not PhysicalReservationSubject.IncomingCapacity)
+        if (owner is ReservationOwner.CargoCollection or ReservationOwner.StationProject
+            && subject is not PhysicalReservationSubject.IncomingCapacity)
             return Rejected(InventoryReservationRejectionReason.InvalidOwner);
 
         if (reservationId.Value == 0)
@@ -207,6 +222,10 @@ public sealed partial class Inventory
         {
             return Rejected(rejection.Value);
         }
+        if (subject is PhysicalReservationSubject.IncomingCapacity && !CanAdmitIncomingCapacity)
+            return Rejected(InventoryReservationRejectionReason.IncomingAdmissionSequenceExhausted);
+        if (subject is not PhysicalReservationSubject.IncomingCapacity && !CanAdmitOutgoingCommitment)
+            return Rejected(InventoryReservationRejectionReason.OutgoingAdmissionSequenceExhausted);
 
         var reservation = new PhysicalReservation(
             reservationId,
@@ -215,6 +234,8 @@ public sealed partial class Inventory
             owner);
         _physicalReservations.Add(reservationId, reservation);
         ApplyReservation(subject);
+        RecordIncomingAdmission(reservation);
+        RecordOutgoingAdmission(reservation);
         return InventoryReservationResult.Accepted(reservation);
     }
 
@@ -246,6 +267,8 @@ public sealed partial class Inventory
 
         _physicalReservations.Remove(reservationId);
         ReleaseReservation(reservation.Subject);
+        if (reservation.Subject is PhysicalReservationSubject.IncomingCapacity) _physicalIncomingAdmissions.Remove(reservationId);
+        else _physicalOutgoingAdmissions.Remove(reservationId);
         return InventoryReservationResult.Accepted(reservation);
     }
 

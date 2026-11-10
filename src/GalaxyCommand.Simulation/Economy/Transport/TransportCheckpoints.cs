@@ -54,6 +54,11 @@ internal static class TransportCheckpointRestore
 {
     private const string Path = "$.checkpoint.economy.transport";
 
+    // A zero market entry may retain a deleted station anchor only after the enclosing archive validated it.
+    private static bool IsRetiredAnchor(IReadOnlyList<EconomyFacilityCheckpoint> retired,
+        InventoryId inventory, LocationId location) => retired.Any(value => value.InventoryId == inventory && value.LocationId == location);
+
+
     /// <summary>
     /// Validates transport state against restored lifecycle and inventory
     /// authority, then directly reconstructs every owner without replay.
@@ -61,7 +66,8 @@ internal static class TransportCheckpointRestore
     internal static CheckpointResult<RestoredTransportOwner> Restore(
         TransportOwnerCheckpoint checkpoint,
         InventoryRegistry inventories,
-        IReadOnlyDictionary<ShipId, InventoryId> liveShips)
+        IReadOnlyDictionary<ShipId, InventoryId> liveShips,
+        IReadOnlyList<EconomyFacilityCheckpoint>? retiredFacilities = null)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         ArgumentNullException.ThrowIfNull(inventories);
@@ -113,7 +119,7 @@ internal static class TransportCheckpointRestore
             new TransferRate(checkpoint.Timing.UnloadingUnitsPerSecond));
         CheckpointResult<RestoredBoard> boardResult = RestoreBoard(
             checkpoint,
-            inventories);
+            inventories, retiredFacilities ?? []);
         if (!boardResult.IsSuccess)
         {
             return CheckpointResult<RestoredTransportOwner>.Rejected(boardResult.Failure!);
@@ -155,24 +161,24 @@ internal static class TransportCheckpointRestore
     /// </summary>
     private static CheckpointResult<RestoredBoard> RestoreBoard(
         TransportOwnerCheckpoint checkpoint,
-        InventoryRegistry inventories)
+        InventoryRegistry inventories, IReadOnlyList<EconomyFacilityCheckpoint> retiredFacilities)
     {
         CheckpointResult<SortedDictionary<SupplyOfferId, SupplyOffer>> supplies =
-            RestoreSupplies(checkpoint, inventories);
+            RestoreSupplies(checkpoint, inventories, retiredFacilities);
         if (!supplies.IsSuccess)
         {
             return CheckpointResult<RestoredBoard>.Rejected(supplies.Failure!);
         }
 
         CheckpointResult<SortedDictionary<DemandRequestId, DemandRequest>> demands =
-            RestoreDemands(checkpoint, inventories);
+            RestoreDemands(checkpoint, inventories, retiredFacilities);
         if (!demands.IsSuccess)
         {
             return CheckpointResult<RestoredBoard>.Rejected(demands.Failure!);
         }
 
         CheckpointResult<SortedDictionary<TransportJobId, TransportJob>> jobs =
-            RestoreJobs(checkpoint, supplies.Value!, demands.Value!, inventories);
+            RestoreJobs(checkpoint, supplies.Value!, demands.Value!, inventories, retiredFacilities);
         if (!jobs.IsSuccess)
         {
             return CheckpointResult<RestoredBoard>.Rejected(jobs.Failure!);
@@ -193,7 +199,7 @@ internal static class TransportCheckpointRestore
     private static CheckpointResult<SortedDictionary<SupplyOfferId, SupplyOffer>>
         RestoreSupplies(
             TransportOwnerCheckpoint checkpoint,
-            InventoryRegistry inventories)
+            InventoryRegistry inventories, IReadOnlyList<EconomyFacilityCheckpoint> retiredFacilities)
     {
         var supplies = new SortedDictionary<SupplyOfferId, SupplyOffer>(
             EntityIdComparer<SupplyOfferId>.Instance);
@@ -203,6 +209,7 @@ internal static class TransportCheckpointRestore
             string path = $"{Path}.board.supplies[{index}]";
             if (saved is null || !WasAllocated(saved.Id.Value, checkpoint.Ids.OfferIds)
                 || saved.InventoryId.Value == 0 || inventories.Get(saved.InventoryId) is null
+                    && (saved.Remaining != Quantity.Zero || !IsRetiredAnchor(retiredFacilities, saved.InventoryId, saved.LocationId))
                 || saved.LocationId.Value == 0 || saved.MaterialId.Value == 0
                 || !supplies.TryAdd(
                     saved.Id,
@@ -230,7 +237,7 @@ internal static class TransportCheckpointRestore
     private static CheckpointResult<SortedDictionary<DemandRequestId, DemandRequest>>
         RestoreDemands(
             TransportOwnerCheckpoint checkpoint,
-            InventoryRegistry inventories)
+            InventoryRegistry inventories, IReadOnlyList<EconomyFacilityCheckpoint> retiredFacilities)
     {
         var demands = new SortedDictionary<DemandRequestId, DemandRequest>(
             EntityIdComparer<DemandRequestId>.Instance);
@@ -240,6 +247,7 @@ internal static class TransportCheckpointRestore
             string path = $"{Path}.board.demands[{index}]";
             if (saved is null || !WasAllocated(saved.Id.Value, checkpoint.Ids.DemandIds)
                 || saved.InventoryId.Value == 0 || inventories.Get(saved.InventoryId) is null
+                    && (saved.Remaining != Quantity.Zero || !IsRetiredAnchor(retiredFacilities, saved.InventoryId, saved.LocationId))
                 || saved.LocationId.Value == 0 || saved.MaterialId.Value == 0
                 || !demands.TryAdd(
                     saved.Id,
@@ -271,7 +279,7 @@ internal static class TransportCheckpointRestore
             TransportOwnerCheckpoint checkpoint,
             SortedDictionary<SupplyOfferId, SupplyOffer> supplies,
             SortedDictionary<DemandRequestId, DemandRequest> demands,
-            InventoryRegistry inventories)
+            InventoryRegistry inventories, IReadOnlyList<EconomyFacilityCheckpoint> retiredFacilities)
     {
         var jobs = new SortedDictionary<TransportJobId, TransportJob>(
             EntityIdComparer<TransportJobId>.Instance);
@@ -302,8 +310,10 @@ internal static class TransportCheckpointRestore
                 || demand.InventoryId != job.DestinationInventoryId
                 || demand.LocationId != job.DestinationLocationId
                 || demand.MaterialId != job.MaterialId
-                || inventories.Get(job.SourceInventoryId) is null
-                || inventories.Get(job.DestinationInventoryId) is null)
+                || inventories.Get(job.SourceInventoryId) is null && (!IsTerminal(job.Status)
+                    || !IsRetiredAnchor(retiredFacilities, job.SourceInventoryId, job.SourceLocationId))
+                || inventories.Get(job.DestinationInventoryId) is null && (!IsTerminal(job.Status)
+                    || !IsRetiredAnchor(retiredFacilities, job.DestinationInventoryId, job.DestinationLocationId)))
             {
                 return Reject<SortedDictionary<TransportJobId, TransportJob>>(
                     path,
@@ -473,8 +483,8 @@ internal static class TransportCheckpointRestore
         int index)
     {
         string path = $"{Path}.board.jobs[{index}]";
-        Inventory source = inventories.Get(job.SourceInventoryId)!;
-        Reservation? sourceReservation = source.GetReservation(job.SourceReservationId);
+        Inventory? source = inventories.Get(job.SourceInventoryId);
+        Reservation? sourceReservation = source?.GetReservation(job.SourceReservationId);
         bool needsSourceReservation = job.Status is TransportJobStatus.Assigned
             or TransportJobStatus.WaitingForRouteToSource
             or TransportJobStatus.TravelingToSource
@@ -491,9 +501,9 @@ internal static class TransportCheckpointRestore
                 "The source reservation disagrees with the transport phase.");
         }
 
-        Inventory destination = inventories.Get(job.DestinationInventoryId)!;
+        Inventory? destination = inventories.Get(job.DestinationInventoryId);
         CapacityReservation? capacity = job.DestinationCapacityReservationId is { } id
-            ? destination.GetCapacityReservation(id)
+            ? destination?.GetCapacityReservation(id)
             : null;
         bool validCapacity = capacity is not null
             && capacity.Quantity == job.Quantity

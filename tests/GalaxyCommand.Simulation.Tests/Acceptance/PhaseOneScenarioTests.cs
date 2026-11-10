@@ -21,10 +21,11 @@ public sealed class PhaseOneScenarioTests
         Assert.NotNull(report.ConstructedShipId);
         Assert.Equal(2, report.StartingShipCount);
         Assert.Equal(3, report.EndingShipCount);
-        Assert.Equal<ulong>(675_400, report.EndTime.Milliseconds);
-        Assert.Equal<ulong>(45, report.EventsProcessed);
-        Assert.Equal<ulong>(0x175eac5bd99a0695, report.EventLogDigest);
-        Assert.Equal<ulong>(0x424bec2061b0e8f9, report.FinalStateDigest);
+        // Attached component production feeds ship construction directly through their shared station storage.
+        Assert.Equal<ulong>(665_000, report.EndTime.Milliseconds);
+        Assert.Equal<ulong>(41, report.EventsProcessed);
+        Assert.Equal<ulong>(0x8644bb09c9867ab0, report.EventLogDigest);
+        Assert.Equal<ulong>(0xadbb710ee8f3a417, report.FinalStateDigest);
         Assert.True(report.Metrics.TransportJobsCreated >= report.Metrics.TransportJobsCompleted);
         Assert.True(report.Metrics.TransportJobsCompleted > 0);
         Assert.Equal<ulong>(0, report.Metrics.TransportJobsFailed);

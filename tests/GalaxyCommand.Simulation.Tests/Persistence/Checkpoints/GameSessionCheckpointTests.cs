@@ -150,6 +150,10 @@ public sealed class GameSessionCheckpointTests
             Assert.Equal(inventories[index].Id, roundTripped[index].Id);
             Assert.Equal(inventories[index].Custody, roundTripped[index].Custody);
             Assert.Equal(inventories[index].Capacity, roundTripped[index].Capacity);
+            Assert.Equal(inventories[index].NextIncomingAdmissionSequence, roundTripped[index].NextIncomingAdmissionSequence);
+            Assert.Equal(inventories[index].IncomingAdmissions, roundTripped[index].IncomingAdmissions);
+            Assert.Equal(inventories[index].NextOutgoingAdmissionSequence, roundTripped[index].NextOutgoingAdmissionSequence);
+            Assert.Equal(inventories[index].OutgoingAdmissions, roundTripped[index].OutgoingAdmissions);
             Assert.Equal(
                 inventories[index].FungibleHoldings,
                 roundTripped[index].FungibleHoldings);

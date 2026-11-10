@@ -24,6 +24,7 @@ public sealed partial class GameSession
     private void CompletePlayerDisclosure()
     {
         CommitDeployableObservations();
+        CommitStationObservations();
         if (!_facts.HasPendingPlayerDisclosure)
         {
             _removedObservationShips.Clear();
@@ -51,6 +52,10 @@ public sealed partial class GameSession
                 SensorDeployedFact deployed => deployed.Sensor.PrincipalId,
                 SensorPickedUpFact pickedUp => pickedUp.Sensor.PrincipalId,
                 SensorRemovedFact removed => removed.Sensor.PrincipalId,
+                StationCreatedFact created => created.PrincipalId,
+                StationRemovedFact removed => removed.Station.PrincipalId,
+                StationCommitmentInvalidatedFact invalidated => invalidated.PrincipalId,
+                _ when PlayerFactProjector.GetStationId(envelope.Fact) is { } station => _runtime.CaptureStationPrincipal(station),
                 _ => principal,
             };
             if (PlayerFactProjector.TryProjectWithoutCoverage(envelope.Fact, observer, _playerCommandSource, principal, out GameFact? direct))
@@ -88,6 +93,17 @@ public sealed partial class GameSession
         if (live is not null && receipt.SubjectPrincipalId != live.PrincipalId) return false;
         if (envelope.Fact is CargoObjectAppearedFact or CargoObjectDisappearedFact
             && receipt.SubjectPrincipalId is not null) return false;
+        StationId? stationSubject = PlayerFactProjector.GetStationId(envelope.Fact);
+        StationStateCheckpoint? station = stationSubject is { } stationId
+            ? checkpoint.Stations?.Stations.FirstOrDefault(item => item.Id == stationId) : null;
+        StationRemovalReceipt? removal = stationSubject is { } removedStationId
+            ? checkpoint.Stations?.Removals.FirstOrDefault(item => item.Station.Id == removedStationId) : null;
+        StationSnapshot? removedStation = removal?.Station;
+        PrincipalId? stationPrincipal = station?.Principal ?? removedStation?.PrincipalId;
+        if (stationPrincipal is not null && receipt.SubjectPrincipalId != stationPrincipal) return false;
+        if (envelope.Fact is StationRemovedFact removedSource && (removal is null
+            || !StationSnapshotValueEquality.Equal(removedSource.Station, removal.Station) || removedSource.Reason != removal.Reason
+            || envelope.Timestamp != removal.RemovedAt)) return false;
         if (receipt.Fact is null) return true;
 
         PrincipalId observer = observation.ObserverPrincipalId;
@@ -119,6 +135,24 @@ public sealed partial class GameSession
                 _ => false,
             };
         }
+        if (receipt.Fact is ObservedStationChangeFact stationNotice)
+        {
+            bool kindMatches = envelope.Fact switch
+            {
+                StationCreatedFact => stationNotice.Kind == ObservedStationChangeKind.Appeared,
+                StationProjectCompletedFact completed => stationNotice.Kind == ObservedStationChangeKind.Changed
+                    && (station?.Projects.Any(project => project.Id == completed.ProjectId && project.Kind == StationProjectKind.BaseConstruction)
+                        ?? removedStation?.Projects.Any(project => project.Id == completed.ProjectId && project.Kind == StationProjectKind.BaseConstruction)) == true,
+                StationModuleChangedFact or StationModuleRemovedFact => stationNotice.Kind == ObservedStationChangeKind.Changed,
+                StationRemovedFact => stationNotice.Kind == ObservedStationChangeKind.Disappeared,
+                _ => false,
+            };
+            return kindMatches && stationNotice.Id == stationSubject && stationNotice.PrincipalId != observer
+                && receipt.SubjectPrincipalId == stationNotice.PrincipalId
+                && (station?.Entity ?? removedStation?.EntityId) == stationNotice.EntityId
+                && (station?.DefinitionKey ?? removedStation?.DefinitionKey) == stationNotice.DefinitionKey
+                && stationPrincipal == stationNotice.PrincipalId && (station?.Position ?? removedStation?.Position) == stationNotice.Position;
+        }
         if (receipt.Fact == envelope.Fact)
         {
             return envelope.Fact switch
@@ -133,6 +167,11 @@ public sealed partial class GameSession
                 SensorDeployedFact deployed => deployed.Sensor.PrincipalId == observer && receipt.SubjectPrincipalId == observer,
                 SensorPickedUpFact pickedUp => pickedUp.Sensor.PrincipalId == observer && receipt.SubjectPrincipalId == observer,
                 SensorRemovedFact removed => removed.Sensor.PrincipalId == observer && receipt.SubjectPrincipalId == observer,
+                StationShipConstructionQueuedFact queued => stationPrincipal == observer && receipt.SubjectPrincipalId == observer
+                    && checkpoint.Stations?.ShipOrders.Any(order => order.Station == queued.StationId && order.Module == queued.Module
+                        && order.Facility == queued.Facility && order.Order == queued.Order && order.Design == queued.Design) == true,
+                StationCreatedFact or StationProjectChangedFact or StationProjectCompletedFact or StationModuleChangedFact or StationModuleRemovedFact or StationRemovedFact or StationCommitmentInvalidatedFact =>
+                    stationPrincipal == observer && receipt.SubjectPrincipalId == observer,
                 ObservedShipChangeFact => false,
                 _ => PlayerFactProjector.IsOwnedAssetFact(envelope.Fact)
                     && subject is not null && receipt.SubjectPrincipalId == observer,

@@ -8,11 +8,23 @@ internal sealed record EconomyFacilityCheckpoint(
     InventoryId InventoryId,
     LocationId LocationId,
     SystemPosition Position,
-    MaterialId? ProductionOutput);
+    MaterialId? ProductionOutput,
+    StationFacilityBinding? StationBinding = null, QualifiedContentKey? StationModuleDefinitionKey = null);
 
 internal sealed record SessionEconomyCheckpoint(
     IReadOnlyList<EconomyFacilityCheckpoint?> Facilities,
     ProductionOwnerCheckpoint Production,
     ConstructionOwnerCheckpoint Construction,
-    TransportOwnerCheckpoint Transport);
+    TransportOwnerCheckpoint Transport,
+    IReadOnlyList<RetiredEconomyFacilityCheckpoint?>? RetiredFacilities = null,
+    IdSequenceCheckpoint? FacilityIds = null,
+    IdSequenceCheckpoint? LocationIds = null)
+{
+    internal EventKey? PendingWake { get; init; }
+}
+
+internal sealed record RetiredEconomyFacilityCheckpoint(
+    EconomyFacilityCheckpoint Facility,
+    ProductionLineCheckpoint? Production,
+    ConstructionProcessCheckpoint? Construction);
 

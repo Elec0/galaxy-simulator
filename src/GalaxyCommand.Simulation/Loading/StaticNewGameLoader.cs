@@ -103,6 +103,10 @@ public static partial class StaticNewGameLoader
             ContentKind.Create(StandingPolicyKind),
             ContentKind.Create(SensorDeployableKind),
             ContentKind.Create(CargoPolicyKind),
+            ContentKind.Create("station"),
+            ContentKind.Create("station-module"),
+            ContentKind.Create("material"),
+            ContentKind.Create("station-storage-loss-policy"),
         ]);
 
     /// <summary>
@@ -117,7 +121,8 @@ public static partial class StaticNewGameLoader
         LocalContentId scenarioId,
         RandomRootSeed randomRootSeed,
         int factRetentionCapacity,
-        int maximumDegreeOfParallelism)
+        int maximumDegreeOfParallelism,
+        ISpatialNavigationPlanner? navigation = null)
     {
         ArgumentNullException.ThrowIfNull(packageDirectories);
         ArgumentNullException.ThrowIfNull(scenarioPackageId);
@@ -149,10 +154,11 @@ public static partial class StaticNewGameLoader
         List<ContentDiagnostic> diagnostics = [];
         GameSessionSetup? setup = Compose(
             content.Catalog,
-            scenario,
+            ExpandScenarioReferences(content.Catalog, scenario),
             randomRootSeed,
             factRetentionCapacity,
             diagnostics,
+            navigation,
             out ReadOnlyCollection<StaticGalaxyLayoutEntry> galaxyLayout);
         return setup is null
             ? StaticNewGameLoadResult.Rejected(diagnostics)
@@ -169,6 +175,7 @@ public static partial class StaticNewGameLoader
         RandomRootSeed randomRootSeed,
         int factRetentionCapacity,
         List<ContentDiagnostic> diagnostics,
+        ISpatialNavigationPlanner? navigation,
         out ReadOnlyCollection<StaticGalaxyLayoutEntry> galaxyLayout)
     {
         galaxyLayout = Array.AsReadOnly(Array.Empty<StaticGalaxyLayoutEntry>());
@@ -181,6 +188,8 @@ public static partial class StaticNewGameLoader
             : ["galaxyLayout", "playerCommandSource", "playerPrincipal", "ships", "standingPolicy", "systems"];
         if (scenario.Values.Properties.ContainsKey("cargoPolicy"))
             scenarioProperties = [.. scenarioProperties, "cargoPolicy"];
+        if (scenario.Values.Properties.ContainsKey("stationRuntime"))
+            scenarioProperties = [.. scenarioProperties, "stationRuntime"];
         if (!TryObjectProperties(
                 scenario.Values,
                 scenarioProperties,
@@ -193,8 +202,9 @@ public static partial class StaticNewGameLoader
 
         Dictionary<QualifiedContentKey, PrincipalDefinition> principals =
             ComposePrincipals(catalog, scenario, source, diagnostics);
+        MaterialInventoryCompatibilityMap materials = ComposeStationMaterials(catalog, scenario, diagnostics);
         Dictionary<QualifiedContentKey, ShipDesign> designs =
-            ComposeShipDesigns(catalog, scenario, source, diagnostics);
+            ComposeShipDesigns(catalog, scenario, source, materials, diagnostics);
         SensorDeployableDefinition[] deployables = ComposeSensorDeployables(catalog, scenario, diagnostics);
         CargoDispositionPolicy? cargoPolicy = ComposeCargoPolicy(catalog, scenario, diagnostics);
         if (!TryDefinitionReference(
@@ -253,12 +263,15 @@ public static partial class StaticNewGameLoader
 
         try
         {
+            CommandSource playerSource = new(CommandSourceKind.Player, new CommandSourceId(playerCommandSource!));
+            if (!TryComposeStationRuntime(catalog, scenario, materials, systems, designs, principals[playerKey!].Id,
+                playerSource, navigation, diagnostics, out StationRuntimeSetup? stations, out GameSessionEconomySetup? economy)) return null;
             return new GameSessionSetup(
                 systems.Values,
                 ships,
                 connectorTopology,
                 [],
-                null,
+                economy,
                 new RelationshipSetup(
                     principals.Values,
                     principals[playerKey!].Id,
@@ -266,9 +279,9 @@ public static partial class StaticNewGameLoader
                     []),
                 randomRootSeed,
                 factRetentionCapacity,
-                new CommandSource(CommandSourceKind.Player, new CommandSourceId(playerCommandSource!)),
+                playerSource,
                 deployables,
-                cargoPolicy: cargoPolicy);
+                cargoPolicy: cargoPolicy, stations: stations);
         }
         catch (Exception exception) when (exception is ArgumentException or OverflowException)
         {
@@ -348,12 +361,13 @@ public static partial class StaticNewGameLoader
 
     /// <summary>
     /// Assigns construction design IDs from qualified-key order and admits only
-    /// the initial material-free starter design vocabulary.
+    /// explicit maneuver, recipe and optional station-builder vocabulary.
     /// </summary>
     private static Dictionary<QualifiedContentKey, ShipDesign> ComposeShipDesigns(
         ResolvedContentCatalog catalog,
         StaticScenarioSource scenario,
         string source,
+        MaterialInventoryCompatibilityMap materials,
         List<ContentDiagnostic> diagnostics)
     {
         QualifiedContentKey[] keys = scenario.References
@@ -369,31 +383,39 @@ public static partial class StaticNewGameLoader
                     definition?.Values,
                     key.ToString(),
                     diagnostics)
-                || !TryUInt64(definition!.Values, "cargoCapacity", key.ToString(), "$definition.values.cargoCapacity", diagnostics, out ulong capacity)
-                || !TryUInt64(definition.Values, "requiredWork", key.ToString(), "$definition.values.requiredWork", diagnostics, out ulong work)
+                || !TryPositiveUInt64(definition!.Values, "cargoCapacity", key.ToString(), "$definition.values.cargoCapacity", diagnostics, out ulong capacity)
+                || !TryPositiveUInt64(definition.Values, "requiredWork", key.ToString(), "$definition.values.requiredWork", diagnostics, out ulong work)
                 || !TryUInt64(definition.Values, "sensorRadiusMeters", key.ToString(), "$definition.values.sensorRadiusMeters", diagnostics, out ulong sensorRadius)
                 || !TryUInt64(definition.Values, "pickupRangeMeters", key.ToString(), "$definition.values.pickupRangeMeters", diagnostics, out ulong pickupRange)
                 || !TryComposeManeuverCapability(
                     definition.Values,
                     key.ToString(),
                     diagnostics,
-                    out ShipManeuverCapability? maneuverCapability)
-                || capacity == 0
-                || work == 0)
+                    out ShipManeuverCapability? maneuverCapability))
             {
                 continue;
             }
+
+            int beforeOptional = diagnostics.Count;
+            StationConstructionCapability? construction = ComposeStationConstructionCapability(
+                definition.Values, "stationConstructionCapability", key.ToString(), diagnostics);
+            KeyValuePair<MaterialId, Quantity>[] inputs = [];
+            if (definition.Values.Properties.ContainsKey("inputs")
+                && !TryComposeStationMaterialQuantities(definition.Values, "inputs", definition, materials,
+                    "$definition.values.inputs", diagnostics, out inputs)) continue;
+            if (diagnostics.Count != beforeOptional) continue;
 
             designs.Add(
                 key,
                 new ShipDesign(
                     new ConstructionDesignId(checked((uint)index + 1)),
                     definition.InvariantFallback,
-                    new ConstructionRecipe([], new Work(work)),
+                    new ConstructionRecipe(inputs, new Work(work)),
                     new Quantity(capacity),
                     maneuverCapability!,
                     sensorRadius,
-                    pickupRange));
+                    pickupRange,
+                    construction));
         }
 
         return designs;
@@ -401,7 +423,7 @@ public static partial class StaticNewGameLoader
 
     /// <summary>
     /// Enforces the complete ship-design vocabulary while allowing only the
-    /// explicitly optional custom passive-deceleration field to be absent.
+    /// explicitly optional deceleration, station-builder capability and material inputs to be absent.
     /// </summary>
     private static bool TryShipDesignProperties(
         ContentObjectValue? value,
@@ -421,10 +443,9 @@ public static partial class StaticNewGameLoader
             "pickupRangeMeters",
             "turnRateDegreesPerSecond",
         ];
-        string[] properties = value?.Properties.ContainsKey(
-            "customPassiveDecelerationMetersPerSecondSquared") == true
-            ? [.. required, "customPassiveDecelerationMetersPerSecondSquared"]
-            : required;
+        string[] properties = [.. required];
+        foreach (string optional in new[] { "customPassiveDecelerationMetersPerSecondSquared", "stationConstructionCapability", "inputs" })
+            if (value?.Properties.ContainsKey(optional) == true) properties = [.. properties, optional];
         return TryObjectProperties(
             value,
             properties,
