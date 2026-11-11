@@ -453,6 +453,8 @@ scope:
 6. proved the single-thread reference path and supported parallel layouts with
    focused tests and benchmark evidence.
 
+TASK-073 supplies observer-safe non-player projection: current captured
+position, velocity, and heading without private maneuver or order state.
 Installed-equipment capability contributions, interaction-owned fine-grained
-activation, observer-safe non-player projection, and saved-reference migration
-remain with `TASK-068`, `TASK-071`, `TASK-073`, and `TASK-037`, respectively.
+activation, and saved-reference migration retain their existing ownership in
+`TASK-068`, `TASK-071`, and `TASK-037`.

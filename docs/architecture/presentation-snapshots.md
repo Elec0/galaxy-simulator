@@ -35,8 +35,8 @@ observer cross the private boundary. Relationship facts use the same filter,
 and `NextFactCursor` advances past inspected hidden facts without exposing
 their payloads.
 
-Completed `TASK-020` defines player fog of war. `TASK-073` stages 1 and 2 now
-implement its ship boundary: the session's bound player observer receives owned
+Completed `TASK-020` defines player fog of war. Completed `TASK-073`
+implements its observation boundary: the session's bound player observer receives owned
 ships and current sensor contacts, with no ghost contacts outside coverage.
 `GameSnapshot` remains a complete authoritative diagnostic view. Presentation
 uses `GameObservedShipSnapshot`: owned assets carry their approved
@@ -53,9 +53,12 @@ Godot consumes this projection for map, routes, inspector, and activity; interna
 command diagnostic reasons do not enter its status display. The detailed policy
 is in [Fog-of-war and scouting](../systems/fog-of-war-and-scouting.md).
 
-Station and stationary-deployable discoveries, stale views, and confirmed
-absence remain open under `TASK-073` stages 3 and 4 after their runtime owners
-provide concrete inputs. Ship implementation does not complete that scope.
+Station and stationary-deployable discoveries retain approved last-observed
+views and simulation times through stale, refresh, and confirmed-absence
+transitions. TASK-073 consumes the completed entity owners, preserves historical
+disclosures through current-schema encoded restoration, and exposes those
+records to Godot without consulting hidden authority. See the
+[combined delivery evidence](../systems/fog-of-war-and-scouting.md#full-domain-delivery-evidence).
 
 ## Original foundation
 

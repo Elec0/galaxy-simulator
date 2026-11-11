@@ -309,8 +309,8 @@ still a ship; it is not evidence of a stationary deployable runtime.
 Completed TASK-095 supplies the real deployable owner and its immutable
 observation inputs. TASK-073 consumes those inputs for coverage, discovery,
 stale views, refresh, and confirmed absence. Completed TASK-105 supplies the
-separate station inputs and runtime integration; TASK-073 retains full-domain
-observation delivery proof.
+separate station inputs and runtime integration; completed TASK-073 supplies
+the combined observation delivery proof.
 
 ```mermaid
 flowchart LR
@@ -507,9 +507,9 @@ domain consumer.
 `GameSession.CaptureSensorDeployableObservation()` supplies immutable committed
 views with observation times and stationary sources with retained radii. These
 are authoritative inputs for TASK-073, rather than player-filtered presentation.
-Pickup and explicit removal withdraw the source immediately. TASK-073 still owns
-coverage consumption, persistent discovery, stale views, refresh and confirmed
-absence. Player controls remain TASK-107. Owned action facts retain their
+Pickup and explicit removal withdraw the source immediately. Completed TASK-073
+supplies coverage consumption, persistent discovery, stale views, refresh and
+confirmed absence. Player controls remain TASK-107. Owned action facts retain their
 detail; covered non-owned facts use appearance/disappearance notices without
 actor, command, inventory, private cause or removal reason. Bounded disclosure
 receipts freeze this decision at commit, including across restoration.

@@ -12,7 +12,8 @@ transient contacts disappear outside coverage, and discovered permanent
 structures retain a stale last-observed view until sensors return.
 
 This document completes the design work approved by the project owner for
-`TASK-020`. `TASK-073` owns implementation.
+`TASK-020`. Completed `TASK-073` implements the accepted ship, station, and
+stationary-deployable observation boundary.
 
 **Decision status:** Accepted by the project owner.
 
@@ -32,8 +33,8 @@ and unspecified ship sensor radii. Those prerequisites are now supplied:
 
 Stages 1 and 2 are implemented. Deployable observation and station source,
 exterior-view, and persistent-observation integration are also present. These
-foundations remove the original prerequisite blockers; `TASK-073` still owns
-full-domain delivery proof across ships, stations, and deployables.
+foundations support the combined observation delivery described in
+[Full-domain delivery evidence](#full-domain-delivery-evidence).
 
 ### Approved stages and completion boundaries
 
@@ -47,8 +48,8 @@ full-domain delivery proof across ships, stations, and deployables.
 Stages 1 and 2 are approved and implemented. Stage 3 consumes the concrete
 station and deployable presentation contracts supplied by their completed
 runtime tasks. Test fixtures alone cannot establish live entity support.
-Stage 4's full-domain proof is still required for `TASK-073` completion. All
-observation stages remain under this task ID.
+Stage 4's combined proof covers the accepted full-domain boundary. All
+observation stages are delivered under `TASK-073`.
 
 ```mermaid
 flowchart LR
@@ -123,15 +124,16 @@ stage, and no future crossing is scheduled by this instantaneous evaluator.
 Coverage cases include exact range limits, all moving/stationary
 combinations, immediate contact loss, overlap, transit/emergence, lifecycle,
 ownership changes, analytic boundaries, controlled intervals, immutable results,
-input rejection, and index/batch equivalence. These prove stage 1 only; live
-disclosure, persistence, and missing entity integration remain open.
+input rejection, and index/batch equivalence. This evaluator evidence is
+complemented by the live disclosure, persistence, and entity integration below.
 
 ### Stage 2 live contracts
 
 **Decision status:** S1 through S9 and the 10 km starter-ship and
 preview-courier sensor radii below were approved by the owner.
-Stage 2 implementation is authorized. Worker execution still requires measured
-evidence, and station/deployable integration remains open under stages 3 and 4.
+Stage 2 implementation is delivered. Its ship coverage evaluator remains serial;
+the later persistent-target crossing evaluator has separate measured worker
+evidence. Stages 3 and 4 integrate station and deployable inputs below.
 
 The binding in S9 makes the one player observer explicit before any
 facts commit. Switching the request principal cannot reveal another principal's
@@ -225,7 +227,7 @@ Stage 2's original persistence proof used the internal whole-session checkpoint
 boundary. Completed `TASK-116` now supplies the current-schema typed JSON bridge,
 including observation state and historical disclosure continuation. General
 user save/load still depends on `TASK-037` for content compatibility and
-saved-reference migration. Full observation delivery proof remains `TASK-073`.
+saved-reference migration. The combined observation proof is described below.
 
 
 ### Stage 2 validation and remaining scope
@@ -254,8 +256,8 @@ claim. Sensor evaluation remains on the serial reference path.
 
 Persistent deployable discoveries and stale/refresh/absence state now consume
 `TASK-095` inputs. Completed `TASK-105` supplies station sources, exterior views,
-and retained observation integration. Full `TASK-073` completion remains open
-for the accepted full-domain delivery proof.
+and retained observation integration. The combined proof joins all three
+source kinds, persistent evidence, historical notices, and encoded restoration.
 
 The owner accepted TASK-095's bounded stationary-range extension
 and deployable notice proposal. Owned assets retain approved detailed notices;
@@ -335,7 +337,9 @@ registered principal/system links, immutable deployment evidence, observation ti
 state validity, current covered-live consistency and retained safe disclosure
 receipts before publishing the session. It restores retained evidence directly,
 including stale records whose entities were removed while hidden. General encoded
-save admission and content migration remain TASK-037.
+content compatibility and saved-reference migration remain TASK-037. Completed
+TASK-116 supplies current-schema encoding, including observation behavior
+version 3 for station evidence.
 
 The Godot preview consumes only the player presentation world's deployable
 records. System-map labels identify the definition and entity, current/stale/
@@ -360,9 +364,9 @@ its user build logs inside the filesystem sandbox. That review limitation does
 not establish the current build state. TASK-104 separately resolved the
 historical navigation benchmark expectation mismatch.
 
-This closes the requested deployable integration, not TASK-073 as a whole.
 Completed TASK-105 supplies station sources, exterior views, and retained
-observation integration. TASK-073 retains the remaining full-domain proof.
+observation integration. TASK-073 joins that pipeline with ship and deployable
+coverage in the full-domain delivery evidence below.
 
 ## Decisions at a glance
 
@@ -587,6 +591,34 @@ evidence for:
 - event disclosure at the commit-time visibility boundary;
 - exact checkpoint restore and continued observation equivalence; and
 - agreement across supported worker, batch, and partition layouts.
+
+## Full-domain delivery evidence
+
+The session unions owned ship, station, and deployable sensor sources. Current
+ship contacts use captured external kinematics; they never expose a future
+maneuver, capability state, private order, or raw fact cause. Removing the last
+source removes a non-owned ship from map, selection, and focus immediately.
+Station and stationary-deployable records instead retain their last observed
+exterior and timestamp. Hidden changes cannot refresh that evidence or replay
+undisclosed events. Returning coverage refreshes a live entity or confirms
+absence without inferring a cause or removal time.
+
+| Boundary | Focused evidence |
+| --- | --- |
+| Exact ship coverage, crossings, transit, and creation/removal | [ShipSensorCoverageTests](../../tests/GalaxyCommand.Simulation.Tests/Spatial/Observation/ShipSensorCoverageTests.cs) and [GameSessionFogOfWarTests](../../tests/GalaxyCommand.Simulation.Tests/Presentation/GameSessionFogOfWarTests.cs). |
+| Station and deployable owner integration | [StationObservationTests](../../tests/GalaxyCommand.Simulation.Tests/Presentation/StationObservationTests.cs) and [DeployableObservationTests](../../tests/GalaxyCommand.Simulation.Tests/Presentation/DeployableObservationTests.cs) cover real owner lifecycles, source changes, persistent evidence, safe notices, and restoration admission. |
+| Combined source withdrawal and persistent continuity | [FullDomainObservationTests](../../tests/GalaxyCommand.Simulation.Tests/Presentation/FullDomainObservationTests.cs) uses actual construction, deployment, movement, and removal. It compares the complete encoded checkpoint across serial, worker/batch, and advancement-partition layouts, with JSON restoration before and after hidden changes and confirmed absence. |
+| Observer-safe analytic maneuvers | [NonOwnedManeuverObservationTests](../../tests/GalaxyCommand.Simulation.Tests/Presentation/NonOwnedManeuverObservationTests.cs) exercises captured kinematics across maneuver phases, the closed contact field vocabulary, immutable captures, and immediate loss of selection when coverage disappears. |
+| Substantial crossing workloads | [Deployable observation measurements](../validation/interaction-session-measurements.md#task-073-deployable-observation-crossings) retain serial/batched digests and performance evidence. Small combined fixtures establish host-tuning invariance, not a new concurrency or scaling claim. |
+
+Godot consumes both station and deployable observation records from the player
+presentation world. Station labels use only retained exterior identity/name,
+position, observation state, and saved observation time; confirmed-missing labels
+remain last-known-location records. [Station label tests](../../tests/GalaxyCommand.Client.Tests/Map/SystemMapStationObservationLabelsTests.cs)
+cover all three states, system filtering, stable ordering, translated templates,
+and locale-aware time formatting without asserting styling. This adds no station command or generic inspector action. Broader shell,
+accessibility, and overlay controls remain TASK-077; authored starting stations
+remain TASK-118, and content compatibility remains TASK-037.
 
 ## Deferred choices
 

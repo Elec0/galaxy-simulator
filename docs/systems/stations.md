@@ -15,7 +15,7 @@ fog-of-war can discover it, remember it, or use its sensors.
 **Decision status:** Accepted by the project owner, including
 Q01-Q58 and the [closing technical contract](#accepted-technical-contract),
 R01-R05. TASK-057 design review and TASK-105 runtime delivery are complete.
-TASK-073 retains full observation delivery ownership.
+TASK-073 completed observation delivery across ship, station, and deployable inputs.
 
 **Implementation boundary:** TASK-105 owns the approved station runtime;
 TASK-073 consumes its sensor sources and observable views. Those tasks implement and consume this accepted contract without selecting

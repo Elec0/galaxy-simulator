@@ -299,6 +299,13 @@ public partial class GalaxyMap : Control
 				fontSize: 11, modulate: new Color("668ca5"));
 		}
 
+		foreach (SystemMapStationObservationLabel label in SystemMapStationObservationLabels.Capture(_snapshot.Stations, system.Id, UiLocalization.Text))
+		{
+			Vector2 position = ToSystemView(label.Position.Position);
+			DrawString(ThemeDB.FallbackFont, position + new Vector2(10, -8), label.Text,
+				fontSize: 11, modulate: new Color("668ca5"));
+		}
+
 		foreach (CargoObjectView cargo in _snapshot.CargoObjects.Where(item => item.Position.SystemId == system.Id))
 		{
 			Vector2 position = ToSystemView(cargo.Position.Position);

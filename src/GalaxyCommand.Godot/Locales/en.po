@@ -183,3 +183,15 @@ msgstr "Command accepted."
 
 msgid "ui.cargo.rejected"
 msgstr "Command rejected ({code})."
+
+msgid "ui.map.station_marker"
+msgstr "Station {station} {name} | {state} | observed {observed}s"
+
+msgid "ui.observation.current"
+msgstr "current"
+
+msgid "ui.observation.stale"
+msgstr "stale"
+
+msgid "ui.observation.confirmed_missing"
+msgstr "confirmed missing"
