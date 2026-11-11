@@ -515,24 +515,30 @@ internal static class SaveJsonCodec
     }
 
     /// <summary>
-    /// Recursively enforces duplicate-property, string-length, and
+    /// Recursively enforces depth, duplicate-property, string-length, and
     /// per-container entry limits over one already parsed JSON value.
     /// </summary>
     internal static SaveFormatFailure? ValidateStructure(
         JsonElement root,
         SaveJsonLimits limits) =>
-        ValidateElement(root, "$", limits);
+        ValidateElement(root, "$", limits, 0);
 
     /// <summary>
-    /// Recursively enforces duplicate-property, string-length, and
+    /// Recursively enforces depth, duplicate-property, string-length, and
     /// per-container entry limits without exposing arbitrary property names in
     /// a returned diagnostic path.
     /// </summary>
     private static SaveFormatFailure? ValidateElement(
         JsonElement element,
         string path,
-        SaveJsonLimits limits)
+        SaveJsonLimits limits,
+        int depth)
     {
+        // JsonDocument permits pre-parsed inert values, so writers must enforce the same depth boundary as readers.
+        if (element.ValueKind is JsonValueKind.Object or JsonValueKind.Array && depth >= limits.MaximumDepth)
+            return new SaveFormatFailure(SaveFormatFailureKind.InvalidJson, path,
+                "The save exceeds the configured JSON depth limit.");
+
         if (element.ValueKind == JsonValueKind.String)
         {
             string value = element.GetString()!;
@@ -554,7 +560,8 @@ internal static class SaveJsonCodec
                 SaveFormatFailure? failure = ValidateElement(
                     item,
                     $"{path}[{index}]",
-                    limits);
+                    limits,
+                    depth + 1);
                 if (failure is not null)
                 {
                     return failure;
@@ -596,7 +603,8 @@ internal static class SaveJsonCodec
             SaveFormatFailure? failure = ValidateElement(
                 property.Value,
                 $"{path}[{propertyIndex}]",
-                limits);
+                limits,
+                depth + 1);
             if (failure is not null)
             {
                 return failure;

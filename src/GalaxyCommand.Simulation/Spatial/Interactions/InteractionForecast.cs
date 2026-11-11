@@ -21,6 +21,8 @@ public sealed record InteractionForecast
     public InteractionSpatialParticipant Source { get; }
     public InteractionSpatialParticipant Target => _target
         ?? throw new InvalidOperationException("A stationary target is not a spatial ship participant.");
+    /// <summary>Retains the exact nullable forecast input without inventing a ship for a stationary target.</summary>
+    internal InteractionSpatialParticipant? CheckpointTarget => _target;
     internal SpatialRevision TargetRevision => _target?.Revision
         ?? ((StationaryInteractionInterest)Candidate.Interest).Revision;
     public SimulationTime From { get; }

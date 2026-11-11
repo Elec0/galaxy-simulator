@@ -194,7 +194,7 @@ internal static class ManeuverPhaseSchedules
     /// Projects the selected translation union, then appends the independently
     /// scheduled terminal heading turn when present.
     /// </summary>
-    private static ManeuverScheduledPhase[] From(
+    internal static ManeuverScheduledPhase[] From(
         StationaryDirectionalManeuverPlan plan)
     {
         ManeuverScheduledPhase[] translation = plan.Kind switch

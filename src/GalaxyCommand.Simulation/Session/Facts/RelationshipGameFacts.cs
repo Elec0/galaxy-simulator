@@ -140,6 +140,22 @@ public sealed record RelationshipGrantRevokedFact : GameFact
         Reason = outcome.Reason;
     }
 
+    /// <summary>
+    /// Restores the retained fact payload without inventing grant parties that
+    /// are deliberately absent from a revocation fact.
+    /// </summary>
+    internal RelationshipGrantRevokedFact(RelationshipGrantId id, RelationshipPolicyChangeReason reason)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(id.Value);
+        if (!Enum.IsDefined(reason))
+        {
+            throw new ArgumentOutOfRangeException(nameof(reason));
+        }
+
+        Id = id;
+        Reason = reason;
+    }
+
     public RelationshipGrantId Id { get; }
 
     public RelationshipPolicyChangeReason Reason { get; }

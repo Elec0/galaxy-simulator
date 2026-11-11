@@ -3,9 +3,20 @@ using GalaxyCommand.Content;
 
 namespace GalaxyCommand.Simulation;
 
+internal enum CheckpointFailureKind
+{
+    InvalidCheckpoint,
+    InvalidSchema,
+    UnsupportedSchemaVersion,
+    IncompatibleRuntimePolicy,
+    IncompatibleContent,
+    UnexpectedFailure,
+}
+
 internal sealed record CheckpointValidationFailure(
     string Path,
-    string Message);
+    string Message,
+    CheckpointFailureKind Kind = CheckpointFailureKind.InvalidCheckpoint);
 
 internal sealed class CheckpointResult<T>
     where T : class

@@ -43,8 +43,9 @@ source of detailed scope and acceptance criteria.
     fields, and collection with coupled in-memory continuation proof.
     Actor-removal collection cleanup remains open under this task; completed
     TASK-115 supplies its exact release-proof admission prerequisite. Encoded
-    checkpoints remain paused until separate TASK-116. Generic component benchmarks and populated UI-fixture
-    evidence do not qualify that station path. Broader platform accessibility
+    checkpoint infrastructure is delivered by TASK-116; remaining cargo
+    integration stays under this task. Generic component benchmarks and
+    populated UI-fixture evidence do not qualify that station path. Broader platform accessibility
     qualification remains with TASK-077.
     See the design's
     [implementation boundaries](systems/cargo-disposition-and-collection.md#initial-arithmetic-and-generation-implementation).
@@ -173,20 +174,6 @@ source of detailed scope and acceptance criteria.
     converts only the approved typed Phase 1 fixture and supplies runtime
     definition loading; it does not select this gameplay content.
 
-- [ ] **TASK-116: Implement the whole-session typed checkpoint JSON bridge**
-  - Existing save mechanics read and write inert JSON documents; no bridge
-    encodes or decodes GameSessionCheckpoint owner sections. Implement the
-    accepted current-schema encoding rules and privately restored session
-    admission before claiming encoded session continuation. Coordinate content
-    compatibility with TASK-037. TASK-108's encoded cargo-save delivery is
-    paused by the owner until this separate prerequisite is delivered.
-  - Context: [Save format and migration](architecture/save-format-and-migration.md) · [Cargo checkpoints](systems/cargo-disposition-and-collection.md#r08-policy-content-and-checkpoint-contract)
-
-- [ ] **TASK-113: Repair the task-list link to TASK-037**
-  - Link validation found that the version-content-catalogs reference points to
-    a heading fragment, but TASK-037 is a list entry without that anchor. Define
-    a stable target and update the reference.
-
 - [ ] **TASK-110: Design and implement voluntary cargo-ejection commands and controls**
   - Deferred by the owner during TASK-108 review. Define player
     selection, authorization, quantities/instances, reservation handling, and
@@ -210,7 +197,6 @@ source of detailed scope and acceptance criteria.
     Player order-failure notification remains TASK-094, and observation remains
     TASK-073. This task is not part of TASK-095's runtime delivery.
   - Context: [Initial deployable delivery](systems/sensor-deployables.md#initial-content-adaptation-and-delivery)
-
 
 - [ ] **TASK-103: Implement combat activation and active-domain continuation**
   - Added when TASK-071 closed to track runtime work not covered
@@ -445,7 +431,6 @@ the project-level **Near-term work** section above.
     semantic failure facts and terminal order state independently of this UI.
   - Context: [Sensor deployables](systems/sensor-deployables.md#execution-and-failure) · [Actor control and order lifecycle](systems/actor-control-and-orders.md) · [Semantic game facts](architecture/semantic-game-facts.md)
 
-
 - [ ] **TASK-032: Define semantic economy facts**
   - Define gameplay-facing production, construction, and logistics lifecycle
     facts after `TASK-009` establishes their commit owners.
@@ -639,6 +624,8 @@ the project-level **Near-term work** section above.
     simulation state or commands.
   - Context: [Relational gameplay model](systems/factions.md)
 
+<a id="task-037"></a>
+
 - [ ] **TASK-037: Version content catalogs and migrate saved content references**
   - Begin after `TASK-022` selects save versioning, `TASK-023` selects the
     gameplay content format, and completed `TASK-063` supplies the resolved
@@ -667,7 +654,7 @@ the project-level **Near-term work** section above.
     future load and preserving an already-running authoritative session.
   - Add focused failure-injection and continuity tests once the recovery
     contract is accepted. Depends on `TASK-022`, `TASK-023`, and `TASK-037`.
-  - Context: [Authoritative save boundary](architecture/authoritative-save-boundary.md) · [Version content catalogs](task-list.md#task-037-version-content-catalogs-and-migrate-saved-content-references)
+  - Context: [Authoritative save boundary](architecture/authoritative-save-boundary.md) · [Version content catalogs](task-list.md#task-037)
 
 - [ ] **TASK-051: Define docking, undocking, and berth capacity**
   - Owner explicitly deferred docking decisions while combat
@@ -893,6 +880,30 @@ the project-level **Near-term work** section above.
 
 ## Completed foundations
 
+- [x] **TASK-113: Repair the task-list link to TASK-037**
+  - Added the stable `task-037` anchor to TASK-037 and updated the content-catalog
+    reference to target it independently of task wording or placement.
+
+- [x] **TASK-116: Implement the whole-session typed checkpoint JSON bridge**
+  - Delivered complete current-schema owner encoding/decoding, explicit frozen
+    value contracts, exact integer strings, closed union tokens, bounded strict
+    validation, and isolated whole-session admission through existing restore
+    contracts and explicit content dependencies.
+  - Included owner-approved TASK-119's exact selected-maneuver reconstruction;
+    preserved continuation through atomic file storage, pending movement,
+    economy, stations, cargo, observations, and historical fact disclosures.
+  - TASK-037 retains content compatibility and saved-reference migration.
+    TASK-108 retains its remaining cargo delivery; TASK-118 retains authored
+    starting gameplay content.
+  - Context: [Typed checkpoint bridge](architecture/save-format-and-migration.md#typed-whole-session-checkpoint-bridge)
+
+- [x] **TASK-119: Define inert analytic-maneuver checkpoint capture and restoration**
+  - Delivered within TASK-116 by owner approval: inert selected analytic
+    payloads, exact phase splits and kinematic reconstruction, direct nested
+    continuation restoration, and validation of future phase joins without
+    planner replay or persisted evaluator delegates.
+  - Context: [Exact active maneuver reconstruction](architecture/save-format-and-migration.md#exact-active-maneuver-reconstruction)
+
 - [x] **TASK-105: Implement the approved station entity runtime**
   - Delivered TASK-057's Q01-Q58 and R01-R05: stable site/base/module identity,
     shared storage, authorized builders, exact partial construction, upgrades,
@@ -910,7 +921,7 @@ the project-level **Near-term work** section above.
   - Retained serial owner commits with deterministic physical work waves,
     material-gate timing, full checkpoint/event digests, and measured station
     workloads across worker, partition, and restore layouts.
-  - Encoded checkpoint delivery remains TASK-116; authored starting gameplay
+  - TASK-116 supplies the encoded checkpoint bridge; authored starting gameplay
     content remains TASK-118. TASK-108 retains its separate remaining cargo
     work, and TASK-073 retains full observation delivery ownership.
   - Context: [Station contract](systems/stations.md) · [Performance and determinism](validation/station-runtime-performance.md) · [Phase 1 conversion](validation/phase-1-simulation-spec.md#station-conversion-baseline)

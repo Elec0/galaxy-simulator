@@ -20,6 +20,20 @@ public sealed record ForcedCruiseDropoutTerminalManeuverPlan
         ContinuationPlan = continuationPlan;
     }
 
+    /// <summary>Rebinds a saved selected continuation without invoking the maneuver planner.</summary>
+    internal static ForcedCruiseDropoutTerminalManeuverPlan RestoreSelected(
+        SystemPosition destination, ShipHeading? requestedHeading,
+        DecelerationManeuverSegment dropoutPhase, ExecutableBoundedTerminalManeuverPlan continuation)
+    {
+        ArgumentNullException.ThrowIfNull(dropoutPhase);
+        ArgumentNullException.ThrowIfNull(continuation);
+        if (dropoutPhase.Kind != ManeuverDecelerationKind.ActiveBrake
+            || dropoutPhase.EndsAt != continuation.StartsAt
+            || dropoutPhase.StateAt(dropoutPhase.EndsAt) != continuation.StateAt(continuation.StartsAt))
+            throw new ArgumentException("A saved cruise dropout must join its continuation at the exact kinematic state.");
+        return new(destination, requestedHeading, dropoutPhase, continuation);
+    }
+
     public SystemPosition Destination { get; }
 
     public ShipHeading? RequestedHeading { get; }

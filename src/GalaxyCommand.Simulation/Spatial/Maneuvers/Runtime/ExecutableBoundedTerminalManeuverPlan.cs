@@ -4,9 +4,10 @@ namespace GalaxyCommand.Simulation;
 /// Read-only execution view over one concrete bounded terminal selection.
 /// It preserves the selected plan's exact analytic schedule and evaluator.
 /// </summary>
-public sealed class ExecutableBoundedTerminalManeuverPlan
+public sealed partial class ExecutableBoundedTerminalManeuverPlan
 {
     private readonly Func<SimulationTime, ShipKinematicState> stateAt;
+    private readonly ExecutableManeuverPayload payload;
 
     /// <summary>
     /// Freezes one complete phase projection and rejects gaps, overlap, or
@@ -17,6 +18,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
         SimulationTime startsAt,
         SimulationTime endsAt,
         Func<SimulationTime, ShipKinematicState> stateAt,
+        ExecutableManeuverPayload payload,
         IEnumerable<ManeuverScheduledPhase> phases,
         IEnumerable<InteractionPhaseCurve> interactionCurves)
     {
@@ -24,6 +26,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
         StartsAt = startsAt;
         EndsAt = endsAt;
         this.stateAt = stateAt;
+        this.payload = payload;
         ManeuverScheduledPhase[] phaseArray = phases.ToArray();
         if (phaseArray.Length == 0
             || phaseArray[0].StartsAt != startsAt
@@ -65,6 +68,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             at,
             at,
             _ => settled,
+            new ExecutableManeuverPayload.TerminalSettle(at, settled),
             ManeuverPhaseSchedules.TerminalSettle(at),
             [InteractionPhaseCurve.Fixed(settled.Position, at, at)]);
 
@@ -88,6 +92,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             segment.StartsAt,
             segment.EndsAt,
             segment.StateAt,
+            new ExecutableManeuverPayload.PassiveDrag(segment),
             [
                 new ManeuverScheduledPhase(
                     ManeuverPhaseKind.CoastUnderPassiveDrag,
@@ -104,6 +109,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
+            new ExecutableManeuverPayload.Turn(plan),
             ManeuverPhaseSchedules.From(plan),
             ManeuverInteractionCurves.From(plan));
 
@@ -121,6 +127,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
+            new ExecutableManeuverPayload.Directional(plan),
             ManeuverPhaseSchedules.From(selection),
             ManeuverInteractionCurves.From(plan));
     }
@@ -132,6 +139,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
+            new ExecutableManeuverPayload.MovingAligned(plan),
             ManeuverPhaseSchedules.From(plan),
             ManeuverInteractionCurves.From(plan));
 
@@ -142,6 +150,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
+            new ExecutableManeuverPayload.Cruise(plan),
             ManeuverPhaseSchedules.From(plan),
             ManeuverInteractionCurves.From(plan));
 
@@ -152,6 +161,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
+            new ExecutableManeuverPayload.ForcedDropout(plan.Destination, plan.RequestedHeading, plan.DropoutPhase, plan.ContinuationPlan.CaptureCheckpoint()),
             ManeuverPhaseSchedules.From(plan),
             ManeuverInteractionCurves.From(plan));
 
@@ -162,6 +172,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
+            new ExecutableManeuverPayload.BrakeThenDirectional(plan),
             ManeuverPhaseSchedules.From(plan),
             ManeuverInteractionCurves.From(plan));
 
@@ -172,6 +183,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             plan.StartsAt,
             plan.EndsAt,
             plan.StateAt,
+            new ExecutableManeuverPayload.ReducedThrust(plan),
             ManeuverPhaseSchedules.From(plan),
             ManeuverInteractionCurves.From(plan));
 
@@ -213,6 +225,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             transitions[0].StartsAt,
             terminalPlan.EndsAt,
             time => StateAtWaypointRoute(transitions, terminalPlan, time),
+            new ExecutableManeuverPayload.WaypointRoute(transitions, terminalPlan.CaptureCheckpoint()),
             phases,
             transitions.Select(InteractionPhaseCurve.From).Concat(terminalPlan.InteractionCurves));
     }
@@ -233,6 +246,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
                 plan.StartsAt,
                 plan.EndsAt,
                 plan.StateAt,
+                new ExecutableManeuverPayload.ImmediateBraking(plan),
                 ManeuverPhaseSchedules.From(selection),
                 ManeuverInteractionCurves.From(selection)),
             {
@@ -243,6 +257,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
                 plan.StartsAt,
                 plan.EndsAt,
                 plan.StateAt,
+                new ExecutableManeuverPayload.Triangular(plan),
                 ManeuverPhaseSchedules.From(selection),
                 ManeuverInteractionCurves.From(selection)),
             {
@@ -253,6 +268,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
                 plan.StartsAt,
                 plan.EndsAt,
                 plan.StateAt,
+                new ExecutableManeuverPayload.CappedSpeed(plan),
                 ManeuverPhaseSchedules.From(selection),
                 ManeuverInteractionCurves.From(selection)),
             _ => throw InvalidPayload(selection.Kind),
@@ -336,6 +352,7 @@ public sealed class ExecutableBoundedTerminalManeuverPlan
             StartsAt,
             EndsAt,
             stateAt,
+            payload,
             split,
             InteractionCurves);
     }

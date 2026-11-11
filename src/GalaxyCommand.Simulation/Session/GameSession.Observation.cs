@@ -77,6 +77,33 @@ public sealed partial class GameSession
     }
 
     /// <summary>
+    /// Compares independently restored historical payloads by complete value. Station removal embeds
+    /// collection-bearing snapshots whose record equality otherwise depends on array identity.
+    /// Standing contributions and field-order priorities likewise retain their complete ordered values.
+    /// </summary>
+    private static bool SamePlayerFactPayload(GameFact left, GameFact right) => (left, right) switch
+    {
+        (StationRemovedFact first, StationRemovedFact second) => first.Reason == second.Reason
+            && StationSnapshotValueEquality.Equal(first.Station, second.Station),
+        (StandingChangedFact first, StandingChangedFact second) => first.AssessingPrincipalId == second.AssessingPrincipalId
+            && first.SubjectPrincipalId == second.SubjectPrincipalId && first.PriorValue == second.PriorValue
+            && first.PriorBand == second.PriorBand && first.CombinedDelta == second.CombinedDelta
+            && first.ResultingValue == second.ResultingValue && first.ResultingBand == second.ResultingBand
+            && first.Contributions.SequenceEqual(second.Contributions),
+        (ShipOrderTransitionFact { Action: ShipActionIntent.CollectField firstAction } first,
+            ShipOrderTransitionFact { Action: ShipActionIntent.CollectField secondAction } second) =>
+            first.ShipId == second.ShipId && first.OrderId == second.OrderId && first.Source == second.Source
+            && first.Destination == second.Destination && first.RequestedHeading == second.RequestedHeading
+            && first.PreviousStatus == second.PreviousStatus && first.NextStatus == second.NextStatus && first.Reason == second.Reason
+            && firstAction.OriginCommandSequence == secondAction.OriginCommandSequence
+            && firstAction.CargoInventoryId == secondAction.CargoInventoryId && firstAction.TargetFieldId == secondAction.TargetFieldId
+            && firstAction.LastObservedObjectEntityId == secondAction.LastObservedObjectEntityId
+            && firstAction.LastObservedPosition == secondAction.LastObservedPosition
+            && firstAction.Priorities.SequenceEqual(secondAction.Priorities),
+        _ => left == right,
+    };
+
+    /// <summary>
     /// Validates saved projection shape and ownership evidence without granting
     /// historical visibility from current coverage. Complete causes never form
     /// part of a player notice, and non-owned notices must match their source.
@@ -153,7 +180,7 @@ public sealed partial class GameSession
                 && (station?.DefinitionKey ?? removedStation?.DefinitionKey) == stationNotice.DefinitionKey
                 && stationPrincipal == stationNotice.PrincipalId && (station?.Position ?? removedStation?.Position) == stationNotice.Position;
         }
-        if (receipt.Fact == envelope.Fact)
+        if (SamePlayerFactPayload(receipt.Fact, envelope.Fact))
         {
             return envelope.Fact switch
             {

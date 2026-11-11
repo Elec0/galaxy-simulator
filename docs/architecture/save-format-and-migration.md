@@ -21,7 +21,9 @@ format, subject to the same complete validation as a game-written save.
 
 **Implementation status:** `TASK-022` completed slices 1 through 4: strict
 format mechanics, complete current-owner checkpoints, whole-session isolated
-restore, and atomic file storage. `TASK-023` has defined the content format and
+restore, and atomic file storage. `TASK-116` adds the typed whole-session JSON
+bridge and exact selected-maneuver reconstruction, including `TASK-119`.
+`TASK-023` has defined the content format and
 boundaries. `TASK-063` supplies resolved content catalogs and completed
 `TASK-048` supplies static new-game composition. General saved sessions remain
 unavailable until `TASK-037` implements content compatibility and
@@ -280,6 +282,105 @@ The first slice establishes editable format mechanics without pretending that
 an encoded presentation snapshot is a save. Later slices remain blocked on an
 owner if that owner cannot yet provide its complete authoritative capture and
 direct restoration contract.
+
+## Typed whole-session checkpoint bridge
+
+`GameSessionSaveCodec` joins completed immutable capture to the strict JSON
+format and isolated whole-session restoration. `Encode` produces an inert
+current-schema document; `Decode` checks its envelope and reconstructs immutable
+checkpoint values; `Restore` admits those values through
+`GameSession.RestoreCheckpoint`. Decode alone does not qualify a document for
+simulation. Only successful isolated owner and cross-owner validation returns a
+session. Existing `SaveJsonCodec` and `SaveFileStore` provide bounded byte I/O
+and atomic slot storage around this bridge.
+
+Envelope metadata is supplied explicitly by the caller. Capture time must be
+UTC, save identity uses a canonical lowercase UUID, and producer identity is
+informational. None of these values selects runtime behavior. The current
+`compatibility` object contains `runtimePolicies`; its complete values must
+match `checkpoint.runtimePolicies` regardless of JSON property order. No
+content compatibility inventory is fabricated. Current physical definitions,
+material compatibility, and host execution tuning are explicit restore inputs
+where the existing owner contracts require them. Content catalog compatibility
+and saved-reference migration remain `TASK-037`, so this bridge does not enable
+general cross-catalog saved sessions.
+
+### Frozen value contracts
+
+The codec registers each admitted object, scalar, enumeration, and union in
+`CheckpointJsonContracts`. Its fixed member lists bind to constructors and
+retained init properties; reflection is only a binding mechanism. A document
+cannot select CLR types, constructor names, or arbitrary properties, and there
+is no automatic runtime type-discovery fallback. Derived getters and aliases
+are reconstructed from their authoritative inputs. A newly added owner field
+or union case requires an explicit schema review rather than silently changing
+the serialized surface.
+
+Domain scalar wrappers emit directly as strings. Signed and unsigned 64-bit
+integers, 128-bit integers, and arbitrary-precision station progress values use
+canonical base-10 strings without exponents, leading zeros, or a leading plus.
+Versions, collection indices, and byte seed elements retain ordinary JSON
+integer tokens. Qualified content keys use their validated external identity.
+Dictionary values use arrays of `key`/`value` entry objects, ordered by numeric
+domain identity or ordinal content identity; duplicate keys reject. Ordered
+sequences retain their captured order.
+
+Every enumeration and union uses its explicit lowercase token vocabulary. A
+union's `kind` discriminant precedes its payload fields. When that payload
+also has an authoritative `Kind` property, the field is named `valueKind` to
+keep it distinct from the discriminant. Unknown tokens, unknown properties,
+duplicate properties, and missing members reject. Nullable owners must still
+be present explicitly. Null entries are accepted only where the declared
+collection element contract permits them, with owner validation deciding
+whether that inert value is admissible.
+
+Both encoding and direct inert-document admission enforce the caller's JSON
+depth and generic resource limits. The typed schema also has a depth ceiling
+of 128. Invalid schema values report bounded paths before runtime admission;
+owner failures remain distinct from unsupported schemas and incompatible
+runtime policies. Diagnostics do not expose arbitrary unknown property names
+or internal exception details.
+
+### Exact active maneuver reconstruction
+
+The in-memory movement checkpoint retains an
+`ExecutableBoundedTerminalManeuverPlan`, whose evaluator is a delegate. That
+delegate is not serializable authority. The bridge captures an inert
+`ExecutableManeuverCheckpoint` instead: the selected kind, exact observable
+phase schedule, and closed selected analytic payload. Payloads retain the
+original concrete plan inputs, including braking target speed, heading,
+waypoint transitions, and nested selected continuations.
+
+Restoration constructs the selected evaluator and interaction geometry from
+those inputs without invoking a planner, replaying commands, or sampling the
+trajectory. It validates future phase joins, position, velocity, heading,
+terminal arrival, and the permitted cruise velocity transitions. Saved
+observable boundaries may split original phases but cannot remove or
+reinterpret a physical boundary. Nested waypoint and dropout payloads restore
+each child once before the parent is validated.
+
+Position-only interaction curves are insufficient for this purpose: a
+stationary turn changes heading while retaining its position. Reconstructing
+the original analytic instructions preserves that rotation and all other
+kinematic behavior rather than inferring it from range-query geometry.
+
+### Continuation and rejection coverage
+
+The bridge's coverage includes byte and atomic-file round trips, pending
+movement and connector transit, production, transport and construction,
+physical inventory replay, station work and destruction, cargo collection and
+expiry, and persistent sensor and disclosure history. Continued owner sections
+are compared with uninterrupted whole-session capture. Restore-tuning cases
+exercise the same encoded checkpoint with different worker and batch inputs;
+these small continuation fixtures do not replace substantive performance
+benchmarks.
+
+Malformed cases cover envelope and owner structure, exact numeric spelling,
+closed tokens, missing and unknown members, null collection entries, depth
+limits, inconsistent manifests, altered future maneuver phases, and complete
+historical disclosure payloads. Station snapshots, standing contributions, and
+cargo-field priorities are compared by their full values during admission, so
+independently decoded collections do not depend on shared reference identity.
 
 ## Deferred choices
 
