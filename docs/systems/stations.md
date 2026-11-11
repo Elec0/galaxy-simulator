@@ -58,7 +58,7 @@ model before defining records, commands, or content fields.
 | Q09 | When may storage be voluntarily removed? | Reject removal if existing holdings plus reserved incoming capacity would exceed the remaining inventory capacity. Cargo and commitments must be resolved first. | Accepted |
 | Q10 | What happens when storage is disabled? | Disabling storage stops new intake without deleting stored cargo or reducing physical capacity. | Accepted |
 | Q11 | What happens when storage is destroyed? | Cargo loss is proportional to the fraction of total storage capacity destroyed. Losing 25% of capacity removes approximately 25% of stored cargo from the station inventory. Q35-Q36 and Q50-Q54 settle rounding, item selection, commitments, and the small-loss cutoff. | Accepted |
-| Q12 | Can lost cargo become recoverable objects, and who owns that policy? | Support an implementable cargo-disposition policy outside the specific station. Some cargo removed from station inventory may be ejected as collectible physical items instead of being permanently destroyed. Recovery fractions and collectible-object behavior are not selected here; shared design and implementation are tracked by TASK-108. | Accepted boundary; policy details open |
+| Q12 | Can lost cargo become recoverable objects, and who owns that policy? | Support an implementable cargo-disposition policy outside the specific station. Some cargo removed from station inventory may be ejected as collectible physical items instead of being permanently destroyed. Recovery fractions and collectible-object behavior are not selected here; shared design and implementation are tracked by TASK-108. | Accepted boundary; policy defined by TASK-108 |
 | Q13 | What supplies initial station construction work? | A construction-capable ship at the site supplies work. Materials are delivered to the site's shared station inventory. | Accepted |
 | Q14 | What supplies expansion work, and do existing services stop? | An attached construction module or a construction-capable ship can supply expansion work. Existing station services continue operating during expansion. Q21 settles simultaneous contribution and project concurrency. | Accepted |
 | Q15 | When are construction materials consumed? | Materials are consumed as work progresses. Each recipe defines total materials and work. Partial deliveries permit partial progress; missing materials pause construction. | Accepted |
@@ -183,8 +183,8 @@ commit. Existing inventory behavior does not create salvage objects implicitly.
 TASK-108 owns the shared policy and collectible-cargo design and implementation,
 including recovery fractions, placement, identity, collection, observation,
 persistence, and deterministic execution. The owner approved the complete
-[TASK-108 cargo contract](cargo-disposition-and-collection.md#accepted-technical-contract). Its design dependency is resolved; shared runtime delivery remains
-pending. TASK-057 retains the proportional storage-loss contract and its
+[TASK-108 cargo contract](cargo-disposition-and-collection.md#accepted-technical-contract). TASK-108 delivers the shared runtime, including station-loss integration and
+encoded continuation. TASK-057 retains the proportional storage-loss contract and its
 integration with station inventory and reservations.
 
 ## Domain relationships
@@ -708,8 +708,10 @@ Station loss selection preserves its accounting window and produces explicit
 subjects for TASK-108's cargo disposition transaction. The resulting objects
 use ordinary field collection. Retired provider archives retain terminal
 history and exact origin links, without retaining a live storage owner.
-In-memory checkpoints preserve these joins. TASK-116 retains the encoded
-whole-session checkpoint bridge; these tests do not qualify that adapter.
+In-memory checkpoints preserve these joins. Completed TASK-116 supplies the
+encoded whole-session checkpoint bridge and separate encoded station-loss,
+collection, and expiry continuation coverage. The in-memory station tests alone
+do not qualify that adapter.
 
 ### Construction admission foundation
 

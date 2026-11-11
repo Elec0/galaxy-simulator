@@ -48,7 +48,8 @@ compatibility accessor, which is undefined for that key category.
 Mutation checks establish sensitivity to work fractions, module state, recovery
 claims, recipe work, command receipts, event sequences and storage-loss windows.
 The digest is benchmark evidence, not a save encoder or a validation substitute.
-The encoded typed checkpoint boundary remains TASK-116.
+Completed TASK-116 supplies the encoded typed checkpoint bridge separately;
+these in-memory benchmark digests do not qualify that adapter.
 
 A separate gameplay digest supports comparison across wake-envelope formats.
 It omits the engine envelope graph, station pending/generation fields, event

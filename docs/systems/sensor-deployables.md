@@ -306,11 +306,11 @@ ship-pair interaction timing. Neither foundation implements a deployed entity
 or a deploy/pickup order. In particular, a stationary ship in TASK-071 tests is
 still a ship; it is not evidence of a stationary deployable runtime.
 
-TASK-095 must supply the real deployable owner and its immutable observation
-inputs. TASK-073 owns consuming those inputs for coverage, discovery, stale
-views, refresh, and confirmed absence. TASK-073 stage 3 can begin once that real
-runtime contract exists; deployable work cannot close the station requirements
-that remain with TASK-057 and TASK-105.
+Completed TASK-095 supplies the real deployable owner and its immutable
+observation inputs. TASK-073 consumes those inputs for coverage, discovery,
+stale views, refresh, and confirmed absence. Completed TASK-105 supplies the
+separate station inputs and runtime integration; TASK-073 retains full-domain
+observation delivery proof.
 
 ```mermaid
 flowchart LR
@@ -437,10 +437,11 @@ cover the existing ship mappings. None closes TASK-095 by analogy.
 
 After implementation, run the relevant content, inventory, lifecycle, order,
 interaction, presentation and checkpoint tests, followed by the solution build
-and regression suite and appropriate benchmark correctness checks. TASK-104's
-known connector-navigation digest mismatch must remain visible and must not be
-"fixed" by replacing its expected value to pass this work. Timing and allocation
-remain informational; worker execution requires its own measured evidence.
+and regression suite and appropriate benchmark correctness checks. Completed
+TASK-104 corrected the connector-navigation expectation after a separate owner
+review of its historical cause; unrelated feature work must not adjust benchmark
+expectations to hide divergence. Timing and allocation remain informational;
+worker execution requires its own measured evidence.
 
 This review used source and test inspection only. It did not execute tests or
 revalidate the historical test counts recorded elsewhere. The owner subsequently
@@ -525,9 +526,10 @@ historical disclosure. Shared stationary-range benchmark evidence is recorded
 with the [advancing-session measurements](../validation/interaction-session-measurements.md).
 
 Stationary-target serial and batched benchmark variants matched each other
-across the measured worker settings. TASK-104's existing navigation mismatch remains
-`88e79d6112f53750` versus expected `673c9af7f54a80e4`; its baseline was not changed.
-TASK-095 is complete within the approved runtime/content scope.
+across the measured worker settings. The historical connector-navigation
+expectation mismatch was subsequently resolved by TASK-104, which registered
+`88e79d6112f53750` after owner review. TASK-095 is complete within the approved
+runtime/content scope.
 
 The owner resumed observation integration under TASK-073.
 Its [deployable integration](fog-of-war-and-scouting.md#deployable-observation-integration)

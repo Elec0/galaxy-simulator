@@ -339,13 +339,14 @@ cancellations; a plan cannot append a claim for an unrelated workflow.
 ```mermaid
 flowchart LR
     prepare["Prepare transport releases"] --> coverage["Match all departing commitments"]
+    collection["Prepare collection attempt cancellation"] --> coverage
     coverage --> movement["Prepare exact movement cancellations"]
     movement --> check["Revalidate all prepared participants"]
-    check --> commit["Commit agenda, economy, orders, and lifecycle"]
+    check --> commit["Commit agenda, collection, economy, orders, and lifecycle"]
 ```
 
 The session revalidates inventory identity, exhaustive coverage, transport
-participants, and the complete referencing-job set before its first agenda
+participants, exact collection attempt/work, and the complete referencing-job set before its first agenda
 cancellation. Preparation and rejection allocate no simulation identities or
 sequences and leave cargo, agenda, economy, orders, facts, and session health
 unchanged. Commit retains the serial reference path and stable job ordering;
@@ -359,11 +360,13 @@ exhaustion, stale transport participants, valid loaded-job cancellation, and
 session rejection that preserves a collecting actor's pending work and later
 successful collection.
 
-TASK-108 retains collection actor-removal integration. Its exact prepared
-attempt cancellation can supply a physical reservation release when that
-cleanup joins this boundary. Until then, collection commitments reject actor
-removal. Production, construction, and orphan reservations likewise require an
-actual prepared release; their owner labels cannot authorize removal.
+TASK-108 joins the collection owner's exact prepared attempt cancellation as a
+supplemental physical release. Economy retains only its own transport releases;
+the session revalidates collection separately before any mutation. Collection
+work and incoming capacity are released before economic cleanup, then removed
+actor interests and retained targets are discarded. Production, construction,
+and orphan reservations still require an actual prepared release; their owner
+labels cannot authorize removal.
 
 ## Facts, snapshots, and commands
 

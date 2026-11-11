@@ -110,6 +110,84 @@ public sealed class EntityRemovalCommitmentTests
     }
 
     [Fact]
+    public void SeparateCollectionReleaseSupplementsCoverageWithoutBecomingAnEconomyRelease()
+    {
+        var (lifecycle, economy, cargo) = Create();
+        var owner = new ReservationOwner.CargoCollection(GameSessionTestFixture.Ship, new(1), new(1));
+        PhysicalReservation reservation = cargo.ReservePhysical(new(1),
+            new PhysicalReservationSubject.IncomingCapacity(new(2)), owner).Reservation!;
+        var release = new InventoryCommitmentRelease.Physical(cargo, reservation);
+
+        Assert.False(economy.TryPrepareEntityRemoval(GameSessionTestFixture.Ship, cargo.Id, out _));
+        Assert.True(economy.TryPrepareEntityRemoval(GameSessionTestFixture.Ship, cargo.Id, out var prepared, [release]));
+        Assert.Empty(prepared!.Releases);
+        Assert.Empty(prepared.Cancellations);
+        Assert.False(economy.CanCommitEntityRemoval(prepared));
+        Assert.True(economy.CanCommitEntityRemoval(prepared, [release]));
+        Assert.False(economy.CanCommitEntityRemoval(prepared, [release, release]));
+        Assert.False(economy.CanCommitEntityRemoval(prepared with { Releases = [release] }));
+        Assert.False(economy.CanCommitEntityRemoval(prepared with { Releases = [release] }, [release]));
+        Assert.Same(reservation, cargo.GetPhysicalReservation(reservation.Id));
+        Assert.Equal(GameSessionTestFixture.Ship, lifecycle.Entities.GetShipId(GameSessionTestFixture.Entity));
+
+        Assert.True(cargo.ReleasePhysicalReservation(reservation.Id, owner).IsAccepted);
+        Assert.True(economy.CanCommitEntityRemoval(prepared));
+        economy.ApplyEntityRemoval(prepared);
+        Assert.False(cargo.HasCommitments);
+    }
+
+    [Fact]
+    public void SupplementalCollectionProofCannotCoverAnAdditionalUnknownCommitment()
+    {
+        var (lifecycle, economy, cargo) = Create();
+        var owner = new ReservationOwner.CargoCollection(GameSessionTestFixture.Ship, new(1), new(1));
+        PhysicalReservation reservation = cargo.ReservePhysical(new(1),
+            new PhysicalReservationSubject.IncomingCapacity(new(2)), owner).Reservation!;
+        var release = new InventoryCommitmentRelease.Physical(cargo, reservation);
+        Assert.True(economy.TryPrepareEntityRemoval(GameSessionTestFixture.Ship, cargo.Id, out var prepared, [release]));
+        CapacityReservation unknown = cargo.ReserveCapacity(new(2), new(1), new ReservationOwner.ConstructionOrder(new(99)));
+        InventoryCheckpoint before = cargo.CaptureCheckpoint();
+
+        Assert.False(economy.CanCommitEntityRemoval(prepared!, [release]));
+        Assert.False(economy.TryPrepareEntityRemoval(GameSessionTestFixture.Ship, cargo.Id, out var rejected, [release]));
+
+        Assert.Null(rejected);
+        InventoryCheckpoint after = cargo.CaptureCheckpoint();
+        Assert.Equal(before.Reservations, after.Reservations);
+        Assert.Equal(before.CapacityReservations, after.CapacityReservations);
+        Assert.Equal(before.PhysicalReservations, after.PhysicalReservations);
+        Assert.Equal(before.NextIncomingAdmissionSequence, after.NextIncomingAdmissionSequence);
+        Assert.Equal(before.IncomingAdmissions, after.IncomingAdmissions);
+        Assert.Equal(before.NextOutgoingAdmissionSequence, after.NextOutgoingAdmissionSequence);
+        Assert.Equal(before.OutgoingAdmissions, after.OutgoingAdmissions);
+        Assert.Same(reservation, cargo.GetPhysicalReservation(reservation.Id));
+        Assert.Same(unknown, cargo.GetCapacityReservation(unknown.Id));
+        Assert.Equal(GameSessionTestFixture.Ship, lifecycle.Entities.GetShipId(GameSessionTestFixture.Entity));
+    }
+
+    [Fact]
+    public void SupplementalCollectionProofRejectsReusedReservationIdentity()
+    {
+        var (_, economy, cargo) = Create();
+        var owner = new ReservationOwner.CargoCollection(GameSessionTestFixture.Ship, new(1), new(1));
+        var subject = new PhysicalReservationSubject.IncomingCapacity(new(2));
+        PhysicalReservation reservation = cargo.ReservePhysical(new(1), subject, owner).Reservation!;
+        var release = new InventoryCommitmentRelease.Physical(cargo, reservation);
+        Assert.True(economy.TryPrepareEntityRemoval(GameSessionTestFixture.Ship, cargo.Id, out var prepared, [release]));
+        Assert.True(cargo.ReleasePhysicalReservation(reservation.Id, owner).IsAccepted);
+        PhysicalReservation replacement = cargo.ReservePhysical(reservation.Id, subject, owner).Reservation!;
+        Assert.NotSame(reservation, replacement);
+
+        Assert.False(economy.CanCommitEntityRemoval(prepared!, [release]));
+        Assert.False(economy.TryPrepareEntityRemoval(GameSessionTestFixture.Ship, cargo.Id, out var rejected, [release]));
+
+        Assert.Null(rejected);
+        Assert.Same(replacement, cargo.GetPhysicalReservation(reservation.Id));
+        Assert.True(economy.TryPrepareEntityRemoval(GameSessionTestFixture.Ship, cargo.Id, out _,
+            [new InventoryCommitmentRelease.Physical(cargo, replacement)]));
+    }
+
+    [Fact]
     public void LifecycleRequiresExactLiveProofBeforeRemovalAndStillRequiresActualReleaseAtApply()
     {
         var (lifecycle, _, cargo) = Create();

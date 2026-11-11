@@ -26,48 +26,11 @@ source of detailed scope and acceptance criteria.
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` completed the [equipment and ship-slot design](systems/equipment-and-ship-slots.md); `TASK-099` owns implementation. `TASK-055` owns trade balance, pricing, and settlement design. |
 | Spatial interaction, sensors, and deployables | `TASK-019` completed moving-ship interaction design. `TASK-020` completed fog-of-war design. `TASK-074` completed the deployable, inventory, lifecycle, and sensor-handoff contract; `TASK-075` completed deployment and pickup range and action-order design. `TASK-095` completed deployable runtime, range orders, committed observation inputs and checkpoint continuity; `TASK-106` completed independent ship-definition retention. `TASK-087` completed the shared system-local coordinate-scale and motion-resolution design, while `TASK-089` and `TASK-090` completed ship thrust and maneuver-kinematics design and implementation. `TASK-071` completed shared interaction discovery, timing, deterministic evaluation, and explicit motion handoffs. | `TASK-068` defined installed-equipment capability contributions; `TASK-099` implements them; `TASK-046` retains frozen combat design and `TASK-103` tracks combat activation and active-domain continuation. `TASK-072` owns geometry, collision, and avoidance, `TASK-073` implements fog of war without a general NPC knowledge model, `TASK-107` owns player deployment/pickup controls, `TASK-094` owns player order-failure notifications, and `TASK-088` retains late-term spatial authoring guidance. |
-| Stations | `TASK-057` completed the [station design](systems/stations.md), including composition, construction, expansion, loss accounting, lifecycle, observation, and persistence. | `TASK-105` implements stations; `TASK-073` integrates observation; `TASK-108` owns cargo recovery and collection; `TASK-109` retains future ownership changes. |
+| Stations | `TASK-057` completed the [station design](systems/stations.md), including composition, construction, expansion, loss accounting, lifecycle, observation, and persistence. | `TASK-105` completed station runtime and `TASK-108` completed cargo recovery and collection; `TASK-073` retains full observation delivery and `TASK-109` future ownership changes. |
 | Application pacing | `TASK-064` completed event-responsive pacing design. | `TASK-038` implements application pause, speed, input timing, and the accepted event-responsive integration. |
 | Source-code organization | `TASK-091` reorganized source and tests around the documented simulation authority, client presentation, deterministic execution, and test-harness boundaries without changing simulation behavior or public type identity. | Further namespace or assembly changes require measured need and separately approved work. |
 
 ## Current focus
-
-- [ ] **TASK-108: Design and implement shared cargo disposition and collection**
-  - Implemented recovery/generation, unclaimed inventory, cargo identity,
-    explicit policy admission, fields, generic causal disposition, expiry,
-    collection orders/timers, covered views, owned pickup feedback, world notices,
-    exact publication/admission and in-memory restoration checks, and Godot cargo
-    controls with the minimum English
-    localization and native keyboard-list foundation.
-    TASK-105 now supplies live station accounting, workflow cleanup, real loss
-    fields, and collection with coupled in-memory continuation proof.
-    Actor-removal collection cleanup remains open under this task; completed
-    TASK-115 supplies its exact release-proof admission prerequisite. Encoded
-    checkpoint infrastructure is delivered by TASK-116; remaining cargo
-    integration stays under this task. Generic component benchmarks and
-    populated UI-fixture evidence do not qualify that station path. Broader platform accessibility
-    qualification remains with TASK-077.
-    See the design's
-    [implementation boundaries](systems/cargo-disposition-and-collection.md#initial-arithmetic-and-generation-implementation).
-  - Accepted gameplay covers
-    cause-dependent survival (initial destruction recovery 50% floored per type
-    per causal commit), unclaimed identity-preserving cargo, deterministic scatter,
-    merged destruction fields, timed object/field collection, live-only coverage,
-    and expiry. Exact rules and initial values are in the design.
-  - TASK-105 joined storage-module loss and base destruction to shared cargo
-    disposition, preserving surviving stations and preparing inventory removal,
-    object publication, commitments, agenda, facts, and restoration together.
-  - Include collection commands and map controls. Voluntary-ejection commands
-    and controls remain TASK-110; installed-equipment disposition remains TASK-096.
-  - Accepted terminal rules: partial object pickup succeeds; no room fails;
-    targets taken by another ship fail object orders or advance field orders.
-    Merged fields never split; expiry destroys remaining cargo without outputs.
-  - Design completed and approved by the owner, including
-    C01-C12, R01-R09 as drafted, and R10's closing behavior. Implementation
-    is in progress. Deliver the full approved runtime, controls, content,
-    checkpoints, deterministic proof, and live station-to-collection integration
-    under R09; retain serial-reference and worker/batch equivalence checks.
-  - Context: [Cargo disposition and collection design](systems/cargo-disposition-and-collection.md) · [Station cargo disposition](systems/stations.md#shared-cargo-disposition-policy) · [Inventory and cargo](systems/inventory-and-cargo.md)
 
 - [ ] **TASK-073: Implement player fog-of-war, sensors, and scouting**
   - Resumed by the owner and implemented the deployable portion:
@@ -75,7 +38,7 @@ source of detailed scope and acceptance criteria.
     refresh/confirmed-absence records, checkpoint v2 and safe historical
     disclosure. Includes exact pass-through/exit boundaries, overlapping-source
     withdrawal and controlled-motion materialization. TASK-095 remains complete.
-    TASK-104's known benchmark mismatch is unchanged. See [deployable integration](systems/fog-of-war-and-scouting.md#deployable-observation-integration).
+    TASK-104 corrected the historical benchmark expectation. See [deployable integration](systems/fog-of-war-and-scouting.md#deployable-observation-integration).
   - Promoted by the project owner. The owner selected a staged
     boundary for review, then implementation of approved stages. The linked
     design now proposes ship coverage, live ship presentation/disclosure,
@@ -90,8 +53,8 @@ source of detailed scope and acceptance criteria.
   - Completed stage 2's explicit sensor definitions and player binding,
     filtered ship presentation/selection, safe commit-time notices, bounded
     disclosure receipts, checkpoint/restore validation, and Godot consumption.
-    The connector-navigation mismatch also occurs at untouched HEAD and is
-    tracked by `TASK-104`.
+    TASK-104 reconciled the historical connector-navigation benchmark
+    expectation.
   - The deployable portion of stages 3 and 4 now consumes TASK-095's committed
     views and sources. Station design remains `TASK-057` and station runtime is
     `TASK-105`. Its committed station sources, exterior views, and retained
@@ -880,6 +843,25 @@ the project-level **Near-term work** section above.
 
 ## Completed foundations
 
+- [x] **TASK-108: Design and implement shared cargo disposition and collection**
+  - Delivered accepted C01-C12 and R01-R10: cause-dependent survival, original
+    discrete identities, unclaimed inventory, deterministic scatter and merged
+    fields, exact expiry, timed object/field orders, capacity settlement,
+    covered views, safe notices, and owned pickup results.
+  - Included Godot cargo inspection, collection and priority controls through
+    the input FIFO, English localization, and native keyboard-list support.
+  - Joined collector removal to TASK-115's exact release admission: prepare and
+    revalidate collection/transport coverage before mutation, cancel attempt
+    work, release capacity, and clear removed actor targets and interests.
+  - Live station loss and collection use completed TASK-105. TASK-116 supplies
+    encoded whole-session continuation, including pending collection and expiry.
+    Regression coverage includes removal before/after JSON restoration, stale
+    wakes, unknown-commitment rejection, and worker/batch/partition equivalence.
+  - TASK-073 retains full observation delivery, TASK-077 broader application
+    accessibility, TASK-096 installed-equipment disposition, TASK-110 voluntary
+    ejection controls, and TASK-118 authored station starting content.
+  - Context: [Cargo disposition and collection](systems/cargo-disposition-and-collection.md) · [Station workloads](validation/station-runtime-performance.md)
+
 - [x] **TASK-113: Repair the task-list link to TASK-037**
   - Added the stable `task-037` anchor to TASK-037 and updated the content-catalog
     reference to target it independently of task wording or placement.
@@ -893,7 +875,7 @@ the project-level **Near-term work** section above.
     preserved continuation through atomic file storage, pending movement,
     economy, stations, cargo, observations, and historical fact disclosures.
   - TASK-037 retains content compatibility and saved-reference migration.
-    TASK-108 retains its remaining cargo delivery; TASK-118 retains authored
+    TASK-108 completed shared cargo delivery; TASK-118 retains authored
     starting gameplay content.
   - Context: [Typed checkpoint bridge](architecture/save-format-and-migration.md#typed-whole-session-checkpoint-bridge)
 
@@ -922,8 +904,8 @@ the project-level **Near-term work** section above.
     material-gate timing, full checkpoint/event digests, and measured station
     workloads across worker, partition, and restore layouts.
   - TASK-116 supplies the encoded checkpoint bridge; authored starting gameplay
-    content remains TASK-118. TASK-108 retains its separate remaining cargo
-    work, and TASK-073 retains full observation delivery ownership.
+    content remains TASK-118. TASK-108 completed shared cargo delivery, and
+    TASK-073 retains full observation delivery ownership.
   - Context: [Station contract](systems/stations.md) · [Performance and determinism](validation/station-runtime-performance.md) · [Phase 1 conversion](validation/phase-1-simulation-spec.md#station-conversion-baseline)
 
 - [x] **TASK-115: Require exact commitment-release proofs for actor removal**
@@ -932,8 +914,8 @@ the project-level **Near-term work** section above.
     Transport proofs retain exact reservations, workflow state, assignment,
     inventories, and cancellation arithmetic; stale, duplicate, mismatched,
     or unsupported commitments reject without partial cleanup.
-  - TASK-108 retains collection actor-removal cleanup and integration with
-    this admission boundary.
+  - TASK-108 completed collection actor-removal cleanup through this
+    admission boundary.
   - Context: [Exact release admission](architecture/entity-lifecycle.md#exact-commitment-release-admission-task-115) · [Cargo interruption contract](systems/cargo-disposition-and-collection.md#r05-timing-interruption-and-exact-agenda-ordering)
 
 - [x] **TASK-117: Define collection admission motion with retained velocity**
@@ -941,7 +923,7 @@ the project-level **Near-term work** section above.
     velocity. Collection retains committed drag, physical completion preserves
     its timer, and strict exit releases capacity before later full-duration
     reentry. Waiting motion and restarted attempts continue through in-memory
-    restoration. Full cargo delivery remains TASK-108.
+    restoration. TASK-108 completed full shared cargo delivery.
   - Context: [Cargo motion](systems/cargo-disposition-and-collection.md#r10-accepted-closing-behavior)
 
 - [x] **TASK-114: Keep routine test and build success reports out of documentation**
@@ -995,7 +977,7 @@ the project-level **Near-term work** section above.
   - Added typed committed views/sources, safe historical notices, direct
     checkpoint continuation and idempotency. TASK-106 records the independent
     definition retention shared by starting and constructed ships.
-  - TASK-104's known navigation digest mismatch remains visible and unchanged.
+  - TASK-104 reconciled the historical navigation digest expectation.
   - Observation integration remains TASK-073, player controls TASK-107, failure
     notifications TASK-094, and general encoded save admission TASK-037.
   - Context: [Runtime delivery and verification](systems/sensor-deployables.md#runtime-delivery-and-verification) · [Shared range measurements](validation/interaction-session-measurements.md#task-095-fixed-position-extension)

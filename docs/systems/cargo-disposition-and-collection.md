@@ -15,9 +15,11 @@ it.
 **Status:** Design complete and accepted by the project owner,
 including C01-C12 and R01-R10. The owner approved R01-R03, R04-R06, and
 R07-R09 as drafted; R10's closing behavior was separately accepted.
-Implementation has begun with the evaluation, inventory, identity, and policy
-boundaries described below. TASK-105's design dependency is
-resolved; its live cargo-loss commits still require the shared cargo runtime.
+The shared runtime, player controls, and live station-loss integration are
+implemented. TASK-115 supplies exact release admission and TASK-116 supplies
+encoded whole-session checkpoints. Collector removal now joins exact attempt
+cancellation to lifecycle and economy admission. TASK-108 delivers the accepted
+R01-R10 contract; separate follow-up ownership is listed below.
 
 ## Established boundaries
 
@@ -47,8 +49,8 @@ during the same transaction, or collectible cargo.
 
 `InventoryCustody.cs` now distinguishes principal-controlled custody from
 explicit unclaimed cargo custody. Lifecycle admission validates the cargo
-entity/inventory link. This does not yet provide a player-visible spatial
-target or observation policy.
+entity/inventory link. The cargo runtime supplies stationary targets and
+coverage-filtered views through the observation boundary described below.
 
 `SensorDeployableTransactions.cs` provides a nearby example of coordinated
 inventory and entity publication, range validation, and idempotent receipts.
@@ -56,9 +58,9 @@ Deployment consumes an item and pickup creates a fresh equivalent item. That
 behavior is specific to the accepted deployable contract. Cargo recovery must
 instead preserve each surviving discrete item's original identity and state.
 
-TASK-105 currently has pure construction and storage-loss arithmetic. Its
-existing calculations do not constitute cargo selection, disposition, or live
-station lifecycle integration.
+TASK-105 supplies live station accounting, selected storage/base loss,
+workflow invalidation, shared disposition, and collection integration. Its
+station workloads and encoded continuation coverage exercise that causal path.
 
 ### Initial arithmetic and generation implementation
 
@@ -76,7 +78,7 @@ remain original and are returned in canonical order; no item, inventory, or
 entity allocator is consumed. Stateless samples use source identity, separate
 command/event namespaces, causal occurrence, generation behavior version,
 qualified definition, purpose, and explicit sample coordinates. Full event-key
-replay equality remains the future receipt owner's responsibility.
+replay equality is enforced by the disposition receipt owner described below.
 
 These helpers are internal evaluation building blocks. Their coverage includes
 numeric extremes, positive partitions and quantity conservation, original item
@@ -115,8 +117,9 @@ authority are not supplied by this inventory primitive.
 The content loader admits an explicitly referenced `cargo-policy` definition.
 The core and preview scenarios author the approved values, including every
 supported cause. Runtime manifests retain the exact policy key, fractions,
-algorithm versions, and parameters through in-memory session restoration.
-This is not encoded-save delivery, and it does not schedule cargo events.
+algorithm versions, and parameters through session restoration. TASK-116
+encodes these owner sections through the whole-session typed JSON bridge;
+policy admission itself does not schedule cargo events.
 
 ```mermaid
 flowchart LR
@@ -124,7 +127,7 @@ flowchart LR
     evaluation --> transaction["Prepared cargo transaction"]
     transaction --> lifecycle["Cargo entity and stationary position"]
     transaction --> inventory["Unclaimed inventory<br/>sole contents authority"]
-    collector["Collection attempt<br/>runtime remains open"] --> settlement["Capacity settlement"]
+    collector["Timed collection attempt"] --> settlement["Capacity settlement"]
     inventory --> settlement
     settlement --> ship["Principal-controlled ship inventory"]
 ```
@@ -146,7 +149,7 @@ inventory-reservation cleanup. It preserves untouched commitments, returns
 original discrete instances, and rejects stale source state without mutation.
 It does not cancel the transport, production, or construction workflow that
 owns a reservation; that workflow's invalidation is a separate causal-owner
-delta that still needs live station integration.
+delta supplied by TASK-105's live station-loss integration.
 
 `CargoDispositionOwner` joins source loss, survival and scatter, prepared
 entity/inventory publication, field membership, exact expiry envelopes, durable
@@ -164,8 +167,8 @@ Receipts compare canonical source inventory/position, typed command or full
 event cause, occurrence, cause policy, selected quantities/instances, and
 authorized inventory cleanup. Replay is resolved before source lookup, so
 later source movement or removal does not recreate cargo. The live station
-path must still join its exact accounting input and external workflow deltas
-to this preparation and receipt boundary.
+path joins its exact accounting input and external workflow deltas to this
+preparation and receipt boundary.
 
 The session supplies cargo's declared physical definitions and shared random,
 agenda, and fact owners. Expiry participates in the StateUpdate wave after
@@ -206,9 +209,21 @@ reservation and cancel owned work. In-range admission preserves nonzero
 velocity through ordinary passive drag; collection does not freeze the ship.
 An exit waits for that committed motion before resuming approach. Its waiting
 state restores directly, and reentry starts a new full-duration attempt. Field reselection uses covered members,
-priority, distance, and identity. Completed TASK-115 supplies exact commitment-release admission. Actor-removal
-collection cleanup remains under TASK-108 and must join its prepared attempt
-cancellation to that boundary before removal can release collection capacity.
+priority, distance, and identity. Collector removal prepares the exact attempt,
+incoming reservation, completion, and optional range-exit cancellation without
+mutation. Its physical release supplements the economy owner's transport proof;
+it does not become an economy-owned claim. Lifecycle coverage and both owners
+revalidate before the first agenda mutation. Commit cancels collection work and
+releases its capacity before economy cleanup, then removes the actor's managed
+interest and retained targets. Unknown commitments still reject atomically.
+Immediate reevaluation wakes for removed actors drain as stale no-ops.
+
+[Collection-order regression coverage](../../tests/GalaxyCommand.Simulation.Tests/Actors/Orders/CargoCollectionOrderTests.cs)
+includes active object/field collection with and without economy, unknown
+commitment rejection, and actual JSON continuation before and after removal.
+Moving attempts with range-exit work, approaching, suspended, queued, and
+pending-wake states continue through the former collection deadline and expiry
+without collecting or recreating removed work.
 
 The player receives fresh covered cargo views and bounded inspection of its
 own active in-range pickup, including outside sensor coverage. Inspection
@@ -242,14 +257,14 @@ collection and coupled in-memory continuation. Its
 [station workloads](../validation/station-runtime-performance.md) exercise the
 actual source-to-collection path; generic sources do not replace that proof.
 
-The owner kept the missing whole-session typed JSON bridge separate as
-TASK-116 and paused encoded cargo-save delivery until that prerequisite is
-available. In-memory continuation does not close R08.
+Completed TASK-116 supplies the whole-session typed JSON bridge.
+`GameSessionSaveContinuationTests` covers encoded live station loss, pending
+field collection, inventory settlement, receipt replay, and pending cargo expiry.
+This complements the in-memory station proof under R08 and R09.
 
-Encoded checkpoint continuity and remaining actor-removal collection cleanup
-stay open under TASK-108's full delivery boundary. The station proof does not
-qualify the encoded adapter or broader application accessibility. Generic
-component measurements below and the UI fixture retain their narrower scope.
+Collector actor-removal cleanup completes the remaining shared runtime
+boundary. Broader application accessibility remains TASK-077. Generic component
+measurements below and the UI fixture retain their narrower scope.
 
 ### Generic component scale measurements
 
@@ -300,15 +315,16 @@ retention, and digest implementations are in
 
 ## Technical source evidence
 
-These sources establish current implementation shape; they do not establish
-full cargo delivery.
+These sources explain the owning boundaries. The collection regressions,
+encoded station continuation, station workloads, and application fixture
+provide complementary evidence for the delivery contract.
 
 | Source | Current constraint or reusable boundary |
 | --- | --- |
 | [Custody](../../src/GalaxyCommand.Simulation/Economy/Inventory/InventoryCustody.cs) | Explicit unclaimed custody is separate from principal control; lifecycle restore checks cargo ownership. |
 | [Physical transfer](../../src/GalaxyCommand.Simulation/Economy/Inventory/PhysicalInventoryTransfers.cs) | Ordinary transfers retain exact reservation costs; the separate collection entry point can consume and release unused incoming capacity. |
 | [Reservation owners](../../src/GalaxyCommand.Simulation/Economy/Inventory/Inventory.cs) | Collection owns generalized incoming capacity only; live attempt/agenda validation remains part of the collection runtime. |
-| [StateUpdate host](../../src/GalaxyCommand.Simulation/Session/Runtime/ActorOrderRuntimeCoordinator.Interactions.cs) | Cargo expiry follows spatial/sensor commits; collection-completion reduction remains part of R05 implementation. |
+| [StateUpdate host](../../src/GalaxyCommand.Simulation/Session/Runtime/ActorOrderRuntimeCoordinator.Interactions.cs) | Cargo reduction follows spatial/sensor commits and applies collection completion before equal-time expiry under R05. |
 | [Simulation time](../../src/GalaxyCommand.Simulation/Kernel/Time/SimulationTime.cs) and [random derivation](../../src/GalaxyCommand.Simulation/Kernel/Determinism/DeterministicRandom.cs) | Time is integer milliseconds; scoped stateless bounded samples are available. |
 | [Runtime policy manifest](../../src/GalaxyCommand.Simulation/Session/RuntimePolicyCheckpointModels.cs) | Cargo policy retains its exact versioned reference, fractions, and parameters. |
 
@@ -322,7 +338,7 @@ The owner selected the following behavior:
   ejection. The initial destruction recovery fraction is 50%, rounded down,
   using the same fraction for all cargo definitions. Calculate recovery
   separately per cargo type within one causal destruction commit. Exact
-  survivor selection still requires definition; no definition-specific override
+  survivor selection follows R02; no definition-specific override
   is selected for the initial policy.
 - **Unclaimed cargo:** Any ship with sufficient cargo capacity may collect
   ejected cargo, regardless of its original principal. Previous custody does
@@ -825,7 +841,7 @@ presentation. Hide cargo details when coverage ends, while retaining the owned
 ship's captured order intent. Live progress comes from saved simulation times,
 not a UI timer. New controls must follow the accepted
 localization/accessibility contract. TASK-094 retains broader order-failure
-notifications; TASK-108 still needs usable collection results in its included
+notifications; TASK-108 supplies usable collection results in its included
 controls.
 
 ### R08. Policy, content, and checkpoint contract
@@ -948,7 +964,8 @@ after ship destruction. TASK-110 retains voluntary-ejection player commands
 and controls.
 
 Design approval is complete for R01-R10 and the included player controls.
-TASK-108 remains open for its remaining implementation and full delivery proof.
+TASK-108 delivers shared runtime, included player controls, current-schema
+continuation, and the accepted deterministic proof boundaries.
 TASK-105 consumes this accepted contract through real station loss and player
 collection, without selecting additional game-content policy. Its in-memory
-proof does not close the encoded checkpoint prerequisite in TASK-116.
+proof is complemented by TASK-116's encoded station/cargo continuation coverage.

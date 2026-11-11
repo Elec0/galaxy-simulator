@@ -21,8 +21,9 @@ format, subject to the same complete validation as a game-written save.
 
 **Implementation status:** `TASK-022` completed slices 1 through 4: strict
 format mechanics, complete current-owner checkpoints, whole-session isolated
-restore, and atomic file storage. `TASK-116` adds the typed whole-session JSON
-bridge and exact selected-maneuver reconstruction, including `TASK-119`.
+restore, and atomic file storage. Completed `TASK-116` supplies the typed
+whole-session JSON bridge and exact selected-maneuver reconstruction, including
+`TASK-119`.
 `TASK-023` has defined the content format and
 boundaries. `TASK-063` supplies resolved content catalogs and completed
 `TASK-048` supplies static new-game composition. General saved sessions remain

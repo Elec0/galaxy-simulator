@@ -132,13 +132,21 @@ internal sealed partial class ActorOrderRuntimeCoordinator
     {
         ThrowIfUnhealthy();
         if (_lifecycle.IsSensorRemovalReference(request.EntityId)) return RemoveSensorEntity(request);
-        PreparedEconomyEntityRemoval? economyRemoval = null;
-        if (_economy is not null && _lifecycle.Entities.GetShipId(request.EntityId) is { } departingShip
-            && _lifecycle.GetShip(departingShip) is { } ship
-            && !_economy.TryPrepareEntityRemoval(departingShip, ship.CargoInventoryId, out economyRemoval))
+        ShipId? departingShip = _lifecycle.Entities.GetShipId(request.EntityId);
+        PreparedCargoAttemptCancellation? cargoCancellation = null;
+        if (departingShip is { } collector && _cargoAttempts?.Get(collector) is not null
+            && !_cargoAttempts.TryPrepareCancellation(collector, _cargoDueKeys, out cargoCancellation))
             return new EntityRemovalResult.Rejected(request, EntityRemovalRejectionReason.OwnerConflict);
 
-        IReadOnlyList<InventoryCommitmentRelease> releases = economyRemoval?.Releases ?? [];
+        IReadOnlyList<InventoryCommitmentRelease> cargoReleases = cargoCancellation is null ? []
+            : [new InventoryCommitmentRelease.Physical(cargoCancellation.Inventory, cargoCancellation.Reservation)];
+        PreparedEconomyEntityRemoval? economyRemoval = null;
+        if (_economy is not null && departingShip is { } actor
+            && _lifecycle.GetShip(actor) is { } ship
+            && !_economy.TryPrepareEntityRemoval(actor, ship.CargoInventoryId, out economyRemoval, cargoReleases))
+            return new EntityRemovalResult.Rejected(request, EntityRemovalRejectionReason.OwnerConflict);
+
+        IReadOnlyList<InventoryCommitmentRelease> releases = (economyRemoval?.Releases ?? []).Concat(cargoReleases).ToArray();
         EntityRemovalPreparation preparation = _lifecycle.PrepareRemoval(request, releases);
         if (preparation is EntityRemovalPreparation.Resolved resolved) return resolved.Value;
         PreparedEntityRemoval removal = ((EntityRemovalPreparation.Prepared)preparation).Value;
@@ -158,7 +166,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
 
         // Revalidate the whole batch before the first agenda cancellation.
         if (!_lifecycle.CanCommitRemoval(removal, releases)
-            || economyRemoval is not null && !_economy!.CanCommitEntityRemoval(economyRemoval))
+            || cargoCancellation is not null && !_cargoAttempts!.CanCommitCancellation(cargoCancellation)
+            || economyRemoval is not null && !_economy!.CanCommitEntityRemoval(economyRemoval, cargoReleases))
             return new EntityRemovalResult.Rejected(request, EntityRemovalRejectionReason.OwnerConflict);
 
         foreach (PreparedMovementCancellation cancellation in cancellations)
@@ -174,6 +183,18 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             _isPoisoned = true;
             throw new InvalidOperationException(
                 $"Prepared cancellation for {cancellation.EventKey} no longer matches the agenda.");
+        }
+
+        // Drop collection capacity first so economy can revalidate its own
+        // remaining commitments without claiming another owner's release.
+        if (cargoCancellation is not null)
+        {
+            try
+            {
+                if (!_cargoAttempts!.ApplyPreparedCancellation(cargoCancellation))
+                    throw new InvalidOperationException("Prepared collection cancellation changed during removal.");
+            }
+            catch { _isPoisoned = true; throw; }
         }
 
         if (_economy is not null && economyRemoval is not null)
@@ -244,6 +265,8 @@ internal sealed partial class ActorOrderRuntimeCoordinator
             CurrentTime,
             new EntityRemovalFactCause(removed.Request),
             factProposals);
+        SynchronizeCargoInterest(removal.ShipId);
+        _cargoDirtyShips.Remove(removal.ShipId);
         SynchronizeSensorInterest(removal.ShipId);
         foreach (TargetedShipOrder targeted in removal.InboundOrders) SynchronizeSensorInterest(targeted.ShipId);
         FlushSensorReevaluations();

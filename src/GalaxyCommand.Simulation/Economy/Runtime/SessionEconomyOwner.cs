@@ -589,12 +589,14 @@ internal sealed partial class SessionEconomyOwner
 
     /// <summary>
     /// Reads every non-terminal transport job that references the departing
-    /// ship or cargo inventory and proves its release can commit.
+    /// ship or cargo inventory and proves its release can commit. The session may
+    /// supply separately prepared owner releases for exhaustive cargo coverage.
     /// </summary>
     internal bool TryPrepareEntityRemoval(
         ShipId shipId,
         InventoryId cargoInventoryId,
-        out PreparedEconomyEntityRemoval? prepared)
+        out PreparedEconomyEntityRemoval? prepared,
+        IReadOnlyList<InventoryCommitmentRelease>? otherOwnerReleases = null)
     {
         Freighter? departingFreighter = _ships.GetFreighter(shipId);
         TransportJob[] jobs = _transportBoard.Jobs
@@ -619,7 +621,7 @@ internal sealed partial class SessionEconomyOwner
         var candidate = new PreparedEconomyEntityRemoval(this, shipId, cargoInventoryId,
             departingFreighter, Array.AsReadOnly(cancellations.ToArray()),
             Array.AsReadOnly(cancellations.SelectMany(cancellation => cancellation.Releases).ToArray()));
-        if (!CanCommitEntityRemoval(candidate)) return false;
+        if (!CanCommitEntityRemoval(candidate, otherOwnerReleases)) return false;
         prepared = candidate;
         return true;
     }
@@ -627,15 +629,18 @@ internal sealed partial class SessionEconomyOwner
     /// <summary>
     /// Revalidates all transport participants and exhaustive departing coverage.
     /// Shared demand and supply restoration is checked as one batch because
-    /// individually affordable additions may overflow in aggregate.
+    /// individually affordable additions may overflow in aggregate. Other-owner
+    /// releases supplement coverage only; their originating owner must revalidate
+    /// them at the session barrier before any participant commits.
     /// </summary>
-    internal bool CanCommitEntityRemoval(PreparedEconomyEntityRemoval prepared)
+    internal bool CanCommitEntityRemoval(PreparedEconomyEntityRemoval prepared,
+        IReadOnlyList<InventoryCommitmentRelease>? otherOwnerReleases = null)
     {
         if (!ReferenceEquals(prepared.Owner, this)
             || !prepared.Releases.SequenceEqual(prepared.Cancellations.SelectMany(cancellation => cancellation.Releases))
             || !ReferenceEquals(_ships.GetFreighter(prepared.ShipId), prepared.Freighter)
             || _lifecycleInventories.Get(prepared.CargoInventoryId) is not { } cargo
-            || !cargo.HasExactReleaseCoverage(prepared.Releases)
+            || !cargo.HasExactReleaseCoverage(prepared.Releases.Concat(otherOwnerReleases ?? []).ToArray())
             || prepared.Cancellations.Any(cancellation =>
                 !ReferenceEquals(_ships.GetFreighter(cancellation.Job.ShipId), cancellation.Freighter)
                 || !_transportBoard.CanCommitRemovalCancellation(cancellation, _lifecycleInventories))) return false;

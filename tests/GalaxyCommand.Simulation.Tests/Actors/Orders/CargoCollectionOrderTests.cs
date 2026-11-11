@@ -344,33 +344,147 @@ public sealed class CargoCollectionOrderTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void RemovalRejectsUnpreparedCollectionCapacityWithoutChangingSession(bool economy)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void CollectorRemovalReleasesAttemptAndPreservesUncollectedCargo(bool economy, bool field)
     {
-        using GameSession session = Create(economy: economy);
-        session.SubmitCommand(GameSessionTestFixture.Player,
-            new CollectCargoObjectCommand(new(2), session.CaptureVisibleCargo()[0].EntityId, OrderPlacement.ReplaceAll));
-        session.AdvanceTo(new(0));
+        using GameSession session = Create(economy: economy, field: field);
+        CargoObjectView target = session.CaptureVisibleCargo()[0];
+        GameplayCommand command = field
+            ? new CollectCargoFieldCommand(new(2), target.OriginalFieldId!.Value, [], OrderPlacement.ReplaceAll)
+            : new CollectCargoObjectCommand(new(2), target.EntityId, OrderPlacement.ReplaceAll);
+        session.SubmitCommand(GameSessionTestFixture.Player, command);
+        session.AdvanceTo(new(450));
         GameSessionCheckpoint before = session.CaptureCheckpoint().Value!;
-        var facts = session.ReadFactsAfter(null, 256).Facts.ToArray();
-        GameShipSnapshot ship = Ship(session, 2);
+        CargoCollectionAttempt attempt = Assert.Single(before.CargoCollectionAttempts!.Attempts)!;
+        CargoObjectView[] cargo = session.CaptureVisibleCargo().ToArray();
 
-        Assert.IsType<EntityRemovalResult.Rejected>(session.RemoveEntity(
+        Assert.IsType<EntityRemovalResult.Removed>(session.RemoveEntity(
             new(new(2), EntityRemovalReason.Despawned, EntityCargoDisposition.DiscardCargo)));
 
         Assert.True(session.IsHealthy);
         GameSessionCheckpoint after = session.CaptureCheckpoint().Value!;
+        Assert.Empty(after.CargoCollectionAttempts!.Attempts);
+        Assert.Empty(after.CargoCollectionTargets!);
+        Assert.DoesNotContain(after.Lifecycle.Inventories.Inventories, inventory => inventory.Id == new InventoryId(2));
+        Assert.DoesNotContain(after.Engine.Agenda.PendingEvents, entry => entry.Key == attempt.CompletionKey || entry.Key == attempt.ExitKey);
+        Assert.Equal(before.Engine.Agenda.NextCreationSequence, after.Engine.Agenda.NextCreationSequence);
+        Assert.Equal(cargo, session.CaptureVisibleCargo());
+        Assert.Contains(session.ReadFactsAfter(null, 256).Facts, fact => fact.Fact is ShipOrderTransitionFact transition
+            && transition.ShipId == new ShipId(2) && transition.Reason == ShipOrderReason.ActionActorRemoved);
+        session.AdvanceTo(new(2000));
+        Assert.Equal(cargo, session.CaptureVisibleCargo());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnknownCommitmentRejectsCollectorRemovalBeforeAnyAttemptOrAgendaChange(bool economy)
+    {
+        using GameSession session = Create(economy: economy);
+        session.SubmitCommand(GameSessionTestFixture.Player,
+            new CollectCargoObjectCommand(new(2), session.CaptureVisibleCargo()[0].EntityId, OrderPlacement.ReplaceAll));
+        session.AdvanceTo(new(450));
+        Assert.True(Assert.Single(session.CommitInventoryMutations([
+            new ReservePhysicalInventoryProposal(new(InventoryOperationSourceKind.Explicit, 99), new(2),
+                new PhysicalReservationSubject.IncomingCapacity(new(1)), new ReservationOwner.TransportJob(new(99))),
+        ]).Outcomes).WasApplied);
+        GameSessionCheckpoint before = session.CaptureCheckpoint().Value!;
+        var facts = session.ReadFactsAfter(null, 256).Facts.ToArray();
+
+        Assert.IsType<EntityRemovalResult.Rejected>(session.RemoveEntity(
+            new(new(2), EntityRemovalReason.Despawned, EntityCargoDisposition.DiscardCargo)));
+
+        GameSessionCheckpoint after = session.CaptureCheckpoint().Value!;
+        Assert.True(session.IsHealthy);
         Assert.Equal(before.Engine.Agenda.PendingEvents, after.Engine.Agenda.PendingEvents);
         Assert.Equal(before.Engine.Agenda.NextCreationSequence, after.Engine.Agenda.NextCreationSequence);
         Assert.Equal(before.CargoCollectionAttempts!.Attempts, after.CargoCollectionAttempts!.Attempts);
         Assert.Equal(before.Lifecycle.Inventories.Inventories.Single(inventory => inventory.Id == new InventoryId(2)).PhysicalReservations,
             Cargo(session, 2).PhysicalReservations);
-        Assert.Equal(ship.CurrentOrder, Ship(session, 2).CurrentOrder);
-        Assert.Equal(ship.SpatialState, Ship(session, 2).SpatialState);
         Assert.Equal(facts, session.ReadFactsAfter(null, 256).Facts);
         session.AdvanceTo(new(1000));
         Assert.Single(Cargo(session, 2).DiscreteItems);
+    }
+
+    [Theory]
+    [InlineData("moving")]
+    [InlineData("approaching")]
+    [InlineData("suspended")]
+    [InlineData("queued")]
+    [InlineData("pending-wake")]
+    public void EncodedCollectorRemovalCannotResumeDiscardedWork(string state)
+    {
+        using GameSession original = Create(collectorX: state == "moving" ? 4900 : state == "approaching" ? 6000 : 0,
+            lifetime: 120000, economy: true);
+        if (state == "moving")
+        {
+            original.SubmitCommand(GameSessionTestFixture.Player,
+                new MoveShipCommand(new(2), GameSessionTestFixture.Destination(100000, 0), OrderPlacement.ReplaceAll));
+            original.AdvanceTo(new(4000));
+        }
+        if (state == "queued")
+            original.SubmitCommand(GameSessionTestFixture.Player,
+                new MoveShipCommand(new(2), GameSessionTestFixture.Destination(100000, 0), OrderPlacement.ReplaceAll));
+        original.SubmitCommand(GameSessionTestFixture.Player,
+            new CollectCargoObjectCommand(new(2), original.CaptureVisibleCargo()[0].EntityId,
+                state == "queued" ? OrderPlacement.Append : OrderPlacement.ReplaceAll));
+        if (state != "pending-wake") original.AdvanceTo(original.CurrentTime);
+        if (state == "moving")
+            Assert.NotNull(Assert.Single(original.CaptureCheckpoint().Value!.CargoCollectionAttempts!.Attempts)!.ExitKey);
+        if (state == "suspended")
+        {
+            var script = new CommandSource(CommandSourceKind.Script, new CommandSourceId("story:cargo"));
+            original.SubmitCommand(script, new BeginScriptedOverrideCommand(new(2), new ActorOverrideReasonId("test"), default));
+            Assert.Single(Ship(original, 2).SuspendedOrders);
+        }
+        using GameSession beforeRemoval = RoundTrip(original);
+        foreach (GameSession session in new[] { original, beforeRemoval })
+            Assert.IsType<EntityRemovalResult.Removed>(session.RemoveEntity(
+                new(new(2), EntityRemovalReason.Despawned, EntityCargoDisposition.DiscardCargo)));
+        using GameSession afterRemoval = RoundTrip(original);
+        foreach (GameSession session in new[] { original, beforeRemoval, afterRemoval })
+        {
+            Assert.Empty(session.CaptureCheckpoint().Value!.CargoCollectionTargets!);
+            Assert.Empty(session.CaptureCheckpoint().Value!.CargoCollectionAttempts!.Attempts);
+            session.AdvanceTo(new(100000));
+            Assert.Equal(3, session.CaptureVisibleCargo().Count);
+            session.AdvanceTo(new(120000));
+            Assert.Empty(session.CaptureVisibleCargo());
+        }
+        Assert.Equal(EncodedCheckpoint(original), EncodedCheckpoint(beforeRemoval));
+        Assert.Equal(EncodedCheckpoint(original), EncodedCheckpoint(afterRemoval));
+    }
+
+    private static readonly SaveJsonLimits SaveLimits = new(16_777_216, 128, 65_536, 100_000);
+    private static readonly GameSessionSaveMetadata SaveMetadata = new(
+        Guid.Parse("2b080570-673a-4f85-a0ac-18730f43c612"),
+        new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero), "cargo-removal");
+
+    private static InertSaveDocument Encode(GameSession session)
+    {
+        CheckpointResult<GameSessionCheckpoint> checkpoint = session.CaptureCheckpoint();
+        Assert.True(checkpoint.IsSuccess, checkpoint.Failure?.Message);
+        CheckpointResult<InertSaveDocument> result = GameSessionSaveCodec.Encode(checkpoint.Value!, SaveMetadata, SaveLimits);
+        Assert.True(result.IsSuccess, result.Failure?.Message);
+        return result.Value!;
+    }
+
+    private static string EncodedCheckpoint(GameSession session) => Encode(session).Root.GetRawText();
+
+    private static GameSession RoundTrip(GameSession session)
+    {
+        using var bytes = new MemoryStream();
+        SaveWriteResult written = SaveJsonCodec.Write(bytes, Encode(session), SaveLimits);
+        Assert.True(written.IsSuccess, written.Failure?.Message);
+        bytes.Position = 0;
+        SaveReadResult decoded = SaveJsonCodec.Read(bytes, SaveLimits, new SaveMigrationRegistry(SaveFormat.CurrentSchemaVersion, []));
+        Assert.True(decoded.IsSuccess, decoded.Failure?.Message);
+        CheckpointResult<GameSession> restored = GameSessionSaveCodec.Restore(decoded.Document!, SaveLimits, definitions: new PhysicalDefinitionCatalog([Item]));
+        Assert.True(restored.IsSuccess, restored.Failure?.Path + ": " + restored.Failure?.Message);
+        return restored.Value!;
     }
 
     private static GameShipSnapshot Ship(GameSession session, ulong ship) => session.CaptureSnapshot().Ships.Single(value => value.Id == new ShipId(ship));

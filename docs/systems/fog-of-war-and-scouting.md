@@ -18,31 +18,22 @@ This document completes the design work approved by the project owner for
 
 ## TASK-073 implementation scope review
 
-The owner promoted `TASK-073`. The accepted observation behavior
-above remains unchanged. Review of the current simulation found three gaps
-that prevent implementing the complete contract without an owner decision:
+The owner promoted `TASK-073` and approved a staged implementation boundary.
+The initial review identified missing station and deployable runtime contracts
+and unspecified ship sensor radii. Those prerequisites are now supplied:
 
-- Stations have no runtime identity, lifecycle, or approved observable state.
-  `TASK-057` still owns that design and `TASK-105` tracks its runtime; economic facilities cannot implicitly be
-  treated as stations.
-- Deployable identity, lifecycle, observable state, and sensor-source handoff
-  are designed, but their runtime implementation remains `TASK-095`.
-- Ship setup, definitions, and content have no base sensor-radius contract.
-  This design requires a definition-supplied radius but does not settle its
-  initial content values, validation, or integration with ship definitions.
+- Completed `TASK-057` defines observable station exterior fields, module
+  targeting handles, sensor composition, lifecycle, and checkpoint contracts.
+  Completed `TASK-105` supplies the live station runtime and committed views.
+- Completed `TASK-095` supplies deployable identity, lifecycle, immutable
+  observable state, and sensor sources.
+- Approved stage 2 decisions S1 through S9 define the ship sensor contract and
+  the 10 km starter-ship and preview-courier content radii.
 
-The owner selected a staged implementation boundary for review,
-followed by implementation of approved stages. Station and deployable
-integration remains open. The owner subsequently approved the boundary and
-stage 1, then approved stage 2, decisions S1 through S9, and the proposed 10 km
-content radii. Those approvals authorize ship observation implementation. They
-do not complete the full ship, station, and deployable acceptance scope.
-
-The owner completed TASK-057's [station design](stations.md),
-including observable exterior fields, module targeting handles, sensor
-composition, lifecycle, and checkpoint contracts. This resolves the station
-design gap identified above. TASK-105 still owns concrete station runtime;
-TASK-073 station integration remains pending that implementation.
+Stages 1 and 2 are implemented. Deployable observation and station source,
+exterior-view, and persistent-observation integration are also present. These
+foundations remove the original prerequisite blockers; `TASK-073` still owns
+full-domain delivery proof across ships, stations, and deployables.
 
 ### Approved stages and completion boundaries
 
@@ -51,13 +42,13 @@ TASK-073 station integration remains pending that implementation.
 | 1. Ship coverage evaluation | Immutable committed ship inputs, system-local source union, stable contact reduction, and a serial reference evaluator. Inputs carry explicit radii; this stage does not change live presentation. | Inclusive range boundaries, moving source and target combinations, overlapping-source loss, transit exclusion, emergence, creation/removal, canonical input ordering, and batch/partition equivalence. |
 | 2. Live ship observation | Definition/content sensor capability, session integration, safe ship presentation and selection, commit-time disclosure, Godot consumption, and current-schema checkpoint/save continuation. | Hidden ships and private fields absent from every presentation path; earlier hidden events stay hidden; disclosed events remain readable after coverage changes; restored and uninterrupted runs agree, including bounded fact retention and cursors. |
 | 3. Persistent observation owner | Session-owned discovery, stale state, refresh, confirmed absence, and persistence, using concrete approved station/deployable inputs. | Typed owner-approved views, last observation time, no refresh from hidden state, absence without invented cause/time, exact restore, and source/target lifecycle integration. Start when an owning entity domain supplies its runtime contract. |
-| 4. Full entity integration and closure | Station sources/targets from TASK-105 after TASK-057 design approval and deployable sources/targets from TASK-095; application consumes their approved records. | Every item in Implementation proof below, across all three entity categories, plus the complete regression suite and appropriate benchmark correctness checks. |
+| 4. Full entity integration and closure | Station sources/targets from completed TASK-105 and deployable sources/targets from completed TASK-095; application consumes their approved records. | Every item in Implementation proof below, across all three entity categories, plus the complete regression suite and appropriate benchmark correctness checks. |
 
-Stages 1 and 2 are approved and implemented.
-Stage 3 must wait for a concrete persistent entity presentation contract; test
-fixtures alone cannot establish live station or deployable support. Stage 4
-is required for full `TASK-073` completion. All stages remain under this task ID;
-the entity prerequisites retain their existing owners and task IDs.
+Stages 1 and 2 are approved and implemented. Stage 3 consumes the concrete
+station and deployable presentation contracts supplied by their completed
+runtime tasks. Test fixtures alone cannot establish live entity support.
+Stage 4's full-domain proof is still required for `TASK-073` completion. All
+observation stages remain under this task ID.
 
 ```mermaid
 flowchart LR
@@ -68,8 +59,8 @@ flowchart LR
     observation --> disclosure
     observation --> presentation["Observed contacts and selection"]
     disclosure --> presentation
-    future["Future station and deployable owners"] -. approved inputs .-> evaluate
-    future -. typed persistent views .-> observation
+    entities["Committed station and deployable owners"] --> evaluate
+    entities --> observation
 ```
 
 ### Contract decision register
@@ -230,11 +221,11 @@ receipt shape. Restore validates the binding, policy version, retained receipt
 coverage, historical ownership consistency, and safe source-to-notice mapping.
 Current sensor geometry is rebuilt from restored authority.
 
-The persistence proof is the current internal whole-session checkpoint boundary.
-General encoded saved-session admission remains unavailable under `TASK-037`,
-as it was before this work; stage 2 does not bypass catalog compatibility or
-claim a newly supported user save/load flow. Persistent discoveries and real
-station/deployable integration remain stages 3 and 4.
+Stage 2's original persistence proof used the internal whole-session checkpoint
+boundary. Completed `TASK-116` now supplies the current-schema typed JSON bridge,
+including observation state and historical disclosure continuation. General
+user save/load still depends on `TASK-037` for content compatibility and
+saved-reference migration. Full observation delivery proof remains `TASK-073`.
 
 
 ### Stage 2 validation and remaining scope
@@ -246,10 +237,12 @@ malformed receipt rejection, and uninterrupted/restored continuation. Simultaneo
 emergence is tested in both event orders, and the engine join is tested after
 all same-time phases and follow-up work drain.
 
-`navigation.connector-volume` produces `88e79d6112f53750` against registered
-`673c9af7f54a80e4` in both this worktree and an independently built, untouched
-`1a5a3d1` HEAD snapshot. The existing mismatch remains visible under `TASK-104`;
-its expectation was not changed by observation work.
+The stage 2 investigation reproduced a connector-navigation expectation mismatch
+at untouched `1a5a3d1`. Completed `TASK-104` traced it to the intentional
+turn-before-acceleration change and corrected the registered version 2 digest
+to `88e79d6112f53750`; it is no longer an observation-delivery blocker. The
+[investigation](../validation/scale-and-benchmark-targets.md#task-104-connector-navigation-investigation)
+retains the historical evidence.
 
 A separate 500-ship crowded check used two measured iterations and no warmup
 before and after limiting disclosure work to pending subjects. Its digest
@@ -259,11 +252,10 @@ this host. These figures compare two implementations within stage 2, not the
 repository's prior release, and do not establish a timing gate or worker-scaling
 claim. Sensor evaluation remains on the serial reference path.
 
-Persistent discoveries, stale/refresh/absence state, and real station/deployable
-source and target adapters remain unimplemented stages 3 and 4. `TASK-057` owns
-station design, `TASK-105` owns its approved runtime implementation, and
-`TASK-095` owns deployables. Full `TASK-073` completion remains open until those
-owners supply the concrete inputs required by its accepted proof.
+Persistent deployable discoveries and stale/refresh/absence state now consume
+`TASK-095` inputs. Completed `TASK-105` supplies station sources, exterior views,
+and retained observation integration. Full `TASK-073` completion remains open
+for the accepted full-domain delivery proof.
 
 The owner accepted TASK-095's bounded stationary-range extension
 and deployable notice proposal. Owned assets retain approved detailed notices;
@@ -363,13 +355,14 @@ compare ordered boundary evidence. Timing is informational, not a worker-default
 selection or a gameplay rule. The [recorded measurements](../validation/interaction-session-measurements.md#task-073-deployable-observation-crossings)
 retain commands, bounded workload details and matching serial/worker digests.
 
-The editor's `--build-solutions` invocation could not write its user build logs
-inside the filesystem sandbox. TASK-104's known navigation mismatch remains
-`88e79d6112f53750` versus `673c9af7f54a80e4`.
+The deployable review's editor `--build-solutions` invocation could not write
+its user build logs inside the filesystem sandbox. That review limitation does
+not establish the current build state. TASK-104 separately resolved the
+historical navigation benchmark expectation mismatch.
 
 This closes the requested deployable integration, not TASK-073 as a whole.
-Station integration and the remaining full-domain proof still depend on
-TASK-057 and TASK-105.
+Completed TASK-105 supplies station sources, exterior views, and retained
+observation integration. TASK-073 retains the remaining full-domain proof.
 
 ## Decisions at a glance
 
