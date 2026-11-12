@@ -85,6 +85,11 @@ semantic counts. Timing and allocation remain informational.
 
 ## Original ship-pair presets
 
+The measurements below describe the original maneuver behavior. TASK-123
+advances both ship-pair presets to version 2 with digest `84ffd9ae5f2cf9b3`;
+see the [moving-course baseline review](scale-and-benchmark-targets.md#moving-course-replacement-baseline).
+Historical timing measurements remain tied to their original source.
+
 TASK-071 added version 1 `interaction.session-serial` and
 `interaction.session-batched` benchmark presets. They exercise real session
 advancement with analytic motion replacement, durable-interest updates and

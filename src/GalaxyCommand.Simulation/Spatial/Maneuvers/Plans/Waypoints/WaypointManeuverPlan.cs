@@ -193,7 +193,7 @@ public sealed record WaypointManeuverPlan
 
         SystemPosition terminalDestination = destinations[^1];
         BoundedTerminalPlanSelection terminalSelection =
-            BoundedTerminalManeuverPlanner.Select(
+            BoundedTerminalManeuverPlanner.SelectWithoutMovingTurn(
                 cursor,
                 current,
                 terminalDestination,
@@ -233,7 +233,7 @@ public sealed record WaypointManeuverPlan
             ShipVelocity.Zero,
             heading);
         BoundedTerminalPlanSelection selection =
-            BoundedTerminalManeuverPlanner.Select(
+            BoundedTerminalManeuverPlanner.SelectWithoutMovingTurn(
                 startsAt,
                 rest,
                 outgoingDestination,

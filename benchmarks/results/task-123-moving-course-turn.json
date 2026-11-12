@@ -1,0 +1,404 @@
+{
+  "SchemaVersion": 2,
+  "RecordedAtUtc": "2026-11-12T02:21:57.843921+00:00",
+  "Suite": "full",
+  "Machine": {
+    "Framework": ".NET 10.0.10",
+    "OperatingSystem": "macOS 26.7.1",
+    "ProcessArchitecture": "Arm64",
+    "ProcessorCount": 11,
+    "ServerGarbageCollection": false
+  },
+  "Scenarios": [
+    {
+      "Id": "maneuver.repeated-replanning",
+      "BasePreset": "maneuver.repeated-replanning",
+      "BasePresetVersion": 2,
+      "IsCanonical": true,
+      "Parameters": {
+        "destinationDistance": 1000000,
+        "factRetentionCapacity": 10000,
+        "measuredIterations": 5,
+        "replanCount": 100,
+        "replanIntervalMilliseconds": 50000,
+        "seed": 1,
+        "simulatedDurationMilliseconds": 5000000,
+        "travelDurationMilliseconds": 1000,
+        "warmupIterations": 1
+      },
+      "Digest": "cbe8c9c70d163ed4",
+      "SimulatedMilliseconds": 5000000,
+      "Counts": {
+        "commands": 100,
+        "events": 146,
+        "factsCommitted": 517,
+        "factsRetained": 517,
+        "ships": 1,
+        "systems": 1
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 14.0532,
+        "MinimumMilliseconds": 13.3566,
+        "MaximumMilliseconds": 14.1537,
+        "MedianAllocatedBytes": 3315712,
+        "Generation0Collections": 2,
+        "Generation1Collections": 1,
+        "Generation2Collections": 0
+      }
+    },
+    {
+      "Id": "interaction.session-serial",
+      "BasePreset": "interaction.session-serial",
+      "BasePresetVersion": 2,
+      "IsCanonical": true,
+      "Parameters": {
+        "activeShipCount": 8,
+        "destinationDistance": 100,
+        "factRetentionCapacity": 10000,
+        "interestCount": 256,
+        "measuredIterations": 5,
+        "rangeUnits": 2,
+        "replanCount": 4,
+        "replanIntervalMilliseconds": 1000,
+        "seed": 1,
+        "shipCount": 32,
+        "simulatedDurationMilliseconds": 6000,
+        "systemCount": 2,
+        "travelDurationMilliseconds": 1000,
+        "warmupIterations": 1
+      },
+      "Digest": "84ffd9ae5f2cf9b3",
+      "SimulatedMilliseconds": 6000,
+      "Counts": {
+        "commands": 32,
+        "effects": 361,
+        "evaluationWaves": 4,
+        "events": 497,
+        "factsCommitted": 144,
+        "factsRetained": 144,
+        "interactionEventsApplied": 361,
+        "interactionEventsIgnored": 128,
+        "interestsCanceled": 69,
+        "interestsRegistered": 256,
+        "interestsRemaining": 187,
+        "interestsUpdated": 211,
+        "ships": 32,
+        "systems": 2
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 45.4235,
+        "MinimumMilliseconds": 43.3896,
+        "MaximumMilliseconds": 54.4163,
+        "MedianAllocatedBytes": 24127912,
+        "Generation0Collections": 14,
+        "Generation1Collections": 3,
+        "Generation2Collections": 2
+      }
+    },
+    {
+      "Id": "interaction.session-batched",
+      "BasePreset": "interaction.session-batched",
+      "BasePresetVersion": 2,
+      "IsCanonical": true,
+      "Parameters": {
+        "activeShipCount": 8,
+        "batchSize": 64,
+        "destinationDistance": 100,
+        "factRetentionCapacity": 10000,
+        "interestCount": 256,
+        "measuredIterations": 5,
+        "rangeUnits": 2,
+        "replanCount": 4,
+        "replanIntervalMilliseconds": 1000,
+        "seed": 1,
+        "shipCount": 32,
+        "simulatedDurationMilliseconds": 6000,
+        "systemCount": 2,
+        "travelDurationMilliseconds": 1000,
+        "warmupIterations": 1,
+        "workerCount": 1
+      },
+      "Digest": "84ffd9ae5f2cf9b3",
+      "SimulatedMilliseconds": 6000,
+      "Counts": {
+        "commands": 32,
+        "effects": 361,
+        "evaluationWaves": 4,
+        "events": 497,
+        "factsCommitted": 144,
+        "factsRetained": 144,
+        "interactionEventsApplied": 361,
+        "interactionEventsIgnored": 128,
+        "interestsCanceled": 69,
+        "interestsRegistered": 256,
+        "interestsRemaining": 187,
+        "interestsUpdated": 211,
+        "ships": 32,
+        "systems": 2
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 42.6605,
+        "MinimumMilliseconds": 30.9546,
+        "MaximumMilliseconds": 50.9687,
+        "MedianAllocatedBytes": 24154840,
+        "Generation0Collections": 15,
+        "Generation1Collections": 3,
+        "Generation2Collections": 3
+      }
+    },
+    {
+      "Id": "navigation.connector-volume",
+      "BasePreset": "navigation.connector-volume",
+      "BasePresetVersion": 2,
+      "IsCanonical": true,
+      "Parameters": {
+        "activeShipCount": 1000,
+        "destinationDistance": 100,
+        "factRetentionCapacity": 100000,
+        "measuredIterations": 5,
+        "seed": 1,
+        "shipCount": 1000,
+        "simulatedDurationMilliseconds": 1000000,
+        "systemCount": 32,
+        "travelDurationMilliseconds": 100,
+        "warmupIterations": 1
+      },
+      "Digest": "88e79d6112f53750",
+      "SimulatedMilliseconds": 1000000,
+      "Counts": {
+        "commands": 1000,
+        "events": 94696,
+        "factsCommitted": 126998,
+        "factsRetained": 100000,
+        "ships": 1000,
+        "systems": 32
+      },
+      "DomainMeasurementsAvailability": "unavailable",
+      "Timing": {
+        "MedianMilliseconds": 949.7802,
+        "MinimumMilliseconds": 944.0002,
+        "MaximumMilliseconds": 1009.689,
+        "MedianAllocatedBytes": 845835776,
+        "Generation0Collections": 574,
+        "Generation1Collections": 200,
+        "Generation2Collections": 115
+      }
+    },
+    {
+      "Id": "station.many-quiet-sites",
+      "BasePreset": "station.many-quiet-sites",
+      "BasePresetVersion": 3,
+      "IsCanonical": true,
+      "Parameters": {
+        "activeStationCount": 8,
+        "advancePartitions": 1,
+        "batchSize": 16,
+        "builderThroughput": 3,
+        "buildersPerProject": 2,
+        "constructionMaterials": 12,
+        "constructionWork": 24,
+        "deliveryWaves": 3,
+        "destructionLifecycle": 0,
+        "factRetentionCapacity": 100000,
+        "measuredIterations": 3,
+        "restoreAtMilliseconds": 16001,
+        "seed": 1,
+        "simulatedDurationMilliseconds": 24000,
+        "stationCount": 256,
+        "systemCount": 16,
+        "warmupIterations": 1,
+        "workerCount": 0
+      },
+      "Digest": "473b941512819524",
+      "SimulatedMilliseconds": 24000,
+      "Counts": {
+        "activeProjects": 8,
+        "commands": 400,
+        "destructions": 0,
+        "events": 200,
+        "factsCommitted": 832,
+        "observedStationChanges": 0,
+        "quietSites": 248,
+        "recoveredMaterials": 32,
+        "removedStations": 8,
+        "restores": 1,
+        "stationWorkEvents": 168,
+        "stationsCreated": 256
+      },
+      "DomainMeasurementsAvailability": "available",
+      "Timing": {
+        "MedianMilliseconds": 660.8337,
+        "MinimumMilliseconds": 628.0542,
+        "MaximumMilliseconds": 859.705,
+        "MedianAllocatedBytes": 1194447064,
+        "Generation0Collections": 433,
+        "Generation1Collections": 14,
+        "Generation2Collections": 8
+      },
+      "DomainMeasurements": {
+        "advanceAndLifecycle": {
+          "Milliseconds": 298.2478,
+          "AllocatedBytes": 567147576
+        },
+        "checkpointRestoreAndProof": {
+          "Milliseconds": 66.0367,
+          "AllocatedBytes": 29139728
+        },
+        "effectDigest": {
+          "Milliseconds": 127.3537,
+          "AllocatedBytes": 29683688
+        },
+        "setup": {
+          "Milliseconds": 236.6795,
+          "AllocatedBytes": 597716008
+        }
+      },
+      "GameplayDigest": "125c790f0ed3e4c8"
+    },
+    {
+      "Id": "station.one-crowded",
+      "BasePreset": "station.one-crowded",
+      "BasePresetVersion": 3,
+      "IsCanonical": true,
+      "Parameters": {
+        "activeStationCount": 64,
+        "advancePartitions": 1,
+        "batchSize": 16,
+        "builderThroughput": 3,
+        "buildersPerProject": 2,
+        "constructionMaterials": 12,
+        "constructionWork": 24,
+        "deliveryWaves": 3,
+        "destructionLifecycle": 0,
+        "factRetentionCapacity": 100000,
+        "measuredIterations": 3,
+        "restoreAtMilliseconds": 16001,
+        "seed": 1,
+        "simulatedDurationMilliseconds": 24000,
+        "stationCount": 64,
+        "systemCount": 1,
+        "warmupIterations": 1,
+        "workerCount": 0
+      },
+      "Digest": "d8b8c6bb58344b57",
+      "SimulatedMilliseconds": 24000,
+      "Counts": {
+        "activeProjects": 64,
+        "commands": 1089,
+        "destructions": 0,
+        "events": 1346,
+        "factsCommitted": 2307,
+        "observedStationChanges": 8,
+        "quietSites": 0,
+        "recoveredMaterials": 256,
+        "removedStations": 64,
+        "restores": 1,
+        "stationWorkEvents": 1344,
+        "stationsCreated": 64
+      },
+      "DomainMeasurementsAvailability": "available",
+      "Timing": {
+        "MedianMilliseconds": 519.8286,
+        "MinimumMilliseconds": 516.8615,
+        "MaximumMilliseconds": 536.4804,
+        "MedianAllocatedBytes": 1070460104,
+        "Generation0Collections": 386,
+        "Generation1Collections": 20,
+        "Generation2Collections": 12
+      },
+      "DomainMeasurements": {
+        "advanceAndLifecycle": {
+          "Milliseconds": 375.0489,
+          "AllocatedBytes": 946216176
+        },
+        "checkpointRestoreAndProof": {
+          "Milliseconds": 53.4315,
+          "AllocatedBytes": 16713400
+        },
+        "effectDigest": {
+          "Milliseconds": 110.7628,
+          "AllocatedBytes": 23444344
+        },
+        "setup": {
+          "Milliseconds": 32.7895,
+          "AllocatedBytes": 100794664
+        }
+      },
+      "GameplayDigest": "a4c76f4d7d884841"
+    },
+    {
+      "Id": "station.partial-deliveries",
+      "BasePreset": "station.partial-deliveries",
+      "BasePresetVersion": 3,
+      "IsCanonical": true,
+      "Parameters": {
+        "activeStationCount": 32,
+        "advancePartitions": 1,
+        "batchSize": 16,
+        "builderThroughput": 3,
+        "buildersPerProject": 2,
+        "constructionMaterials": 24,
+        "constructionWork": 48,
+        "deliveryWaves": 6,
+        "destructionLifecycle": 0,
+        "factRetentionCapacity": 100000,
+        "measuredIterations": 3,
+        "restoreAtMilliseconds": 64001,
+        "seed": 1,
+        "simulatedDurationMilliseconds": 96000,
+        "stationCount": 32,
+        "systemCount": 4,
+        "warmupIterations": 1,
+        "workerCount": 0
+      },
+      "Digest": "eda509aa3c8ef73a",
+      "SimulatedMilliseconds": 96000,
+      "Counts": {
+        "activeProjects": 32,
+        "commands": 548,
+        "destructions": 0,
+        "events": 1160,
+        "factsCommitted": 1168,
+        "observedStationChanges": 28,
+        "quietSites": 0,
+        "recoveredMaterials": 128,
+        "removedStations": 32,
+        "restores": 1,
+        "stationWorkEvents": 1152,
+        "stationsCreated": 32
+      },
+      "DomainMeasurementsAvailability": "available",
+      "Timing": {
+        "MedianMilliseconds": 188.214,
+        "MinimumMilliseconds": 181.4206,
+        "MaximumMilliseconds": 208.7331,
+        "MedianAllocatedBytes": 296033344,
+        "Generation0Collections": 105,
+        "Generation1Collections": 7,
+        "Generation2Collections": 4
+      },
+      "DomainMeasurements": {
+        "advanceAndLifecycle": {
+          "Milliseconds": 113.1122,
+          "AllocatedBytes": 254543400
+        },
+        "checkpointRestoreAndProof": {
+          "Milliseconds": 27.5587,
+          "AllocatedBytes": 9599432
+        },
+        "effectDigest": {
+          "Milliseconds": 63.0535,
+          "AllocatedBytes": 13308880
+        },
+        "setup": {
+          "Milliseconds": 8.9571,
+          "AllocatedBytes": 28196608
+        }
+      },
+      "GameplayDigest": "7c7bddf3900ead21"
+    }
+  ]
+}

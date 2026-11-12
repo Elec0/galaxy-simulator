@@ -49,9 +49,9 @@ public sealed class InteractionSessionBenchmarkTests
             new Dictionary<string, long> { ["workerCount"] = workers, ["batchSize"] = batch });
         var expected = BenchmarkScenarioFactory.Create(serial.BasePreset).Run(serial);
         var actual = BenchmarkScenarioFactory.Create(parallel.BasePreset).Run(parallel);
-        Assert.Equal("1079ca5a77a8341f", expected.Digest);
+        Assert.Equal("84ffd9ae5f2cf9b3", expected.Digest);
         Assert.Equal(serial.ExpectedDigest, expected.Digest);
-        Assert.Equal(1, serial.BasePresetVersion);
+        Assert.Equal(2, serial.BasePresetVersion);
         Assert.Equal(expected.Digest, actual.Digest);
         Assert.Equal(expected.Counts.OrderBy(x => x.Key), actual.Counts.OrderBy(x => x.Key));
         Assert.True(actual.Counts["effects"] > 0);

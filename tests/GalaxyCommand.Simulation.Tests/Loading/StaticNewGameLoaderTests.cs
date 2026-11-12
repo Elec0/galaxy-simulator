@@ -174,6 +174,35 @@ public sealed class StaticNewGameLoaderTests
         Assert.Equal("minimal", Assert.Single(result.Content.Scenarios).Id.Value);
     }
 
+    [Theory]
+    [InlineData("built-in", "galaxy-command.core", "minimal")]
+    [InlineData("development", "galaxy-command.preview", "visual-preview")]
+    public void AuthoredPlayerSourceCanMoveAndCancelEveryStartingPlayerShip(string directory, string package, string scenario)
+    {
+        StaticNewGameLoadResult loaded = StaticNewGameLoader.Load(
+            [Path.Combine(FindRepositoryRoot(), "content", directory, package)],
+            PackageId.Create(package), LocalContentId.Create(scenario), GameSessionTestFixture.RootSeed,
+            factRetentionCapacity: 1024, maximumDegreeOfParallelism: 2);
+        Assert.True(loaded.IsSuccess);
+        GameSessionSetup setup = Assert.IsType<GameSessionSetup>(loaded.Setup);
+        using var session = new GameSession(setup, new HierarchicalNavigationPlanner(
+            setup.ConnectorTopology, new ChebyshevLocalTravelTimeEstimator(10)));
+
+        foreach (InitialShipSetup ship in setup.Ships.Where(ship => ship.PrincipalId == setup.Relationships.PlayerPrincipalId))
+        {
+            var destination = new SystemPosition(ship.Position.SystemId,
+                new SpatialPosition(new(ship.Position.Position.X.Units + 100), ship.Position.Position.Y));
+            GameplayCommandRecord move = session.SubmitCommand(setup.PlayerCommandSource,
+                new MoveShipCommand(ship.Id, new NavigationDestination.Position(destination), OrderPlacement.ReplaceAll));
+            Assert.Equal(CommandResultStatus.Accepted, move.Result.Status);
+            ShipOrderSnapshot order = session.CaptureSnapshot().Ships.Single(actor => actor.Id == ship.Id).CurrentOrder!;
+            GameplayCommandRecord cancel = session.SubmitCommand(setup.PlayerCommandSource,
+                new CancelShipOrderCommand(ship.Id, order.Id));
+            Assert.Equal(CommandResultStatus.Accepted, cancel.Result.Status);
+            Assert.Equal(ShipOrderStatus.Cancelled, session.CaptureSnapshot().Ships.Single(actor => actor.Id == ship.Id).CurrentOrder!.Status);
+        }
+    }
+
     [Fact]
     public void DevelopmentPreviewScenarioComposesCanonicalConnectorTopology()
     {

@@ -176,6 +176,13 @@ public sealed partial class ExecutableBoundedTerminalManeuverPlan
             ManeuverPhaseSchedules.From(plan),
             ManeuverInteractionCurves.From(plan));
 
+    /// <summary>Preserves simultaneous rotation/translation and the directly selected continuation as one authoritative plan.</summary>
+    internal static ExecutableBoundedTerminalManeuverPlan From(MovingCourseTurnManeuverPlan plan) =>
+        new(BoundedTerminalPlanKind.MovingCourseTurn, plan.StartsAt, plan.EndsAt, plan.StateAt,
+            new ExecutableManeuverPayload.MovingCourseTurn(plan.Destination, plan.RequestedHeading, plan.CourseTurn,
+                plan.CruiseDropoutPhase, plan.BrakingPhase, plan.ContinuationPlan.CaptureCheckpoint()),
+            ManeuverPhaseSchedules.From(plan), ManeuverInteractionCurves.From(plan));
+
     internal static ExecutableBoundedTerminalManeuverPlan From(
         ReducedThrustTerminalManeuverPlan plan) =>
         new(

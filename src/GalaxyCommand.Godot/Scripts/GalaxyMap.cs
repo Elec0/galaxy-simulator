@@ -35,7 +35,6 @@ public partial class GalaxyMap : Control
 	public event Action? SelectionChanged;
 	public event Action? ViewChanged;
 	public event Action<SystemPosition, OrderPlacement>? DestinationRequested;
-	public event Action<ShipId>? CancelRequested;
 	public event Action<EntityId>? CargoSelected;
 	public EntityId? SelectedCargoId { get; private set; }
 
@@ -64,6 +63,11 @@ public partial class GalaxyMap : Control
 	public string ViewDescription => _scale == MapScale.Galaxy
 		? "GALAXY"
 		: $"SYSTEM {CurrentSystem()?.Name.ToUpperInvariant() ?? "UNAVAILABLE"}";
+
+	/// <summary>Supplies map guidance to the native header so it participates in layout with the buttons.</summary>
+	public string NavigationHint => _scale == MapScale.Galaxy
+		? "GALAXY | click a system to inspect | wheel to zoom | middle drag to pan"
+		: UiLocalization.Text("ui.map.system_navigation_hint", ("system", CurrentSystem()?.Name.ToUpperInvariant() ?? "UNAVAILABLE"));
 
 	public override void _Ready()
 	{
@@ -153,6 +157,7 @@ public partial class GalaxyMap : Control
 
 	// Godot declares this override parameter as `event`; preserving that external
 	// metadata name is required by CA1725 even though it needs C# escaping.
+	/// <summary>Routes selection and movement through separate pointer buttons while retaining local zoom and pan.</summary>
 	public override void _GuiInput(InputEvent @event)
 	{
 		if (_snapshot is null)
@@ -195,12 +200,7 @@ public partial class GalaxyMap : Control
 
 		if (mouse.ButtonIndex == MouseButton.Right)
 		{
-			if (FocusedShipId is { } focused)
-			{
-				CancelRequested?.Invoke(focused);
-				AcceptEvent();
-			}
-
+			if (_scale == MapScale.System) RequestMoveAt(mouse);
 			return;
 		}
 
@@ -215,7 +215,7 @@ public partial class GalaxyMap : Control
 			return;
 		}
 
-		SelectShipOrRequestMove(mouse);
+		SelectAt(mouse);
 	}
 
 	public override void _Draw()
@@ -236,9 +236,9 @@ public partial class GalaxyMap : Control
 		}
 	}
 
+	/// <summary>Draws public static topology; the native header owns navigation text and its layout.</summary>
 	private void DrawGalaxy()
 	{
-		DrawString(ThemeDB.FallbackFont, new Vector2(28, 118), "GALAXY | click a system to inspect | wheel to zoom | middle drag to pan", fontSize: 13, modulate: new Color("668ca5"));
 		foreach (TransitConnectionSnapshot connection in _snapshot!.TransitConnections.OrderBy(connection => connection.Id.Value))
 		{
 			ConnectorEndpointSnapshot? source = _snapshot.ConnectorEndpoints.FirstOrDefault(endpoint => endpoint.Id == connection.SourceEndpointId);
@@ -267,6 +267,7 @@ public partial class GalaxyMap : Control
 		}
 	}
 
+	/// <summary>Draws permitted contacts and records only when the selected system still resolves.</summary>
 	private void DrawSystem()
 	{
 		GameSystemSnapshot? system = CurrentSystem();
@@ -276,7 +277,6 @@ public partial class GalaxyMap : Control
 		}
 
 		DrawSystemAxes();
-		DrawString(ThemeDB.FallbackFont, new Vector2(28, 118), $"{system.Name.ToUpperInvariant()} | Galaxy returns to topology | wheel to zoom | middle drag to pan", fontSize: 13, modulate: new Color("668ca5"));
 		foreach (ConnectorEndpointSnapshot endpoint in _snapshot!.ConnectorEndpoints.Where(endpoint => endpoint.Position.SystemId == system.Id).OrderBy(endpoint => endpoint.Id.Value))
 		{
 			Vector2 position = ToSystemView(endpoint.Position.Position);
@@ -372,7 +372,8 @@ public partial class GalaxyMap : Control
 		AcceptEvent();
 	}
 
-	private void SelectShipOrRequestMove(InputEventMouseButton mouse)
+	/// <summary>Selects covered cargo or ships without submitting movement, including when clicking empty space.</summary>
+	private void SelectAt(InputEventMouseButton mouse)
 	{
 		GameSystemSnapshot? system = CurrentSystem();
 		if (system is null)
@@ -406,8 +407,15 @@ public partial class GalaxyMap : Control
 			AcceptEvent();
 			return;
 		}
+	}
 
-		if (FocusedShipId is { } focused)
+	/// <summary>Requests movement at the clicked position without hit-testing or changing the current selection.</summary>
+	private void RequestMoveAt(InputEventMouseButton mouse)
+	{
+		GameSystemSnapshot? system = CurrentSystem();
+		if (system is null) return;
+
+		if (FocusedShipId is not null)
 		{
 			SpatialPosition destination = SystemMapCoordinateTransform.ScreenToSystemPosition(
 				mouse.Position.X,

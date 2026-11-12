@@ -306,6 +306,14 @@ where the existing owner contracts require them. Content catalog compatibility
 and saved-reference migration remain `TASK-037`, so this bridge does not enable
 general cross-catalog saved sessions.
 
+Moving-course replacement plans use maneuver behavior version 2 and current save
+schema 3. Their selected payload retains the independent angular instruction,
+optional cruise-dropout brake, precision brake, and nested destination
+continuation. Restoration joins those exact instructions without planner replay.
+Prior save schemas require an explicit migration registration; none is inferred
+for this motion-policy change. Historical maneuver behavior version 1 is rejected
+by the current runtime-policy compatibility check.
+
 ### Frozen value contracts
 
 The codec registers each admitted object, scalar, enumeration, and union in

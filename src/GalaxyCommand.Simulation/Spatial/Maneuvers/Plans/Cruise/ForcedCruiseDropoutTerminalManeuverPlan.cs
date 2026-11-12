@@ -88,8 +88,10 @@ public sealed record ForcedCruiseDropoutTerminalManeuverPlan
             new ManeuverAcceleration(dropoutRate),
             capability.MaximumSubCruiseSpeed);
         ShipKinematicState atSubCruise = dropout.StateAt(dropout.EndsAt);
+        // Dropout already owns the interruption boundary; this child continues
+        // the selected destination instead of introducing another initial turn.
         BoundedTerminalPlanSelection continuation =
-            BoundedTerminalManeuverPlanner.Select(
+            BoundedTerminalManeuverPlanner.SelectWithoutMovingTurn(
                 dropout.EndsAt,
                 atSubCruise,
                 destination,

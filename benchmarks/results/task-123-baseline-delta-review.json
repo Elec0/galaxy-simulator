@@ -1,0 +1,135 @@
+{
+  "Qualification": "Noncanonical diagnostic instrumentation in isolated source snapshots; no performance comparison",
+  "PriorSourceCommit": "bccb9037d4e094827e3df6e6f9a07d118388d4ad",
+  "CurrentSource": "TASK-123 worktree",
+  "Replanning": {
+    "full": {
+      "Before": {
+        "Events": 53,
+        "Facts": 500,
+        "FactKinds": {
+          "CommandAcceptedFact": 100,
+          "ShipOrderTransitionFact": 199,
+          "ShipLocalMotionStartedFact": 100,
+          "ShipCruiseEnteredFact": 1,
+          "ShipLocalMotionEndedFact": 99,
+          "ShipCruiseDroppedOutFact": 1
+        },
+        "PhaseBoundaries": {
+          "('Maneuver', 'PhaseBoundary', 0)": 51,
+          "('Maneuver', 'PhaseBoundary', 1)": 2
+        }
+      },
+      "After": {
+        "Events": 146,
+        "Facts": 517,
+        "FactKinds": {
+          "CommandAcceptedFact": 100,
+          "ShipOrderTransitionFact": 199,
+          "ShipLocalMotionStartedFact": 100,
+          "ShipCruiseEnteredFact": 10,
+          "ShipLocalMotionEndedFact": 99,
+          "ShipCruiseDroppedOutFact": 9
+        },
+        "PhaseBoundaries": {
+          "('Maneuver', 'PhaseBoundary', 0)": 100,
+          "('Maneuver', 'PhaseBoundary', 1)": 37,
+          "('Maneuver', 'PhaseBoundary', 2)": 9
+        }
+      },
+      "FactDeltas": {
+        "ShipCruiseDroppedOutFact": 8,
+        "ShipCruiseEnteredFact": 9
+      },
+      "EventDeltas": {
+        "('Maneuver', 'PhaseBoundary', 0)": 49,
+        "('Maneuver', 'PhaseBoundary', 1)": 35,
+        "('Maneuver', 'PhaseBoundary', 2)": 9
+      },
+      "AfterEventDispositions": {
+        "Applied": 146
+      }
+    },
+    "reduced": {
+      "Before": {
+        "Events": 4,
+        "Facts": 20,
+        "FactKinds": {
+          "CommandAcceptedFact": 4,
+          "ShipOrderTransitionFact": 7,
+          "ShipLocalMotionStartedFact": 4,
+          "ShipCruiseEnteredFact": 1,
+          "ShipLocalMotionEndedFact": 3,
+          "ShipCruiseDroppedOutFact": 1
+        },
+        "PhaseBoundaries": {
+          "('Maneuver', 'PhaseBoundary', 0)": 3,
+          "('Maneuver', 'PhaseBoundary', 1)": 1
+        }
+      },
+      "After": {
+        "Events": 6,
+        "Facts": 20,
+        "FactKinds": {
+          "CommandAcceptedFact": 4,
+          "ShipOrderTransitionFact": 7,
+          "ShipLocalMotionStartedFact": 4,
+          "ShipCruiseEnteredFact": 1,
+          "ShipLocalMotionEndedFact": 3,
+          "ShipCruiseDroppedOutFact": 1
+        },
+        "PhaseBoundaries": {
+          "('Maneuver', 'PhaseBoundary', 0)": 4,
+          "('Maneuver', 'PhaseBoundary', 1)": 2
+        }
+      },
+      "FactDeltas": {},
+      "EventDeltas": {
+        "('Maneuver', 'PhaseBoundary', 0)": 1,
+        "('Maneuver', 'PhaseBoundary', 1)": 1
+      },
+      "AfterEventDispositions": {
+        "Applied": 6
+      }
+    },
+    "Scope": "Temporary diagnostic trace export only; iteration overrides are noncanonical and do not qualify performance."
+  },
+  "StationAndInteraction": {
+    "StationMetadataNormalization": [
+      {
+        "id": "station.many-quiet-sites",
+        "normalizedManeuverVersion": 1,
+        "normalizedDigest": "285568c294f5e9db",
+        "OldDigest": "285568c294f5e9db",
+        "RestoresOldDigest": true
+      },
+      {
+        "id": "station.one-crowded",
+        "normalizedManeuverVersion": 1,
+        "normalizedDigest": "b56940d4752279bc",
+        "OldDigest": "b56940d4752279bc",
+        "RestoresOldDigest": true
+      },
+      {
+        "id": "station.partial-deliveries",
+        "normalizedManeuverVersion": 1,
+        "normalizedDigest": "8d0fba9b6bf6c88b",
+        "OldDigest": "8d0fba9b6bf6c88b",
+        "RestoresOldDigest": true
+      }
+    ],
+    "InteractionSession": {
+      "Events": {
+        "Before": 497,
+        "After": 497,
+        "ChangedRecords": 8
+      },
+      "Facts": {
+        "Before": 144,
+        "After": 144,
+        "ChangedRecords": 40
+      },
+      "SameFinalDiagnosticSnapshot": false
+    }
+  }
+}

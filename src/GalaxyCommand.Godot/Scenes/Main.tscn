@@ -47,6 +47,11 @@ theme_override_colors/font_color = Color(0.78, 0.9, 1, 1)
 theme_override_font_sizes/font_size = 14
 text = "DEVELOPMENT VISUAL PREVIEW | GALAXY"
 
+[node name="NavigationHint" type="Label" parent="Interface/Header/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.54901963, 0.64705884, 1)
+theme_override_font_sizes/font_size = 13
+
 [node name="ViewControls" type="HBoxContainer" parent="Interface/Header/Content"]
 layout_mode = 2
 theme_override_constants/separation = 8

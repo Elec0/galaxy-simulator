@@ -336,6 +336,17 @@ authorize implementation.
     precision translation when exact-course primary thrust is unavailable.
     This provisional threshold will be replaced by a rule derived from ship
     size when that model is defined.
+    For a moving start whose new course differs by more than the existing
+    one-degree heading tolerance, begin shortest-arc rotation immediately while
+    applying ordinary precision braking along the current velocity vector.
+    Turning never rotates or snaps velocity. Cruise interruptions retain their
+    dedicated twice-primary-acceleration brake to sub-cruise speed before
+    precision braking continues. Rotation and braking have independent physical
+    boundaries: a completed turn holds heading while braking finishes, and a
+    completed brake holds position while the turn finishes. Continue from that
+    exact stopped, rotated state with the existing bounded destination planner.
+    Internal waypoint continuations do not restart this initial course-turn
+    policy. The optional terminal heading remains a separate arrival constraint.
 
 ### Arrival, short moves, and cruise transitions
 

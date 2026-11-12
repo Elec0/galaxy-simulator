@@ -212,12 +212,10 @@ public sealed class BoundedTerminalManeuverPlannerTests
         Assert.Null(selection.AlignedSubCruisePlan);
     }
 
-    [Theory]
-    [InlineData(1U)]
-    [InlineData(90_000U)]
-    public void CapabilityPathUsesPrecisionForNonCourseMovingHeading(
-        uint heading)
+    [Fact]
+    public void CapabilityPathKeepsPrecisionForTinyMovingHeadingDifference()
     {
+        const uint heading = 1;
         EffectiveShipManeuverCapability capability = Capability();
         BoundedTerminalPlanSelection selection =
             BoundedTerminalManeuverPlanner.Select(
@@ -246,6 +244,48 @@ public sealed class BoundedTerminalManeuverPlannerTests
         Assert.Equal(
             new ShipHeading(heading),
             translation.StateAt(translation.EndsAt).Heading);
+    }
+
+    [Fact]
+    public void CapabilityPathTurnsImmediatelyWhilePrecisionBrakingExistingMomentum()
+    {
+        EffectiveShipManeuverCapability capability = Capability();
+        ShipKinematicState start = State(0, 0, 1_000, 0, 90_000);
+        BoundedTerminalPlanSelection selection = BoundedTerminalManeuverPlanner.Select(
+            SimulationTime.Zero, start, Position(90, 0), requestedHeading: null,
+            capability, ManeuverObjective.FastestArrival);
+
+        Assert.Equal(BoundedTerminalPlanKind.MovingCourseTurn, selection.Kind);
+        MovingCourseTurnManeuverPlan complete = Assert.IsType<MovingCourseTurnManeuverPlan>(selection.MovingCourseTurnPlan);
+        Assert.Equal(start, complete.StateAt(complete.StartsAt));
+        Assert.Equal(capability.PrecisionAcceleration, complete.BrakingPhase.Deceleration);
+        Assert.Equal(complete.StartsAt, complete.BrakingPhase.StartsAt);
+        Assert.Equal(complete.StartsAt, complete.CourseTurn.StartsAt);
+        Assert.Equal(new ShipHeading(0), complete.CourseTurn.RequestedHeading);
+        ShipKinematicState turning = complete.StateAt(new(complete.StartsAt.Milliseconds + 1));
+        Assert.InRange(turning.Velocity.MillimetersPerSecondX, 1, start.Velocity.MillimetersPerSecondX - 1);
+        Assert.Equal(0, turning.Velocity.MillimetersPerSecondY);
+        Assert.InRange(turning.Heading.Millidegrees, 1U, start.Heading.Millidegrees - 1);
+        Assert.True(ManeuverArrival.EvaluateTerminal(complete.StateAt(complete.EndsAt), Position(90, 0),
+            requestedHeading: null).IsSatisfied);
+    }
+
+    [Fact]
+    public void InternalSelectionRetainsPrecisionMovingPrimitiveWithoutAnotherCourseTurn()
+    {
+        EffectiveShipManeuverCapability capability = Capability();
+        BoundedTerminalPlanSelection selection = BoundedTerminalManeuverPlanner.SelectWithoutMovingTurn(
+            SimulationTime.Zero, State(0, 0, 1_000, 0, 90_000), Position(90, 0), requestedHeading: null,
+            capability, ManeuverObjective.FastestArrival);
+
+        Assert.Equal(BoundedTerminalPlanKind.MovingAlignedTerminal, selection.Kind);
+        MovingAlignedTerminalManeuverPlan complete = Assert.IsType<MovingAlignedTerminalManeuverPlan>(selection.MovingAlignedTerminalPlan);
+        ShortMoveTriangularPlan translation = Assert.IsType<ShortMoveTriangularPlan>(complete.TranslationPlan.TriangularPlan);
+        Assert.Equal(capability.PrecisionAcceleration, translation.Profile.Acceleration);
+        Assert.Equal(capability.PrecisionAcceleration, translation.Profile.Braking);
+        Assert.Equal(new ShipHeading(90_000), translation.StateAt(translation.EndsAt).Heading);
+        Assert.True(ManeuverArrival.EvaluateTerminal(complete.StateAt(complete.EndsAt), Position(90, 0),
+            requestedHeading: null).IsSatisfied);
     }
 
     [Fact]

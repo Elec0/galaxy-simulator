@@ -17,10 +17,10 @@ public sealed class SaveFormatTests
     [Fact]
     public void ReaderAcceptsExternallyEditedWhitespaceAndPropertyOrder()
     {
-        const string edited = """
+        string edited = $$"""
             {
               "checkpoint": { "engine": { "currentTime": "500" } },
-              "schemaVersion": 2,
+              "schemaVersion": {{SaveFormat.CurrentSchemaVersion}},
               "format": "galaxy-command-save"
             }
             """;
@@ -28,7 +28,7 @@ public sealed class SaveFormatTests
         SaveReadResult result = Read(edited);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(2, result.Document!.SchemaVersion);
+        Assert.Equal(SaveFormat.CurrentSchemaVersion, result.Document!.SchemaVersion);
         Assert.Equal(
             "500",
             result.Document.Root
@@ -52,7 +52,7 @@ public sealed class SaveFormatTests
         Assert.True(result.IsSuccess);
         Assert.Equal(destination.Length, result.BytesWritten);
         string encoded = Encoding.UTF8.GetString(destination.ToArray());
-        Assert.Contains("\n  \"schemaVersion\": 2,", encoded, StringComparison.Ordinal);
+        Assert.Contains($"\n  \"schemaVersion\": {SaveFormat.CurrentSchemaVersion},", encoded, StringComparison.Ordinal);
         Assert.EndsWith("\n", encoded, StringComparison.Ordinal);
         Assert.DoesNotContain("\uFEFF", encoded, StringComparison.Ordinal);
     }
@@ -60,13 +60,13 @@ public sealed class SaveFormatTests
     [Fact]
     public void WriterRejectsNonCurrentSchema()
     {
-        using JsonDocument parsed = JsonDocument.Parse("""
+        using JsonDocument parsed = JsonDocument.Parse($$"""
             {
               "format": "galaxy-command-save",
-              "schemaVersion": 3
+              "schemaVersion": {{SaveFormat.CurrentSchemaVersion + 1}}
             }
             """);
-        var document = new InertSaveDocument(3, parsed.RootElement);
+        var document = new InertSaveDocument(SaveFormat.CurrentSchemaVersion + 1, parsed.RootElement);
         using var destination = new MemoryStream();
 
         SaveWriteResult result = SaveJsonCodec.Write(
@@ -130,10 +130,10 @@ public sealed class SaveFormatTests
     [Fact]
     public void ReaderRejectsUnsupportedFutureSchema()
     {
-        const string future = """
+        string future = $$"""
             {
               "format": "galaxy-command-save",
-              "schemaVersion": 3
+              "schemaVersion": {{SaveFormat.CurrentSchemaVersion + 1}}
             }
             """;
 
@@ -267,7 +267,7 @@ public sealed class SaveFormatTests
     [Fact]
     public void RegistryRejectsSourceVersionThatDisagreesWithEnvelope()
     {
-        using JsonDocument parsed = JsonDocument.Parse(CurrentDocument());
+        using JsonDocument parsed = JsonDocument.Parse(CurrentDocument(2));
         var source = new InertSaveDocument(1, parsed.RootElement);
         var registry = new SaveMigrationRegistry(
             currentSchemaVersion: 2,

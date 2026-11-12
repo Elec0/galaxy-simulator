@@ -227,8 +227,10 @@ public sealed class RuntimePolicyManifestTests
                 .Failure!.Path);
     }
 
-    [Fact]
-    public void ResolveRejectsUnknownManeuverBehaviorVersion()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(ShipManeuverCapability.CurrentBehaviorVersion + 1)]
+    public void ResolveRejectsUnsupportedManeuverBehaviorVersion(int behaviorVersion)
     {
         RuntimePolicyManifestCheckpoint checkpoint = Manifest();
         MaterializationPolicyCheckpoint policy = Assert.IsType<MaterializationPolicyCheckpoint>(
@@ -239,7 +241,7 @@ public sealed class RuntimePolicyManifestTests
             Assert.IsType<ShipManeuverCapabilityCheckpoint>(design.ManeuverCapability);
         RuntimePolicyManifestCheckpoint invalid = checkpoint with
         {
-            ShipDefinitions = [design with { ManeuverCapability = capability with { BehaviorVersion = 2 } }],
+            ShipDefinitions = [design with { ManeuverCapability = capability with { BehaviorVersion = behaviorVersion } }],
         };
 
         CheckpointResult<ResolvedRuntimePolicies> result =

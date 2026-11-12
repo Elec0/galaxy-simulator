@@ -445,6 +445,32 @@ public sealed class GameSessionTerminalManeuverTests
     }
 
     [Fact]
+    public void MovingReplacementStartsTurningWithoutChangingItsInitialMomentum()
+    {
+        using GameSession session = CreateSession();
+        session.SubmitCommand(GameSessionTestFixture.Player, new MoveShipCommand(GameSessionTestFixture.Ship,
+            GameSessionTestFixture.Destination(10_000, 0), OrderPlacement.ReplaceAll));
+        session.AdvanceTo(new(1_000));
+        GameShipSnapshot before = Assert.Single(session.CaptureSnapshot().Ships);
+        Assert.NotEqual(ShipVelocity.Zero, before.Velocity);
+
+        Assert.Equal(CommandResultStatus.Accepted, session.SubmitCommand(GameSessionTestFixture.Player,
+            new MoveShipCommand(GameSessionTestFixture.Ship, GameSessionTestFixture.Destination(0, 10_000),
+                OrderPlacement.ReplaceAll)).Result.Status);
+
+        GameShipSnapshot admitted = Assert.Single(session.CaptureSnapshot().Ships);
+        Assert.Equal(before.Position, admitted.Position);
+        Assert.Equal(before.Velocity, admitted.Velocity);
+        Assert.Equal(before.Heading, admitted.Heading);
+        session.AdvanceTo(new(1_100));
+        GameShipSnapshot turning = Assert.Single(session.CaptureSnapshot().Ships);
+        Assert.NotEqual(before.Heading, turning.Heading);
+        Assert.True(turning.Velocity.MillimetersPerSecondX > 0);
+        Assert.Equal(0, turning.Velocity.MillimetersPerSecondY);
+        Assert.True(turning.Position!.Value.Position.X.Units >= before.Position!.Value.Position.X.Units);
+    }
+
+    [Fact]
     public void ReplacementCancelsOldBoundariesAndContinuesWithNewGeneration()
     {
         GameSession session = CreateSession();

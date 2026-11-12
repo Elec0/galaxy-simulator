@@ -198,11 +198,11 @@ public sealed class SaveFileStoreTests : IDisposable
         using JsonDocument parsed = JsonDocument.Parse($$"""
             {
               "format": "galaxy-command-save",
-              "schemaVersion": 2,
+              "schemaVersion": {{SaveFormat.CurrentSchemaVersion}},
               "value": "{{value}}"
             }
             """);
-        return new InertSaveDocument(2, parsed.RootElement);
+        return new InertSaveDocument(SaveFormat.CurrentSchemaVersion, parsed.RootElement);
     }
 
     public enum SaveFailurePoint

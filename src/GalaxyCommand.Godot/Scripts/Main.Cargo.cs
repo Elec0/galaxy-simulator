@@ -22,7 +22,7 @@ public partial class Main
     private Label _collectionResult = null!;
     private Button _collectObject = null!;
     private Button _collectField = null!;
-    private Button _cancelCollection = null!;
+    private Button _cancelOrders = null!;
     private Button _priorityRemove = null!;
     private Button _priorityAdd = null!;
     private Button _priorityUp = null!;
@@ -73,7 +73,7 @@ public partial class Main
         content.AddChild(_collectionPlacement);
         _collectObject = AddCargoButton(content, "ui.cargo.collect_object", () => EnqueueCargo(_cargoInspector.CreateObjectCommand(_presentation.Selection.FocusedShip, CollectionPlacement)));
         _collectField = AddCargoButton(content, "ui.cargo.collect_field", () => EnqueueCargo(_cargoInspector.CreateFieldCommand(_presentation.Selection.FocusedShip, CollectionPlacement)));
-        _cancelCollection = AddCargoButton(content, "ui.cargo.cancel", () => EnqueueCargo(_cargoInspector.CreateCancelCommand(_presentation.Selection.FocusedShip)));
+        _cancelOrders = AddCargoButton(content, "ui.cargo.cancel", CancelSelectedOrders);
         AddCargoLabel(content, "ui.cargo.priorities");
         AddCargoLabel(content, "ui.cargo.priority_help");
         _priorityList = AddSemanticList(content, "ui.cargo.priorities", 78);
@@ -151,7 +151,10 @@ public partial class Main
             _fieldDetails.Text = selected?.OriginalFieldId is null ? UiLocalization.Text("ui.cargo.no_field") : DescribeVisibleField(field);
             _collectObject.Disabled = _cargoInspector.CreateObjectCommand(_presentation.Selection.FocusedShip, CollectionPlacement) is null;
             _collectField.Disabled = _cargoInspector.CreateFieldCommand(_presentation.Selection.FocusedShip, CollectionPlacement) is null;
-            _cancelCollection.Disabled = _cargoInspector.CreateCancelCommand(_presentation.Selection.FocusedShip) is null;
+            _cancelOrders.Disabled = CaptureSelectedOrderCancellation() is null;
+            string cancelText = UiLocalization.Text(_map.SelectedShipIds.Count > 1 ? "ui.orders.cancel_selected" : "ui.cargo.cancel");
+            _cancelOrders.Text = cancelText;
+            _cancelOrders.AccessibilityName = cancelText;
             RefreshPriorityDraft();
             _collectionProgress.Text = DescribeCollectionProgress();
             _collectionResult.Text = UiLocalization.Text("ui.cargo.order_and_result", ("state", DescribeCargoOrderResult()), ("result", _cargoResultText));
@@ -233,7 +236,7 @@ public partial class Main
     private void RestoreCargoControlFocus(Control? prior)
     {
         if (prior is not BaseButton { Disabled: true }) return;
-        Control[] order = [_shipList, _cargoList, _collectionPlacement, _collectObject, _collectField, _cancelCollection,
+        Control[] order = [_shipList, _cargoList, _collectionPlacement, _collectObject, _collectField, _cancelOrders,
             _priorityList, _priorityType, _priorityAdd, _priorityRemove, _priorityUp, _priorityDown];
         int index = Array.IndexOf(order, prior);
         if (index < 0) return;

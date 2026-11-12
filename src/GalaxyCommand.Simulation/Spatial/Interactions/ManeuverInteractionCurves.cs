@@ -19,6 +19,17 @@ internal static class ManeuverInteractionCurves
             foreach (InteractionPhaseCurve curve in From(final)) yield return curve;
     }
 
+    /// <summary>Uses exact translation geometry while angular state remains owned by the composite evaluator.</summary>
+    internal static IEnumerable<InteractionPhaseCurve> From(MovingCourseTurnManeuverPlan plan)
+    {
+        if (plan.CruiseDropoutPhase is { } dropout) yield return InteractionPhaseCurve.From(dropout);
+        DecelerationManeuverSegment braking = plan.BrakingPhase;
+        yield return InteractionPhaseCurve.From(braking);
+        if (braking.EndsAt < plan.PrefixEndsAt)
+            yield return InteractionPhaseCurve.Fixed(braking.StateAt(braking.EndsAt).Position, braking.EndsAt, plan.PrefixEndsAt);
+        foreach (InteractionPhaseCurve curve in plan.ContinuationPlan.InteractionCurves) yield return curve;
+    }
+
     internal static IEnumerable<InteractionPhaseCurve> From(ForcedCruiseDropoutTerminalManeuverPlan plan) =>
         new[] { InteractionPhaseCurve.From(plan.DropoutPhase) }.Concat(plan.ContinuationPlan.InteractionCurves);
 

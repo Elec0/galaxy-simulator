@@ -291,13 +291,24 @@ public sealed class GameFactTests
         GameSession session = GameSessionTestFixture.Create();
         SubmitMove(session, 100, 0);
         session.AdvanceTo(new SimulationTime(1_000));
+        TerminalManeuverSnapshot cancelled = Assert.IsType<TerminalManeuverSnapshot>(
+            Assert.Single(session.CaptureSnapshot().Ships).Maneuver);
         SubmitMove(session, 50, 100);
+        TerminalManeuverSnapshot replacement = Assert.IsType<TerminalManeuverSnapshot>(
+            Assert.Single(session.CaptureSnapshot().Ships).Maneuver);
+        Assert.NotEqual(cancelled.MotionId, replacement.MotionId);
         GameFactEnvelope[] beforeCancelledBoundary = ReadAll(session);
 
         session.AdvanceTo(new SimulationTime(4_000));
 
         Assert.Equal(beforeCancelledBoundary, ReadAll(session));
-        Assert.Empty(session.EventRecords);
+        Assert.DoesNotContain(session.EventRecords, record => record.Timestamp >= new SimulationTime(1_000)
+            && record.Kind is GameEventKind.SpatialMovement { Event: SpatialMovementEvent.Maneuver motion }
+            && motion.Event.MotionId == cancelled.MotionId && motion.Event.Generation == cancelled.Generation);
+        Assert.Contains(session.EventRecords, record => record.Disposition == ScheduledEventDisposition.Applied
+            && record.Kind is GameEventKind.SpatialMovement { Event: SpatialMovementEvent.Maneuver motion }
+            && motion.Event is ManeuverScheduleEvent.PhaseBoundary
+            && motion.Event.MotionId == replacement.MotionId && motion.Event.Generation == replacement.Generation);
     }
 
     [Fact]

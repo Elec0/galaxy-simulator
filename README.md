@@ -139,13 +139,14 @@ acceptance scenario. The client advances automatically, renders authoritative
 system-local ship motion, and submits move or cancel commands through the same
 session boundary used by headless tests.
 
-Click a ship to select and focus it. Shift-click ships to add or remove them
-from the local selection, while the focused ship remains the target for the
-current single-ship controls. Click empty system space to issue or replace its
-destination, Shift-click empty space to append a destination, and right-click
-to cancel its active order. The status panel shows the active controller, queue
-length, current destination, order state and reason, motion state, and bounded
-recent-fact feed status.
+Left-click a ship to select and focus it. Shift-left-click ships to add or
+remove them from the local selection. Left-clicking empty space issues no order.
+Right-click in a system to issue or replace movement for the selected ships;
+Shift-right-click appends a destination for the focused ship. The existing
+cancel button cancels the current orders of a selected group, or the focused
+ship's current order for a single selection. The status panel shows the active
+controller, queue length, current destination, order state and reason, motion
+state, and bounded recent-fact feed status.
 
 Install the .NET edition of Godot, then open
 `src/GalaxyCommand.Godot/project.godot` in the editor. From this directory, the
@@ -156,6 +157,15 @@ client can also be built and run with:
   --headless --path src/GalaxyCommand.Godot --build-solutions --quit
 /Applications/Godot_mono.app/Contents/MacOS/Godot \
   --path src/GalaxyCommand.Godot
+```
+
+After building, exercise the real preview's selection, movement, queued moves,
+and single/group cancellation with the native input smoke check:
+
+```sh
+/Applications/Godot_mono.app/Contents/MacOS/Godot \
+  --path src/GalaxyCommand.Godot \
+  --script "$PWD/tests/GalaxyCommand.Godot.Smoke/MapInputBindings.gd"
 ```
 
 The test-only Phase 1 acceptance scenario runs through mining, transport,

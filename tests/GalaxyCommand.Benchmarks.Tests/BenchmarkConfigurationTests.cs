@@ -56,7 +56,8 @@ public sealed class BenchmarkConfigurationTests
         Assert.Equal(
             5_000_000,
             preset.Parameters[BenchmarkParameterNames.SimulatedDurationMilliseconds]);
-        Assert.Equal("603601f07a12a8c1", preset.ExpectedDigest);
+        Assert.Equal(2, preset.Version);
+        Assert.Equal("cbe8c9c70d163ed4", preset.ExpectedDigest);
     }
 
     [Fact]
@@ -272,7 +273,7 @@ public sealed class BenchmarkConfigurationTests
             output.ToString(),
             StringComparison.Ordinal);
         Assert.Contains(
-            "\"events\": 4",
+            "\"events\": 6",
             output.ToString(),
             StringComparison.Ordinal);
         Assert.DoesNotContain("benchmark_failure", error.ToString(), StringComparison.Ordinal);

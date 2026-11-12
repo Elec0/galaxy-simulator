@@ -33,6 +33,29 @@ internal static class SelectedManeuverCheckpointValidation
                 Inspect(item.DropoutPhase);
                 Arrival(From(restored), item.Destination, item.RequestedHeading);
                 break;
+            case ExecutableManeuverPayload.MovingCourseTurn item:
+                // Rotation and translation are separately retained instructions;
+                // the composed prefix is what joins the selected child state.
+                Inspect(item.CourseTurn);
+                DecelerationManeuverSegment initial = item.CruiseDropoutPhase ?? item.BrakingPhase;
+                Require(initial.Start.Velocity != ShipVelocity.Zero
+                    && initial.StartsAt == item.CourseTurn.StartsAt
+                    && initial.Start.Position == item.CourseTurn.TurnPhase.Start.Position
+                    && initial.Start.Heading == item.CourseTurn.TurnPhase.Start.Heading
+                    && initial.Start.Position != item.Destination);
+                long dx = checked((long)(((Int128)item.Destination.Position.X.Units - initial.Start.Position.Position.X.Units) * 1_000));
+                long dy = checked((long)(((Int128)item.Destination.Position.Y.Units - initial.Start.Position.Position.Y.Units) * 1_000));
+                Require(item.CourseTurn.RequestedHeading == ManeuverHeadingProjection.ResolveCourseHeading(dx, dy));
+                if (item.CruiseDropoutPhase is { } dropout)
+                {
+                    Require(dropout.Kind == ManeuverDecelerationKind.ActiveBrake && dropout.TargetSpeedMillimetersPerSecond > 0);
+                    Inspect(dropout);
+                }
+                Require(item.BrakingPhase.Kind == ManeuverDecelerationKind.ActiveBrake
+                    && item.BrakingPhase.TargetSpeedMillimetersPerSecond == 0);
+                Inspect(item.BrakingPhase);
+                Arrival(From(restored), item.Destination, item.RequestedHeading);
+                break;
             case ExecutableManeuverPayload.WaypointRoute item:
                 Require(item.Transitions.Count > 0);
                 Interval route = Inspect(item.Transitions[0]);

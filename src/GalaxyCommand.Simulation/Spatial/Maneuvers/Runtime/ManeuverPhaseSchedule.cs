@@ -84,6 +84,22 @@ internal static class ManeuverPhaseSchedules
         From(selection.CompletePlan
             ?? throw InvalidPayload(selection.Kind));
 
+    /// <summary>Retains rotation completion, active-braking stop, and required cruise dropout as exact physical boundaries.</summary>
+    internal static ManeuverScheduledPhase[] From(MovingCourseTurnManeuverPlan plan)
+    {
+        SimulationTime[] boundaries = new[] { plan.StartsAt, plan.CourseTurn.EndsAt, plan.PrefixEndsAt,
+                plan.CruiseDropoutPhase?.EndsAt ?? plan.PrefixEndsAt, plan.BrakingPhase.EndsAt }
+            .Where(time => time >= plan.StartsAt && time <= plan.PrefixEndsAt).Distinct().Order().ToArray();
+        var phases = new List<ManeuverScheduledPhase>();
+        for (int index = 1; index < boundaries.Length; index++)
+            phases.Add(new(plan.CruiseDropoutPhase is { } dropout && boundaries[index - 1] < dropout.EndsAt
+                ? ManeuverPhaseKind.CruiseDropoutBrake
+                : boundaries[index - 1] < plan.BrakingPhase.EndsAt ? ManeuverPhaseKind.ActiveBrake : ManeuverPhaseKind.Turn,
+                boundaries[index - 1], boundaries[index]));
+        phases.AddRange(plan.ContinuationPlan.Phases);
+        return phases.ToArray();
+    }
+
     internal static ManeuverScheduledPhase[] From(
         MovingAlignedTerminalManeuverPlan plan) =>
         AppendFinalTurn(

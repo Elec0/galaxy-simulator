@@ -244,6 +244,17 @@ persistent discoveries, refresh, and confirmed absence available. Future
 station, deployable, inventory, production, combat, and dialogue owners retain
 control of their entity-specific fields and actions.
 
+The preview's ship bindings keep selection separate from intent: left click
+selects a ship or cargo, and Shift-left-click toggles ship selection. Empty left
+clicks issue no order. Right click captures a replacement move for the current
+ship selection, including when the pointer is over another contact; it does not
+change selection. Shift-right-click retains focused-ship append behavior. The
+existing right-panel cancel button captures the selected ships' current-order
+cancellation, or the focused ship's current order for a single selection. It
+leaves queued work under the existing order lifecycle contract and reports the
+command outcome for both single and group cancellation. Galaxy-system opening,
+zoom, and pan retain their existing bindings.
+
 ## Overlays and activity surface
 
 The minimal map always distinguishes a selected set, a focused entity, current

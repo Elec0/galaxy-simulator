@@ -94,11 +94,12 @@ public sealed class ExecutableManeuverPhaseScheduleTests
     [Fact]
     public void BrakeThenStationaryCompositionRetainsBothSchedules()
     {
-        ExecutableBoundedTerminalManeuverPlan plan = SelectWithCapability(
+        BoundedTerminalPlanSelection selection = BoundedTerminalManeuverPlanner.SelectWithoutMovingTurn(
             SimulationTime.Zero,
             State(0, 0, 0, 2_000, 0),
             Position(90, 2),
-            requestedHeading: null);
+            requestedHeading: null, Capability(), ManeuverObjective.FastestArrival);
+        ExecutableBoundedTerminalManeuverPlan plan = Assert.IsType<ExecutableBoundedTerminalManeuverPlan>(selection.ExecutablePlan);
 
         AssertSchedule(
             plan,
@@ -121,6 +122,31 @@ public sealed class ExecutableManeuverPhaseScheduleTests
             ManeuverPhaseKind.Accelerate,
             ManeuverPhaseKind.ActiveBrake,
             ManeuverPhaseKind.Turn);
+    }
+
+    [Fact]
+    public void MovingCourseTurnScheduleRetainsBothConcurrentCompletionsBeforeContinuation()
+    {
+        ShipKinematicState start = State(0, 0, 1_000, 0, 90_000);
+        BoundedTerminalPlanSelection selection = BoundedTerminalManeuverPlanner.Select(
+            new(125), start, Position(90, 0), requestedHeading: null, Capability(), ManeuverObjective.FastestArrival);
+        MovingCourseTurnManeuverPlan composite = Assert.IsType<MovingCourseTurnManeuverPlan>(selection.MovingCourseTurnPlan);
+        ExecutableBoundedTerminalManeuverPlan executable = Assert.IsType<ExecutableBoundedTerminalManeuverPlan>(selection.ExecutablePlan);
+        SimulationTime[] prefixBoundaries = new[] { composite.StartsAt, composite.CourseTurn.EndsAt,
+                composite.BrakingPhase.EndsAt }.Distinct().Order().ToArray();
+        Assert.Equal(executable.StartsAt, executable.Phases[0].StartsAt);
+        Assert.Equal(executable.EndsAt, executable.Phases[^1].EndsAt);
+        for (int index = 1; index < executable.Phases.Count; index++)
+            Assert.Equal(executable.Phases[index - 1].EndsAt, executable.Phases[index].StartsAt);
+        Assert.Equal(prefixBoundaries, executable.Phases.Where(phase => phase.StartsAt < composite.PrefixEndsAt)
+            .Select(phase => phase.StartsAt).Append(composite.PrefixEndsAt));
+        Assert.Equal(composite.PrefixEndsAt, composite.ContinuationPlan.StartsAt);
+        Assert.Equal(composite.StateAt(composite.PrefixEndsAt), composite.ContinuationPlan.StateAt(composite.ContinuationPlan.StartsAt));
+        Assert.Equal(start, executable.StateAt(executable.StartsAt));
+        foreach (SimulationTime boundary in executable.Phases.Select(phase => phase.EndsAt))
+            Assert.Equal(composite.StateAt(boundary), executable.StateAt(boundary));
+        Assert.True(ManeuverArrival.EvaluateTerminal(executable.StateAt(executable.EndsAt), Position(90, 0),
+            requestedHeading: null).IsSatisfied);
     }
 
     private static void AssertSchedule(

@@ -139,7 +139,7 @@ future behavior.
 | `interaction.swept-scan`, `interaction.swept-grid`, `interaction.swept-hierarchy` | Matching linear, quadratic, and whole-braking interval fixtures | Prepared conservative bounds, overflow and duplication, exact contact digests, query-volume amortization | Available with shared version 1 digests; runtime adoption pending |
 | `interaction.runtime-swept-scan`, `interaction.runtime-swept-grid`, `interaction.runtime-swept-hierarchy` | Real linear and mixed maneuver captures clipped at next scheduled boundaries | Public preparation and exact contact cost, scoped queries, allocation | Available with matching version 1 contact digests and explicit tuning |
 | `interaction.batch-swept-scan`, `interaction.batch-swept-grid`, `interaction.batch-swept-hierarchy` | Same real captures through public pure batches | Explicit worker-capacity scaling, private buffers, ordered digest and allocation | Available with matching version 1 digests; only pure forecasts can run on workers |
-| `interaction.session-serial`, `interaction.session-batched` | Advancing analytic sessions with durable interests, replacements, updates, cancellations, and serial effects | Complete-session worker scaling, stale rejection, ordered contact digest, and allocation | Available with shared version 1 canonical digest and [controlled measurements](interaction-session-measurements.md) |
+| `interaction.session-serial`, `interaction.session-batched` | Advancing analytic sessions with durable interests, replacements, updates, cancellations, and serial effects | Complete-session worker scaling, stale rejection, ordered contact digest, and allocation | Available with shared version 2 canonical digest and [controlled measurements](interaction-session-measurements.md) |
 | `interaction.stationary-session-serial`, `interaction.stationary-session-batched` | The advancing-session workload using fixed target positions through TASK-095's shared extension | Stationary-interest timing, invalidation, serial/batched contact equivalence, and allocation | Available with [characterization measurements](interaction-session-measurements.md#task-095-fixed-position-extension); no pinned expected-digest baseline |
 | `maneuver.repeated-replanning` | One ship alternates long-route goals after bounded time advances | Exact materialization, schedule invalidation, forced dropout, replacement facts | Available with a benchmark fixture |
 | `spatial.several-crowded` | Several systems with concentrated activity | Cross-owner batching without assuming one thread per system | Available with a benchmark fixture |
@@ -451,6 +451,65 @@ navigation.connector-volume`. Historical diagnostic runs override only
 noncanonical and retain every simulation parameter. Temporary instrumentation
 and historical source copies live outside the repository and are not benchmark
 timing evidence.
+
+## Moving-course replacement baseline
+
+TASK-123 changes moving replacements to rotate immediately while braking along
+their existing velocity vector. Maneuver behavior version 2 and save schema 3
+retain that composite instruction and its selected continuation. The affected
+presets advance their versions deliberately; fixture parameters and digest
+coverage remain unchanged.
+
+The [prior-source diagnostic](../../benchmarks/results/task-123-prior-maneuver-baseline.json)
+uses source `bccb9037d4e094827e3df6e6f9a07d118388d4ad`, overriding only
+warmup and measured iteration counts. Its digests reproduce the committed
+expectations. The [current canonical report](../../benchmarks/results/task-123-moving-course-turn.json)
+retains default parameters and matching repeated measured iterations. This is
+correctness evidence; overlapping local validation makes its timing unsuitable
+for a performance comparison.
+The [diagnostic delta review](../../benchmarks/results/task-123-baseline-delta-review.json)
+retains event/fact breakdowns and the station metadata-normalization comparison.
+
+| Preset | Prior digest | Current version | Current digest |
+| --- | --- | --- | --- |
+| `maneuver.repeated-replanning` | `603601f07a12a8c1` | 2 | `cbe8c9c70d163ed4` |
+| `interaction.session-serial`, `interaction.session-batched` | `1079ca5a77a8341f` | 2 | `84ffd9ae5f2cf9b3` |
+| `navigation.connector-volume` | `88e79d6112f53750` | 2, unchanged | `88e79d6112f53750` |
+| `station.many-quiet-sites` | `285568c294f5e9db` | 3 | `473b941512819524` |
+| `station.one-crowded` | `b56940d4752279bc` | 3 | `d8b8c6bb58344b57` |
+| `station.partial-deliveries` | `8d0fba9b6bf6c88b` | 3 | `eda509aa3c8ef73a` |
+
+Repeated replanning increases applied events from 53 to 146. All 93 additions
+are maneuver phase boundaries: 49 at phase index 0, 35 at index 1, and nine at
+index 2. Committed and retained facts increase from 500 to 517, entirely from
+nine additional cruise entries and eight additional cruise dropouts. Command,
+order-transition, motion-start, and motion-end counts remain unchanged. The
+reduced four-command regression retains 20 facts and increases from four to
+six phase-boundary events. These changes follow the selected turn/brake and
+subsequent cruise schedules rather than a change to command volume.
+
+Session serial and batched presets retain identical digests and counts across
+execution layouts. Their changed motion is substantive: at 6,000 milliseconds,
+ship 1 changes from x=59, velocity 9,092 mm/s, heading 0 to x=44, velocity
+5,000 mm/s, heading 135 degrees in the moving-course composite. Eight event
+records and 40 fact payloads differ despite unchanged totals. The interaction
+digest does not include runtime-policy metadata.
+
+Navigation retains its existing digest and counts. Station presets retain every
+semantic count while their full checkpoint digests change. Temporary diagnostic
+normalization of only each ship capability's maneuver behavior version from 2
+to 1 reproduces all three prior complete station digests exactly, leaving
+events untouched. Those station deltas are solely compatibility metadata.
+
+Reproduce the canonical comparison with:
+
+```sh
+dotnet run -c Release --project benchmarks/GalaxyCommand.Benchmarks -- \
+  --suite full --preset maneuver.repeated-replanning \
+  --preset interaction.session-serial --preset interaction.session-batched \
+  --preset navigation.connector-volume --preset station.many-quiet-sites \
+  --preset station.one-crowded --preset station.partial-deliveries
+```
 
 ## Station runtime workload
 

@@ -344,8 +344,8 @@ public static class StationaryDirectionalManeuverPlanner
     }
 
     /// <summary>
-    /// Keeps sub-50-meter precision adjustments heading-preserving while
-    /// requiring longer off-heading moves to establish a visible course.
+    /// Keeps short precision adjustments heading-preserving and treats the
+    /// accepted heading tolerance as already on course, matching turn admission.
     /// </summary>
     private static bool RequiresCourseTurn(
         ShipKinematicState start,
@@ -365,6 +365,7 @@ public static class StationaryDirectionalManeuverPlanner
         ShipHeading course = ManeuverHeadingProjection.ResolveCourseHeading(
             checked((long)(x * 1_000)),
             checked((long)(y * 1_000)));
-        return start.Heading != course;
+        return Math.Abs(start.Heading.ShortestTurnTo(course))
+            > ManeuverArrival.ArrivalHeadingToleranceDegrees * 1_000;
     }
 }

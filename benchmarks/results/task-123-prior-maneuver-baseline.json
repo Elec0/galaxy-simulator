@@ -1,0 +1,162 @@
+{
+  "SourceCommit": "bccb9037d4e094827e3df6e6f9a07d118388d4ad",
+  "Qualification": "Noncanonical diagnostic; only iteration-count overrides; no production qualification",
+  "Scenarios": [
+    {
+      "Id": "maneuver.repeated-replanning",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Digest": "603601f07a12a8c1",
+      "SimulatedMilliseconds": 5000000,
+      "Counts": {
+        "commands": 100,
+        "events": 53,
+        "factsCommitted": 500,
+        "factsRetained": 500,
+        "ships": 1,
+        "systems": 1
+      },
+      "CommittedExpectedDigest": "603601f07a12a8c1",
+      "MatchesCommittedExpectation": true
+    },
+    {
+      "Id": "interaction.session-serial",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Digest": "1079ca5a77a8341f",
+      "SimulatedMilliseconds": 6000,
+      "Counts": {
+        "commands": 32,
+        "effects": 361,
+        "evaluationWaves": 4,
+        "events": 497,
+        "factsCommitted": 144,
+        "factsRetained": 144,
+        "interactionEventsApplied": 361,
+        "interactionEventsIgnored": 128,
+        "interestsCanceled": 69,
+        "interestsRegistered": 256,
+        "interestsRemaining": 187,
+        "interestsUpdated": 211,
+        "ships": 32,
+        "systems": 2
+      },
+      "CommittedExpectedDigest": "1079ca5a77a8341f",
+      "MatchesCommittedExpectation": true
+    },
+    {
+      "Id": "interaction.session-batched",
+      "BasePresetVersion": 1,
+      "IsCanonical": false,
+      "Digest": "1079ca5a77a8341f",
+      "SimulatedMilliseconds": 6000,
+      "Counts": {
+        "commands": 32,
+        "effects": 361,
+        "evaluationWaves": 4,
+        "events": 497,
+        "factsCommitted": 144,
+        "factsRetained": 144,
+        "interactionEventsApplied": 361,
+        "interactionEventsIgnored": 128,
+        "interestsCanceled": 69,
+        "interestsRegistered": 256,
+        "interestsRemaining": 187,
+        "interestsUpdated": 211,
+        "ships": 32,
+        "systems": 2
+      },
+      "CommittedExpectedDigest": "1079ca5a77a8341f",
+      "MatchesCommittedExpectation": true
+    },
+    {
+      "Id": "navigation.connector-volume",
+      "BasePresetVersion": 2,
+      "IsCanonical": false,
+      "Digest": "88e79d6112f53750",
+      "SimulatedMilliseconds": 1000000,
+      "Counts": {
+        "commands": 1000,
+        "events": 94696,
+        "factsCommitted": 126998,
+        "factsRetained": 100000,
+        "ships": 1000,
+        "systems": 32
+      },
+      "CommittedExpectedDigest": "88e79d6112f53750",
+      "MatchesCommittedExpectation": true
+    },
+    {
+      "Id": "station.many-quiet-sites",
+      "BasePresetVersion": 2,
+      "IsCanonical": false,
+      "Digest": "285568c294f5e9db",
+      "SimulatedMilliseconds": 24000,
+      "Counts": {
+        "activeProjects": 8,
+        "commands": 400,
+        "destructions": 0,
+        "events": 200,
+        "factsCommitted": 832,
+        "observedStationChanges": 0,
+        "quietSites": 248,
+        "recoveredMaterials": 32,
+        "removedStations": 8,
+        "restores": 1,
+        "stationWorkEvents": 168,
+        "stationsCreated": 256
+      },
+      "CommittedExpectedDigest": "285568c294f5e9db",
+      "MatchesCommittedExpectation": true,
+      "GameplayDigest": "703de34e76334545"
+    },
+    {
+      "Id": "station.one-crowded",
+      "BasePresetVersion": 2,
+      "IsCanonical": false,
+      "Digest": "b56940d4752279bc",
+      "SimulatedMilliseconds": 24000,
+      "Counts": {
+        "activeProjects": 64,
+        "commands": 1089,
+        "destructions": 0,
+        "events": 1346,
+        "factsCommitted": 2307,
+        "observedStationChanges": 8,
+        "quietSites": 0,
+        "recoveredMaterials": 256,
+        "removedStations": 64,
+        "restores": 1,
+        "stationWorkEvents": 1344,
+        "stationsCreated": 64
+      },
+      "CommittedExpectedDigest": "b56940d4752279bc",
+      "MatchesCommittedExpectation": true,
+      "GameplayDigest": "194f6095e52ca5f9"
+    },
+    {
+      "Id": "station.partial-deliveries",
+      "BasePresetVersion": 2,
+      "IsCanonical": false,
+      "Digest": "8d0fba9b6bf6c88b",
+      "SimulatedMilliseconds": 96000,
+      "Counts": {
+        "activeProjects": 32,
+        "commands": 548,
+        "destructions": 0,
+        "events": 1160,
+        "factsCommitted": 1168,
+        "observedStationChanges": 28,
+        "quietSites": 0,
+        "recoveredMaterials": 128,
+        "removedStations": 32,
+        "restores": 1,
+        "stationWorkEvents": 1152,
+        "stationsCreated": 32
+      },
+      "CommittedExpectedDigest": "8d0fba9b6bf6c88b",
+      "MatchesCommittedExpectation": true,
+      "GameplayDigest": "e420d28ddae79e4e"
+    }
+  ]
+}

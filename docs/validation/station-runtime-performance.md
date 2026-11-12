@@ -77,7 +77,7 @@ project's entire future recipe.
 The preserved pre-optimization runtime and optimized runtime produced equal
 gameplay digests at all fixed witnesses and final checkpoints for each preset:
 `703de34e76334545`, `194f6095e52ca5f9`, and `e420d28ddae79e4e`, respectively.
-The current full version-2 digests also include the reciprocal target
+The historical full version-2 digests also include the reciprocal target
 continuation owner section, including its explicit absence in these presets:
 
 | Preset | Full digest |
@@ -87,7 +87,11 @@ continuation owner section, including its explicit absence in these presets:
 | Partial deliveries | `8d0fba9b6bf6c88b` |
 
 Their full event digests intentionally differ because fewer envelopes allocate
-fewer creation sequences. The station preset baseline therefore uses version 2.
+fewer creation sequences. That optimization established preset version 2.
+TASK-123 advances the current presets to version 3 because their checkpoint
+digests include the maneuver behavior identity. See the
+[moving-course baseline review](scale-and-benchmark-targets.md#moving-course-replacement-baseline)
+for the current digests and unchanged station counts.
 
 The following warmed Release measurements used .NET 10.0.10, macOS 26.7.1,
 Arm64, 11 logical processors, workstation GC, one warmup and three measured

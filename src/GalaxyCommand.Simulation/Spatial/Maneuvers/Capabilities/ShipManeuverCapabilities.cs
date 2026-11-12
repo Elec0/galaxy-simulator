@@ -155,7 +155,7 @@ public readonly record struct ShipHeading
 /// </summary>
 public sealed record ShipManeuverCapability
 {
-    public const int CurrentBehaviorVersion = 1;
+    public const int CurrentBehaviorVersion = 2;
 
     /// <summary>
     /// Creates the validated base capability without inventing a passive-rate

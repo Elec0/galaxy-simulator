@@ -195,3 +195,9 @@ msgstr "stale"
 
 msgid "ui.observation.confirmed_missing"
 msgstr "confirmed missing"
+
+msgid "ui.orders.cancel_selected"
+msgstr "Cancel selected orders"
+
+msgid "ui.map.system_navigation_hint"
+msgstr "{system} | left select | right move | Shift-right append | cancel via button | wheel zoom | middle drag pan"

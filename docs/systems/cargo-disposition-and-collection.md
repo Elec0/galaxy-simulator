@@ -242,7 +242,7 @@ Client cargo selection and editable priority drafts are independent from ship
 focus and create immutable single-ship commands through the existing input
 FIFO. The Godot inspector provides separate named ship/cargo lists, covered
 object and visible field details, explicit placement and collection actions,
-priority editing, focused cancellation, saved-time progress, and bounded
+priority editing, selection-aware order cancellation, saved-time progress, and bounded
 results. Cargo marker selection preserves ship focus. The shared gettext
 helper resolves semantic English keys and complete typed templates; native
 controls provide keyboard selection, actions, disabled state, and stable focus

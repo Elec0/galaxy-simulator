@@ -17,6 +17,9 @@ internal abstract record ExecutableManeuverPayload
     internal sealed record Cruise(CruiseTerminalManeuverPlan Plan) : ExecutableManeuverPayload;
     internal sealed record ForcedDropout(SystemPosition Destination, ShipHeading? RequestedHeading,
         DecelerationManeuverSegment DropoutPhase, ExecutableManeuverCheckpoint Continuation) : ExecutableManeuverPayload;
+    internal sealed record MovingCourseTurn(SystemPosition Destination, ShipHeading? RequestedHeading,
+        StationaryTurnManeuverPlan CourseTurn, DecelerationManeuverSegment? CruiseDropoutPhase,
+        DecelerationManeuverSegment BrakingPhase, ExecutableManeuverCheckpoint Continuation) : ExecutableManeuverPayload;
     internal sealed record BrakeThenDirectional(BrakeThenStationaryDirectionalManeuverPlan Plan) : ExecutableManeuverPayload;
     internal sealed record ReducedThrust(ReducedThrustTerminalManeuverPlan Plan) : ExecutableManeuverPayload;
     internal sealed record ImmediateBraking(ShortMoveImmediateBrakingPlan Plan) : ExecutableManeuverPayload;
@@ -68,6 +71,9 @@ public sealed partial class ExecutableBoundedTerminalManeuverPlan
         ExecutableManeuverPayload.Cruise item => From(item.Plan),
         ExecutableManeuverPayload.ForcedDropout item => From(ForcedCruiseDropoutTerminalManeuverPlan.RestoreSelected(
             item.Destination, item.RequestedHeading, item.DropoutPhase, RestoreCheckpoint(item.Continuation))),
+        ExecutableManeuverPayload.MovingCourseTurn item => From(MovingCourseTurnManeuverPlan.RestoreSelected(
+            item.Destination, item.RequestedHeading, item.CourseTurn, item.CruiseDropoutPhase, item.BrakingPhase,
+            RestoreCheckpoint(item.Continuation))),
         ExecutableManeuverPayload.BrakeThenDirectional item => From(item.Plan),
         ExecutableManeuverPayload.ReducedThrust item => From(item.Plan),
         ExecutableManeuverPayload.ImmediateBraking item => From(AlignedSubCruisePlanSelection.ImmediateBraking(item.Plan)),

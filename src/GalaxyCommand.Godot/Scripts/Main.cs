@@ -26,6 +26,7 @@ public partial class Main : Node
 	private Label _pacingConfiguration = null!;
 	private Label _pacingExplanation = null!;
 	private Label _view = null!;
+	private Label _navigationHint = null!;
 	private Label _inspector = null!;
 	private Label _activity = null!;
 	private Button _pauseOrResume = null!;
@@ -41,6 +42,7 @@ public partial class Main : Node
 	private GamePresentationSnapshot _presentation = null!;
 	private string _lastCommandStatus = "Select a ship";
 
+	/// <summary>Loads the validated preview session and binds local controls to its presentation and input queue.</summary>
 	public override void _Ready()
 	{
 		_pacing = PacingSpeedLadderFile.Load(
@@ -70,6 +72,7 @@ public partial class Main : Node
 		_pacingExplanation = GetNode<Label>(
 			"Interface/StatusPanel/Margin/Content/PacingExplanation");
 		_view = GetNode<Label>("Interface/Header/Content/View");
+		_navigationHint = GetNode<Label>("Interface/Header/Content/NavigationHint");
 		_inspector = GetNode<Label>("Interface/StatusPanel/Margin/Content/Inspector");
 		_activity = GetNode<Label>("Interface/StatusPanel/Margin/Content/Activity");
 		_pauseOrResume = GetNode<Button>(
@@ -80,7 +83,6 @@ public partial class Main : Node
 		_map.SelectionChanged += OnSelectionChanged;
 		_map.ViewChanged += RefreshPresentation;
 		_map.DestinationRequested += OnDestinationRequested;
-		_map.CancelRequested += OnCancelRequested;
 		ConfigureCargoControls();
 		AdvanceTo(SimulationTime.Zero);
 		_shipList.GrabFocus();
@@ -215,16 +217,9 @@ public partial class Main : Node
 	/// Captures the current local selection as one buffered current-order
 	/// cancellation, leaving idle members to authoritative group-cancel handling.
 	/// </summary>
-	private void OnCancelRequested(ShipId shipId)
+	private void CancelSelectedOrders()
 	{
-		ShipOrderSnapshot? current = _presentation.Selection.FocusedShip is { } focused
-			&& focused.Id == shipId
-				? focused.OwnedDetail?.CurrentOrder
-				: null;
-		GameplayCommand? command = MapSelectionCommandFactory.CreateCancel(
-			_map.SelectedShipIds,
-			shipId,
-			current);
+		GameplayCommand? command = CaptureSelectedOrderCancellation();
 		if (command is null)
 		{
 			_lastCommandStatus = "No active order to cancel";
@@ -239,6 +234,15 @@ public partial class Main : Node
 			? "Group cancel order queued"
 			: "Cancel order queued";
 		RefreshPresentation();
+	}
+
+	/// <summary>Uses the latest permitted selection for button availability and captures the same cancellation on activation.</summary>
+	private GameplayCommand? CaptureSelectedOrderCancellation()
+	{
+		if (_map.FocusedShipId is not { } shipId) return null;
+		ShipOrderSnapshot? current = _presentation.Selection.FocusedShip is { } focused && focused.Id == shipId
+			? focused.OwnedDetail?.CurrentOrder : null;
+		return MapSelectionCommandFactory.CreateCancel(_map.SelectedShipIds, shipId, current);
 	}
 
 	/// <summary>
@@ -256,7 +260,7 @@ public partial class Main : Node
 						gameplay.Source,
 						gameplay.Command);
 					_lastCommandStatus = DescribeResult(record);
-					if (gameplay.Command is CollectCargoObjectCommand or CollectCargoFieldCommand or CancelShipOrderCommand)
+					if (gameplay.Command is CollectCargoObjectCommand or CollectCargoFieldCommand or CancelShipOrderCommand or CancelShipGroupCommand)
 						_cargoResultText = record.Result.Status == CommandResultStatus.Accepted
 							? UiLocalization.Text("ui.cargo.accepted")
 							: UiLocalization.Text("ui.cargo.rejected", ("code", record.Result.RejectionCode?.Value ?? ""));
@@ -345,6 +349,7 @@ public partial class Main : Node
 		RefreshPresentation();
 	}
 
+	/// <summary>Captures one observer-scoped refresh for the map, native header, inspector, and fact feed.</summary>
 	private void RefreshPresentation()
 	{
 		RefreshPacingControls();
@@ -383,6 +388,7 @@ public partial class Main : Node
 			? "FACT HISTORY INCOMPLETE"
 			: $"FACTS {_recentFacts.Count}";
 		_view.Text = $"DEVELOPMENT VISUAL PREVIEW | {_map.ViewDescription}";
+		_navigationHint.Text = _map.NavigationHint;
 		_inspector.Text = DescribeInspector(_presentation.Selection.FocusedShip);
 		_activity.Text = DescribeActivity();
 

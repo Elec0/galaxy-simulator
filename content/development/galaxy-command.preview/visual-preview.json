@@ -12,7 +12,7 @@
     "galaxy-command.preview/cargo-policy/default-cargo"
   ],
   "values": {
-    "playerCommandSource": "local-player",
+    "playerCommandSource": "preview-player",
     "playerPrincipal": "galaxy-command.preview/principal/player",
     "standingPolicy": "galaxy-command.preview/standing-policy/default-standing",
     "galaxyLayout": [

@@ -236,7 +236,7 @@ public static class BenchmarkPresets
                     (BenchmarkParameterNames.FactRetentionCapacity, 10_000),
                     (BenchmarkParameterNames.TravelDurationMilliseconds, 1_000),
                     (BenchmarkParameterNames.DestinationDistance, 1_000_000)),
-                "603601f07a12a8c1"),
+                "cbe8c9c70d163ed4", version: 2),
         ];
         BenchmarkPreset reference = values.Single(value => value.Id == InteractionScopedProximity);
         BenchmarkPreset prepared = new(InteractionPreparedProximity, true, reference.Parameters, reference.ExpectedDigest);
@@ -322,8 +322,8 @@ public static class BenchmarkPresets
         };
         BenchmarkPreset[] sessions =
         [
-            new(InteractionSessionSerial, true, sessionParameters, "1079ca5a77a8341f"),
-            new(InteractionSessionBatched, true, sessionBatchParameters, "1079ca5a77a8341f"),
+            new(InteractionSessionSerial, true, sessionParameters, "84ffd9ae5f2cf9b3", version: 2),
+            new(InteractionSessionBatched, true, sessionBatchParameters, "84ffd9ae5f2cf9b3", version: 2),
             new(StationarySessionSerial, true, sessionParameters),
             new(StationarySessionBatched, true, sessionBatchParameters),
         ];
@@ -366,14 +366,14 @@ public static class BenchmarkPresets
             (BenchmarkParameterNames.FactRetentionCapacity, 100000));
         BenchmarkPreset[] stations =
         [
-            new(StationManyQuiet, true, stationParameters, "285568c294f5e9db", version: 2),
+            new(StationManyQuiet, true, stationParameters, "473b941512819524", version: 3),
             new(StationOneCrowded, true, new Dictionary<string, long>(stationParameters)
-            { [BenchmarkParameterNames.SystemCount] = 1, [BenchmarkParameterNames.StationCount] = 64, [BenchmarkParameterNames.ActiveStationCount] = 64 }, "b56940d4752279bc", version: 2),
+            { [BenchmarkParameterNames.SystemCount] = 1, [BenchmarkParameterNames.StationCount] = 64, [BenchmarkParameterNames.ActiveStationCount] = 64 }, "d8b8c6bb58344b57", version: 3),
             new(StationPartialDeliveries, true, new Dictionary<string, long>(stationParameters)
             { [BenchmarkParameterNames.SystemCount] = 4, [BenchmarkParameterNames.StationCount] = 32, [BenchmarkParameterNames.ActiveStationCount] = 32,
                 [BenchmarkParameterNames.ConstructionWork] = 48, [BenchmarkParameterNames.ConstructionMaterials] = 24,
                 [BenchmarkParameterNames.DeliveryWaves] = 6, [BenchmarkParameterNames.SimulatedDurationMilliseconds] = 96000,
-                [BenchmarkParameterNames.RestoreAtMilliseconds] = 64001 }, "8d0fba9b6bf6c88b", version: 2),
+                [BenchmarkParameterNames.RestoreAtMilliseconds] = 64001 }, "eda509aa3c8ef73a", version: 3),
         ];
         return new ReadOnlyDictionary<string, BenchmarkPreset>(
             values.Append(prepared).Concat(indexes).Concat(runtime).Concat(sweeps).Concat(runtimeSweeps).Concat(batchSweeps).Concat(sessions).Concat(observations).Concat(cargo).Concat(stations).ToDictionary(value => value.Id, StringComparer.Ordinal));

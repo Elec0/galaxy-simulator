@@ -14,6 +14,7 @@ public enum BoundedTerminalPlanKind
     WaypointRoute,
     DirectionalPlanner,
     PassiveDrag,
+    MovingCourseTurn,
 }
 
 /// <summary>
@@ -36,8 +37,10 @@ public sealed record BoundedTerminalPlanSelection
         CruiseTerminalManeuverPlan? cruiseTerminalPlan = null,
         ForcedCruiseDropoutTerminalManeuverPlan?
             forcedCruiseDropoutTerminalPlan = null,
-        ReducedThrustTerminalManeuverPlan? reducedThrustTerminalPlan = null)
+        ReducedThrustTerminalManeuverPlan? reducedThrustTerminalPlan = null,
+        MovingCourseTurnManeuverPlan? movingCourseTurnPlan = null)
     {
+        MovingCourseTurnPlan = movingCourseTurnPlan;
         Kind = kind;
         SettledState = settledState;
         StationaryTurnPlan = stationaryTurnPlan;
@@ -54,6 +57,8 @@ public sealed record BoundedTerminalPlanSelection
     }
 
     public BoundedTerminalPlanKind Kind { get; }
+
+    public MovingCourseTurnManeuverPlan? MovingCourseTurnPlan { get; }
 
     public ShipKinematicState? SettledState { get; }
 
@@ -118,6 +123,9 @@ public sealed record BoundedTerminalPlanSelection
                 ExecutableBoundedTerminalManeuverPlan.From(plan),
             BoundedTerminalPlanKind.ReducedThrustTerminal
                 when ReducedThrustTerminalPlan is { } plan =>
+                ExecutableBoundedTerminalManeuverPlan.From(plan),
+            BoundedTerminalPlanKind.MovingCourseTurn
+                when MovingCourseTurnPlan is { } plan =>
                 ExecutableBoundedTerminalManeuverPlan.From(plan),
             BoundedTerminalPlanKind.DirectionalPlanner => null,
             _ => throw new InvalidOperationException(
@@ -254,6 +262,11 @@ public sealed record BoundedTerminalPlanSelection
             selectedRank: null,
             terminalSettlesAt: null);
 
+    internal static BoundedTerminalPlanSelection MovingCourseTurn(MovingCourseTurnManeuverPlan plan) =>
+        new(BoundedTerminalPlanKind.MovingCourseTurn, settledState: null, stationaryTurnPlan: null,
+            stationaryDirectionalPlan: null, movingAlignedTerminalPlan: null, brakeThenStationaryDirectionalPlan: null,
+            alignedSubCruisePlan: null, selectedRank: null, terminalSettlesAt: null, movingCourseTurnPlan: plan);
+
     internal static BoundedTerminalPlanSelection DirectionalPlanner() =>
         new(
             BoundedTerminalPlanKind.DirectionalPlanner,
@@ -276,18 +289,30 @@ public static class BoundedTerminalManeuverPlanner
     private const long MillimetersPerMeter = 1_000;
 
     /// <summary>
-    /// Selects complete stationary, aligned-moving, or precision-brake
-    /// continuation candidates from the resolved capability and objective.
+    /// Establishes a moving course through simultaneous turning and braking,
+    /// then selects complete bounded destination candidates.
     /// Terminal settle and pure stationary turns retain precedence; moving
     /// states hand off only when no complete bounded schedule is available.
     /// </summary>
     public static BoundedTerminalPlanSelection Select(
-        SimulationTime startsAt,
-        ShipKinematicState start,
-        SystemPosition destination,
-        ShipHeading? requestedHeading,
-        EffectiveShipManeuverCapability capability,
-        ManeuverObjective objective)
+        SimulationTime startsAt, ShipKinematicState start, SystemPosition destination,
+        ShipHeading? requestedHeading, EffectiveShipManeuverCapability capability, ManeuverObjective objective) =>
+        SelectCore(startsAt, start, destination, requestedHeading, capability, objective, establishMovingCourse: true);
+
+    /// <summary>
+    /// Selects the continuation after an already committed course turn without
+    /// recursively adding another initial turn to the same selected continuation.
+    /// </summary>
+    internal static BoundedTerminalPlanSelection SelectWithoutMovingTurn(
+        SimulationTime startsAt, ShipKinematicState start, SystemPosition destination,
+        ShipHeading? requestedHeading, EffectiveShipManeuverCapability capability, ManeuverObjective objective) =>
+        SelectCore(startsAt, start, destination, requestedHeading, capability, objective, establishMovingCourse: false);
+
+    /// <summary>Applies the initial moving-course policy once, then retains existing bounded candidate selection.</summary>
+    private static BoundedTerminalPlanSelection SelectCore(
+        SimulationTime startsAt, ShipKinematicState start, SystemPosition destination,
+        ShipHeading? requestedHeading, EffectiveShipManeuverCapability capability, ManeuverObjective objective,
+        bool establishMovingCourse)
     {
         ArgumentNullException.ThrowIfNull(capability);
         if (objective is not ManeuverObjective.FastestArrival
@@ -379,6 +404,17 @@ public static class BoundedTerminalManeuverPlanner
                 _ => throw new InvalidOperationException(
                     $"The {comparison.Kind} stationary comparison has an invalid payload."),
             };
+        }
+
+        if (establishMovingCourse && MovingCourseTurnManeuverPlan.RequiresCourseTurn(start, destination))
+        {
+            // An unsupported required turn must remain unsupported rather than
+            // silently admitting the previous heading-preserving policy.
+            return MovingCourseTurnManeuverPlan.TryCreate(
+                    startsAt, start, destination, requestedHeading, capability, objective, out var movingTurn)
+                && movingTurn is not null
+                ? BoundedTerminalPlanSelection.MovingCourseTurn(movingTurn)
+                : BoundedTerminalPlanSelection.DirectionalPlanner();
         }
 
         if (ForcedCruiseDropoutTerminalManeuverPlan.TryCreate(

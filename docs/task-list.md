@@ -32,7 +32,7 @@ source of detailed scope and acceptance criteria.
 
 ## Current focus
 
-No task is currently in progress. Near-term work is listed below.
+No task is currently selected.
 
 ## Near-term work
 
@@ -79,6 +79,15 @@ No task is currently in progress. Near-term work is listed below.
   - Context: [Time and pacing](application/time-and-pacing.md)
 
 ## Future parking lot
+
+- [ ] **TASK-124: Review bounded continuation admission after moving-course turns**
+  - Define the scope of fixed-point continuation support when a moving turn
+    changes the subsequent stopping position. Precision and reduced-thrust
+    candidates can reject a shifted off-axis destination that the old initial
+    state admitted. Do not silently fall back to heading-preserving movement.
+  - Retain the concrete 10 km north regression discovered by TASK-123; expand
+    the planner only after owner direction.
+  - Context: [Maneuver planning contract](architecture/ship-maneuver-kinematics.md#heading-turning-and-translation)
 
 - [ ] **TASK-118: Review authored station gameplay content and disk starting state**
   - Obtain owner direction before adding stations, builder capabilities, material
@@ -796,6 +805,46 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application/application-shell-and-map-experience.md) · [Fog-of-war and scouting](systems/fog-of-war-and-scouting.md) · [Gameplay content](application/gameplay-content.md) · [Presentation snapshots](architecture/presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-123: Turn moving ships toward replacement destinations immediately**
+  - Begin shortest-arc course rotation immediately while preserving the
+    precision-braking trajectory and required cruise dropout. Continue from
+    the exact stopped/rotated state, retaining independent physical turn and
+    brake boundaries and exact interaction geometry.
+  - Freeze the angular, dropout, braking, and selected continuation instructions
+    across checkpoint and encoded-save restoration. Advance maneuver behavior
+    to version 2 and save schema to 3; reject historical behavior without an
+    explicit migration. Unsupported required turns cannot silently retain the
+    previous heading-preserving policy.
+  - Retain internal waypoint continuation behavior and worker/batch invariance.
+    Broader drift-through-turn numeric admission remains under TASK-124.
+  - Context: [Heading and translation contract](architecture/ship-maneuver-kinematics.md#heading-turning-and-translation),
+    [selected save contract](architecture/save-format-and-migration.md#frozen-value-contracts),
+    and [benchmark baseline review](validation/scale-and-benchmark-targets.md#moving-course-replacement-baseline)
+
+- [x] **TASK-122: Separate preview selection, movement, and button cancellation**
+  - Left click selects ships/cargo only; right click issues replacement movement
+    without changing selection. Shift-right-click appends for the focused ship.
+  - The existing cancel button captures current-order cancellation for the
+    selected group, or the focused ship for a single selection, through the
+    existing FIFO. Its localized label, accessible name, and result feedback
+    reflect the selected scope.
+  - Added a native preview input regression covering mouse routing, queued
+    moves, right-click over another contact, and single/group cancellation.
+  - Context: [Preview bindings](../README.md#godot-graphics-client) · [Native input smoke](../tests/GalaxyCommand.Godot.Smoke/MapInputBindings.gd)
+
+- [x] **TASK-121: Keep preview navigation buttons clear of header text**
+  - Moved the existing galaxy/system navigation hint from fixed canvas drawing
+    into the native header layout, placing Galaxy/Recenter below all labels.
+  - Preserved the hint wording and map behavior in both views.
+  - Context: [Preview header scene](../src/GalaxyCommand.Godot/Scenes/Main.tscn)
+
+- [x] **TASK-120: Repair development preview player command-source binding**
+  - Matched the preview command source to its existing `preview-player` ship
+    controllers so map movement and cancellation use the correct identity.
+  - Added real built-in/preview content coverage for player movement and
+    cancellation through normal session admission.
+  - Context: [Static new-game loader coverage](../tests/GalaxyCommand.Simulation.Tests/Loading/StaticNewGameLoaderTests.cs)
 
 - [x] **TASK-073: Implement player fog-of-war, sensors, and scouting**
   - Delivered TASK-020's player-owned ship, station, and stationary-deployable
@@ -1640,7 +1689,7 @@ the project-level **Near-term work** section above.
   - Completion, cancellation, replacement, command rejection, immutable
     snapshots, and stale-arrival handling are covered headlessly.
   - Godot selects a ship, submits or replaces a position destination, cancels
-    with right-click, and displays the order, reason, destination, and motion.
+    with the cancel button, and displays the order, reason, destination, and motion.
   - Queues, controller changes, and the broader lifecycle were completed by
     `TASK-006`; semantic facts were completed by `TASK-008`.
   - Context: [Gameplay integration §2.3, §2.9, and §3.2](architecture/gameplay-integration.md#23-introduce-a-persistent-game-session-facade)
@@ -1657,8 +1706,8 @@ the project-level **Near-term work** section above.
     confusing leg completion with order completion.
   - Move and cancel evaluation produce immutable proposals before deterministic
     owner commit; autonomous and player sources use the same order model.
-  - Godot uses click to replace, Shift-click to append, and right-click to
-    cancel the active order while displaying controller and queue state; route
+  - Godot uses right-click to replace, Shift-right-click to append, and the
+    cancel button for current-order cancellation while displaying controller and queue state; route
     overlays are limited to active or waiting orders and clear on cancellation
     or completion.
   - Waiting and failed states are defined; `TASK-028` proves transit waiting

@@ -131,6 +131,7 @@ internal static class CheckpointJsonContracts
         codec.Object<ExecutableManeuverPayload.ForcedDropout>(["Destination", "RequestedHeading", "DropoutPhase", "Continuation"]);
         codec.Object<ExecutableManeuverPayload.ImmediateBraking>(["Plan"]);
         codec.Object<ExecutableManeuverPayload.MovingAligned>(["Plan"]);
+        codec.Object<ExecutableManeuverPayload.MovingCourseTurn>(["Destination", "RequestedHeading", "CourseTurn", "CruiseDropoutPhase", "BrakingPhase", "Continuation"]);
         codec.Object<ExecutableManeuverPayload.PassiveDrag>(["Plan"]);
         codec.Object<ExecutableManeuverPayload.ReducedThrust>(["Plan"]);
         codec.Object<ExecutableManeuverPayload.TerminalSettle>(["At", "State"]);
@@ -466,6 +467,7 @@ internal static class CheckpointJsonContracts
             ("forced-dropout", typeof(ExecutableManeuverPayload.ForcedDropout)),
             ("immediate-braking", typeof(ExecutableManeuverPayload.ImmediateBraking)),
             ("moving-aligned", typeof(ExecutableManeuverPayload.MovingAligned)),
+            ("moving-course-turn", typeof(ExecutableManeuverPayload.MovingCourseTurn)),
             ("passive-drag", typeof(ExecutableManeuverPayload.PassiveDrag)),
             ("reduced-thrust", typeof(ExecutableManeuverPayload.ReducedThrust)),
             ("terminal-settle", typeof(ExecutableManeuverPayload.TerminalSettle)),
@@ -686,6 +688,7 @@ internal static class CheckpointJsonContracts
             ("waypoint-route", BoundedTerminalPlanKind.WaypointRoute),
             ("directional-planner", BoundedTerminalPlanKind.DirectionalPlanner),
             ("passive-drag", BoundedTerminalPlanKind.PassiveDrag),
+            ("moving-course-turn", BoundedTerminalPlanKind.MovingCourseTurn),
         ]);
         codec.Enum<CargoLossCause>([
             ("entity-destruction", CargoLossCause.EntityDestruction),
