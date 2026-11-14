@@ -40,5 +40,6 @@ internal sealed record GameSessionCheckpoint(
     CargoCollectionAttemptOwnerCheckpoint? CargoCollectionAttempts = null,
     IReadOnlyList<CargoCollectionTarget>? CargoCollectionTargets = null,
     StationRuntimeCheckpoint? Stations = null,
-    StationTargetContinuationCheckpoint? StationTargetContinuation = null);
+    StationTargetContinuationCheckpoint? StationTargetContinuation = null,
+    DialogueOwnerCheckpoint? Dialogue = null);
 

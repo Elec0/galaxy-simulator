@@ -168,6 +168,19 @@ and single/group cancellation with the native input smoke check:
   --script "$PWD/tests/GalaxyCommand.Godot.Smoke/MapInputBindings.gd"
 ```
 
+The dialogue smoke runner loads temporary conversation fixtures through the
+production package path, exercises the native dock and pacing/locale handoffs,
+and captures viewport images for visual review:
+
+```sh
+python3 tests/GalaxyCommand.Godot.Smoke/RunDialogueSmoke.py
+```
+
+It overlays only the copied development package in build output and restores
+those bytes afterward. Authored built-in and preview content remain unchanged.
+Use `--no-build` with an already imported and built Godot project, or `--output`
+to retain the native log and screenshots in a selected directory.
+
 The test-only Phase 1 acceptance scenario runs through mining, transport,
 refining, component manufacturing, and construction of a persistent freighter.
 It checks material and logistics totals, facility-state timing, current

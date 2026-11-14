@@ -25,6 +25,7 @@ public sealed partial class GameSession
     {
         CommitDeployableObservations();
         CommitStationObservations();
+        CompleteDialogueBoundary();
         if (!_facts.HasPendingPlayerDisclosure)
         {
             _removedObservationShips.Clear();
@@ -83,6 +84,7 @@ public sealed partial class GameSession
     /// </summary>
     private static bool SamePlayerFactPayload(GameFact left, GameFact right) => (left, right) switch
     {
+        (DialogueFact first, DialogueFact second) => SameDialogueFactPayload(first, second),
         (StationRemovedFact first, StationRemovedFact second) => first.Reason == second.Reason
             && StationSnapshotValueEquality.Equal(first.Station, second.Station),
         (StandingChangedFact first, StandingChangedFact second) => first.AssessingPrincipalId == second.AssessingPrincipalId
@@ -184,6 +186,7 @@ public sealed partial class GameSession
         {
             return envelope.Fact switch
             {
+                DialogueFact => receipt.SubjectPrincipalId is null,
                 CommandAcceptedFact or CommandRejectedFact => false,
                 StandingChangedFact standing => standing.SubjectPrincipalId == observer,
                 DiplomaticConditionChangedFact => true,

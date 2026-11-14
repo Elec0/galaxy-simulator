@@ -366,14 +366,14 @@ public static class BenchmarkPresets
             (BenchmarkParameterNames.FactRetentionCapacity, 100000));
         BenchmarkPreset[] stations =
         [
-            new(StationManyQuiet, true, stationParameters, "473b941512819524", version: 3),
+            new(StationManyQuiet, true, stationParameters, "e21d7b29856a7fdc", version: 4),
             new(StationOneCrowded, true, new Dictionary<string, long>(stationParameters)
-            { [BenchmarkParameterNames.SystemCount] = 1, [BenchmarkParameterNames.StationCount] = 64, [BenchmarkParameterNames.ActiveStationCount] = 64 }, "d8b8c6bb58344b57", version: 3),
+            { [BenchmarkParameterNames.SystemCount] = 1, [BenchmarkParameterNames.StationCount] = 64, [BenchmarkParameterNames.ActiveStationCount] = 64 }, "20d3c733a3ad8d39", version: 4),
             new(StationPartialDeliveries, true, new Dictionary<string, long>(stationParameters)
             { [BenchmarkParameterNames.SystemCount] = 4, [BenchmarkParameterNames.StationCount] = 32, [BenchmarkParameterNames.ActiveStationCount] = 32,
                 [BenchmarkParameterNames.ConstructionWork] = 48, [BenchmarkParameterNames.ConstructionMaterials] = 24,
                 [BenchmarkParameterNames.DeliveryWaves] = 6, [BenchmarkParameterNames.SimulatedDurationMilliseconds] = 96000,
-                [BenchmarkParameterNames.RestoreAtMilliseconds] = 64001 }, "eda509aa3c8ef73a", version: 3),
+                [BenchmarkParameterNames.RestoreAtMilliseconds] = 64001 }, "f9bc7472872ca386", version: 4),
         ];
         return new ReadOnlyDictionary<string, BenchmarkPreset>(
             values.Append(prepared).Concat(indexes).Concat(runtime).Concat(sweeps).Concat(runtimeSweeps).Concat(batchSweeps).Concat(sessions).Concat(observations).Concat(cargo).Concat(stations).ToDictionary(value => value.Id, StringComparer.Ordinal));

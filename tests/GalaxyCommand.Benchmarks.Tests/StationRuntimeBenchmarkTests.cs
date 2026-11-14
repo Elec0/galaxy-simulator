@@ -7,13 +7,13 @@ namespace GalaxyCommand.Benchmarks.Tests;
 public sealed class StationRuntimeBenchmarkTests
 {
     [Theory]
-    [InlineData("station.many-quiet-sites", "473b941512819524")]
-    [InlineData("station.one-crowded", "d8b8c6bb58344b57")]
-    [InlineData("station.partial-deliveries", "eda509aa3c8ef73a")]
+    [InlineData("station.many-quiet-sites", "e21d7b29856a7fdc")]
+    [InlineData("station.one-crowded", "20d3c733a3ad8d39")]
+    [InlineData("station.partial-deliveries", "f9bc7472872ca386")]
     public void CanonicalPresetsPinTheGateFormatVersion(string preset, string digest)
     {
         ResolvedBenchmarkScenario configuration = BenchmarkScenarioResolver.ResolvePreset(preset, new Dictionary<string, long>());
-        Assert.Equal(3, configuration.BasePresetVersion);
+        Assert.Equal(4, configuration.BasePresetVersion);
         Assert.Equal(digest, configuration.ExpectedDigest);
     }
 

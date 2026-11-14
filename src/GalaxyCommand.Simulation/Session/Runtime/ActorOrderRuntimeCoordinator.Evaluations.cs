@@ -2,7 +2,7 @@ namespace GalaxyCommand.Simulation;
 
 internal sealed partial class ActorOrderRuntimeCoordinator
 {
-    private sealed record MoveOrderProposal(
+    internal sealed record MoveOrderProposal(
         ShipId ShipId,
         CommandSource Source,
         NavigationDestination Destination,

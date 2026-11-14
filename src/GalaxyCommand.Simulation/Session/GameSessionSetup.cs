@@ -182,7 +182,8 @@ public sealed class GameSessionSetup
         CommandSource playerCommandSource,
         IEnumerable<SensorDeployableDefinition>? sensorDeployableDefinitions = null,
         CargoDispositionPolicy? cargoPolicy = null,
-        StationRuntimeSetup? stations = null)
+        StationRuntimeSetup? stations = null,
+        DialogueDefinitionCatalog? dialogueDefinitions = null)
     {
         ArgumentNullException.ThrowIfNull(systems);
         ArgumentNullException.ThrowIfNull(ships);
@@ -311,6 +312,7 @@ public sealed class GameSessionSetup
         PlayerCommandSource = playerCommandSource;
         CargoPolicy = cargoPolicy;
         Stations = stations?.BindPlayer(playerCommandSource, relationships.PlayerPrincipalId);
+        DialogueDefinitions = dialogueDefinitions ?? new DialogueDefinitionCatalog([]);
         stations?.Definitions.ValidateForSession(stations.Materials, systemIds);
         if (Stations is not null && Stations.CommandAuthorities.Any(authority => !principalIds.Contains(authority.Principal)))
             throw new ArgumentException("Station command authority references an unknown principal.", nameof(stations));
@@ -322,6 +324,8 @@ public sealed class GameSessionSetup
     }
 
     public IReadOnlyList<StarSystem> Systems { get; }
+
+    public DialogueDefinitionCatalog DialogueDefinitions { get; }
 
     public IReadOnlyList<InitialShipSetup> Ships { get; }
 

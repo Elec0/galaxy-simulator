@@ -452,6 +452,27 @@ noncanonical and retain every simulation parameter. Temporary instrumentation
 and historical source copies live outside the repository and are not benchmark
 timing evidence.
 
+## Dialogue checkpoint baseline
+
+`TASK-065` adds explicit dialogue authority to the complete session checkpoint.
+The owner approved advancing the three station presets to version 4 because
+their benchmark digests include every checkpoint member. Gameplay workloads,
+event counts, and the full-state digest algorithm remain unchanged.
+
+The [checkpoint-shape diagnostic](../../benchmarks/results/task-065-station-checkpoint-shape-diagnostic.json)
+runs each canonical workload once and independently recomputes its aggregate.
+A temporary diagnostic copy of the digest omits only the new `Dialogue` member
+and reproduces every pinned version 3 hash exactly. This isolates the baseline
+change to the added authority section. Production hashing includes dialogue;
+the projection is diagnostic evidence, not an alternative gate. These runs
+qualify correctness rather than timing or performance.
+
+| Preset | Version 3 | Version 4 |
+| --- | --- | --- |
+| `station.many-quiet-sites` | `473b941512819524` | `e21d7b29856a7fdc` |
+| `station.one-crowded` | `d8b8c6bb58344b57` | `20d3c733a3ad8d39` |
+| `station.partial-deliveries` | `eda509aa3c8ef73a` | `f9bc7472872ca386` |
+
 ## Moving-course replacement baseline
 
 TASK-123 changes moving replacements to rotate immediately while braking along

@@ -4,6 +4,114 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "ui.dialogue.heading"
+msgstr "Conversations"
+
+msgid "ui.dialogue.start_help"
+msgstr "Choose a conversation and each participant to begin."
+
+msgid "ui.dialogue.definition"
+msgstr "Conversation to start"
+
+msgid "ui.dialogue.choose_definition"
+msgstr "Choose conversation"
+
+msgid "ui.dialogue.choose_participant"
+msgstr "Choose participant"
+
+msgid "ui.dialogue.role"
+msgstr "Participant: {role}"
+
+msgid "ui.dialogue.ship"
+msgstr "Ship {id}"
+
+msgid "ui.dialogue.station"
+msgstr "Station: {name}"
+
+msgid "ui.dialogue.station_last_observed"
+msgstr "Station: {name} (last observed)"
+
+msgid "ui.dialogue.principal"
+msgstr "Principal: {name}"
+
+msgid "ui.dialogue.start"
+msgstr "Start conversation"
+
+msgid "ui.dialogue.start_section"
+msgstr "Start a conversation"
+
+msgid "ui.dialogue.pending"
+msgstr "Pending conversations"
+
+msgid "ui.dialogue.pending_entry"
+msgstr "{conversation} #{id}: {state}"
+
+msgid "ui.dialogue.active"
+msgstr "Ready"
+
+msgid "ui.dialogue.suspended"
+msgstr "Closed, awaiting response"
+
+msgid "ui.dialogue.completed"
+msgstr "Information"
+
+msgid "ui.dialogue.open"
+msgstr "Open selected conversation"
+
+msgid "ui.dialogue.close"
+msgstr "Close conversation"
+
+msgid "ui.dialogue.ready"
+msgstr "Conversations can stay open while you use the map and pacing controls."
+
+msgid "ui.dialogue.queued"
+msgstr "Conversation input queued."
+
+msgid "ui.dialogue.accepted"
+msgstr "Conversation updated."
+
+msgid "ui.dialogue.rejected"
+msgstr "Conversation could not be updated: {reason}"
+
+msgid "ui.dialogue.unavailable.source"
+msgstr "This action is not available to you."
+
+msgid "ui.dialogue.unavailable.state"
+msgstr "The current state does not allow this action."
+
+msgid "ui.dialogue.unavailable.control"
+msgstr "The required ship is temporarily unavailable for your orders."
+
+msgid "ui.dialogue.unavailable.control_changed"
+msgstr "Control of the required ship has changed."
+
+msgid "ui.dialogue.unavailable.action"
+msgstr "The requested action cannot be carried out."
+
+msgid "ui.dialogue.unavailable.next_response"
+msgstr "No response is available for the next part of this conversation."
+
+msgid "ui.dialogue.unavailable.participant"
+msgstr "A conversation participant is no longer available."
+
+msgid "ui.dialogue.unavailable.closed"
+msgstr "Open this conversation before choosing a response."
+
+msgid "ui.dialogue.unavailable.conversation"
+msgstr "This conversation is no longer available."
+
+msgid "ui.dialogue.unavailable.response"
+msgstr "This response is no longer available."
+
+msgid "ui.dialogue.unavailable.used"
+msgstr "This conversation has already been used."
+
+msgid "ui.dialogue.unavailable.start"
+msgstr "This conversation is not available now."
+
+msgid "ui.dialogue.unavailable.generic"
+msgstr "This action is unavailable."
+
 msgid "ui.cargo.heading"
 msgstr "Cargo collection"
 

@@ -70,6 +70,7 @@ internal enum GameFactCommitCategory
     Relationship,
     RelationshipDiplomacy,
     RelationshipGrant,
+    Dialogue,
 }
 
 internal readonly record struct GameFactProposalKey(

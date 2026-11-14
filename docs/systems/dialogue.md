@@ -83,6 +83,80 @@ declarative and cannot introduce executable scripts or assemblies.
 The physical JSON representation remains an adapter concern. It must not leak
 into the simulation model or make JSON nodes live authority.
 
+### Package vocabulary
+
+Dialogue uses the existing `definitions` document envelope with definition kind
+`dialogue`. Its qualified key, invariant definition fallback, and package
+references follow the shared content contract. `DialogueContentLoader` converts
+format-neutral content values into a fully validated `DialogueDefinitionCatalog`.
+Both new-game loading and the headless validator use this adapter. Invalid
+dialogue rejects the entire catalog and new-game setup, including invalid
+definitions that the selected scenario does not reference. The adapter selects
+no built-in conversations or automatic initiation policy.
+
+The definition's `values` object requires these fields:
+
+| Field | Authored shape |
+| --- | --- |
+| `roles` | Array of `{id, acceptedKinds}`. Kinds are `ship`, `station`, and `principal`. |
+| `memories` | Array of `{id, scope}`. Scope is explicitly `session` or `participant-binding`; a choice's memory writes use this declaration. |
+| `initialNodeId` | Stable ID of a declared node. |
+| `repeatability` | `repeatable`, `once-per-session`, or `once-per-participant-binding`. |
+| `startConditions` | Explicit array of the conditions described below; an empty array imposes no additional condition. |
+| `nodes` | Array of nodes with stable `id`, `segments`, and `choices`. |
+
+Every segment requires `id`, nonnegative integral `order`, and `text`, and may
+carry `speaker` using the same text contract. Every choice requires `id`,
+nonnegative integral `order`, `label`, `transition`, `repeatability`,
+`offerConditions`, `admissionConditions`, and `memoryIds`. The optional `move`
+field describes the single approved gameplay consequence. Display order comes
+from each explicit `order`, while role, node, and memory identity sets use
+ordinal canonical order. Duplicate identities or display orders reject before
+publication.
+
+A transition is either `{kind: "node", nodeId}` or
+`{kind: "complete", outcomeId}`. A node with no choices must declare
+`automaticTransition`; a node with choices must omit it. All transition
+references resolve before automatic chains are checked for cycles. Automatic
+cycles reject because initial dialogue has no timed wake or implicit input.
+
+The initial condition vocabulary is deliberately closed:
+
+| `kind` | Required fields and meaning |
+| --- | --- |
+| `receipt` | `memoryId`, `scope`, and boolean `exists`; its scope must match the definition's memory declaration. |
+| `standing` | `assessingRoleId`, `subjectRoleId`, and signed integral `minimumValue`; both roles accept principals only, preserving directional standing without inferring asset ownership. |
+| `detected` | `roleId`; the role accepts ships or stations and checks current player detection. |
+| `discovered` | `roleId`; the role accepts stations only, matching the initial persistent station-discovery contract. |
+
+Condition arrays are conjunctions. Previously discovered mobile ships and
+observation-age conditions are outside this vocabulary. An authored move uses
+`{kind: "move-ship", actorRoleId, destinationRoleId, placement}`. The actor role
+accepts ships only, the destination role accepts ships or stations, and
+`placement` is explicitly `replace-all` or `append`. Admission still uses the
+ordinary movement owner's authority and navigation checks.
+
+Every text object requires `resourceKey`, `invariantFallback`, `markup`, and an
+explicit `arguments` array, and may declare a nonnegative integral
+`pluralSelector`. Each argument has `name`, `kind`, and `value`. Supported kinds
+are `text` (string), `number` (exact decimal), `count` (unsigned integer), and
+`duration` (unsigned simulation milliseconds). Fallback placeholders use
+`{name}` and must exactly match the declared argument names. Numeric strings,
+fractional integral values, and overflow reject rather than being coerced.
+
+`markup` is explicitly `plain-text` or `restricted-rich-text`. Plain text keeps
+brackets literal. Restricted rich text permits only balanced, properly nested
+`[b]`, `[i]`, and `[u]` tags with their matching closing tags. The shared
+`DialogueText.ValidateMarkup` validator checks authored fallbacks and translated
+templates. Presentation escapes substituted values separately, so a name or
+other argument cannot introduce a tag. Authored bracket-escape tags, attributes,
+links, images, and executable behavior are unsupported.
+
+Unknown fields, unsupported tokens, missing required fields, incompatible role
+references, and unresolved graph or memory references produce stable content
+diagnostics before catalog publication. Adding a new condition, argument kind,
+or command consequence requires an explicit typed model and validation change.
+
 ## Starting conversations
 
 The player may request an available conversation through an explicit
@@ -90,6 +164,17 @@ interaction submitted as a normal gameplay command. Trusted session command
 sources may also request a conversation through the same admission boundary.
 Admission validates the definition, participant bindings, repeatability, and
 current start conditions before allocating or publishing an instance.
+
+The owner approved an interim Godot initiation flow: select a loaded definition
+and explicitly bind each required role from player-visible ships, stations, and
+public principals, then submit the normal start command. This is a temporary
+interaction, with its eventual replacement owned by `TASK-125`.
+
+The approved dialogue surface is a docked panel beside the map. It keeps a
+pending list, speaker and line presentation, ordered response buttons, and Close,
+while leaving map and pacing controls available. Closing or reopening a live
+conversation waits for accepted suspension or resumption; translated labels
+never become command identities.
 
 Initial dialogue does not subscribe directly to facts, time, locations, or
 threshold changes and does not contain a partial trigger runtime. Deterministic
@@ -134,6 +219,12 @@ evaluation records the stable set and authored order of choices offered for
 that node. An offered choice does not silently appear later merely because an
 unrelated condition changes.
 
+Current choice availability uses the same pure preparation path as selection,
+including staged memory, resulting-node offers, and the ordinary move owner's
+validation. The locale-neutral view supplies a stable unavailability code for
+explanation. This read allocates no command, order, conversation, or fact
+sequence; admission still revalidates when the player submits a response.
+
 Before accepting a selection, the dialogue owner re-evaluates that choice's
 admission conditions against current authoritative state. A failed
 revalidation rejects the command with a stable reason, leaves the conversation
@@ -155,6 +246,39 @@ default and permits narrow currently-detected, previously-discovered, and
 observation-age predicates when authored availability should respect
 fog-of-war. It does not silently reinterpret existing content or introduce a
 general knowledge-condition language.
+
+### Initial implementation vocabulary
+
+The owner selected a bounded initial vocabulary for `TASK-065`. Conditions may
+check a declared dialogue memory receipt for presence or absence, compare a
+principal's directional standing against an authored threshold, or ask whether
+a bound ship or station is currently detected, or whether a bound station was
+previously discovered by the player. Ships retain their transient-contact
+contract and receive no discovery ledger. Participant existence is always validated independently of authored
+conditions. Lists of conditions are conjunctions; unavailable required data
+cannot satisfy a condition. Receipt checks distinguish session-wide memory
+from memory scoped to normalized participant bindings. Each declared memory
+identity has an explicit scope; recording that identity uses its declared
+scope, and a condition cannot reinterpret it under another scope.
+Standing conditions name explicit principal roles rather than inferring a
+political participant from a ship or station binding.
+
+Dialogue effects may advance to a node, complete with a declared outcome, and
+record declared structural memory. A choice may additionally request one
+ordinary `MoveShipCommand` using a bound ship as actor and a bound ship or
+station as destination, with explicit order placement. The ordinary command
+owner retains source eligibility, actor control, destination validation, and
+rejection behavior. Dialogue grants no additional control authority.
+
+Inventory transfers, relationship changes, combat consequences, observation-age
+predicates, and scripted initiation are outside this initial vocabulary. Their
+later inclusion needs a concrete scenario and the corresponding owner contract.
+
+If no choices remain after offer evaluation for a response-required node,
+admission rejects the start or transition atomically. A rejected transition
+retains the existing conversation, records no selection memory, and applies no
+gameplay consequence. Authors can provide an unconditional fallback choice to
+avoid this rejection. The owner selected this rule for runtime implementation.
 
 ## Conversation lifecycle and continuity
 
@@ -263,6 +387,13 @@ committed choices, completed conversations, and declared terminal outcomes.
 It is not an arbitrary string-to-object variable bag. Rejected commands create
 no memory. Participant-binding normalization follows stable role order rather
 than dictionary or caller order.
+
+The owner selected accepted Start as the definition's once-only consumption
+boundary. Its receipt commits with conversation creation, preventing a second
+unresolved instance from bypassing that policy. Rejected starts consume nothing.
+Suspension, completion, and participant loss do not release the consumed use.
+Choice repeatability remains separate: its receipt commits with the accepted
+choice.
 
 Counters, cooldowns, arbitrary local values, and authored mutation of unrelated
 memory are outside the initial model. They require a concrete scenario and an
@@ -376,6 +507,13 @@ contract rather than leaving a partially advanced conversation.
 The first implementation retains a single-thread reference path. Concurrent
 evaluation requires focused agreement tests before it is enabled.
 
+Participant availability reconciles at completed timestamps before player fact
+disclosure. A loss closes active and suspended instances in conversation-ID
+order and emits an ended fact under a typed dialogue-boundary cause. Ordinary
+start, selection, suspension, and resumption facts retain their admitted command
+cause. Restore validates these causes alongside graph-derived fact paths and
+the owning domains' historical participant records.
+
 ## Task boundaries
 
 - `TASK-016` owns this dialogue-state and presentation design.
@@ -421,5 +559,7 @@ Implementation is not complete until focused tests prove:
    pseudolocalization, and right-to-left layout without authoritative changes;
 9. snapshot, fact, save, and canonical-digest agreement across worker counts
    and valid batch layouts; and
-10. unchanged existing simulation digests and a working single-thread reference
-    path.
+10. unchanged existing simulation behavior and a working single-thread reference
+    path. The owner approved version 4 station checkpoint baselines for the added
+    dialogue owner section; the [shape-change diagnostic](../validation/scale-and-benchmark-targets.md#dialogue-checkpoint-baseline)
+    reproduces the old hashes while retaining full-state coverage in production.

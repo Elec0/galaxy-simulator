@@ -107,7 +107,7 @@ internal static class GameSessionSaveCodec
     /// </summary>
     internal static CheckpointResult<GameSession> Restore(InertSaveDocument document, SaveJsonLimits limits,
         PhysicalDefinitionCatalog? definitions = null, MaterialInventoryCompatibilityMap? materialCompatibility = null,
-        InteractionBatchExecution? interactionExecution = null)
+        InteractionBatchExecution? interactionExecution = null, DialogueDefinitionCatalog? dialogueDefinitions = null)
     {
         CheckpointResult<GameSessionCheckpoint> decoded = Decode(document, limits);
         if (!decoded.IsSuccess) return CheckpointResult<GameSession>.Rejected(decoded.Failure!);
@@ -116,7 +116,9 @@ internal static class GameSessionSaveCodec
         GameSessionCheckpoint checkpoint = decoded.Value!;
         try
         {
-            CheckpointResult<GameSession> admitted = definitions is null
+            CheckpointResult<GameSession> admitted = dialogueDefinitions is not null
+                ? GameSession.RestoreCheckpoint(checkpoint, definitions, materialCompatibility, interactionExecution, dialogueDefinitions)
+                : definitions is null
                 ? interactionExecution is null ? GameSession.RestoreCheckpoint(checkpoint)
                     : GameSession.RestoreCheckpoint(checkpoint, interactionExecution)
                 : materialCompatibility is null

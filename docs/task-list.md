@@ -21,7 +21,7 @@ source of detailed scope and acceptance criteria.
 | --- | --- | --- |
 | Project scope, content, and accessibility | `TASK-023`, `TASK-043`, `TASK-044`, `TASK-045`, `TASK-048`, `TASK-061`, `TASK-063`, and `TASK-083` completed the content, static-scenario, validation, scope-review, localization, comprehensive accessibility, built-in new-game, and development-preview foundations. | `TASK-077` implements the full accessibility application contract; `TASK-078` through `TASK-080` own audio, and `TASK-081` and `TASK-082` retain deferred motion and photosensitivity design. |
 | NPCs | `TASK-015` established the ship-only NPC boundary. | `TASK-042` designs NPC decision quality and `TASK-053` autonomous work selection; neither introduces person-level state. |
-| Dialogue and randomness | `TASK-016` completed dialogue design. `TASK-021` and `TASK-066` completed deterministic-randomness design and implementation. | `TASK-065` implements dialogue. |
+| Dialogue and randomness | `TASK-016` completed dialogue design and `TASK-065` implemented authored definitions, authoritative state, persistence, and Godot presentation. `TASK-021` and `TASK-066` completed deterministic randomness. | `TASK-125` replaces the interim dialogue chooser; `TASK-017` retains scripted initiation. |
 | Saves and application presentation | `TASK-050` completed the preference design and `TASK-084` implemented its shared device-local store. `TASK-049` completed the application shell and minimal map, including public static topology and presentation-only galaxy coordinates. | `TASK-067` implements save-envelope display names; cross-device synchronization is out of scope. `TASK-077` implements the shell and map; `TASK-076` owns future nonpublic topology and connector discovery. |
 | One-shot group commands | `TASK-033` completed the authoritative explicit-selection move and current-order cancellation boundary, including the initial formation resolver and Godot selection handoff. | `TASK-086` owns any later persistent group or fleet identity and lifecycle. |
 | Inventory and economy | `TASK-041` designed generalized inventory and cargo, and `TASK-069` completed its compatible implementation. Trade uses Credits as the single unified currency. | `TASK-068` completed the [equipment and ship-slot design](systems/equipment-and-ship-slots.md); `TASK-099` owns implementation. `TASK-055` owns trade balance, pricing, and settlement design. |
@@ -66,19 +66,25 @@ No task is currently selected.
   - Retain player-facing controls that write or explicitly reset device-local
     pacing choices with `TASK-077`, which owns the complete settings surface;
     startup already loads and validates the shared local preferences.
-  - Integrate response-required dialogue automatic pause using the accepted
-    classification and continuity contract from completed `TASK-016`.
+  - Consumes completed `TASK-065`'s response-required dialogue signal and
+    informational foreground notices through the accepted pacing boundary.
   - Complete the live event-responsive integration by routing owner-provided
     disclosure-safe typed notices through the application boundary. Coordinate
     typed combat-start notices with `TASK-046` rather than inventing combat
     semantics here.
-  - Wire live event adapters only after their owners provide typed disclosures:
-    informational dialogue remains with `TASK-065` and combat start remains with
-    `TASK-046`. Keep persisted pacing overrides in the shared device-local
+  - Wire the remaining combat-start adapter only after `TASK-046` provides its
+    typed disclosure contract. Keep persisted pacing overrides in the shared device-local
     preference store completed by `TASK-084`, not a separate pacing-only file.
   - Context: [Time and pacing](application/time-and-pacing.md)
 
 ## Future parking lot
+
+- [ ] **TASK-125: Replace the interim dialogue definition and role chooser**
+  - Review the intended player interaction for initiating conversations and
+    replace TASK-065's owner-approved interim definition picker and explicit
+    participant-role selectors. Preserve normal command admission and the
+    foreground/pending lifecycle; do not infer new trigger behavior.
+  - Context: [Dialogue initiation and presentation](systems/dialogue.md#starting-conversations)
 
 - [ ] **TASK-124: Review bounded continuation admission after moving-course turns**
   - Define the scope of fixed-point continuation support when a moving turn
@@ -362,22 +368,6 @@ the project-level **Near-term work** section above.
   - Preserve typed causes, deterministic proposal ordering, bounded retention,
     and the existing distinction between facts and internal effects.
   - Context: [Semantic game facts](architecture/semantic-game-facts.md) · [Runtime orchestration](architecture/runtime-orchestration.md)
-
-- [ ] **TASK-065: Implement dialogue state and presentation**
-  - Implement the accepted authored-definition, validation, authoritative
-    conversation, participant, condition, choice, memory, fact, snapshot,
-    checkpoint, and restore contracts from `TASK-016`.
-  - Add the Godot foreground and pending-conversation surfaces, localized
-    dialogue and optional named-person attribution, and response-required
-    pacing integration without making presentation state authoritative.
-  - Coordinate one normal gameplay-command consequence atomically with a
-    choice, retain a single-thread reference path, and prove deterministic
-    results across supported worker and batch layouts.
-  - Build on completed `TASK-016`. Coordinate content integration with
-    `TASK-048`, pacing with `TASK-038` and `TASK-064`, the application shell
-    with `TASK-049`, station identity with `TASK-057`, and the narrow
-    fog-of-war predicates accepted by completed `TASK-020`.
-  - Context: [Dialogue](systems/dialogue.md) · [Gameplay content](application/gameplay-content.md) · [Time and pacing](application/time-and-pacing.md) · [Concurrency and performance](architecture/concurrency-and-performance.md)
 
 - [ ] **TASK-042: Define NPC skills and bounded decision quality**
   - Decide which NPC categories, if any, have skills, competencies, preferences,
@@ -805,6 +795,22 @@ the project-level **Near-term work** section above.
   - Context: [Application shell and map experience](application/application-shell-and-map-experience.md) · [Fog-of-war and scouting](systems/fog-of-war-and-scouting.md) · [Gameplay content](application/gameplay-content.md) · [Presentation snapshots](architecture/presentation-snapshots.md)
 
 ## Completed foundations
+
+- [x] **TASK-065: Implement dialogue state and presentation**
+  - Added immutable authored definitions, strict package validation, typed
+    participants, authoritative conversations, scoped memory and repeatability,
+    semantic facts, and atomic coordination with one ordinary move command.
+    Once-only definition use commits on accepted Start; rejected starts consume
+    nothing. Empty resulting offers reject atomically.
+  - Added direct schema 4 restoration with external gameplay-definition
+    compatibility and no command replay, retaining the serial reference path
+    and worker/batch agreement. Version 4 station baselines include the new
+    dialogue checkpoint authority.
+  - Added localized Godot foreground/pending surfaces, named-speaker text,
+    response-required and informational pacing handoffs, and the interim
+    explicit role chooser. `TASK-125` owns its replacement; `TASK-017` retains
+    scripted initiation and `TASK-037` retains historical save migration.
+  - Context: [Dialogue](systems/dialogue.md) · [Save boundary](architecture/save-format-and-migration.md#typed-whole-session-checkpoint-bridge) · [Benchmark baseline](validation/scale-and-benchmark-targets.md#dialogue-checkpoint-baseline)
 
 - [x] **TASK-123: Turn moving ships toward replacement destinations immediately**
   - Begin shortest-arc course rotation immediately while preserving the
@@ -1402,9 +1408,9 @@ the project-level **Near-term work** section above.
   - Kept explicit player and trusted-session initiation inside normal command
     admission; deferred fact-, time-, location-, and threshold-triggered
     initiation to `TASK-017`.
-  - Implementation remains in `TASK-065`; completed `TASK-020` adds only narrow
-    fog-of-war predicates without reinterpreting existing authoritative
-    conditions; station identity remains in `TASK-057`.
+  - Implementation completed in `TASK-065`, using the narrow fog-of-war
+    predicates from `TASK-020` and authoritative station runtime from
+    `TASK-105` without reinterpreting existing authoritative conditions.
   - Context: [Dialogue state and presentation](systems/dialogue.md)
 
 - [x] **TASK-063: Implement the format-neutral content validation foundation**

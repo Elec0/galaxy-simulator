@@ -45,6 +45,9 @@ public partial class Main : Node
 	/// <summary>Loads the validated preview session and binds local controls to its presentation and input queue.</summary>
 	public override void _Ready()
 	{
+		// UiLocalization resolves complete templates explicitly; native automatic
+		// translation must not translate literal arguments or pseudo-transform them again.
+		AutoTranslateMode = AutoTranslateModeEnum.Disabled;
 		_pacing = PacingSpeedLadderFile.Load(
 			ProjectSettings.GlobalizePath(PacingSpeedLadderResourcePath));
 		_pacingPreferences = ApplicationPacingPreferences.Load(
@@ -84,6 +87,7 @@ public partial class Main : Node
 		_map.ViewChanged += RefreshPresentation;
 		_map.DestinationRequested += OnDestinationRequested;
 		ConfigureCargoControls();
+		ConfigureDialogueControls();
 		AdvanceTo(SimulationTime.Zero);
 		_shipList.GrabFocus();
 		GD.Print("Galaxy Command development visual preview ready.");
@@ -260,6 +264,7 @@ public partial class Main : Node
 						gameplay.Source,
 						gameplay.Command);
 					_lastCommandStatus = DescribeResult(record);
+					HandleDialogueCommandResult(record);
 					if (gameplay.Command is CollectCargoObjectCommand or CollectCargoFieldCommand or CancelShipOrderCommand or CancelShipGroupCommand)
 						_cargoResultText = record.Result.Status == CommandResultStatus.Accepted
 							? UiLocalization.Text("ui.cargo.accepted")
@@ -267,6 +272,9 @@ public partial class Main : Node
 					break;
 				case BufferedApplicationInput.Pacing pacing:
 					pacing.Action.Apply(_pacing);
+					break;
+				case BufferedApplicationInput.DialoguePresentation dialogue:
+					ApplyDialoguePresentationAction(dialogue.Action);
 					break;
 				default:
 					throw new InvalidOperationException(
@@ -363,6 +371,7 @@ public partial class Main : Node
 		_map.Display(_presentation);
 		_cargoCollectedThisRefresh = false;
 		ConsumeFacts(_presentation.Facts);
+		RefreshDialogueControls(_presentation.Facts);
 		RefreshCargoControls();
 		_factCursor = _presentation.NextFactCursor;
 

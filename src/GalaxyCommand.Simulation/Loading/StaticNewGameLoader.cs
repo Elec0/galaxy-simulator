@@ -107,6 +107,7 @@ public static partial class StaticNewGameLoader
             ContentKind.Create("station-module"),
             ContentKind.Create("material"),
             ContentKind.Create("station-storage-loss-policy"),
+            ContentKind.Create("dialogue"),
         ]);
 
     /// <summary>
@@ -143,6 +144,8 @@ public static partial class StaticNewGameLoader
         }
 
         ResolvedContentSet content = validation.Content!;
+        DialogueContentLoadResult dialogue = DialogueContentLoader.Load(content.Catalog);
+        if (!dialogue.IsSuccess) return StaticNewGameLoadResult.Rejected(dialogue.Diagnostics);
         StaticScenarioSource? scenario = content.Scenarios.SingleOrDefault(
             candidate => candidate.PackageId == scenarioPackageId && candidate.Id == scenarioId);
         if (scenario is null)
@@ -154,6 +157,7 @@ public static partial class StaticNewGameLoader
         List<ContentDiagnostic> diagnostics = [];
         GameSessionSetup? setup = Compose(
             content.Catalog,
+            dialogue.Catalog!,
             ExpandScenarioReferences(content.Catalog, scenario),
             randomRootSeed,
             factRetentionCapacity,
@@ -171,6 +175,7 @@ public static partial class StaticNewGameLoader
     /// </summary>
     private static GameSessionSetup? Compose(
         ResolvedContentCatalog catalog,
+        DialogueDefinitionCatalog dialogueDefinitions,
         StaticScenarioSource scenario,
         RandomRootSeed randomRootSeed,
         int factRetentionCapacity,
@@ -281,7 +286,7 @@ public static partial class StaticNewGameLoader
                 factRetentionCapacity,
                 playerSource,
                 deployables,
-                cargoPolicy: cargoPolicy, stations: stations);
+                cargoPolicy: cargoPolicy, stations: stations, dialogueDefinitions: dialogueDefinitions);
         }
         catch (Exception exception) when (exception is ArgumentException or OverflowException)
         {

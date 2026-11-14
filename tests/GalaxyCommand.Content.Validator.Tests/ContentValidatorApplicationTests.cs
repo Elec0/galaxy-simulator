@@ -55,6 +55,29 @@ public sealed class ContentValidatorApplicationTests : IDisposable
         Assert.Contains("--package", error.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ValidatorRejectsInvalidDialogueGraphThroughProductionDomainAdmission()
+    {
+        string package = WriteManifest("""
+            {"format":"galaxy-command-content-package","schemaVersion":1,"packageId":"core","dependencies":[],
+              "documents":[{"path":"dialogue.json","kind":"definitions"}]}
+            """);
+        File.WriteAllText(Path.Combine(package, "dialogue.json"), """
+            {"format":"galaxy-command-content-definitions","schemaVersion":5,"definitions":[
+              {"kind":"dialogue","id":"broken","fallback":"Broken dialogue","references":[],"values":{
+                "roles":[],"memories":[],"startConditions":[],"initialNodeId":"absent","repeatability":"repeatable",
+                "nodes":[{"id":"entry","segments":[],"choices":[],"automaticTransition":{"kind":"complete","outcomeId":"done"}}]}}]}
+            """);
+        using StringWriter output = new();
+        using StringWriter error = new();
+        int exitCode = ContentValidatorApplication.Run(["--package", package, "--allow-kind", "dialogue", "--show-keys"], output, error);
+        Assert.Equal(1, exitCode);
+        Assert.Empty(output.ToString());
+        Assert.Contains("core/dialogue/broken", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("$definition.values", error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("Exception", error.ToString(), StringComparison.Ordinal);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))

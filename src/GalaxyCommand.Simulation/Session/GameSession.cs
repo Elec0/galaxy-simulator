@@ -34,6 +34,8 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         _spatialInteractions = new SpatialInteractionRegistration();
         _facts = new GameFactStore(setup.FactRetentionCapacity);
         _runtime = new ActorOrderRuntimeCoordinator(setup, navigation, _facts);
+        DialogueDefinitions = setup.DialogueDefinitions;
+        _dialogue = new DialogueOwner(DialogueDefinitions);
         _playerCommandSource = setup.PlayerCommandSource;
         _runtime.ObservationTimestampCompleted = CompletePlayerDisclosure;
         _runtime.NextObservationBoundary = FindNextDeployableObservationBoundary;
@@ -56,12 +58,16 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         CommandAdmissionCheckpoint commandAdmission,
         SpatialInteractionRegistration spatialInteractions,
         InteractionBatchExecution? interactionExecution,
-        PlayerObservationCheckpoint observation)
+        PlayerObservationCheckpoint observation,
+        DialogueOwner dialogue,
+        DialogueDefinitionCatalog dialogueDefinitions)
     {
         InteractionExecution = interactionExecution;
         _spatialInteractions = spatialInteractions;
         _facts = facts;
         _runtime = runtime;
+        DialogueDefinitions = dialogueDefinitions;
+        _dialogue = dialogue;
         _playerCommandSource = observation.PlayerCommandSource;
         foreach (ObservedSensorDeployableSnapshot item in observation.Deployables!)
             _deployableObservations.Add(item.View.EntityId, item);
@@ -127,7 +133,7 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
     /// Reports whether the session remains safe for authoritative mutation and
     /// checkpoint capture.
     /// </summary>
-    public bool IsHealthy => _runtime.IsHealthy;
+    public bool IsHealthy => _runtime.IsHealthy && _dialogue.IsHealthy;
 
     public ShipId? ResolveShip(EntityId entityId) =>
         _runtime.ResolveShip(entityId);
@@ -262,7 +268,19 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         GameplayCommand command)
     {
         EnsureHealthy();
-        GameplayCommandRecord result = _commands.Submit(CurrentTime, source, command);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(command);
+        GameplayCommandRecord result;
+        try { result = _commands.Submit(CurrentTime, source, command); }
+        catch
+        {
+            if (command is StartDialogueCommand or SelectDialogueChoiceCommand or SuspendDialogueCommand or ResumeDialogueCommand)
+            {
+                _dialogue.Poison();
+                _runtime.PoisonDialogueCommit();
+            }
+            throw;
+        }
         CompletePlayerDisclosureIfIdle();
         return result;
     }
@@ -278,6 +296,8 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
     /// </summary>
     internal CheckpointResult<GameSessionCheckpoint> CaptureCheckpoint()
     {
+        if (!_dialogue.IsHealthy)
+            return CheckpointResult<GameSessionCheckpoint>.Rejected(new("$.checkpoint.dialogue", "Dialogue owner is unhealthy."));
         GameFactStoreCheckpoint facts = _facts.CaptureCheckpoint();
         CheckpointResult<GameSessionRuntimeCheckpoint> runtime =
             _runtime.CaptureCheckpoint(facts.Capacity);
@@ -304,7 +324,7 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
             _spatialInteractions.CaptureCheckpoint(),
             new PlayerObservationCheckpoint(3, value.Relationships.PlayerPrincipalId, _playerCommandSource,
                 Array.AsReadOnly(_deployableObservations.Values.OrderBy(item => item.View.EntityId.Value).ToArray()),
-                Array.AsReadOnly(_stationObservations.Values.OrderBy(item => item.View.EntityId.Value).ToArray())), value.Cargo, value.CargoCollectionAttempts, value.CargoCollectionTargets, value.Stations, value.StationTargetContinuation);
+                Array.AsReadOnly(_stationObservations.Values.OrderBy(item => item.View.EntityId.Value).ToArray())), value.Cargo, value.CargoCollectionAttempts, value.CargoCollectionTargets, value.Stations, value.StationTargetContinuation, _dialogue.CaptureCheckpoint());
         return CheckpointResult<GameSessionCheckpoint>.Success(checkpoint);
     }
 
@@ -315,6 +335,16 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
     internal static CheckpointResult<GameSession> RestoreCheckpoint(
         GameSessionCheckpoint checkpoint) =>
         RestoreCheckpointCore(checkpoint, definitions: null);
+
+    /// <summary>Restores dialogue authority against current external definitions without replaying conversations or consequences.</summary>
+    internal static CheckpointResult<GameSession> RestoreCheckpoint(GameSessionCheckpoint checkpoint,
+        DialogueDefinitionCatalog dialogueDefinitions) => RestoreCheckpointCore(checkpoint, null, dialogueDefinitions: dialogueDefinitions);
+
+    /// <summary>Supplies all current content dependencies and fresh host execution choices to isolated aggregate restore.</summary>
+    internal static CheckpointResult<GameSession> RestoreCheckpoint(GameSessionCheckpoint checkpoint,
+        PhysicalDefinitionCatalog? definitions, MaterialInventoryCompatibilityMap? materialCompatibility,
+        InteractionBatchExecution? interactionExecution, DialogueDefinitionCatalog dialogueDefinitions) =>
+        RestoreCheckpointCore(checkpoint, definitions, materialCompatibility, interactionExecution, dialogueDefinitions);
 
     internal static CheckpointResult<GameSession> RestoreCheckpoint(
         GameSessionCheckpoint checkpoint,
@@ -373,7 +403,8 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         GameSessionCheckpoint checkpoint,
         PhysicalDefinitionCatalog? definitions,
         MaterialInventoryCompatibilityMap? materialCompatibility = null,
-        InteractionBatchExecution? interactionExecution = null)
+        InteractionBatchExecution? interactionExecution = null,
+        DialogueDefinitionCatalog? dialogueDefinitions = null)
     {
         ArgumentNullException.ThrowIfNull(checkpoint);
         if (checkpoint.Random is null)
@@ -479,6 +510,14 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
                 return CheckpointResult<GameSession>.Rejected(new CheckpointValidationFailure(
                     "$.checkpoint.playerObservation", $"Retained fact disclosure {fact?.Sequence.Value} ({fact?.Fact.GetType().Name}) is missing or inconsistent."));
 
+        dialogueDefinitions ??= new DialogueDefinitionCatalog([]);
+        CheckpointResult<DialogueOwner> dialogue = DialogueOwner.RestoreCheckpoint(checkpoint.Dialogue, dialogueDefinitions,
+            CaptureDialogueReadContext(runtime.Value!, observation.Stations ?? [], checkpoint));
+        if (!dialogue.IsSuccess) return CheckpointResult<GameSession>.Rejected(dialogue.Failure!);
+        if (checkpoint.Facts.RetainedFacts.Any(envelope => envelope is not null && (!IsValidDialogueCause(envelope, checkpoint.CommandAdmission)
+            || envelope.Fact is DialogueFact fact && !dialogue.Value!.IsValidFact(fact))))
+            return CheckpointResult<GameSession>.Rejected(new("$.checkpoint.dialogue", "Retained dialogue facts do not match authoritative receipts."));
+
         try
         {
             return CheckpointResult<GameSession>.Success(
@@ -489,7 +528,9 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
                     checkpoint.CommandAdmission,
                     spatialInteractions.Value!,
                     interactionExecution,
-                    observation));
+                    observation,
+                    dialogue.Value!,
+                    dialogueDefinitions));
         }
         catch (InvalidOperationException error)
         {
@@ -504,11 +545,16 @@ public sealed partial class GameSession : IGameplayCommandHandler, IDisposable
         GameplayCommandEnvelope envelope)
     {
         EnsureHealthy();
-        return _runtime.Handle(envelope);
+        return envelope.Command is StartDialogueCommand or SelectDialogueChoiceCommand or SuspendDialogueCommand or ResumeDialogueCommand
+            ? HandleDialogue(envelope) : _runtime.Handle(envelope);
     }
 
     /// <summary>
     /// Prevents authoritative operations after a failed prepared commit.
     /// </summary>
-    private void EnsureHealthy() => _runtime.ThrowIfUnhealthy();
+    private void EnsureHealthy()
+    {
+        _runtime.ThrowIfUnhealthy();
+        if (!_dialogue.IsHealthy) throw new InvalidOperationException("Dialogue owner is unhealthy after a failed prepared commit.");
+    }
 }

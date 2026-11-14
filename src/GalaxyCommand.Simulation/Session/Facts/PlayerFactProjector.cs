@@ -89,6 +89,11 @@ internal sealed class PlayerFactProjector(CommandSource playerCommandSource, Gam
         }
         switch (fact)
         {
+            case DialogueFact:
+                // These are explicitly authored player conversations. Their
+                // payload carries structural dialogue data, never private domain state.
+                result = fact;
+                return true;
             case CargoCollectedFact collected:
                 // Receiving cargo is the owned ship's evidence. Target visibility,
                 // remaining contents and retirement do not authorize a world notice.

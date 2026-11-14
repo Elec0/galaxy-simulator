@@ -306,13 +306,29 @@ where the existing owner contracts require them. Content catalog compatibility
 and saved-reference migration remain `TASK-037`, so this bridge does not enable
 general cross-catalog saved sessions.
 
-Moving-course replacement plans use maneuver behavior version 2 and current save
-schema 3. Their selected payload retains the independent angular instruction,
+Moving-course replacement plans use maneuver behavior version 2. Their saved
+payload retains the independent angular instruction,
 optional cruise-dropout brake, precision brake, and nested destination
 continuation. Restoration joins those exact instructions without planner replay.
 Prior save schemas require an explicit migration registration; none is inferred
 for this motion-policy change. Historical maneuver behavior version 1 is rejected
 by the current runtime-policy compatibility check.
+
+Dialogue extends the current save schema to version 4. Its owner section keeps
+conversation allocation, unresolved nodes and recorded offers, structural use
+and memory receipts, participant bindings, and selected move consequences.
+Prepared moves are synchronous admission tokens and never survive a completed
+capture boundary. Restore rebuilds dialogue directly without replaying starts,
+choices, facts, or movement commands.
+
+Current dialogue definitions are explicit external restore inputs. Saved
+gameplay fingerprints cover graph structure, conditions, scopes, repeatability,
+and consequence identity while excluding line text, choice labels, speaker
+attribution, and localization resources. Missing or changed gameplay definitions
+reject restoration. Presentation edits remain compatible. Historical participant
+references resolve through their owning domain's current records and validated
+removal receipts. Earlier save schemas need explicit migration through
+`TASK-037`; schema version changes do not silently supply missing dialogue state.
 
 ### Frozen value contracts
 

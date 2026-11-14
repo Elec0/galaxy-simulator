@@ -33,6 +33,13 @@ internal sealed class ApplicationInputBuffer
         _pending.Enqueue(new BufferedApplicationInput.Pacing(action));
     }
 
+    /// <summary>Captures local dialogue selection in the same FIFO without inventing a gameplay command.</summary>
+    public void EnqueueDialoguePresentation(DialoguePresentationAction action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        _pending.Enqueue(new BufferedApplicationInput.DialoguePresentation(action));
+    }
+
     /// <summary>
     /// Returns every captured input in FIFO order and clears the buffer so a
     /// later boundary cannot apply the same input twice.
@@ -61,6 +68,29 @@ internal abstract record BufferedApplicationInput
 
     internal sealed record Pacing(
         ApplicationPacingAction Action) : BufferedApplicationInput;
+
+    internal sealed record DialoguePresentation(
+        DialoguePresentationAction Action) : BufferedApplicationInput;
+}
+
+/// <summary>One local foreground operation captured with its stable conversation identity.</summary>
+internal abstract record DialoguePresentationAction
+{
+    private DialoguePresentationAction(DialogueConversationId conversationId)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(conversationId.Value);
+        ConversationId = conversationId;
+    }
+
+    internal DialogueConversationId ConversationId { get; }
+    internal sealed record Open : DialoguePresentationAction
+    {
+        internal Open(DialogueConversationId conversationId) : base(conversationId) { }
+    }
+    internal sealed record Close : DialoguePresentationAction
+    {
+        internal Close(DialogueConversationId conversationId) : base(conversationId) { }
+    }
 }
 
 /// <summary>

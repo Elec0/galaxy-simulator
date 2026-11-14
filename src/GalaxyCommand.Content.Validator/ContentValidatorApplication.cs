@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using GalaxyCommand.Simulation;
 
 namespace GalaxyCommand.Content.Validator;
 
@@ -41,6 +42,14 @@ public static class ContentValidatorApplication
                         $"{ContentDiagnosticCodes.GetCode(diagnostic.Kind)}\t{diagnostic.Source}\t{diagnostic.Path}\t{diagnostic.Message}");
                 }
 
+                return 1;
+            }
+
+            DialogueContentLoadResult dialogue = DialogueContentLoader.Load(result.Content!.Catalog);
+            if (!dialogue.IsSuccess)
+            {
+                foreach (ContentDiagnostic diagnostic in dialogue.Diagnostics)
+                    standardError.WriteLine($"{ContentDiagnosticCodes.GetCode(diagnostic.Kind)}\t{diagnostic.Source}\t{diagnostic.Path}\t{diagnostic.Message}");
                 return 1;
             }
 

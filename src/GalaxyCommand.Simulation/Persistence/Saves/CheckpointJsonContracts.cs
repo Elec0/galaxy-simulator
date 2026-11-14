@@ -99,6 +99,34 @@ internal static class CheckpointJsonContracts
         codec.Object<DeployedSensorSnapshot>(["EntityId", "DefinitionKey", "PrincipalId", "Position"]);
         codec.Object<DeploySensorCommand>(["ShipId", "ItemId", "Position", "Placement"]);
         codec.Object<DeterministicRandomCheckpoint>(["RootSeed", "DerivationAlgorithm", "DerivationVersion", "Streams"]);
+        codec.Object<DialogueBoundaryFactCause>(["Timestamp"]);
+        codec.Object<DialogueChoiceCommittedFact>(["ConversationId", "DefinitionKey", "Bindings", "ChoiceId", "ResultingNodeId", "OutcomeId", "EnteredNodeIds"]);
+        codec.Scalar<DialogueConversationId>("Value");
+        codec.Object<DialogueConversationState>(["Id", "DefinitionKey", "Bindings", "NodeId", "Status", "OfferedChoiceIds", "EnteredNodeIds"]);
+        codec.Object<DialogueDefinitionCompatibility>(["Key", "Fingerprint"]);
+        codec.Object<DialogueEndedFact>(["ConversationId", "DefinitionKey", "Bindings", "Reason", "OutcomeId", "EnteredNodeIds"]);
+        codec.Object<DialogueMemoryReceipt>(["DefinitionKey", "MemoryId", "Scope", "Bindings"]);
+        codec.Object<DialogueOwnerCheckpoint>(["BehaviorVersion", "Sequences", "Definitions", "Conversations", "Uses", "Memories"]);
+        codec.Object<DialogueParticipant.Principal>(["Id"]);
+        codec.Object<DialogueParticipant.Ship>(["Id"]);
+        codec.Object<DialogueParticipant.Station>(["Id"]);
+        codec.Object<DialogueParticipantBinding>(["RoleId", "Participant"]);
+        // Decode structural references without loading authored definitions. The
+        // dialogue owner's aggregate restore checks every role against its catalog.
+        codec.Factory<DialogueParticipantBindings>(["Items"], values =>
+        {
+            var items = (IReadOnlyList<DialogueParticipantBinding>)values[0]!;
+            return new DialogueParticipantBindings(items.Select(binding =>
+                new DialogueParticipantRole(binding.RoleId, [binding.Participant.Kind])), items);
+        });
+        codec.Object<DialogueResumedFact>(["ConversationId", "DefinitionKey", "Bindings"]);
+        codec.Object<DialogueStartedFact>(["ConversationId", "DefinitionKey", "Bindings", "EnteredNodeIds"]);
+        codec.Object<DialogueSuspendedFact>(["ConversationId", "DefinitionKey", "Bindings"]);
+        codec.Object<DialogueUseReceipt>(["ConversationId", "DefinitionKey", "Bindings", "Kind", "Identity", "Consequence"]);
+        codec.Object<ResumeDialogueCommand>(["ConversationId"]);
+        codec.Object<SelectDialogueChoiceCommand>(["ConversationId", "ChoiceId"]);
+        codec.Object<StartDialogueCommand>(["DefinitionKey", "Bindings"]);
+        codec.Object<SuspendDialogueCommand>(["ConversationId"]);
         codec.Object<DiplomaticConditionChangeOutcome>(["LowerPrincipalId", "UpperPrincipalId", "PriorCondition", "ResultingCondition", "Reason"]);
         codec.Object<DiscreteItemInstance>(["Id", "DefinitionKey"]);
         codec.Object<DismantleStationBaseCommand>(["RequestingPrincipal", "Station", "ExpectedStationRevision", "RecoveryInventory"]);
@@ -154,7 +182,7 @@ internal static class CheckpointJsonContracts
         codec.Scalar<GameFactSequence>("Value");
         codec.Object<GameFactStoreCheckpoint>(["Capacity", "Sequences", "RetainedFacts"]);
         codec.Object<GameplayCommandEnvelope>(["Sequence", "SubmittedAt", "Source", "Command"]);
-        codec.Object<GameSessionCheckpoint>(["Engine", "RuntimePolicies", "WorldTopology", "Movement", "Control", "Orders", "Lifecycle", "Relationships", "Economy", "Random", "Facts", "CommandAdmission", "InventoryCommit", "SpatialInteractions", "PlayerObservation", "Cargo", "CargoCollectionAttempts", "CargoCollectionTargets", "Stations", "StationTargetContinuation"]);
+        codec.Object<GameSessionCheckpoint>(["Engine", "RuntimePolicies", "WorldTopology", "Movement", "Control", "Orders", "Lifecycle", "Relationships", "Economy", "Random", "Facts", "CommandAdmission", "InventoryCommit", "SpatialInteractions", "PlayerObservation", "Cargo", "CargoCollectionAttempts", "CargoCollectionTargets", "Stations", "StationTargetContinuation", "Dialogue"]);
         codec.Object<IdSequenceCheckpoint>(["NextValue"]);
         codec.Object<InitialStationModuleSetup>(["Id", "DefinitionKey", "Enabled", "FacilityId"]);
         codec.Object<InitialStationSetup>(["EntityId", "Id", "InventoryId", "PrincipalId", "DefinitionKey", "Position", "Modules", "CreatedAt"]);
@@ -475,6 +503,11 @@ internal static class CheckpointJsonContracts
             ("turn", typeof(ExecutableManeuverPayload.Turn)),
             ("waypoint-route", typeof(ExecutableManeuverPayload.WaypointRoute)),
         ]);
+        codec.Union<DialogueParticipant>([
+            ("ship", typeof(DialogueParticipant.Ship)),
+            ("station", typeof(DialogueParticipant.Station)),
+            ("principal", typeof(DialogueParticipant.Principal)),
+        ]);
         codec.Union<GameEvent>([
             ("cargo-collection-completion", typeof(GameEvent.CargoCollectionCompletion)),
             ("cargo-collection-range-exit", typeof(GameEvent.CargoCollectionRangeExit)),
@@ -496,6 +529,11 @@ internal static class CheckpointJsonContracts
             ("cargo-object-expired", typeof(CargoObjectExpiredFact)),
             ("command-accepted", typeof(CommandAcceptedFact)),
             ("command-rejected", typeof(CommandRejectedFact)),
+            ("dialogue-choice-committed", typeof(DialogueChoiceCommittedFact)),
+            ("dialogue-ended", typeof(DialogueEndedFact)),
+            ("dialogue-resumed", typeof(DialogueResumedFact)),
+            ("dialogue-started", typeof(DialogueStartedFact)),
+            ("dialogue-suspended", typeof(DialogueSuspendedFact)),
             ("diplomatic-condition-changed", typeof(DiplomaticConditionChangedFact)),
             ("entity-materialized", typeof(EntityMaterializedFact)),
             ("entity-removed", typeof(EntityRemovedFact)),
@@ -531,6 +569,7 @@ internal static class CheckpointJsonContracts
         ]);
         codec.Union<GameFactCause>([
             ("command", typeof(CommandFactCause)),
+            ("dialogue-boundary", typeof(DialogueBoundaryFactCause)),
             ("entity-removal", typeof(EntityRemovalFactCause)),
             ("relationship-policy-change", typeof(RelationshipPolicyChangeFactCause)),
             ("scheduled-event", typeof(ScheduledEventFactCause)),
@@ -548,6 +587,10 @@ internal static class CheckpointJsonContracts
             ("control-station-project", typeof(ControlStationProjectCommand)),
             ("create-station-site", typeof(CreateStationSiteCommand)),
             ("deploy-sensor", typeof(DeploySensorCommand)),
+            ("dialogue-resume", typeof(ResumeDialogueCommand)),
+            ("dialogue-select", typeof(SelectDialogueChoiceCommand)),
+            ("dialogue-start", typeof(StartDialogueCommand)),
+            ("dialogue-suspend", typeof(SuspendDialogueCommand)),
             ("dismantle-station-base", typeof(DismantleStationBaseCommand)),
             ("dismantle-station-module", typeof(DismantleStationModuleCommand)),
             ("end-scripted-override", typeof(EndScriptedOverrideCommand)),
@@ -712,6 +755,25 @@ internal static class CheckpointJsonContracts
             ("completed", ConstructionOrderStatus.Completed),
             ("cancelled", ConstructionOrderStatus.Cancelled),
             ("paused", ConstructionOrderStatus.Paused),
+        ]);
+        codec.Enum<DialogueConversationStatus>([
+            ("active", DialogueConversationStatus.Active),
+            ("suspended", DialogueConversationStatus.Suspended),
+        ]);
+        codec.Enum<DialogueEndReason>([
+            ("completed", DialogueEndReason.Completed),
+            ("participant-unavailable", DialogueEndReason.ParticipantUnavailable),
+        ]);
+        codec.Enum<DialogueMemoryScope>([
+            ("session", DialogueMemoryScope.Session),
+            ("participant-binding", DialogueMemoryScope.ParticipantBinding),
+        ]);
+        codec.Enum<DialogueUseKind>([
+            ("started", DialogueUseKind.Started),
+            ("choice", DialogueUseKind.Choice),
+            ("completed", DialogueUseKind.Completed),
+            ("outcome", DialogueUseKind.Outcome),
+            ("participant-unavailable", DialogueUseKind.ParticipantUnavailable),
         ]);
         codec.Enum<DiplomaticCondition>([
             ("peace", DiplomaticCondition.Peace),
