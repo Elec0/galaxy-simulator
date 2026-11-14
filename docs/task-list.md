@@ -95,14 +95,6 @@ No task is currently selected.
     the planner only after owner direction.
   - Context: [Maneuver planning contract](architecture/ship-maneuver-kinematics.md#heading-turning-and-translation)
 
-- [ ] **TASK-118: Review authored station gameplay content and disk starting state**
-  - Obtain owner direction before adding stations, builder capabilities, material
-    stock, or economic providers to built-in or preview scenarios.
-  - If disk-authored starting stations are selected, define their scenario
-    vocabulary and explicit shared inventory/module/facility origins. TASK-105
-    converts only the approved typed Phase 1 fixture and supplies runtime
-    definition loading; it does not select this gameplay content.
-
 - [ ] **TASK-110: Design and implement voluntary cargo-ejection commands and controls**
   - Deferred by the owner during TASK-108 review. Define player
     selection, authorization, quantities/instances, reservation handling, and
@@ -796,6 +788,20 @@ the project-level **Near-term work** section above.
 
 ## Completed foundations
 
+- [x] **TASK-118: Add preview stations, basic dialogue, and disk starting state**
+  - Added Aster Relay, Borealis Harbor, and Cinder Beacon as player-owned
+    operational preview stations with explicit empty station-owned inventories.
+    Disk `startingStations` preserves authored origins and shared custody without
+    startup construction commands or economic facilities.
+  - Added four basic conversations covering per-station branching memory,
+    once-per-binding welcome, informational rich text, and a ship-to-station
+    move followed by a separate acknowledgement. Save restoration preserves
+    these states without reseeding inventories or repeating movement effects.
+  - Built-in content, builder capabilities, stock, modules, and economic
+    providers remain outside this preview setup. TASK-125 retains replacement
+    of the interim explicit conversation and participant picker.
+  - Context: [Starting-station vocabulary](systems/stations.md#disk-authored-starting-stations) · [Preview conversations](systems/dialogue.md#development-preview-conversations)
+
 - [x] **TASK-065: Implement dialogue state and presentation**
   - Added immutable authored definitions, strict package validation, typed
     participants, authoritative conversations, scoped memory and repeatability,
@@ -869,8 +875,8 @@ the project-level **Near-term work** section above.
   - Godot displays station and deployable current/stale/confirmed-missing
     records with their retained observation times. TASK-077 retains broader
     shell/accessibility/overlay controls, TASK-107 deploy/pickup controls,
-    TASK-118 authored station starting content, and TASK-037 saved-reference
-    compatibility. Deferred NPC knowledge, sensor sharing, stealth, occlusion,
+    and TASK-037 saved-reference compatibility. TASK-118 supplies preview
+    station starting content. Deferred NPC knowledge, sensor sharing, stealth, occlusion,
     and moving-contact extrapolation remain outside this delivery.
   - Context: [Full-domain observation evidence](systems/fog-of-war-and-scouting.md#full-domain-delivery-evidence) · [Presentation snapshots](architecture/presentation-snapshots.md)
 
@@ -890,7 +896,7 @@ the project-level **Near-term work** section above.
     wakes, unknown-commitment rejection, and worker/batch/partition equivalence.
   - TASK-073 completed observation integration; TASK-077 retains broader
     application accessibility, TASK-096 installed-equipment disposition, TASK-110 voluntary
-    ejection controls, and TASK-118 authored station starting content.
+    ejection controls. TASK-118 supplies preview station starting content.
   - Context: [Cargo disposition and collection](systems/cargo-disposition-and-collection.md) · [Station workloads](validation/station-runtime-performance.md)
 
 - [x] **TASK-113: Repair the task-list link to TASK-037**
@@ -906,8 +912,8 @@ the project-level **Near-term work** section above.
     preserved continuation through atomic file storage, pending movement,
     economy, stations, cargo, observations, and historical fact disclosures.
   - TASK-037 retains content compatibility and saved-reference migration.
-    TASK-108 completed shared cargo delivery; TASK-118 retains authored
-    starting gameplay content.
+    TASK-108 completed shared cargo delivery; TASK-118 supplies authored
+    preview starting content.
   - Context: [Typed checkpoint bridge](architecture/save-format-and-migration.md#typed-whole-session-checkpoint-bridge)
 
 - [x] **TASK-119: Define inert analytic-maneuver checkpoint capture and restoration**
@@ -935,7 +941,7 @@ the project-level **Near-term work** section above.
     material-gate timing, full checkpoint/event digests, and measured station
     workloads across worker, partition, and restore layouts.
   - TASK-116 supplies the encoded checkpoint bridge; authored starting gameplay
-    content remains TASK-118. TASK-108 completed shared cargo delivery, and
+    content is supplied by TASK-118 for the preview. TASK-108 completed shared cargo delivery, and
     TASK-073 completed full observation delivery.
   - Context: [Station contract](systems/stations.md) · [Performance and determinism](validation/station-runtime-performance.md) · [Phase 1 conversion](validation/phase-1-simulation-spec.md#station-conversion-baseline)
 

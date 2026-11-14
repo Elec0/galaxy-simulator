@@ -195,6 +195,8 @@ public static partial class StaticNewGameLoader
             scenarioProperties = [.. scenarioProperties, "cargoPolicy"];
         if (scenario.Values.Properties.ContainsKey("stationRuntime"))
             scenarioProperties = [.. scenarioProperties, "stationRuntime"];
+        if (scenario.Values.Properties.ContainsKey("startingStations"))
+            scenarioProperties = [.. scenarioProperties, "startingStations"];
         if (!TryObjectProperties(
                 scenario.Values,
                 scenarioProperties,
@@ -271,6 +273,8 @@ public static partial class StaticNewGameLoader
             CommandSource playerSource = new(CommandSourceKind.Player, new CommandSourceId(playerCommandSource!));
             if (!TryComposeStationRuntime(catalog, scenario, materials, systems, designs, principals[playerKey!].Id,
                 playerSource, navigation, diagnostics, out StationRuntimeSetup? stations, out GameSessionEconomySetup? economy)) return null;
+            if (!TryComposeStartingStations(scenario, ships, principals, systems, stations, diagnostics,
+                out stations, out InitialStationInventorySetup[] stationInventories)) return null;
             return new GameSessionSetup(
                 systems.Values,
                 ships,
@@ -286,7 +290,8 @@ public static partial class StaticNewGameLoader
                 factRetentionCapacity,
                 playerSource,
                 deployables,
-                cargoPolicy: cargoPolicy, stations: stations, dialogueDefinitions: dialogueDefinitions);
+                cargoPolicy: cargoPolicy, stations: stations, dialogueDefinitions: dialogueDefinitions,
+                stationInventories: stationInventories);
         }
         catch (Exception exception) when (exception is ArgumentException or OverflowException)
         {

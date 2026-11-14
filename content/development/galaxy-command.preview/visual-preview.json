@@ -9,7 +9,11 @@
     "galaxy-command.preview/standing-policy/default-standing",
     "galaxy-command.preview/sensor-deployable/satellite",
     "galaxy-command.preview/sensor-deployable/advanced-satellite",
-    "galaxy-command.preview/cargo-policy/default-cargo"
+    "galaxy-command.preview/cargo-policy/default-cargo",
+    "galaxy-command.preview/station/aster-relay",
+    "galaxy-command.preview/station/borealis-harbor",
+    "galaxy-command.preview/station/cinder-beacon",
+    "galaxy-command.preview/station-storage-loss-policy/preview-station-loss"
   ],
   "values": {
     "playerCommandSource": "preview-player",
@@ -128,6 +132,54 @@
         ]
       }
     ],
-    "cargoPolicy": "galaxy-command.preview/cargo-policy/default-cargo"
+    "cargoPolicy": "galaxy-command.preview/cargo-policy/default-cargo",
+    "stationRuntime": {
+      "territoryPolicy": "absent",
+      "storageLossPolicy": "galaxy-command.preview/station-storage-loss-policy/preview-station-loss"
+    },
+    "startingStations": [
+      {
+        "id": "aster-relay",
+        "principal": "galaxy-command.preview/principal/player",
+        "definition": "galaxy-command.preview/station/aster-relay",
+        "system": "aster",
+        "x": 80,
+        "y": 60,
+        "inventory": {
+          "id": "aster-relay-storage",
+          "capacity": 0,
+          "contents": []
+        },
+        "modules": []
+      },
+      {
+        "id": "borealis-harbor",
+        "principal": "galaxy-command.preview/principal/player",
+        "definition": "galaxy-command.preview/station/borealis-harbor",
+        "system": "borealis",
+        "x": -80,
+        "y": 80,
+        "inventory": {
+          "id": "borealis-harbor-storage",
+          "capacity": 0,
+          "contents": []
+        },
+        "modules": []
+      },
+      {
+        "id": "cinder-beacon",
+        "principal": "galaxy-command.preview/principal/player",
+        "definition": "galaxy-command.preview/station/cinder-beacon",
+        "system": "cinder",
+        "x": 0,
+        "y": 60,
+        "inventory": {
+          "id": "cinder-beacon-storage",
+          "capacity": 0,
+          "contents": []
+        },
+        "modules": []
+      }
+    ]
   }
 }

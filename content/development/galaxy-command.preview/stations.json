@@ -1,0 +1,89 @@
+{
+  "format": "galaxy-command-content-definitions",
+  "schemaVersion": 5,
+  "definitions": [
+    {
+      "kind": "station",
+      "id": "aster-relay",
+      "fallback": "Aster Relay",
+      "references": [],
+      "values": {
+        "moduleCapacity": 0,
+        "stagingCapacity": 0,
+        "baseCapacity": 0,
+        "baseRecipe": {
+          "inputs": [],
+          "requiredWork": 1
+        },
+        "sensorRadiusMeters": 0,
+        "allowedModules": [],
+        "dismantleWork": 1,
+        "dismantleRecovery": [],
+        "placementRules": {
+          "allowedSystems": [],
+          "allowedRegions": [],
+          "exclusionRegions": []
+        }
+      }
+    },
+    {
+      "kind": "station",
+      "id": "borealis-harbor",
+      "fallback": "Borealis Harbor",
+      "references": [],
+      "values": {
+        "moduleCapacity": 0,
+        "stagingCapacity": 0,
+        "baseCapacity": 0,
+        "baseRecipe": {
+          "inputs": [],
+          "requiredWork": 1
+        },
+        "sensorRadiusMeters": 0,
+        "allowedModules": [],
+        "dismantleWork": 1,
+        "dismantleRecovery": [],
+        "placementRules": {
+          "allowedSystems": [],
+          "allowedRegions": [],
+          "exclusionRegions": []
+        }
+      }
+    },
+    {
+      "kind": "station",
+      "id": "cinder-beacon",
+      "fallback": "Cinder Beacon",
+      "references": [],
+      "values": {
+        "moduleCapacity": 0,
+        "stagingCapacity": 0,
+        "baseCapacity": 0,
+        "baseRecipe": {
+          "inputs": [],
+          "requiredWork": 1
+        },
+        "sensorRadiusMeters": 0,
+        "allowedModules": [],
+        "dismantleWork": 1,
+        "dismantleRecovery": [],
+        "placementRules": {
+          "allowedSystems": [],
+          "allowedRegions": [],
+          "exclusionRegions": []
+        }
+      }
+    },
+    {
+      "kind": "station-storage-loss-policy",
+      "id": "preview-station-loss",
+      "fallback": "Preview Station Storage Loss",
+      "references": [],
+      "values": {
+        "behaviorVersion": 1,
+        "cutoffNumerator": 1,
+        "cutoffDenominator": 100
+      }
+    }
+  ]
+}

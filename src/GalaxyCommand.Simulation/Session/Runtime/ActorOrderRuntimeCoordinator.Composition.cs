@@ -64,6 +64,11 @@ internal sealed partial class ActorOrderRuntimeCoordinator : ISimulationRuntime<
             _sensorDeployableDefinitions, _shipDefinitions);
 
         _lifecycle.RegisterSetup(setup.Ships);
+        foreach (InitialStationInventorySetup seed in setup.StationInventories)
+            _lifecycle.RegisterOwnedInventory(new Inventory(seed.Id,
+                new InventoryCustody.PrincipalControlled(
+                    new InventoryOwnerReference.SessionEntity(seed.StationEntityId), seed.PrincipalId),
+                seed.Capacity, setup.Stations!.Materials));
         _economy = setup.Economy is null
             ? null
             : new SessionEconomyOwner(setup.Economy, _lifecycle);

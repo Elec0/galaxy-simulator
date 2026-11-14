@@ -1,0 +1,512 @@
+{
+  "format": "galaxy-command-content-definitions",
+  "schemaVersion": 5,
+  "definitions": [
+    {
+      "kind": "dialogue",
+      "id": "station-greeting",
+      "fallback": "Station greeting",
+      "references": [],
+      "values": {
+        "roles": [
+          {
+            "id": "station",
+            "acceptedKinds": [
+              "station"
+            ]
+          }
+        ],
+        "initialNodeId": "entry",
+        "repeatability": "repeatable",
+        "startConditions": [],
+        "memories": [
+          {
+            "id": "introduced",
+            "scope": "participant-binding"
+          }
+        ],
+        "nodes": [
+          {
+            "id": "entry",
+            "segments": [
+              {
+                "id": "greeting",
+                "order": 0,
+                "text": {
+                  "resourceKey": "preview.dialogue.station-greeting.entry",
+                  "invariantFallback": "Station channel open. What would you like to say?",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "speaker": {
+                  "resourceKey": "preview.dialogue.station-greeting.entry.speaker",
+                  "invariantFallback": "Station operator",
+                  "markup": "plain-text",
+                  "arguments": []
+                }
+              }
+            ],
+            "choices": [
+              {
+                "id": "introduce",
+                "order": 0,
+                "label": {
+                  "resourceKey": "preview.dialogue.introduce.label",
+                  "invariantFallback": "Introduce yourself",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "transition": {
+                  "kind": "node",
+                  "nodeId": "introduction"
+                },
+                "repeatability": "repeatable",
+                "offerConditions": [
+                  {
+                    "kind": "receipt",
+                    "memoryId": "introduced",
+                    "scope": "participant-binding",
+                    "exists": false
+                  }
+                ],
+                "admissionConditions": [
+                  {
+                    "kind": "receipt",
+                    "memoryId": "introduced",
+                    "scope": "participant-binding",
+                    "exists": false
+                  }
+                ],
+                "memoryIds": [
+                  "introduced"
+                ]
+              },
+              {
+                "id": "return-greeting",
+                "order": 1,
+                "label": {
+                  "resourceKey": "preview.dialogue.return-greeting.label",
+                  "invariantFallback": "Good to hear from you again",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "transition": {
+                  "kind": "node",
+                  "nodeId": "return"
+                },
+                "repeatability": "repeatable",
+                "offerConditions": [
+                  {
+                    "kind": "receipt",
+                    "memoryId": "introduced",
+                    "scope": "participant-binding",
+                    "exists": true
+                  }
+                ],
+                "admissionConditions": [
+                  {
+                    "kind": "receipt",
+                    "memoryId": "introduced",
+                    "scope": "participant-binding",
+                    "exists": true
+                  }
+                ],
+                "memoryIds": []
+              },
+              {
+                "id": "channel-check",
+                "order": 2,
+                "label": {
+                  "resourceKey": "preview.dialogue.channel-check.label",
+                  "invariantFallback": "Request a channel check",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "transition": {
+                  "kind": "node",
+                  "nodeId": "channel-check"
+                },
+                "repeatability": "repeatable",
+                "offerConditions": [],
+                "admissionConditions": [],
+                "memoryIds": []
+              },
+              {
+                "id": "greeting-close",
+                "order": 3,
+                "label": {
+                  "resourceKey": "preview.dialogue.greeting-close.label",
+                  "invariantFallback": "Close channel",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "transition": {
+                  "kind": "complete",
+                  "outcomeId": "channel-closed"
+                },
+                "repeatability": "repeatable",
+                "offerConditions": [],
+                "admissionConditions": [],
+                "memoryIds": []
+              }
+            ]
+          },
+          {
+            "id": "introduction",
+            "segments": [
+              {
+                "id": "introduction-reply",
+                "order": 0,
+                "text": {
+                  "resourceKey": "preview.dialogue.station-greeting.introduction",
+                  "invariantFallback": "Your introduction is noted for this station channel. Welcome.",
+                  "markup": "plain-text",
+                  "arguments": []
+                }
+              }
+            ],
+            "choices": [
+              {
+                "id": "introduction-ack",
+                "order": 0,
+                "label": {
+                  "resourceKey": "preview.dialogue.introduction-ack.label",
+                  "invariantFallback": "Thank you",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "transition": {
+                  "kind": "complete",
+                  "outcomeId": "introduced"
+                },
+                "repeatability": "repeatable",
+                "offerConditions": [],
+                "admissionConditions": [],
+                "memoryIds": []
+              }
+            ]
+          },
+          {
+            "id": "return",
+            "segments": [
+              {
+                "id": "return-reply",
+                "order": 0,
+                "text": {
+                  "resourceKey": "preview.dialogue.station-greeting.return",
+                  "invariantFallback": "Welcome back. We remember your introduction.",
+                  "markup": "plain-text",
+                  "arguments": []
+                }
+              }
+            ],
+            "choices": [
+              {
+                "id": "return-ack",
+                "order": 0,
+                "label": {
+                  "resourceKey": "preview.dialogue.return-ack.label",
+                  "invariantFallback": "Until next time",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "transition": {
+                  "kind": "complete",
+                  "outcomeId": "greeted-again"
+                },
+                "repeatability": "repeatable",
+                "offerConditions": [],
+                "admissionConditions": [],
+                "memoryIds": []
+              }
+            ]
+          },
+          {
+            "id": "channel-check",
+            "segments": [
+              {
+                "id": "channel-check-reply",
+                "order": 0,
+                "text": {
+                  "resourceKey": "preview.dialogue.station-greeting.channel-check",
+                  "invariantFallback": "The channel is clear. Your message arrived.",
+                  "markup": "plain-text",
+                  "arguments": []
+                }
+              }
+            ],
+            "choices": [
+              {
+                "id": "channel-check-ack",
+                "order": 0,
+                "label": {
+                  "resourceKey": "preview.dialogue.channel-check-ack.label",
+                  "invariantFallback": "Received",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "transition": {
+                  "kind": "complete",
+                  "outcomeId": "channel-checked"
+                },
+                "repeatability": "repeatable",
+                "offerConditions": [],
+                "admissionConditions": [],
+                "memoryIds": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "dialogue",
+      "id": "station-welcome",
+      "fallback": "First contact welcome",
+      "references": [],
+      "values": {
+        "roles": [
+          {
+            "id": "station",
+            "acceptedKinds": [
+              "station"
+            ]
+          }
+        ],
+        "initialNodeId": "entry",
+        "repeatability": "once-per-participant-binding",
+        "startConditions": [],
+        "memories": [],
+        "nodes": [
+          {
+            "id": "entry",
+            "segments": [
+              {
+                "id": "welcome",
+                "order": 0,
+                "text": {
+                  "resourceKey": "preview.dialogue.station-welcome.entry",
+                  "invariantFallback": "Welcome to this station channel. Safe travels.",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "speaker": {
+                  "resourceKey": "preview.dialogue.station-welcome.entry.speaker",
+                  "invariantFallback": "Communications",
+                  "markup": "plain-text",
+                  "arguments": []
+                }
+              }
+            ],
+            "choices": [
+              {
+                "id": "welcome-ack",
+                "order": 0,
+                "label": {
+                  "resourceKey": "preview.dialogue.welcome-ack.label",
+                  "invariantFallback": "Acknowledge welcome",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "transition": {
+                  "kind": "complete",
+                  "outcomeId": "welcomed"
+                },
+                "repeatability": "repeatable",
+                "offerConditions": [],
+                "admissionConditions": [],
+                "memoryIds": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "dialogue",
+      "id": "channel-bulletin",
+      "fallback": "Station channel bulletin",
+      "references": [],
+      "values": {
+        "roles": [
+          {
+            "id": "station",
+            "acceptedKinds": [
+              "station"
+            ]
+          }
+        ],
+        "initialNodeId": "entry",
+        "repeatability": "repeatable",
+        "startConditions": [],
+        "memories": [],
+        "nodes": [
+          {
+            "id": "entry",
+            "segments": [
+              {
+                "id": "bulletin",
+                "order": 0,
+                "text": {
+                  "resourceKey": "preview.dialogue.channel-bulletin.entry",
+                  "invariantFallback": "[b]{channel}[/b]: [i]Channel check complete.[/i] [u]No response required.[/u]",
+                  "markup": "restricted-rich-text",
+                  "arguments": [
+                    {
+                      "kind": "text",
+                      "name": "channel",
+                      "value": "Station bulletin"
+                    }
+                  ]
+                }
+              }
+            ],
+            "choices": [],
+            "automaticTransition": {
+              "kind": "complete",
+              "outcomeId": "bulletin-delivered"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "dialogue",
+      "id": "station-navigation",
+      "fallback": "Navigate to station",
+      "references": [],
+      "values": {
+        "roles": [
+          {
+            "id": "ship",
+            "acceptedKinds": [
+              "ship"
+            ]
+          },
+          {
+            "id": "station",
+            "acceptedKinds": [
+              "station"
+            ]
+          }
+        ],
+        "initialNodeId": "entry",
+        "repeatability": "repeatable",
+        "startConditions": [
+          {
+            "kind": "detected",
+            "roleId": "station"
+          }
+        ],
+        "memories": [],
+        "nodes": [
+          {
+            "id": "entry",
+            "segments": [
+              {
+                "id": "navigation-request",
+                "order": 0,
+                "text": {
+                  "resourceKey": "preview.dialogue.station-navigation.entry",
+                  "invariantFallback": "Shall we set a course for this station?",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "speaker": {
+                  "resourceKey": "preview.dialogue.station-navigation.entry.speaker",
+                  "invariantFallback": "Navigation relay",
+                  "markup": "plain-text",
+                  "arguments": []
+                }
+              }
+            ],
+            "choices": [
+              {
+                "id": "set-course",
+                "order": 0,
+                "label": {
+                  "resourceKey": "preview.dialogue.set-course.label",
+                  "invariantFallback": "Set course for this station",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "transition": {
+                  "kind": "node",
+                  "nodeId": "acknowledgement"
+                },
+                "repeatability": "repeatable",
+                "offerConditions": [],
+                "admissionConditions": [
+                  {
+                    "kind": "detected",
+                    "roleId": "station"
+                  }
+                ],
+                "memoryIds": [],
+                "move": {
+                  "kind": "move-ship",
+                  "actorRoleId": "ship",
+                  "destinationRoleId": "station",
+                  "placement": "replace-all"
+                }
+              },
+              {
+                "id": "keep-course",
+                "order": 1,
+                "label": {
+                  "resourceKey": "preview.dialogue.keep-course.label",
+                  "invariantFallback": "Keep current orders",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "transition": {
+                  "kind": "complete",
+                  "outcomeId": "navigation-declined"
+                },
+                "repeatability": "repeatable",
+                "offerConditions": [],
+                "admissionConditions": [],
+                "memoryIds": []
+              }
+            ]
+          },
+          {
+            "id": "acknowledgement",
+            "segments": [
+              {
+                "id": "navigation-accepted",
+                "order": 0,
+                "text": {
+                  "resourceKey": "preview.dialogue.station-navigation.acknowledgement",
+                  "invariantFallback": "Navigation request accepted.",
+                  "markup": "plain-text",
+                  "arguments": []
+                }
+              }
+            ],
+            "choices": [
+              {
+                "id": "navigation-ack",
+                "order": 0,
+                "label": {
+                  "resourceKey": "preview.dialogue.navigation-ack.label",
+                  "invariantFallback": "Close channel",
+                  "markup": "plain-text",
+                  "arguments": []
+                },
+                "transition": {
+                  "kind": "complete",
+                  "outcomeId": "navigation-confirmed"
+                },
+                "repeatability": "repeatable",
+                "offerConditions": [],
+                "admissionConditions": [],
+                "memoryIds": []
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -563,7 +563,8 @@ contracts, including explicit scenario conversion. It adapts facility consumers
 to shared station storage without adding a compatibility inventory per module.
 The owner selected conversion of the Phase 1 Mine, Refinery, and Shipyard test
 fixture, preserving its economic behavior. Adding station gameplay content to
-the built-in or preview scenarios requires separate owner review.
+the built-in or preview scenarios requires separate owner review. TASK-118
+supplies the approved empty operational stations for the development preview.
 TASK-073 consumes concrete committed station sources and typed views. Provider
 hooks for trade, repair, defense, docking, refitting, and territory do not count
 as implementations of those domains. TASK-108 supplies recoverable physical
@@ -986,11 +987,41 @@ No initial provider, facility, stock or delivery fleet is invented by loading th
 context. Existing built-in and preview calls need no new binding because their
 content does not select station providers.
 
-A disk `startingStations` scenario schema is not required for this TASK-105
-adapter. The owner-approved Phase 1 conversion already authors its
-initial stations through the typed acceptance fixture. Built-in and preview
-scenarios receive no new station references, stations, modules, builder
-capabilities, material stock or economic providers. A future request to author
-starting stations on disk is tracked by TASK-118 and needs a separate explicit
-composition proposal; it must preserve the same origin, shared inventory and module/facility identity
-rules rather than manufacture construction history.
+### Disk-authored starting stations
+
+The owner approved a bounded `TASK-118` starting-state adapter for station and
+dialogue testing in the development preview. A scenario may declare
+`values.startingStations` alongside the existing explicit `stationRuntime`
+policies. Each entry requires `id`, `principal`, `definition`, `system`, `x`,
+`y`, `inventory`, and `modules`. The principal and station definition are
+selected qualified content keys; system is a scenario-local system ID, and
+coordinates are exact signed integral local coordinates.
+
+`inventory` requires an independent scenario-local `id`, an explicit `capacity`
+equal to the selected base definition's capacity, and `contents: []`.
+`modules` must be `[]`. Nonempty contents and modules are unsupported by this
+initial adapter. Unknown or missing fields, duplicate station or inventory
+identities, unresolved references, unsupported positions, and capacity
+mismatches reject the entire setup before publication.
+
+Station IDs follow ordinal station-local identity order. Entity IDs occupy a
+disjoint range after initial ship entities. Inventory IDs follow ordinal
+inventory-local identity order in a disjoint range after initial ship cargo
+inventories. Each station is explicitly pre-existing and operational at
+simulation time zero, with no fabricated construction projects or consumed
+materials.
+
+The loader supplies both the `InitialStationSetup` origin and its matching
+empty `InitialStationInventorySetup`. Session composition registers the real
+principal-controlled inventory under that station entity before initializing
+the station owner. This path creates no economy owner, placeholder facility,
+provider, or startup gameplay command. Existing typed Phase 1 stations continue
+to share their economy-owned inventory instances through their existing origin
+and module/facility bindings.
+
+Save restoration uses the existing lifecycle inventory checkpoint and station
+origin records directly. It validates the same custody and ownership links and
+does not rerun initial seeding. The development preview includes Aster Relay,
+Borealis Harbor, and Cinder Beacon through this adapter. The built-in minimal
+scenario remains unchanged. Initial module/facility authoring, stock, builders,
+and economic providers remain outside this starting-state vocabulary.

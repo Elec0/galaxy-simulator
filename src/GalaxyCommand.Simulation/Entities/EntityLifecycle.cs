@@ -706,11 +706,13 @@ internal sealed partial class EntityLifecycleOwner
                 _materialCompatibility);
     }
 
+    internal void RegisterEconomyInventory(Inventory inventory) => RegisterOwnedInventory(inventory);
+
     /// <summary>
-    /// Registers an economy-owned setup inventory and advances the shared
-    /// inventory allocator so later materialization cannot reuse its identity.
+    /// Registers an owned inventory and advances the shared allocator.
+    /// Unclaimed cargo requires its separate physical-object publication boundary.
     /// </summary>
-    internal void RegisterEconomyInventory(Inventory inventory)
+    internal void RegisterOwnedInventory(Inventory inventory)
     {
         ArgumentNullException.ThrowIfNull(inventory);
         if (inventory.Custody is InventoryCustody.Unclaimed)

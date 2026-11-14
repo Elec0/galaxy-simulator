@@ -9,6 +9,14 @@
       "kind": "definitions"
     },
     {
+      "path": "dialogue.json",
+      "kind": "definitions"
+    },
+    {
+      "path": "stations.json",
+      "kind": "definitions"
+    },
+    {
       "path": "visual-preview.json",
       "kind": "scenario"
     }

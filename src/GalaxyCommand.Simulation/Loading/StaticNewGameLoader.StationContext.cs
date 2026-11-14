@@ -16,7 +16,7 @@ public static partial class StaticNewGameLoader
             selected.OrderBy(key => key.ToString(), StringComparer.Ordinal), scenario.Values);
     }
 
-    /// <summary>Requires authored station policies and provider context, leaving every initial station and economic collection empty.</summary>
+    /// <summary>Requires authored station policies and provider context; explicit starting origins are composed separately.</summary>
     private static bool TryComposeStationRuntime(ResolvedContentCatalog catalog, StaticScenarioSource scenario,
         MaterialInventoryCompatibilityMap materials, IReadOnlyDictionary<string, StarSystem> systems,
         IReadOnlyDictionary<QualifiedContentKey, ShipDesign> designs, PrincipalId player,

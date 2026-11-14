@@ -51,8 +51,11 @@ manifest schema 1 and every existing built-in and preview gameplay value. The
 adds explicit station/module/material definitions, construction capability,
 recipes and station loss policy. Provider selections require authored economic
 timing and the host's shared navigation binding. Definition loading creates no
-starting stations, stock or economic facilities. TASK-118 retains owner review
-of that starting gameplay content; TASK-037 retains older-schema migration.
+starting stations, stock or economic facilities. TASK-118 adds explicit
+`startingStations` scenario origins with empty station-owned inventories and
+three development-preview stations for dialogue exercises. Modules, stock and
+economic providers remain outside this preview setup. TASK-037 retains
+older-schema migration.
 
 ## Decisions at a glance
 

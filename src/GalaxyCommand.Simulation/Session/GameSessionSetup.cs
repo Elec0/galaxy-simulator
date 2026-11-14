@@ -183,7 +183,8 @@ public sealed class GameSessionSetup
         IEnumerable<SensorDeployableDefinition>? sensorDeployableDefinitions = null,
         CargoDispositionPolicy? cargoPolicy = null,
         StationRuntimeSetup? stations = null,
-        DialogueDefinitionCatalog? dialogueDefinitions = null)
+        DialogueDefinitionCatalog? dialogueDefinitions = null,
+        IEnumerable<InitialStationInventorySetup>? stationInventories = null)
     {
         ArgumentNullException.ThrowIfNull(systems);
         ArgumentNullException.ThrowIfNull(ships);
@@ -312,6 +313,8 @@ public sealed class GameSessionSetup
         PlayerCommandSource = playerCommandSource;
         CargoPolicy = cargoPolicy;
         Stations = stations?.BindPlayer(playerCommandSource, relationships.PlayerPrincipalId);
+        StationInventories = ValidateStationInventories(stationInventories, Stations, economy,
+            principalIds, systemIds, entityIds, cargoInventoryIds);
         DialogueDefinitions = dialogueDefinitions ?? new DialogueDefinitionCatalog([]);
         stations?.Definitions.ValidateForSession(stations.Materials, systemIds);
         if (Stations is not null && Stations.CommandAuthorities.Any(authority => !principalIds.Contains(authority.Principal)))
@@ -357,6 +360,37 @@ public sealed class GameSessionSetup
     public CargoDispositionPolicy? CargoPolicy { get; }
 
     public StationRuntimeSetup? Stations { get; }
+
+    public IReadOnlyList<InitialStationInventorySetup> StationInventories { get; }
+
+    private static ReadOnlyCollection<InitialStationInventorySetup> ValidateStationInventories(
+        IEnumerable<InitialStationInventorySetup>? inventories, StationRuntimeSetup? stations,
+        GameSessionEconomySetup? economy, HashSet<PrincipalId> principals, HashSet<SystemId> systems,
+        HashSet<EntityId> shipEntities, HashSet<InventoryId> shipInventories)
+    {
+        InitialStationInventorySetup[] values = (inventories ?? []).ToArray();
+        var ids = new HashSet<InventoryId>(shipInventories);
+        ids.UnionWith(economy?.Inventories.Select(item => item.InventoryId) ?? []);
+        var entities = new HashSet<EntityId>(shipEntities);
+        foreach (InitialStationInventorySetup seed in values)
+        {
+            ArgumentNullException.ThrowIfNull(seed);
+            InitialStationSetup[] origins = stations?.InitialStations
+                .Where(item => item.EntityId == seed.StationEntityId).ToArray() ?? [];
+            if (!ids.Add(seed.Id) || !entities.Add(seed.StationEntityId) || origins.Length != 1
+                || !principals.Contains(seed.PrincipalId))
+                throw new ArgumentException("Station inventory identity or origin is invalid.", nameof(inventories));
+            InitialStationSetup origin = origins[0];
+            StationDefinition? definition = stations!.Definitions.Stations
+                .FirstOrDefault(item => item.Key == origin.DefinitionKey);
+            if (origin.InventoryId != seed.Id || origin.PrincipalId != seed.PrincipalId
+                || !systems.Contains(origin.Position.SystemId) || origin.CreatedAt != SimulationTime.Zero
+                || origin.Modules.Count != 0 || definition is null
+                || definition.BaseCapacity != seed.Capacity || !definition.PlacementRules.Allows(origin.Position))
+                throw new ArgumentException("Station inventory must match an empty authored base origin.", nameof(inventories));
+        }
+        return Array.AsReadOnly(values.OrderBy(item => item.Id.Value).ToArray());
+    }
 
     private static void ValidateEconomy(
         GameSessionEconomySetup? economy,

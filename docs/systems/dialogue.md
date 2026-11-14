@@ -182,6 +182,27 @@ fact-, time-, location-, and threshold-triggered initiation belongs to
 `TASK-017`. That later system may request a conversation through the accepted
 command boundary rather than creating dialogue state directly.
 
+## Development-preview conversations
+
+The preview has three player-owned stations: Aster Relay, Borealis Harbor, and
+Cinder Beacon. In the docked panel, open "Start conversation", select a
+conversation, and choose each required participant explicitly.
+
+- "Station greeting" offers an introduction, a repeat greeting after that
+  introduction, and an unconditional channel check. Introduction memory belongs
+  to the selected station binding.
+- "First contact welcome" is available once per station binding. Closing it
+  leaves a pending conversation to resume; starting it again is rejected.
+- "Station channel bulletin" displays bold, italic, and underline text and
+  completes without requiring a response or pausing the simulation.
+- "Navigate to station" requires both a ship and a station. "Set course for this
+  station" submits the ordinary replacement move order, then waits for a separate
+  acknowledgement. A same-system pair such as the Aster courier and Aster Relay
+  provides a short visible movement check.
+
+These are basic code-path exercises through the interim initiation flow, with
+no station modules, material stock, or economic providers.
+
 ## Participants and apparent speakers
 
 A live participant binding is a discriminated stable reference to one of these
